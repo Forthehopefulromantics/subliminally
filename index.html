@@ -215,6 +215,24 @@
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
+  .profile-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
+  .profile-header{ display:flex; align-items:center; gap:16px; margin-bottom:36px; }
+  .profile-avatar{ width:64px; height:64px; border-radius:50%; background:var(--dusk); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; flex-shrink:0; }
+  .profile-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .profile-name{ font-family:var(--serif); font-size:20px; color:var(--moonlight); }
+  .profile-tier{ font-size:12.5px; color:var(--lilac); margin-top:2px; }
+  .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
+  .profile-list{ display:flex; flex-direction:column; gap:10px; }
+  .profile-item{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .profile-item .meta{ font-size:12px; color:var(--haze); margin-top:3px; }
+  .profile-item button{ background:none; border:none; color:var(--haze); font-size:12px; cursor:pointer; text-decoration:underline; flex-shrink:0; }
+  .profile-item button:hover{ color:#E39A9A; }
+  .profile-settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:640px){ .profile-settings-grid{ grid-template-columns:1fr; } }
+  .profile-field-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:18px; }
+  .profile-field-card label{ display:block; font-size:12px; color:var(--haze); margin-bottom:8px; }
+  .profile-field-card input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; outline:none; margin-bottom:10px; }
+  .profile-field-card input:focus{ border-color:var(--candle); }
   .manage-sub{ text-align:center; margin-top:28px; font-size:12.5px; }
   .manage-sub a{ color:var(--haze); text-decoration:none; transition:color .2s; }
   .manage-sub a:hover{ color:var(--candle); }
@@ -309,6 +327,7 @@
     <button onclick="goTo('flow-section')">Build yours</button>
     <button onclick="goTo('library')">Library</button>
     <button onclick="goTo('journal')">Journal</button>
+    <button onclick="goTo('profile')">Profile</button>
     <button onclick="goTo('pricing')">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
@@ -650,6 +669,52 @@
         <button class="mini-btn candlebtn" onclick="addJournalEntry()">Add</button>
       </div>
       <div class="journal-entries" id="journalEntries"></div>
+    </div>
+  </div>
+</section>
+
+<section class="profile-section" id="profile">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Your account</div>
+      <h2>Profile</h2>
+      <p>Everything you've built, and your account settings, in one place.</p>
+    </div>
+    <div id="profileLocked" class="journal-locked">
+      <div class="ic">👤</div>
+      <h3>Log in to see your profile</h3>
+      <p>Your saved subliminals, account details, and settings live here once you're signed in.</p>
+      <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
+    </div>
+
+    <div id="profilePanel" style="display:none;">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profileAvatarDisplay">🌙</div>
+        <div>
+          <div class="profile-name" id="profileNameDisplay">—</div>
+          <div class="profile-tier" id="profileTierDisplay">Free account</div>
+        </div>
+      </div>
+
+      <h3 class="profile-subhead">My subliminals</h3>
+      <div class="profile-list" id="mySubliminalsList"><div class="library-empty">Loading…</div></div>
+
+      <h3 class="profile-subhead">Account settings</h3>
+      <div class="profile-settings-grid">
+        <div class="profile-field-card">
+          <label>Email</label>
+          <input type="email" id="settingsEmail" placeholder="you@example.com">
+          <button class="mini-btn ghostbtn" onclick="updateEmail()">Update email</button>
+          <div class="save-msg" id="emailSettingsMsg"></div>
+        </div>
+        <div class="profile-field-card">
+          <label>New password</label>
+          <input type="password" id="settingsPassword" placeholder="••••••••">
+          <button class="mini-btn ghostbtn" onclick="updatePassword()">Update password</button>
+          <div class="save-msg" id="passwordSettingsMsg"></div>
+        </div>
+      </div>
+      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
     </div>
   </div>
 </section>
@@ -1081,7 +1146,7 @@ function prepareFinal(){
     : "This is a waking preview. The full nightly ritual — playing all night with the screen locked, plus an alarm — is coming to the Subliminally app.";
 }
 
-let finalCtx=null, finalTone=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null;
 let liveToneGain=null, liveBgGain=null;
 
@@ -1092,7 +1157,7 @@ let liveToneGain=null, liveBgGain=null;
   el.addEventListener('input', ()=>{
     readout.textContent = el.value + '%';
     if (!finalPlaying) return;
-    if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = el.value/100 * 0.12;
+    if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = el.value/100 * 0.10;
     if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = el.value/100;
     /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
   });
@@ -1111,9 +1176,22 @@ function playFinal(){
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
   finalCtx = new (window.AudioContext||window.webkitAudioContext)();
-  const toneGain = finalCtx.createGain(); toneGain.gain.value = document.getElementById('mixTone').value/100 * 0.12;
-  finalTone = finalCtx.createOscillator(); finalTone.type='sine'; finalTone.frequency.value = state.freq ? state.freq.hz : 528;
-  finalTone.connect(toneGain).connect(finalCtx.destination); finalTone.start();
+  const toneGain = finalCtx.createGain();
+  const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
+  toneGain.gain.setValueAtTime(0, finalCtx.currentTime);
+  toneGain.gain.linearRampToValueAtTime(targetToneVol, finalCtx.currentTime + 2.5); // gentle fade-in, no hard onset
+  const toneFilter = finalCtx.createBiquadFilter();
+  toneFilter.type = 'lowpass'; toneFilter.frequency.value = 2600; toneFilter.Q.value = 0.4; // softens harsh upper harmonics
+  toneFilter.connect(toneGain).connect(finalCtx.destination);
+  const baseHz = state.freq ? state.freq.hz : 528;
+  finalTone = finalCtx.createOscillator(); finalTone.type='sine'; finalTone.frequency.value = baseHz;
+  finalTone.connect(toneFilter); finalTone.start();
+  // A second, quieter, very slightly detuned voice removes the "piercing" quality of one isolated pure tone
+  const toneLayer2 = finalCtx.createOscillator(); toneLayer2.type='sine'; toneLayer2.frequency.value = baseHz * 1.003;
+  const layer2Gain = finalCtx.createGain(); layer2Gain.gain.value = 0.4;
+  toneLayer2.connect(layer2Gain).connect(toneFilter);
+  toneLayer2.start();
+  finalToneLayer2 = toneLayer2;
   liveToneGain = toneGain;
 
   const bgGain = finalCtx.createGain(); bgGain.gain.value = document.getElementById('mixBg').value/100;
@@ -1216,6 +1294,7 @@ function finishFinal(){
     window._subliminallyDownloadBlob = new Blob(finalChunks, { type:'audio/webm' });
   }
   if (finalTone){ try{ finalTone.stop(); }catch(e){} }
+  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
   if (finalAmbience){ finalAmbience.stop(); }
   if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
   liveToneGain = null; liveBgGain = null;
@@ -1228,6 +1307,7 @@ function stopFinal(){
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   window.speechSynthesis.cancel();
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
+  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalAmbience){ finalAmbience.stop(); finalAmbience=null; }
   if (finalRecorder && finalRecorder.state !== 'inactive'){
     finalRecorder.onstop = ()=>{ window._subliminallyDownloadBlob = new Blob(finalChunks, {type:'audio/webm'}); };
@@ -1542,11 +1622,75 @@ async function logOut(){
 function renderAccountArea(){
   const area = document.getElementById('authArea');
   if (currentUser){
-    area.innerHTML = `<div class="account-chip"><b>${currentUser.email}</b><button onclick="logOut()">Log out</button></div>`;
+    area.innerHTML = `<div class="account-chip"><b style="cursor:pointer;" onclick="goTo('profile')">${currentUser.email}</b><button onclick="logOut()">Log out</button></div>`;
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
   renderJournalState();
+  renderProfileState();
+}
+
+/* ---------- profile ---------- */
+function renderProfileState(){
+  document.getElementById('profileLocked').style.display = currentUser ? 'none' : 'block';
+  document.getElementById('profilePanel').style.display = currentUser ? 'block' : 'none';
+  if (currentUser) loadProfile();
+}
+async function loadProfile(){
+  if (!sb || !currentUser) return;
+  document.getElementById('settingsEmail').value = currentUser.email || '';
+
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if (prof){
+    document.getElementById('profileNameDisplay').textContent = prof.full_name || prof.username || currentUser.email.split('@')[0];
+    const avatarEl = document.getElementById('profileAvatarDisplay');
+    if (prof.avatar_url){ avatarEl.innerHTML = `<img src="${prof.avatar_url}" alt="avatar">`; }
+    else { avatarEl.textContent = prof.avatar || '🌙'; }
+  }
+
+  const myTier = await getMyTier();
+  document.getElementById('profileTierDisplay').textContent =
+    myTier === 'none' ? 'Free account' : (myTier[0].toUpperCase()+myTier.slice(1)+' member');
+
+  const list = document.getElementById('mySubliminalsList');
+  const { data: subs, error } = await sb.from('subliminals').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  if (error || !subs || !subs.length){ list.innerHTML = '<div class="library-empty">Nothing saved yet — build one and hit "Save to my library."</div>'; return; }
+  list.innerHTML = subs.map(s => {
+    const mins = Math.round((s.duration_seconds||0)/60);
+    const when = new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+    return `<div class="profile-item">
+      <div>
+        <div>${s.title || (s.frequency_hz ? s.frequency_hz+' Hz' : 'Subliminal')}</div>
+        <div class="meta">${mins ? mins+' min · ' : ''}${when}</div>
+      </div>
+      <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
+    </div>`;
+  }).join('');
+}
+async function deleteMySubliminal(id){
+  if (!sb || !currentUser) return;
+  await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
+  loadProfile();
+}
+async function updateEmail(){
+  const msg = document.getElementById('emailSettingsMsg');
+  const newEmail = document.getElementById('settingsEmail').value.trim();
+  if (!sb || !newEmail){ return; }
+  msg.textContent = 'Updating…'; msg.className = 'save-msg';
+  const { error } = await sb.auth.updateUser({ email: newEmail });
+  if (error){ msg.textContent = error.message; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Check both your old and new inbox to confirm the change.'; msg.className = 'save-msg ok';
+}
+async function updatePassword(){
+  const msg = document.getElementById('passwordSettingsMsg');
+  const newPassword = document.getElementById('settingsPassword').value;
+  if (!sb || !newPassword){ return; }
+  if (newPassword.length < 6){ msg.textContent = 'Use at least 6 characters.'; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Updating…'; msg.className = 'save-msg';
+  const { error } = await sb.auth.updateUser({ password: newPassword });
+  if (error){ msg.textContent = error.message; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Password updated.'; msg.className = 'save-msg ok';
+  document.getElementById('settingsPassword').value = '';
 }
 
 /* ---------- journal ---------- */
@@ -1609,72 +1753,3 @@ if (sb){
 </script>
 </body>
 </html>
-// /api/generate-affirmations.js
-// Vercel serverless function — keeps the Anthropic API key server-side.
-// The browser calls THIS endpoint instead of api.anthropic.com directly.
-//
-// Required environment variable (Vercel -> Project -> Settings -> Environment Variables):
-//   ANTHROPIC_API_KEY  - from console.anthropic.com -> API Keys
-
-export const config = { api: { bodyParser: true } };
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.status(405).send('Method not allowed');
-    return;
-  }
-  if (!ANTHROPIC_API_KEY) {
-    res.status(500).json({ error: 'Server is not configured with an API key yet.' });
-    return;
-  }
-
-  const { count, freqLabel, toneLabel, goal } = req.body || {};
-  const safeCount = Math.min(Math.max(parseInt(count, 10) || 14, 5), 20);
-
-  const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
-Frequency association (mood only, not medical): ${freqLabel || 'none'}
-Desired voice/tone: ${toneLabel || 'warm'}
-What the person said they want help with: "${goal || 'not specified'}"
-Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
-Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.`;
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Anthropic API error:', response.status, errText);
-      res.status(502).json({ error: 'Affirmation generation failed upstream.' });
-      return;
-    }
-
-    const data = await response.json();
-    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-
-    if (!Array.isArray(parsed)) {
-      res.status(502).json({ error: 'Unexpected response shape.' });
-      return;
-    }
-
-    res.status(200).json({ affirmations: parsed.filter((x) => typeof x === 'string') });
-  } catch (err) {
-    console.error('generate-affirmations error:', err);
-    res.status(500).json({ error: 'Something went wrong generating affirmations.' });
-  }
-}
