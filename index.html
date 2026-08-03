@@ -198,6 +198,9 @@
   .price-feats li{ font-size:13px; color:var(--haze); padding-left:18px; position:relative; }
   .price-feats li::before{ content:"✦"; position:absolute; left:0; color:var(--lilac); font-size:11px; top:2px; }
   .price-card .btn{ width:100%; justify-content:center; margin-top:22px; }
+  .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
+  .save-msg.err{ color:#E39A9A; }
+  .save-msg.ok{ color:var(--candle); }
   .manage-sub{ text-align:center; margin-top:28px; font-size:12.5px; }
   .manage-sub a{ color:var(--haze); text-decoration:none; transition:color .2s; }
   .manage-sub a:hover{ color:var(--candle); }
@@ -276,7 +279,11 @@
   .library-card .ic{ font-size:20px; color:var(--candle); }
   .library-card h4{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin-top:10px; }
   .library-card p{ font-size:12.5px; color:var(--haze); margin-top:6px; }
+  .library-embed-wrap{ position:relative; width:100%; max-width:900px; margin:0 auto; padding-top:50.625%; border-radius:20px; overflow:hidden; border:1px solid var(--dusk); background:var(--veil); }
+  .library-embed-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; }
   .library-card .meta{ font-size:11px; color:var(--lilac); margin-top:10px; }
+  .library-card .yt-badge{ font-size:10.5px; color:#FF6B6B; margin-top:8px; font-weight:500; }
+  .library-yt-cta{ text-align:center; margin-top:28px; }
   .library-empty{ text-align:center; font-size:13px; color:var(--haze); padding:20px 0; }
 </style>
 </head>
@@ -377,10 +384,19 @@
     <div class="section-head">
       <div class="eyebrow">Ready-made</div>
       <h2>Or start from the library</h2>
-      <p>Generalized subliminals built by us — tap one to preview it, or use it as a starting point for your own.</p>
+      <p>Generalized subliminals, free to watch on YouTube — preview a video, or use it as a starting point for building your own here.</p>
     </div>
-    <div class="library-grid" id="libraryGrid">
-      <div class="library-empty">Loading the library…</div>
+    <div class="library-embed-wrap">
+      <iframe
+        src="https://www.youtube.com/embed/videoseries?list=PLPlW0fS4brRk"
+        title="Subliminally by FTHR — YouTube playlist"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen>
+      </iframe>
+    </div>
+    <div class="library-yt-cta">
+      <a class="btn btn-ghost" href="https://www.youtube.com/@Kylamchyle" target="_blank" rel="noopener">▶ Watch all subliminals on YouTube</a>
     </div>
   </div>
 </section>
@@ -525,9 +541,11 @@
             <div class="record-actions">
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()">▶ Play my subliminal</button>
               <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
+              <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()">💾 Save to my library</button>
               <button class="mini-btn ghostbtn" id="downloadBtn" onclick="downloadFinal()" disabled>⬇ Download</button>
               <button class="mini-btn ghostbtn" onclick="resetFlow()">Start over</button>
             </div>
+            <div class="save-msg" id="saveMsg"></div>
             <div class="demo-note" id="finalNote">This is a waking preview. The full nightly ritual — playing all night with the screen locked, plus an alarm — is coming to the Subliminally app.</div>
           </div>
         </div>
@@ -583,7 +601,7 @@
           <li>Nature sound layers</li>
           <li>Save and replay your sessions</li>
         </ul>
-        <a class="btn btn-ghost" href="https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Get Whisper</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00')">Get Whisper</a>
       </div>
       <div class="price-card">
         <h3>Reverie</h3>
@@ -595,7 +613,7 @@
           <li>Success-story narration instead of affirmations</li>
           <li>Performance-specific frequency pairings</li>
         </ul>
-        <a class="btn btn-ghost" href="https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01" target="_blank" rel="noopener">Get Reverie</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
       </div>
       <div class="price-card featured">
         <span class="badge">All night</span>
@@ -608,7 +626,7 @@
           <li>Share your frequencies with friends and followers</li>
           <li>Request or gift a custom subliminal to someone else</li>
         </ul>
-        <a class="btn btn-primary" href="https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02" target="_blank" rel="noopener">Get Ritual</a>
+        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
     </div>
     <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Already a member? Manage your subscription →</a></div>
@@ -1121,14 +1139,93 @@ function stopFinal(){
   if (btn){ btn.disabled=false; btn.textContent='▶ Play my subliminal'; }
 }
 
-function downloadFinal(){
+/* ---------------- CHECKOUT LINKING ---------------- */
+function goToCheckout(evt, baseUrl){
+  evt.preventDefault();
+  if (!currentUser){
+    openAuthModal();
+    document.getElementById('authSub').textContent = 'Create an account first, then tap the plan again — this is how we link your subscription to your account.';
+    return false;
+  }
+  window.open(baseUrl + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
+  return false;
+}
+
+/* ---------------- ACCOUNT-GATED SAVE + DOWNLOAD ---------------- */
+const TIER_DOWNLOAD_CAPS = { whisper: 1, reverie: 3, ritual: 5 };
+const FREE_SAVE_LIMIT_SECONDS = 60;
+
+// Rough estimate: ~4 seconds per spoken affirmation line, looped or not.
+function estimateSessionSeconds(){
+  return (state.affirmations.length || 1) * 4;
+}
+
+async function getMySubscriberRow(){
+  if (!sb || !currentUser) return null;
+  const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
+  return data; // null if they've never subscribed
+}
+
+async function saveSubliminal(){
+  const msg = document.getElementById('saveMsg');
+  if (!currentUser){ openAuthModal(); return; }
+  if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
+
+  const seconds = estimateSessionSeconds();
+  const subRow = await getMySubscriberRow();
+  const isPaid = subRow && subRow.status === 'active';
+
+  if (!isPaid && seconds > FREE_SAVE_LIMIT_SECONDS){
+    msg.innerHTML = `Free accounts can save sessions up to 1 minute. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
+    msg.className = 'save-msg err';
+    return;
+  }
+
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.from('subliminals').insert({
+    user_id: currentUser.id,
+    title: (state.freq ? state.freq.hz + ' Hz' : 'My subliminal'),
+    frequency_hz: state.freq ? state.freq.hz : null,
+    affirmations: state.affirmations,
+    background: state.bg,
+    duration_seconds: seconds
+  });
+  if (error){ msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
+}
+
+async function downloadFinal(){
+  const msg = document.getElementById('saveMsg');
   if (!window._subliminallyDownloadBlob){
     document.getElementById('finalLine').textContent = "Play the full session once first, then download.";
     return;
   }
+  if (!currentUser){ openAuthModal(); return; }
+  if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
+
+  const subRow = await getMySubscriberRow();
+  const tier = subRow && subRow.status === 'active' ? subRow.tier : null;
+  const cap = TIER_DOWNLOAD_CAPS[tier] || 0;
+  const used = (subRow && subRow.downloads_used) || 0;
+
+  if (!tier){
+    msg.innerHTML = `Downloading needs a plan — <a href="#pricing" onclick="closeAuthModal();">see Whisper, Reverie & Ritual</a>.`;
+    msg.className = 'save-msg err';
+    return;
+  }
+  if (used >= cap){
+    msg.innerHTML = `You've used all ${cap} download${cap===1?'':'s'} on ${tier[0].toUpperCase()+tier.slice(1)} this period — <a href="#pricing" onclick="closeAuthModal();">upgrade for more</a>.`;
+    msg.className = 'save-msg err';
+    return;
+  }
+
   const url = URL.createObjectURL(window._subliminallyDownloadBlob);
   const a = document.createElement('a'); a.href = url; a.download = 'subliminally-by-fthr.webm';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+  await sb.from('subscribers').update({ downloads_used: used + 1 }).eq('user_id', currentUser.id);
+  msg.textContent = `Downloaded. ${cap - used - 1} download${(cap-used-1)===1?'':'s'} left on ${tier[0].toUpperCase()+tier.slice(1)} this period.`;
+  msg.className = 'save-msg ok';
 }
 
 /* ---------------- WAITLIST ---------------- */
@@ -1164,10 +1261,10 @@ renderProgress();
    ================================================================ */
 const SUPABASE_URL = 'https://eiqylxcgexndzopesvhd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1g7zbin7PEQhi2e0Y-QM8Q_-0TAfubb';
-let supabase = null;
+let sb = null;
 try {
   if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase){
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } else {
     console.warn('Supabase client library did not load — accounts/journal/library will be disabled.');
   }
@@ -1194,22 +1291,22 @@ function toggleAuthMode(){
     : `New here? <button onclick="toggleAuthMode()">Create a free account</button>`;
 }
 async function submitAuth(){
-  if (!supabase){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
+  if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const msg = document.getElementById('authMsg');
   if (!email || !password){ msg.textContent = 'Enter an email and password.'; msg.className = 'auth-msg err'; return; }
   msg.textContent = 'Working on it…'; msg.className = 'auth-msg';
   const { data, error } = authMode === 'signup'
-    ? await supabase.auth.signUp({ email, password })
-    : await supabase.auth.signInWithPassword({ email, password });
+    ? await sb.auth.signUp({ email, password })
+    : await sb.auth.signInWithPassword({ email, password });
   if (error){ msg.textContent = error.message; msg.className = 'auth-msg err'; return; }
   msg.textContent = 'You\'re in.'; msg.className = 'auth-msg ok';
   setTimeout(closeAuthModal, 600);
 }
 async function logOut(){
-  if (!supabase) return;
-  await supabase.auth.signOut();
+  if (!sb) return;
+  await sb.auth.signOut();
 }
 
 function renderAccountArea(){
@@ -1237,10 +1334,10 @@ function renderJournalState(){
   if (currentUser) loadJournalEntries();
 }
 async function loadJournalEntries(){
-  if (!supabase || !currentUser) return;
+  if (!sb || !currentUser) return;
   const list = document.getElementById('journalEntries');
   list.innerHTML = '<div class="journal-empty">Loading…</div>';
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('journal_entries')
     .select('*')
     .eq('category', journalTab)
@@ -1254,43 +1351,31 @@ async function loadJournalEntries(){
     </div>`).join('');
 }
 async function addJournalEntry(){
-  if (!supabase || !currentUser) return;
+  if (!sb || !currentUser) return;
   const input = document.getElementById('journalInput');
   const content = input.value.trim();
   if (!content) return;
-  const { error } = await supabase.from('journal_entries').insert({ user_id: currentUser.id, category: journalTab, content });
+  const { error } = await sb.from('journal_entries').insert({ user_id: currentUser.id, category: journalTab, content });
   if (!error){ input.value=''; loadJournalEntries(); }
 }
 
-/* ---------- library ---------- */
-async function loadLibrary(){
-  const grid = document.getElementById('libraryGrid');
-  if (!supabase){ grid.innerHTML = '<div class="library-empty">Library connects once accounts go live.</div>'; return; }
-  const { data, error } = await supabase.from('library_subliminals').select('*').order('sort_order');
-  if (error || !data || !data.length){ grid.innerHTML = '<div class="library-empty">No library items yet.</div>'; return; }
-  grid.innerHTML = data.map(item => `
-    <button class="library-card" onclick="alert('Preview coming soon — this will play &quot;${item.title.replace(/"/g,'')}&quot; using the builder\\'s player.')">
-      <div class="ic">${item.cover_emoji || '✦'}</div>
-      <h4>${item.title}</h4>
-      <p>${item.description || ''}</p>
-      <div class="meta">${item.frequency_hz ? item.frequency_hz + ' Hz · ' : ''}${item.category || ''}</div>
-    </button>`).join('');
-}
+/* Library is now a direct YouTube playlist embed — see #library in the HTML.
+   No Supabase fetch needed for it anymore. */
 
 /* ---------- boot ---------- */
-if (supabase){
-  supabase.auth.onAuthStateChange((_event, session) => {
+if (sb){
+  sb.auth.onAuthStateChange((_event, session) => {
     currentUser = session ? session.user : null;
     renderAccountArea();
   });
-  supabase.auth.getSession().then(({ data }) => {
+  sb.auth.getSession().then(({ data }) => {
     currentUser = data.session ? data.session.user : null;
     renderAccountArea();
   });
 } else {
   renderAccountArea();
 }
-loadLibrary();
+/* library is now a static embed — nothing to fetch on load */
 </script>
 </body>
 </html>
