@@ -23,9 +23,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Map each Stripe Price ID to your plan names.
 // Find these in Stripe -> Product catalog -> click each product -> copy the Price ID (starts with "price_").
 const PRICE_TO_TIER = {
-  'price_REPLACE_WITH_WHISPER_PRICE_ID': 'whisper',
-  'price_REPLACE_WITH_REVERIE_PRICE_ID': 'reverie',
-  'price_REPLACE_WITH_RITUAL_PRICE_ID': 'ritual',
+  'price_1U00xTBiVHYI4vcXIDdi9kuF': 'whisper',
+  'price_1U00y5BiVHYI4vcXrtlN930K': 'reverie',
+  'price_1U00yoBiVHYI4vcXirZnmnwI': 'ritual',
 };
 
 function getRawBody(req) {
