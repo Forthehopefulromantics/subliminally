@@ -241,8 +241,8 @@
   .modal-sub{ font-size:13px; color:var(--haze); margin-top:6px; }
   .auth-field{ margin-top:16px; }
   .auth-field label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
-  .auth-field input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:12px 14px; color:var(--moonlight); font-size:14px; outline:none; transition:border-color .2s; }
-  .auth-field input:focus{ border-color:var(--candle); }
+  .auth-field input, .auth-field select{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:12px 14px; color:var(--moonlight); font-size:14px; outline:none; transition:border-color .2s; font-family:inherit; }
+  .auth-field input:focus, .auth-field select:focus{ border-color:var(--candle); }
   .auth-msg{ font-size:12.5px; min-height:16px; margin-top:10px; }
   .auth-msg.err{ color:#E39A9A; }
   .auth-msg.ok{ color:var(--candle); }
@@ -317,6 +317,41 @@
     <div class="auth-msg" id="authMsg"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Create a free account</button>
     <div class="auth-toggle" id="authToggle">Already have an account? <button onclick="toggleAuthMode()">Log in</button></div>
+  </div>
+</div>
+
+<!-- ============ ONBOARDING QUESTIONNAIRE (shown once, right after sign-up) ============ -->
+<div class="modal-overlay" id="onboardOverlay">
+  <div class="modal-card">
+    <div class="modal-title">Welcome in</div>
+    <div class="modal-sub">A couple quick questions — helps us build the right thing.</div>
+    <div class="auth-field">
+      <label>Your name</label>
+      <input type="text" id="obName" placeholder="First name is fine" autocomplete="given-name">
+    </div>
+    <div class="auth-field">
+      <label>Phone <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
+      <input type="tel" id="obPhone" placeholder="For early-access texts, if you'd like" autocomplete="tel">
+    </div>
+    <div class="auth-field">
+      <label>How'd you find us?</label>
+      <select id="obSource">
+        <option value="">Select one…</option>
+        <option value="social_media">Social media</option>
+        <option value="influencer">An influencer / creator</option>
+        <option value="google_search">Google search</option>
+        <option value="friend_family">Friend or family</option>
+        <option value="app_store">App Store / Play Store</option>
+        <option value="other">Something else</option>
+      </select>
+    </div>
+    <div class="auth-field">
+      <label>What are you hoping this helps with? <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
+      <input type="text" id="obReason" placeholder="Sleep, confidence, focus…">
+    </div>
+    <div class="auth-msg" id="onboardMsg"></div>
+    <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="submitOnboarding()">Finish setup</button>
+    <div class="auth-toggle"><button onclick="skipOnboarding()">Skip for now</button></div>
   </div>
 </div>
 
@@ -1297,12 +1332,37 @@ async function submitAuth(){
   const msg = document.getElementById('authMsg');
   if (!email || !password){ msg.textContent = 'Enter an email and password.'; msg.className = 'auth-msg err'; return; }
   msg.textContent = 'Working on it…'; msg.className = 'auth-msg';
-  const { data, error } = authMode === 'signup'
+  const wasSignup = authMode === 'signup';
+  const { data, error } = wasSignup
     ? await sb.auth.signUp({ email, password })
     : await sb.auth.signInWithPassword({ email, password });
   if (error){ msg.textContent = error.message; msg.className = 'auth-msg err'; return; }
   msg.textContent = 'You\'re in.'; msg.className = 'auth-msg ok';
-  setTimeout(closeAuthModal, 600);
+  setTimeout(() => {
+    closeAuthModal();
+    if (wasSignup) openOnboardingModal();
+  }, 600);
+}
+function openOnboardingModal(){
+  document.getElementById('onboardOverlay').classList.add('open');
+}
+function closeOnboardingModal(){
+  document.getElementById('onboardOverlay').classList.remove('open');
+}
+function skipOnboarding(){ closeOnboardingModal(); }
+async function submitOnboarding(){
+  const msg = document.getElementById('onboardMsg');
+  if (!sb || !currentUser){ closeOnboardingModal(); return; }
+  const patch = {
+    full_name: document.getElementById('obName').value.trim() || null,
+    phone: document.getElementById('obPhone').value.trim() || null,
+    referral_source: document.getElementById('obSource').value || null,
+    signup_reason: document.getElementById('obReason').value.trim() || null,
+  };
+  msg.textContent = 'Saving…'; msg.className = 'auth-msg';
+  const { error } = await sb.from('profiles').update(patch).eq('id', currentUser.id);
+  if (error){ msg.textContent = "Couldn't save — you can skip for now."; msg.className = 'auth-msg err'; return; }
+  closeOnboardingModal();
 }
 async function logOut(){
   if (!sb) return;
