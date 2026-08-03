@@ -198,6 +198,20 @@
   .price-feats li{ font-size:13px; color:var(--haze); padding-left:18px; position:relative; }
   .price-feats li::before{ content:"✦"; position:absolute; left:0; color:var(--lilac); font-size:11px; top:2px; }
   .price-card .btn{ width:100%; justify-content:center; margin-top:22px; }
+  .length-chip-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
+  .length-chip{ cursor:pointer; padding:12px 6px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:13px; font-family:inherit; transition:all .2s; }
+  .length-chip span{ display:block; font-size:10px; color:var(--lilac); margin-top:3px; }
+  .length-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .length-chip.locked{ opacity:.55; }
+  .length-chip.locked span{ color:var(--candle); }
+  .avatar-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .avatar-opt{ cursor:pointer; aspect-ratio:1; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:20px; border:2px solid transparent; background:var(--dusk); transition:all .2s; }
+  .avatar-opt.sel{ border-color:var(--candle); }
+  #avatarPreviewWrap img{ width:48px; height:48px; border-radius:50%; object-fit:cover; margin-top:8px; border:2px solid var(--candle); }
+  .session-target{ font-size:12.5px; color:var(--lilac); margin-bottom:4px; min-height:16px; }
+  .breath-note{ font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--lilac); background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.2); border-radius:14px; padding:14px 18px; margin:14px 0; line-height:1.6; }
+  .length-msg{ font-size:12px; margin-top:10px; min-height:14px; }
+  .length-msg.err{ color:#E39A9A; }
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
@@ -328,6 +342,16 @@
     <div class="auth-field">
       <label>Your name</label>
       <input type="text" id="obName" placeholder="First name is fine" autocomplete="given-name">
+    </div>
+    <div class="auth-field">
+      <label>Username</label>
+      <input type="text" id="obUsername" placeholder="how others will find you" autocomplete="off">
+    </div>
+    <div class="auth-field">
+      <label>Pick an avatar <span style="color:var(--haze); font-weight:400;">(or upload your own below)</span></label>
+      <div class="avatar-grid" id="avatarGrid"></div>
+      <input type="file" id="obAvatarFile" accept="image/*" style="margin-top:10px; font-size:12.5px; color:var(--haze);">
+      <div id="avatarPreviewWrap"></div>
     </div>
     <div class="auth-field">
       <label>Phone <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
@@ -480,6 +504,16 @@
             <label>How many affirmations?</label>
             <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
           </div>
+          <div class="quiz-q">
+            <label>How long should tonight's session run?</label>
+            <div class="length-chip-grid" id="lengthChips">
+              <button class="length-chip sel" data-min="5" data-tier="none" onclick="pickLength(this)">5 min<span>Free</span></button>
+              <button class="length-chip" data-min="30" data-tier="whisper" onclick="pickLength(this)">30 min<span>Whisper</span></button>
+              <button class="length-chip" data-min="120" data-tier="reverie" onclick="pickLength(this)">2 hr<span>Reverie</span></button>
+              <button class="length-chip" data-min="480" data-tier="ritual" onclick="pickLength(this)">8 hr<span>Ritual</span></button>
+            </div>
+            <div class="length-msg" id="lengthMsg"></div>
+          </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="generateAffirmations()">Generate my affirmations ✦</button></div>
       </div>
@@ -547,6 +581,7 @@
       <div class="flow-step" data-step="6">
         <div class="flow-title">Record in your own voice</div>
         <div class="flow-sub">Press and hold, speak the line, then release.</div>
+        <div class="breath-note">Before you start — take a slow breath in, and let it out. Give yourself a second to settle. You'll hear this back every night, so it's worth recording it from a calm, grounded place rather than rushing through.</div>
         <div class="flow-body">
           <div class="record-panel">
             <div class="record-counter" id="recCounter">1 of 14</div>
@@ -572,7 +607,8 @@
             <div class="orb-wrap final-orb"><div class="orb"></div><div class="orb-inner"></div></div>
             <div class="final-title" id="finalTitle">528 Hz</div>
             <div class="final-line" id="finalLine">"…"</div>
-            <label class="final-toggle"><input type="checkbox" id="loopToggle"> loop this session</label>
+            <div class="session-target" id="sessionTarget"></div>
+            <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()">▶ Play my subliminal</button>
               <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
@@ -737,7 +773,7 @@ const BACKGROUNDS = [
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none' };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5 };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -752,13 +788,17 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none' };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5 };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
   document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
   document.getElementById('downloadBtn').disabled = true;
+  const defaultChip = document.querySelector('.length-chip[data-min="5"]');
+  if (defaultChip) defaultChip.classList.add('sel');
+  document.getElementById('lengthMsg').textContent = '';
+  document.getElementById('sessionTarget').textContent = '';
   showStep(0);
 }
 
@@ -806,21 +846,15 @@ async function generateAffirmations(){
 }
 async function callClaudeForAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
-  const prompt = `Write ${state.count} short, first-person, present-tense affirmations for a bedtime affirmation app.
-Frequency association (mood only, not medical): ${state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none'}
-Desired voice/tone: ${toneLabel}
-What the person said they want help with: "${state.goal || 'not specified'}"
-Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
-Return ONLY a raw JSON array of ${state.count} strings. No markdown, no preamble, no code fences.`;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1200, messages:[{role:"user", content:prompt}] })
+  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const response = await fetch("/api/generate-affirmations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal })
   });
+  if (!response.ok) return null;
   const data = await response.json();
-  const text = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
-  const clean = text.replace(/```json|```/g,'').trim();
-  const parsed = JSON.parse(clean);
-  return Array.isArray(parsed) ? parsed.filter(x=>typeof x==='string') : null;
+  return Array.isArray(data.affirmations) ? data.affirmations : null;
 }
 function buildFallbackList(){
   const bank = FALLBACK_BANK[state.intention] || FALLBACK_BANK.sleep;
@@ -1048,6 +1082,7 @@ function prepareFinal(){
 }
 
 let finalCtx=null, finalTone=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+let finalStartTime=null, finalTimerInterval=null;
 let liveToneGain=null, liveBgGain=null;
 
 /* Live volume readouts + real-time gain updates while a session is playing */
@@ -1069,8 +1104,11 @@ function playFinal(){
   if (!hasVoice){ document.getElementById('finalLine').textContent = "No lines were recorded — go back and hold the record button on at least one."; return; }
 
   finalPlaying = true;
+  finalStartTime = Date.now();
   document.getElementById('finalPlayBtn').disabled = true;
   document.getElementById('finalPlayBtn').textContent = '⏸ Playing…';
+  updateSessionTimerLabel();
+  finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
   finalCtx = new (window.AudioContext||window.webkitAudioContext)();
   const toneGain = finalCtx.createGain(); toneGain.gain.value = document.getElementById('mixTone').value/100 * 0.12;
@@ -1134,15 +1172,40 @@ function playFinal(){
     finalRecorder.start();
   }
 
-  runSequence(()=>{
-    const loop = document.getElementById('loopToggle').checked;
-    if (loop && finalPlaying){ runSequence(arguments.callee); }
-    else { finishFinal(); }
+  runSequence(function loopCheck(){
+    const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
+    const elapsed = Date.now() - finalStartTime;
+    const stillBuildingTowardTarget = targetMs && elapsed < targetMs;
+    const manualLoop = document.getElementById('loopToggle').checked;
+    if (finalPlaying && (stillBuildingTowardTarget || manualLoop)){
+      runSequence(loopCheck);
+    } else {
+      finishFinal();
+    }
   });
+}
+
+function updateSessionTimerLabel(){
+  const el = document.getElementById('sessionTarget');
+  if (!el) return;
+  const targetMin = state.targetLengthMinutes;
+  if (!finalPlaying || !targetMin){
+    el.textContent = targetMin ? `Session length: ${targetMin >= 60 ? (targetMin/60)+' hr' : targetMin+' min'}` : '';
+    return;
+  }
+  const elapsedSec = Math.floor((Date.now() - finalStartTime)/1000);
+  const targetSec = targetMin * 60;
+  const remaining = Math.max(0, targetSec - elapsedSec);
+  const mm = Math.floor(remaining/60), ss = remaining%60;
+  el.textContent = remaining > 0
+    ? `Playing… ${mm}:${String(ss).padStart(2,'0')} left in this session`
+    : `Wrapping up this loop…`;
 }
 
 function finishFinal(){
   finalPlaying = false;
+  if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').textContent = '▶ Play my subliminal';
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
@@ -1160,6 +1223,8 @@ function finishFinal(){
 
 function stopFinal(){
   finalPlaying = false;
+  if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   window.speechSynthesis.cancel();
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
@@ -1188,10 +1253,46 @@ function goToCheckout(evt, baseUrl){
 
 /* ---------------- ACCOUNT-GATED SAVE + DOWNLOAD ---------------- */
 const TIER_DOWNLOAD_CAPS = { whisper: 1, reverie: 3, ritual: 5 };
-const FREE_SAVE_LIMIT_SECONDS = 60;
+// Matches the durations promised on the pricing cards.
+const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
+const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
+
+async function getMyTier(){
+  const subRow = await getMySubscriberRow();
+  return (subRow && subRow.status === 'active' && subRow.tier) ? subRow.tier : 'none';
+}
+
+async function pickLength(btn){
+  const msg = document.getElementById('lengthMsg');
+  const minutes = parseInt(btn.dataset.min, 10);
+  const requiredTier = btn.dataset.tier;
+  msg.textContent = '';
+
+  if (requiredTier !== 'none'){
+    if (!currentUser){
+      msg.innerHTML = `Log in to unlock longer sessions — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+    const myTier = await getMyTier();
+    const order = ['none','whisper','reverie','ritual'];
+    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+      msg.innerHTML = `That length needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+  }
+
+  document.querySelectorAll('.length-chip').forEach(c => c.classList.remove('sel'));
+  btn.classList.add('sel');
+  state.targetLengthMinutes = minutes;
+  updateSessionTimerLabel();
+}
 
 // Rough estimate: ~4 seconds per spoken affirmation line, looped or not.
+// If the person picked a target length, that takes priority.
 function estimateSessionSeconds(){
+  if (state.targetLengthMinutes) return state.targetLengthMinutes * 60;
   return (state.affirmations.length || 1) * 4;
 }
 
@@ -1207,11 +1308,11 @@ async function saveSubliminal(){
   if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
 
   const seconds = estimateSessionSeconds();
-  const subRow = await getMySubscriberRow();
-  const isPaid = subRow && subRow.status === 'active';
+  const myTier = await getMyTier();
+  const cap = TIER_LENGTH_SECONDS[myTier];
 
-  if (!isPaid && seconds > FREE_SAVE_LIMIT_SECONDS){
-    msg.innerHTML = `Free accounts can save sessions up to 1 minute. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
+  if (seconds > cap){
+    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${Math.round(cap/60)} min. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
     msg.className = 'save-msg err';
     return;
   }
@@ -1267,24 +1368,30 @@ async function downloadFinal(){
 const waitlistForm = document.getElementById('waitlistForm');
 const waitlistMsg = document.getElementById('waitlistMsg');
 const waitlistCount = document.getElementById('waitlistCount');
-let waitlistEmails = [];
-function updateCount(){ waitlistCount.innerHTML = `<b>${214 + waitlistEmails.length}</b> hopeful romantics on the list`; }
+let waitlistBonusCount = 0;
+function updateCount(){ waitlistCount.innerHTML = `<b>${214 + waitlistBonusCount}</b> hopeful romantics on the list`; }
 updateCount();
-waitlistForm.addEventListener('submit', (e)=>{
+waitlistForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
   const input = document.getElementById('waitlistEmail');
   const email = input.value.trim();
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   if (!valid){ waitlistMsg.textContent="That doesn't look like a valid email — try again."; waitlistMsg.className='waitlist-msg err'; return; }
-  if (waitlistEmails.includes(email)){ waitlistMsg.textContent="You're already on the list. We'll be in touch."; waitlistMsg.className='waitlist-msg ok'; return; }
-  waitlistEmails.push(email);
+  if (!sb){ waitlistMsg.textContent="Waitlist isn't connected yet — try again shortly."; waitlistMsg.className='waitlist-msg err'; return; }
+
+  waitlistMsg.textContent = "Joining…"; waitlistMsg.className = 'waitlist-msg';
+  const { error } = await sb.from('waitlist_signups').insert({ email });
+  if (error){
+    if (error.message && error.message.toLowerCase().includes('duplicate')){
+      waitlistMsg.textContent="You're already on the list. We'll be in touch."; waitlistMsg.className='waitlist-msg ok';
+    } else {
+      waitlistMsg.textContent="Something went wrong — try again."; waitlistMsg.className='waitlist-msg err';
+    }
+    return;
+  }
+  waitlistBonusCount++;
   waitlistMsg.textContent="You're in. Be more hopeful — check your inbox soon."; waitlistMsg.className='waitlist-msg ok';
   input.value=''; updateCount();
-  /* PRODUCTION NOTE: wire to ConvertKit/Beehiiv:
-     fetch('https://api.convertkit.com/v3/forms/FORM_ID/subscribe', {
-       method:'POST', headers:{'Content-Type':'application/json'},
-       body: JSON.stringify({ api_key:'YOUR_KEY', email })
-     }); */
 });
 
 renderProgress();
@@ -1337,31 +1444,94 @@ async function submitAuth(){
     ? await sb.auth.signUp({ email, password })
     : await sb.auth.signInWithPassword({ email, password });
   if (error){ msg.textContent = error.message; msg.className = 'auth-msg err'; return; }
+
+  // Signed up, but Supabase requires clicking an email link before there's a real session.
+  if (wasSignup && !data.session){
+    msg.innerHTML = 'Account created — check your email and click the confirmation link, then come back and log in.';
+    msg.className = 'auth-msg ok';
+    return;
+  }
+
   msg.textContent = 'You\'re in.'; msg.className = 'auth-msg ok';
   setTimeout(() => {
     closeAuthModal();
     if (wasSignup) openOnboardingModal();
   }, 600);
 }
+
+/* ---------------- ONBOARDING: avatar + username ---------------- */
+const PRESET_AVATARS = ['🌙','✨','🕊️','🌊','🔮','🌸','⭐','🦋'];
+let selectedAvatar = null;
+let uploadedAvatarUrl = null;
+
+function renderAvatarGrid(){
+  const grid = document.getElementById('avatarGrid');
+  if (!grid || grid.children.length) return; // only build once
+  grid.innerHTML = PRESET_AVATARS.map((emoji, i) =>
+    `<div class="avatar-opt${i===0?' sel':''}" data-emoji="${emoji}" onclick="pickAvatar(this)">${emoji}</div>`
+  ).join('');
+  selectedAvatar = PRESET_AVATARS[0];
+}
+function pickAvatar(el){
+  document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedAvatar = el.dataset.emoji;
+  uploadedAvatarUrl = null; // picking a preset overrides any uploaded photo
+  document.getElementById('avatarPreviewWrap').innerHTML = '';
+}
+
 function openOnboardingModal(){
+  renderAvatarGrid();
   document.getElementById('onboardOverlay').classList.add('open');
 }
 function closeOnboardingModal(){
   document.getElementById('onboardOverlay').classList.remove('open');
 }
 function skipOnboarding(){ closeOnboardingModal(); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const fileInput = document.getElementById('obAvatarFile');
+  if (fileInput){
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file || !sb || !currentUser) return;
+      const msg = document.getElementById('onboardMsg');
+      msg.textContent = 'Uploading photo…'; msg.className = 'auth-msg';
+      const path = `${currentUser.id}/avatar-${Date.now()}.${file.name.split('.').pop()}`;
+      const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+      if (error){ msg.textContent = "Couldn't upload that photo — try a different one, or pick an avatar above."; msg.className = 'auth-msg err'; return; }
+      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+      uploadedAvatarUrl = pub.publicUrl;
+      document.getElementById('avatarPreviewWrap').innerHTML = `<img src="${uploadedAvatarUrl}" alt="Your avatar">`;
+      document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('sel'));
+      msg.textContent = ''; msg.className = 'auth-msg';
+    });
+  }
+});
+
 async function submitOnboarding(){
   const msg = document.getElementById('onboardMsg');
   if (!sb || !currentUser){ closeOnboardingModal(); return; }
+  const username = document.getElementById('obUsername').value.trim();
   const patch = {
     full_name: document.getElementById('obName').value.trim() || null,
+    username: username || null,
+    avatar: uploadedAvatarUrl ? null : selectedAvatar,
+    avatar_url: uploadedAvatarUrl,
     phone: document.getElementById('obPhone').value.trim() || null,
     referral_source: document.getElementById('obSource').value || null,
     signup_reason: document.getElementById('obReason').value.trim() || null,
   };
   msg.textContent = 'Saving…'; msg.className = 'auth-msg';
   const { error } = await sb.from('profiles').update(patch).eq('id', currentUser.id);
-  if (error){ msg.textContent = "Couldn't save — you can skip for now."; msg.className = 'auth-msg err'; return; }
+  if (error){
+    if (error.message && error.message.toLowerCase().includes('duplicate')){
+      msg.textContent = 'That username is taken — try another.'; msg.className = 'auth-msg err';
+    } else {
+      msg.textContent = "Couldn't save — you can skip for now."; msg.className = 'auth-msg err';
+    }
+    return;
+  }
   closeOnboardingModal();
 }
 async function logOut(){
@@ -1439,3 +1609,72 @@ if (sb){
 </script>
 </body>
 </html>
+// /api/generate-affirmations.js
+// Vercel serverless function — keeps the Anthropic API key server-side.
+// The browser calls THIS endpoint instead of api.anthropic.com directly.
+//
+// Required environment variable (Vercel -> Project -> Settings -> Environment Variables):
+//   ANTHROPIC_API_KEY  - from console.anthropic.com -> API Keys
+
+export const config = { api: { bodyParser: true } };
+
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method not allowed');
+    return;
+  }
+  if (!ANTHROPIC_API_KEY) {
+    res.status(500).json({ error: 'Server is not configured with an API key yet.' });
+    return;
+  }
+
+  const { count, freqLabel, toneLabel, goal } = req.body || {};
+  const safeCount = Math.min(Math.max(parseInt(count, 10) || 14, 5), 20);
+
+  const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
+Frequency association (mood only, not medical): ${freqLabel || 'none'}
+Desired voice/tone: ${toneLabel || 'warm'}
+What the person said they want help with: "${goal || 'not specified'}"
+Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
+Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1200,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Anthropic API error:', response.status, errText);
+      res.status(502).json({ error: 'Affirmation generation failed upstream.' });
+      return;
+    }
+
+    const data = await response.json();
+    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    if (!Array.isArray(parsed)) {
+      res.status(502).json({ error: 'Unexpected response shape.' });
+      return;
+    }
+
+    res.status(200).json({ affirmations: parsed.filter((x) => typeof x === 'string') });
+  } catch (err) {
+    console.error('generate-affirmations error:', err);
+    res.status(500).json({ error: 'Something went wrong generating affirmations.' });
+  }
+}
