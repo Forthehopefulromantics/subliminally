@@ -918,6 +918,20 @@
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
         <div class="profile-field-card">
+          <label>Username</label>
+          <input type="text" id="settingsUsername" placeholder="your username">
+          <button class="mini-btn ghostbtn" onclick="updateUsername()">Update username</button>
+          <div class="save-msg" id="usernameSettingsMsg"></div>
+        </div>
+        <div class="profile-field-card">
+          <label>Avatar</label>
+          <div class="avatar-grid" id="settingsAvatarGrid" style="margin-bottom:10px;"></div>
+          <label class="avatar-upload-label" for="settingsAvatarFile">or upload a photo</label>
+          <input type="file" id="settingsAvatarFile" accept="image/*" style="display:none;">
+          <div id="settingsAvatarPreviewWrap"></div>
+          <div class="save-msg" id="avatarSettingsMsg"></div>
+        </div>
+        <div class="profile-field-card">
           <label>Email</label>
           <input type="email" id="settingsEmail" placeholder="you@example.com">
           <button class="mini-btn ghostbtn" onclick="updateEmail()">Update email</button>
@@ -1908,8 +1922,16 @@ async function saveSubliminal(){
 const waitlistForm = document.getElementById('waitlistForm');
 const waitlistMsg = document.getElementById('waitlistMsg');
 const waitlistCount = document.getElementById('waitlistCount');
-let waitlistBonusCount = 0;
-function updateCount(){ waitlistCount.innerHTML = `<b>${214 + waitlistBonusCount}</b> hopeful romantics on the list`; }
+let realWaitlistCount = null;
+function updateCount(){
+  const shown = realWaitlistCount !== null ? realWaitlistCount : 214;
+  waitlistCount.innerHTML = `<b>${shown}</b> hopeful romantics on the list`;
+}
+async function refreshWaitlistCount(){
+  if (!sb) return;
+  const { data, error } = await sb.rpc('get_waitlist_count');
+  if (!error && typeof data === 'number') { realWaitlistCount = data; updateCount(); }
+}
 updateCount();
 waitlistForm.addEventListener('submit', async (e)=>{
   e.preventDefault();
@@ -1929,9 +1951,8 @@ waitlistForm.addEventListener('submit', async (e)=>{
     }
     return;
   }
-  waitlistBonusCount++;
   waitlistMsg.textContent="You're in. Be more hopeful — check your inbox soon."; waitlistMsg.className='waitlist-msg ok';
-  input.value=''; updateCount();
+  input.value=''; refreshWaitlistCount();
 });
 
 renderProgress();
@@ -2294,6 +2315,12 @@ async function loadProfile(){
     const avatarEl = document.getElementById('profileAvatarDisplay');
     if (prof.avatar_url){ avatarEl.innerHTML = `<img src="${prof.avatar_url}" alt="avatar">`; }
     else { avatarEl.textContent = prof.avatar || '🌙'; }
+
+    document.getElementById('settingsUsername').value = prof.username || '';
+    renderSettingsAvatarGrid(prof.avatar);
+    if (prof.avatar_url){
+      document.getElementById('settingsAvatarPreviewWrap').innerHTML = `<img src="${prof.avatar_url}" alt="Current avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-top:8px;border:2px solid var(--candle);">`;
+    }
   }
 
   const myTier = await getMyTier();
@@ -2301,6 +2328,67 @@ async function loadProfile(){
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
+}
+
+/* ---------- change username / avatar anytime ---------- */
+function renderSettingsAvatarGrid(currentAvatar){
+  const grid = document.getElementById('settingsAvatarGrid');
+  grid.innerHTML = PRESET_AVATARS.map((emoji) =>
+    `<div class="avatar-opt${emoji===currentAvatar ? ' sel' : ''}" data-emoji="${emoji}" onclick="pickSettingsAvatar(this)">${emoji}</div>`
+  ).join('');
+}
+async function pickSettingsAvatar(el){
+  const msg = document.getElementById('avatarSettingsMsg');
+  if (!sb || !currentUser) return;
+  document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('settingsAvatarPreviewWrap').innerHTML = '';
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.from('profiles').update({ avatar: el.dataset.emoji, avatar_url: null }).eq('id', currentUser.id);
+  if (error){ msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
+  loadNavIdentity();
+  loadProfile();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const f = document.getElementById('settingsAvatarFile');
+  if (f){
+    f.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const msg = document.getElementById('avatarSettingsMsg');
+      if (!file || !sb || !currentUser) return;
+      msg.textContent = 'Uploading…'; msg.className = 'save-msg';
+      const path = `${currentUser.id}/avatar-${Date.now()}.${(file.name||'jpg').split('.').pop()}`;
+      const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
+      if (upErr){ msg.textContent = "Couldn't upload — try a different photo."; msg.className = 'save-msg err'; return; }
+      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+      const { error } = await sb.from('profiles').update({ avatar_url: pub.publicUrl, avatar: null }).eq('id', currentUser.id);
+      if (error){ msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+      document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
+      msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
+      loadNavIdentity();
+      loadProfile();
+    });
+  }
+});
+async function updateUsername(){
+  const msg = document.getElementById('usernameSettingsMsg');
+  if (!sb || !currentUser) return;
+  const username = document.getElementById('settingsUsername').value.trim();
+  if (!username){ msg.textContent = 'Enter a username.'; msg.className = 'save-msg err'; return; }
+  if (!/^[a-zA-Z0-9_.]{3,24}$/.test(username)){ msg.textContent = 'Usernames are 3–24 characters — letters, numbers, dots, and underscores.'; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.from('profiles').update({ username }).eq('id', currentUser.id);
+  if (error){
+    if (error.message && error.message.toLowerCase().includes('duplicate')){
+      msg.textContent = 'That username is taken — try another.'; msg.className = 'save-msg err';
+    } else {
+      msg.textContent = "Couldn't save."; msg.className = 'save-msg err';
+    }
+    return;
+  }
+  msg.textContent = 'Username updated.'; msg.className = 'save-msg ok';
+  loadNavIdentity();
 }
 
 async function loadMyLibrary(){
@@ -2523,6 +2611,7 @@ if (sb){
   renderAccountArea();
 }
 /* library is now a static embed — nothing to fetch on load */
+refreshWaitlistCount();
 </script>
 </body>
 </html>
