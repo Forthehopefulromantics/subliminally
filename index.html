@@ -204,6 +204,8 @@
 
   .pricing{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .pricing-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; max-width:1020px; margin:0 auto; }
+  .pricing-grid.centered{ display:flex; justify-content:center; flex-wrap:wrap; }
+  .pricing-grid.centered .price-card{ width:320px; }
   @media (max-width:900px){ .pricing-grid{ grid-template-columns:1fr; max-width:420px; } }
   .price-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:32px 28px; text-align:left; position:relative; transition:border-color .3s, transform .3s; }
   .price-card:hover{ border-color:var(--lilac); transform:translateY(-3px); }
@@ -913,13 +915,18 @@
 
 <section class="pricing" id="pricing">
   <div class="wrap">
-    <div class="section-head">
+    <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
-      <h2>Three ways in</h2>
-      <p>Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.</p>
+      <h2 id="pricingHeading">Three ways in</h2>
+      <p id="pricingSub">Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.</p>
     </div>
-    <div class="pricing-grid">
-      <div class="price-card">
+
+    <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
+      <p style="font-size:14.5px; color:var(--haze);">You're on Ritual — the full ritual, unlocked. Nothing to upgrade to here.</p>
+    </div>
+
+    <div class="pricing-grid" id="pricingGrid">
+      <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
         <div class="price-amount">$10<span>/month</span></div>
         <div class="limit">Sessions up to 30 minutes</div>
@@ -931,7 +938,7 @@
         </ul>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00')">Get Whisper</a>
       </div>
-      <div class="price-card">
+      <div class="price-card" id="priceCardReverie">
         <h3>Reverie</h3>
         <div class="price-amount">$22<span>/month</span></div>
         <div class="limit">Sessions up to 2 hours</div>
@@ -943,7 +950,7 @@
         </ul>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
       </div>
-      <div class="price-card featured">
+      <div class="price-card featured" id="priceCardRitual">
         <span class="badge">All night</span>
         <h3>Ritual</h3>
         <div class="price-amount">$35<span>/month</span></div>
@@ -958,8 +965,8 @@
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
     </div>
-    <p style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon) — no downloads, so your ritual stays with your membership.</p>
-    <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Already a member? Manage your subscription →</a></div>
+    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
+    <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
   </div>
 </section>
 
@@ -1692,6 +1699,55 @@ async function getMyTier(){
   return (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
 }
 
+/* Show pricing as an upsell only for tiers above what you already have.
+   Ritual members see no marketing here at all — just account management. */
+async function applyPricingVisibility(){
+  const myTier = await getMyTier();
+  const cards = { whisper: document.getElementById('priceCardWhisper'), reverie: document.getElementById('priceCardReverie'), ritual: document.getElementById('priceCardRitual') };
+  const head = document.getElementById('pricingHead');
+  const grid = document.getElementById('pricingGrid');
+  const thanks = document.getElementById('pricingRitualThanks');
+  const footnote = document.getElementById('pricingFootnote');
+  const manageSub = document.getElementById('pricingManageSub');
+  if (!cards.whisper) return; // pricing markup not present yet
+
+  Object.values(cards).forEach(c => c.style.display = '');
+
+  if (myTier === 'ritual'){
+    head.style.display = 'none';
+    grid.style.display = 'none';
+    footnote.style.display = 'none';
+    thanks.style.display = 'block';
+    manageSub.style.display = 'block';
+    return;
+  }
+
+  thanks.style.display = 'none';
+  head.style.display = 'block';
+  grid.style.display = 'grid';
+  footnote.style.display = 'block';
+
+  if (myTier === 'reverie'){
+    cards.whisper.style.display = 'none';
+    cards.reverie.style.display = 'none';
+    grid.classList.add('centered');
+    document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
+    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
+    manageSub.style.display = 'block';
+  } else if (myTier === 'whisper'){
+    cards.whisper.style.display = 'none';
+    grid.classList.add('centered');
+    document.getElementById('pricingHeading').textContent = "You're missing the deeper tiers";
+    document.getElementById('pricingSub').textContent = "Unlimited saved subliminals, 2–8 hour sessions, visualization for performance, your own uploaded track — Whisper doesn't unlock any of it yet.";
+    manageSub.style.display = 'block';
+  } else {
+    grid.classList.remove('centered');
+    document.getElementById('pricingHeading').textContent = 'Three ways in';
+    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.';
+    manageSub.style.display = 'none';
+  }
+}
+
 async function pickLength(btn){
   const msg = document.getElementById('lengthMsg');
   const minutes = parseInt(btn.dataset.min, 10);
@@ -2102,6 +2158,7 @@ function renderAccountArea(){
   renderJournalState();
   renderProfileState();
   renderMyLibraryState();
+  applyPricingVisibility();
 }
 async function loadNavIdentity(){
   if (!sb || !currentUser) return;
