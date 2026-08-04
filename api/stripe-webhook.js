@@ -62,6 +62,7 @@ async function supabaseRequest(path, options) {
   if (!res.ok) {
     const text = await res.text();
     console.error('Supabase request failed:', res.status, text);
+    throw new Error(`Supabase ${options.method || 'request'} to ${path} failed (${res.status}): ${text}`);
   }
   return res;
 }
@@ -85,7 +86,11 @@ async function fetchStripeSubscription(subscriptionId) {
   const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
     headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}` },
   });
-  return res.json();
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(`Stripe subscription lookup failed (${res.status}): ${JSON.stringify(json)}`);
+  }
+  return json;
 }
 
 export default async function handler(req, res) {
@@ -163,6 +168,6 @@ export default async function handler(req, res) {
     res.status(200).json({ received: true });
   } catch (err) {
     console.error('Webhook handler error:', err);
-    res.status(500).send('Webhook handler error');
+    res.status(500).json({ error: 'Webhook handler error', detail: err.message || String(err) });
   }
 }
