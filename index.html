@@ -44,7 +44,18 @@
   .nav-links button:hover{ color:var(--candle); }
   .nav-cta{ font-size:13px; font-weight:500; cursor:pointer; padding:9px 20px; border-radius:999px; background:var(--candle); color:#241C0E; border:none; transition:transform .25s, box-shadow .25s; }
   .nav-cta:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(227,190,127,0.25); }
-  @media (max-width:760px){ .nav-links{ display:none; } }
+  .mobile-nav-toggle{ display:none; background:none; border:none; color:var(--moonlight); font-size:22px; cursor:pointer; padding:4px 6px; }
+  @media (max-width:760px){
+    .nav-links{
+      display:none; position:absolute; top:100%; left:0; right:0;
+      background:var(--midnight-2); border-bottom:1px solid var(--dusk);
+      flex-direction:column; gap:0; padding:8px 0; z-index:400;
+    }
+    .nav-links.open{ display:flex; }
+    .nav-links button{ padding:14px 24px; text-align:left; font-size:14.5px; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .mobile-nav-toggle{ display:block; }
+    nav{ position:relative; flex-wrap:wrap; }
+  }
 
   .hero{ min-height:92vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 28px 70px; gap:24px; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
@@ -79,6 +90,8 @@
   .quote-card p{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--moonlight); line-height:1.5; }
   .quote-card .who{ margin-top:16px; font-size:12.5px; color:var(--lilac); }
   .quote-card .who span{ display:block; font-size:11px; color:var(--haze); margin-top:2px; }
+  .reprogram-quiz-result{ margin-top:18px; background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:18px 20px; font-size:13.5px; color:var(--haze); line-height:1.7; display:none; }
+  .reprogram-quiz-result.show{ display:block; }
   .reprogram-body{ max-width:680px; margin:52px auto 0; }
   .reprogram-body h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); margin-top:32px; }
   .reprogram-body h3:first-child{ margin-top:0; }
@@ -222,15 +235,15 @@
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
   body[data-view="profile"] > nav ~ section:not(#profile),
-  body[data-view="mylibrary"] > nav ~ section:not(#mylibrary),
+  body[data-view="library"] > nav ~ section:not(#library),
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
   body[data-view="profile"] > footer,
-  body[data-view="mylibrary"] > footer,
+  body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
-  body:not([data-view="mylibrary"]) #mylibrary{ display:none !important; }
+  body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
   .profile-page-back{ display:none; }
@@ -354,15 +367,15 @@
 
 <nav>
   <div class="brand" style="cursor:pointer;" onclick="goHome()"><span class="brand-mark">Subliminally</span><span class="brand-by">by FTHR</span></div>
-  <div class="nav-links">
-    <button onclick="goHome(); goTo('flow-section')">Build yours</button>
-    <button onclick="goHome(); goTo('library')">Library</button>
-    <button onclick="showMyLibraryPage()">My Library</button>
-    <button onclick="showJournalPage()">Journal</button>
-    <button onclick="showReprogramPage()">The Science</button>
-    <button onclick="goHome(); goTo('pricing')">Pricing</button>
+  <div class="nav-links" id="navLinks">
+    <button onclick="goHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
+    <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
+    <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
+    <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
+    <button onclick="goHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
+  <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu">☰</button>
 </nav>
 
 <!-- ============ AUTH MODAL ============ -->
@@ -525,6 +538,16 @@
       <h3>Why right before sleep</h3>
       <p>In the relaxed, drowsy window before sleep, the mind's usual critical filtering eases. This is well-documented territory in sleep research — it's part of why racing thoughts feel louder at bedtime, and why calming input in that window tends to land differently than the same input during an alert, busy day.</p>
 
+      <h3>What does this mean for you, specifically?</h3>
+      <p style="margin-bottom:14px;">Pick what you're actually working on, and we'll connect the research above to it directly.</p>
+      <div class="length-chip-grid" id="reprogramQuizChips" style="grid-template-columns:repeat(2,1fr); max-width:460px;">
+        <button class="length-chip" onclick="answerReprogramQuiz(this,'sleep')">Sleep</button>
+        <button class="length-chip" onclick="answerReprogramQuiz(this,'confidence')">Confidence</button>
+        <button class="length-chip" onclick="answerReprogramQuiz(this,'anxiety')">Anxious thoughts</button>
+        <button class="length-chip" onclick="answerReprogramQuiz(this,'relationships')">Relationships</button>
+      </div>
+      <div class="reprogram-quiz-result" id="reprogramQuizResult"></div>
+
       <h3>An honest caveat</h3>
       <p>"Subliminal" messaging specifically — information presented below the threshold of conscious perception — has a genuinely mixed scientific record, and some of the earliest famous claims about it (like the 1950s "eat popcorn" theater experiment) were later admitted to be fabricated. What this app actually does is closer to conscious, repeated self-affirmation in a relaxed state layered with calming sound — a more modest and better-supported claim than "bypassing your mind entirely," and, we think, an honest one.</p>
     </div>
@@ -550,22 +573,42 @@
 
 <section class="library-section" id="library">
   <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
-      <div class="eyebrow">Ready-made</div>
-      <h2>Or start from the library</h2>
-      <p>Generalized subliminals, free to watch on YouTube — preview a video, or use it as a starting point for building your own here.</p>
+      <div class="eyebrow">Library</div>
+      <h2>Ready-made, or made by you</h2>
+      <p>Browse generalized subliminals, or everything you've personally built and saved.</p>
     </div>
-    <div class="library-embed-wrap">
-      <iframe
-        src="https://www.youtube.com/embed/videoseries?list=PLPlW0fS4brRk"
-        title="Subliminally by FTHR — YouTube playlist"
-        frameborder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowfullscreen>
-      </iframe>
+    <div class="journal-tabs" style="max-width:340px;">
+      <button class="active" data-libtab="premade" onclick="setLibraryTab('premade')">🎧 Premade</button>
+      <button data-libtab="mine" onclick="setLibraryTab('mine')">📼 Mine</button>
     </div>
-    <div class="library-yt-cta">
-      <a class="btn btn-ghost" href="https://www.youtube.com/@Kylamchyle" target="_blank" rel="noopener">▶ Watch all subliminals on YouTube</a>
+
+    <div id="libraryTabPremade">
+      <div class="library-embed-wrap">
+        <iframe
+          src="https://www.youtube.com/embed/videoseries?list=PLPlW0fS4brRk"
+          title="Subliminally by FTHR — YouTube playlist"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+      <div class="library-yt-cta">
+        <a class="btn btn-ghost" href="https://www.youtube.com/@Kylamchyle" target="_blank" rel="noopener">▶ Watch all subliminals on YouTube</a>
+      </div>
+    </div>
+
+    <div id="libraryTabMine" style="display:none;">
+      <div id="myLibraryLocked" class="journal-locked">
+        <div class="ic">📼</div>
+        <h3>Log in to see what you've made</h3>
+        <p>Everything you've built and saved lives here once you're signed in.</p>
+        <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
+      </div>
+      <div id="myLibraryPanel" style="display:none;">
+        <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -802,7 +845,7 @@
         </div>
       </div>
 
-      <button class="mini-btn ghostbtn" onclick="showMyLibraryPage()">📼 View my saved subliminals →</button>
+      <button class="mini-btn ghostbtn" onclick="showLibraryPage(); setLibraryTab('mine');">📼 View my saved subliminals →</button>
 
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
@@ -821,18 +864,6 @@
       </div>
       <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
     </div>
-  </div>
-</section>
-
-<section class="mylibrary-section" id="mylibrary">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
-    <div class="section-head">
-      <div class="eyebrow">Your creations</div>
-      <h2>My library</h2>
-      <p>Every subliminal you've built and saved, with the full affirmations and when you made it.</p>
-    </div>
-    <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
   </div>
 </section>
 
@@ -1632,17 +1663,21 @@ async function saveSubliminal(){
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
 
   let recordingUrls = null;
+  let recordingUploadFailed = false;
   if (state.voiceMode === 'own' && recordings.some(r => r)){
     msg.textContent = 'Uploading your voice…'; msg.className = 'save-msg';
     const folder = `${currentUser.id}/${Date.now()}`;
     recordingUrls = [];
+    let anyUploaded = false;
     for (let i = 0; i < recordings.length; i++){
       if (!recordings[i] || !recordings[i].blob){ recordingUrls.push(null); continue; }
       const path = `${folder}/${i}.webm`;
       const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: 'audio/webm' });
       if (upErr){ console.error('recording upload failed for line', i, upErr); recordingUrls.push(null); continue; }
       recordingUrls.push(path); // store the storage path; we generate a signed URL when loading it back
+      anyUploaded = true;
     }
+    if (!anyUploaded) recordingUploadFailed = true;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
@@ -1661,7 +1696,12 @@ async function saveSubliminal(){
     msg.className = 'save-msg err';
     return;
   }
-  msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
+  if (recordingUploadFailed){
+    msg.textContent = 'Saved — but your voice recording failed to upload, so this one will replay with the AI voice. (If this keeps happening, the recordings storage bucket may not be set up yet.)';
+    msg.className = 'save-msg err';
+  } else {
+    msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
+  }
 }
 
 async function downloadFinal(){
@@ -1894,6 +1934,7 @@ function renderAccountArea(){
   }
   renderJournalState();
   renderProfileState();
+  renderMyLibraryState();
 }
 
 /* ---------- profile ---------- */
@@ -1904,13 +1945,37 @@ function showProfilePage(){
   window.scrollTo(0,0);
   history.pushState({ page:'profile' }, '', '#profile');
 }
-function showMyLibraryPage(){
-  if (!currentUser){ openAuthModal(); return; }
-  document.body.setAttribute('data-view', 'mylibrary');
+function showLibraryPage(){
+  document.body.setAttribute('data-view', 'library');
   window.scrollTo(0,0);
-  history.pushState({ page:'mylibrary' }, '', '#mylibrary');
-  loadMyLibrary();
+  history.pushState({ page:'library' }, '', '#library');
 }
+function setLibraryTab(tab){
+  document.querySelectorAll('.journal-tabs [data-libtab]').forEach(b => b.classList.toggle('active', b.dataset.libtab === tab));
+  document.getElementById('libraryTabPremade').style.display = tab === 'premade' ? 'block' : 'none';
+  document.getElementById('libraryTabMine').style.display = tab === 'mine' ? 'block' : 'none';
+  if (tab === 'mine') renderMyLibraryState();
+}
+function renderMyLibraryState(){
+  document.getElementById('myLibraryLocked').style.display = currentUser ? 'none' : 'block';
+  document.getElementById('myLibraryPanel').style.display = currentUser ? 'block' : 'none';
+  if (currentUser) loadMyLibrary();
+}
+/* ---------- interactive science quiz ---------- */
+const REPROGRAM_ANSWERS = {
+  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try Whisper's 30-minute sessions timed right as you're winding down, not after you're already trying to force sleep.`,
+  confidence: `<b>On confidence:</b> this leans hardest on the self-referential processing point — information framed as being about you, in your own voice, tends to get encoded more deeply than the same words from someone else. That's a real finding behind why journaling and self-talk work as tools at all. Repetition strengthens whichever pathway gets used, so the actual mechanism here is closer to "practice" than "magic" — which is honestly a better guarantee.`,
+  anxiety: `<b>On anxious, looping thoughts:</b> the honest framing is that this won't out-argue a racing mind mid-spiral — nothing bypasses your conscious mind that easily, despite what "subliminal" branding often implies. What it can do is give the pre-sleep window, when filtering naturally eases, something calmer to loop on instead of the same worry track. Pair a grounding frequency with a slower, present-tense line, and keep expectations realistic: this is a nightly practice, not a single-session fix.`,
+  relationships: `<b>On relationships — with others or with yourself:</b> repetition and self-talk research both point to the same place: how you talk to yourself, repeatedly, shapes the baseline you bring into other relationships. There's nothing here that replaces communication or therapy where that's needed — but a consistent, calm, self-directed practice is a reasonable complement to that work, not a substitute for it.`
+};
+function answerReprogramQuiz(btn, key){
+  document.querySelectorAll('#reprogramQuizChips .length-chip').forEach(c => c.classList.remove('sel'));
+  btn.classList.add('sel');
+  const result = document.getElementById('reprogramQuizResult');
+  result.innerHTML = REPROGRAM_ANSWERS[key] || '';
+  result.classList.add('show');
+}
+
 function showJournalPage(){
   document.body.setAttribute('data-view', 'journal');
   window.scrollTo(0,0);
@@ -1929,11 +1994,19 @@ function goHome(){
 window.addEventListener('popstate', (e) => {
   const page = e.state && e.state.page;
   if (page === 'profile') document.body.setAttribute('data-view','profile');
-  else if (page === 'mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+  else if (page === 'library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
   else if (page === 'journal') document.body.setAttribute('data-view','journal');
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
   else document.body.removeAttribute('data-view');
 });
+
+/* ---------- mobile nav ---------- */
+function toggleMobileNav(){
+  document.getElementById('navLinks').classList.toggle('open');
+}
+function closeMobileNav(){
+  document.getElementById('navLinks').classList.remove('open');
+}
 
 function renderProfileState(){
   document.getElementById('profileLocked').style.display = currentUser ? 'none' : 'block';
@@ -2120,7 +2193,7 @@ if (sb){
     currentUser = data.session ? data.session.user : null;
     renderAccountArea();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
-    if (currentUser && location.hash === '#mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+    if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
     if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
   });
