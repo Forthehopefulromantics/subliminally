@@ -215,6 +215,13 @@
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
+  body.view-profile > nav ~ section:not(#profile){ display:none !important; }
+  body.view-profile > footer{ display:none !important; }
+  body:not(.view-profile) #profile{ display:none !important; }
+  .profile-page-back{ display:none; }
+  body.view-profile .profile-page-back{ display:inline-flex; }
+  .profile-icon-btn{ background:none; border:none; cursor:pointer; font-size:17px; color:var(--haze); padding:0; line-height:1; transition:color .2s; }
+  .profile-icon-btn:hover{ color:var(--candle); }
   .profile-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .profile-header{ display:flex; align-items:center; gap:16px; margin-bottom:36px; }
   .profile-avatar{ width:64px; height:64px; border-radius:50%; background:var(--dusk); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; flex-shrink:0; }
@@ -286,6 +293,7 @@
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
   .journal-tabs button{ flex:1; background:none; border:none; color:var(--haze); font-size:13.5px; font-weight:500; padding:11px 14px; border-radius:999px; cursor:pointer; transition:all .2s; }
   .journal-tabs button.active{ background:linear-gradient(135deg, var(--lilac), #7C6BC4); color:#fff; }
+  .journal-prompt{ max-width:520px; margin:0 auto 20px; text-align:center; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); }
   .journal-locked{ max-width:520px; margin:0 auto; text-align:center; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:44px 30px; }
   .journal-locked .ic{ font-size:30px; }
   .journal-locked h3{ font-family:var(--serif); font-size:21px; color:var(--moonlight); margin-top:14px; }
@@ -322,13 +330,12 @@
 <body>
 
 <nav>
-  <div class="brand"><span class="brand-mark">Subliminally</span><span class="brand-by">by FTHR</span></div>
+  <div class="brand" style="cursor:pointer;" onclick="goHome()"><span class="brand-mark">Subliminally</span><span class="brand-by">by FTHR</span></div>
   <div class="nav-links">
-    <button onclick="goTo('flow-section')">Build yours</button>
-    <button onclick="goTo('library')">Library</button>
-    <button onclick="goTo('journal')">Journal</button>
-    <button onclick="goTo('profile')">Profile</button>
-    <button onclick="goTo('pricing')">Pricing</button>
+    <button onclick="goHome(); goTo('flow-section')">Build yours</button>
+    <button onclick="goHome(); goTo('library')">Library</button>
+    <button onclick="goHome(); goTo('journal')">Journal</button>
+    <button onclick="goHome(); goTo('pricing')">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
 </nav>
@@ -657,6 +664,7 @@
       <button class="active" data-cat="received" onclick="setJournalTab('received')">Already mine</button>
       <button data-cat="manifesting" onclick="setJournalTab('manifesting')">On its way</button>
     </div>
+    <div class="journal-prompt" id="journalPrompt">A good morning practice: write down three things you're grateful for, right when you wake up.</div>
     <div id="journalLocked" class="journal-locked">
       <div class="ic">📖</div>
       <h3>Keep your own record</h3>
@@ -668,6 +676,7 @@
         <input type="text" id="journalInput" placeholder="I am so grateful for…" onkeydown="if(event.key==='Enter') addJournalEntry()">
         <button class="mini-btn candlebtn" onclick="addJournalEntry()">Add</button>
       </div>
+      <div class="save-msg" id="journalAddMsg"></div>
       <div class="journal-entries" id="journalEntries"></div>
     </div>
   </div>
@@ -675,6 +684,7 @@
 
 <section class="profile-section" id="profile">
   <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your account</div>
       <h2>Profile</h2>
@@ -1622,7 +1632,7 @@ async function logOut(){
 function renderAccountArea(){
   const area = document.getElementById('authArea');
   if (currentUser){
-    area.innerHTML = `<div class="account-chip"><b style="cursor:pointer;" onclick="goTo('profile')">${currentUser.email}</b><button onclick="logOut()">Log out</button></div>`;
+    area.innerHTML = `<div class="account-chip"><button class="profile-icon-btn" onclick="showProfilePage()" title="Your profile">👤</button><b>${currentUser.email}</b><button onclick="logOut()">Log out</button></div>`;
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
@@ -1631,6 +1641,23 @@ function renderAccountArea(){
 }
 
 /* ---------- profile ---------- */
+/* ---------- profile page toggle (separate "page" without a separate file) ---------- */
+function showProfilePage(){
+  if (!currentUser){ openAuthModal(); return; }
+  document.body.classList.add('view-profile');
+  window.scrollTo(0,0);
+  history.pushState({ page:'profile' }, '', '#profile');
+}
+function goHome(){
+  document.body.classList.remove('view-profile');
+  window.scrollTo(0,0);
+  history.pushState({ page:'home' }, '', location.pathname);
+}
+window.addEventListener('popstate', (e) => {
+  if (e.state && e.state.page === 'profile') document.body.classList.add('view-profile');
+  else document.body.classList.remove('view-profile');
+});
+
 function renderProfileState(){
   document.getElementById('profileLocked').style.display = currentUser ? 'none' : 'block';
   document.getElementById('profilePanel').style.display = currentUser ? 'block' : 'none';
@@ -1697,9 +1724,16 @@ async function updatePassword(){
 function setJournalTab(cat){
   journalTab = cat;
   document.querySelectorAll('.journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
-  document.getElementById('journalInput').placeholder = cat === 'received'
-    ? 'I am so grateful for…'
-    : 'I am so grateful now that…';
+  const input = document.getElementById('journalInput');
+  const prompt = document.getElementById('journalPrompt');
+  if (cat === 'received'){
+    input.placeholder = 'I am so grateful for…';
+    prompt.textContent = 'A good morning practice: write down three things you\'re grateful for, right when you wake up.';
+  } else {
+    input.placeholder = 'I am so grateful now that…';
+    prompt.textContent = 'Try one thing you\'re grateful for that hasn\'t arrived yet — write it as if it already has.';
+  }
+  document.getElementById('journalAddMsg').textContent = '';
   loadJournalEntries();
 }
 function renderJournalState(){
@@ -1725,12 +1759,22 @@ async function loadJournalEntries(){
     </div>`).join('');
 }
 async function addJournalEntry(){
+  const msg = document.getElementById('journalAddMsg');
   if (!sb || !currentUser) return;
   const input = document.getElementById('journalInput');
   const content = input.value.trim();
   if (!content) return;
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
   const { error } = await sb.from('journal_entries').insert({ user_id: currentUser.id, category: journalTab, content });
-  if (!error){ input.value=''; loadJournalEntries(); }
+  if (error){
+    console.error('journal insert error:', error);
+    msg.textContent = "Couldn't save that entry — try again in a moment.";
+    msg.className = 'save-msg err';
+    return;
+  }
+  input.value = '';
+  msg.textContent = '';
+  loadJournalEntries();
 }
 
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
@@ -1745,6 +1789,7 @@ if (sb){
   sb.auth.getSession().then(({ data }) => {
     currentUser = data.session ? data.session.user : null;
     renderAccountArea();
+    if (location.hash === '#profile' && currentUser) document.body.classList.add('view-profile');
   });
 } else {
   renderAccountArea();
