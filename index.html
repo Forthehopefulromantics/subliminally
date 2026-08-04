@@ -215,11 +215,14 @@
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
-  body.view-profile > nav ~ section:not(#profile){ display:none !important; }
-  body.view-profile > footer{ display:none !important; }
-  body:not(.view-profile) #profile{ display:none !important; }
+  body[data-view="profile"] > nav ~ section:not(#profile),
+  body[data-view="mylibrary"] > nav ~ section:not(#mylibrary){ display:none !important; }
+  body[data-view="profile"] > footer,
+  body[data-view="mylibrary"] > footer{ display:none !important; }
+  body:not([data-view="profile"]) #profile{ display:none !important; }
+  body:not([data-view="mylibrary"]) #mylibrary{ display:none !important; }
   .profile-page-back{ display:none; }
-  body.view-profile .profile-page-back{ display:inline-flex; }
+  body[data-view] .profile-page-back{ display:inline-flex; }
   .profile-icon-btn{ background:none; border:none; cursor:pointer; font-size:17px; color:var(--haze); padding:0; line-height:1; transition:color .2s; }
   .profile-icon-btn:hover{ color:var(--candle); }
   .profile-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
@@ -230,7 +233,11 @@
   .profile-tier{ font-size:12.5px; color:var(--lilac); margin-top:2px; }
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
-  .profile-item{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .mylibrary-section{ padding:80px 0; }
+  .profile-item-affs{ margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; gap:5px; }
+  .profile-item-affs p{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--haze); }
+  .profile-item-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .profile-item{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; padding:14px 18px; }
   .profile-item .meta{ font-size:12px; color:var(--haze); margin-top:3px; }
   .profile-item button{ background:none; border:none; color:var(--haze); font-size:12px; cursor:pointer; text-decoration:underline; flex-shrink:0; }
   .profile-item button:hover{ color:#E39A9A; }
@@ -334,6 +341,7 @@
   <div class="nav-links">
     <button onclick="goHome(); goTo('flow-section')">Build yours</button>
     <button onclick="goHome(); goTo('library')">Library</button>
+    <button onclick="showMyLibraryPage()">My Library</button>
     <button onclick="goHome(); goTo('journal')">Journal</button>
     <button onclick="goHome(); goTo('pricing')">Pricing</button>
   </div>
@@ -607,7 +615,7 @@
       <div class="flow-step" data-step="6">
         <div class="flow-title">Record in your own voice</div>
         <div class="flow-sub">Press and hold, speak the line, then release.</div>
-        <div class="breath-note">Before you start — take a slow breath in, and let it out. Give yourself a second to settle. You'll hear this back every night, so it's worth recording it from a calm, grounded place rather than rushing through.</div>
+        <div class="breath-note">Before you start — take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</div>
         <div class="flow-body">
           <div class="record-panel">
             <div class="record-counter" id="recCounter">1 of 14</div>
@@ -706,8 +714,7 @@
         </div>
       </div>
 
-      <h3 class="profile-subhead">My subliminals</h3>
-      <div class="profile-list" id="mySubliminalsList"><div class="library-empty">Loading…</div></div>
+      <button class="mini-btn ghostbtn" onclick="showMyLibraryPage()">📼 View my saved subliminals →</button>
 
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
@@ -726,6 +733,18 @@
       </div>
       <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
     </div>
+  </div>
+</section>
+
+<section class="mylibrary-section" id="mylibrary">
+  <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+    <div class="section-head">
+      <div class="eyebrow">Your creations</div>
+      <h2>My library</h2>
+      <p>Every subliminal you've built and saved, with the full affirmations and when you made it.</p>
+    </div>
+    <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
   </div>
 </section>
 
@@ -771,6 +790,7 @@
           <li>Full-night sessions with screen-lock playback</li>
           <li>Share your frequencies with friends and followers</li>
           <li>Request or gift a custom subliminal to someone else</li>
+          <li>Devotional chants <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
         </ul>
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
@@ -1082,6 +1102,23 @@ function buildAmbience(ctx, key, destination){
   if (key === 'none') return { stop(){} };
   const master = ctx.createGain(); master.gain.value = 1; master.connect(destination); nodes.push(master);
 
+  // If a real recorded track has been uploaded for this key (see Supabase ambience_tracks
+  // table), use it instead of the synthesized version below.
+  if (window.AMBIENCE_URLS && window.AMBIENCE_URLS[key]){
+    let stopped = false;
+    let src = null;
+    fetch(window.AMBIENCE_URLS[key])
+      .then(r => r.arrayBuffer())
+      .then(buf => ctx.decodeAudioData(buf))
+      .then(audioBuf => {
+        if (stopped) return;
+        src = ctx.createBufferSource(); src.buffer = audioBuf; src.loop = true;
+        src.connect(master); src.start();
+      })
+      .catch(e => console.error('ambience track failed to load, no fallback for this key:', key, e));
+    return { stop(){ stopped = true; if (src){ try{ src.stop(); }catch(e){} } } };
+  }
+
   function noiseLayer(color, hp, lp, gainVal){
     const src = ctx.createBufferSource(); src.buffer = makeNoiseBuffer(ctx, 4, color); src.loop = true;
     const hpF = ctx.createBiquadFilter(); hpF.type='highpass'; hpF.frequency.value = hp;
@@ -1157,7 +1194,7 @@ function prepareFinal(){
 }
 
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
-let finalStartTime=null, finalTimerInterval=null;
+let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
 let liveToneGain=null, liveBgGain=null;
 
 /* Live volume readouts + real-time gain updates while a session is playing */
@@ -1172,6 +1209,28 @@ let liveToneGain=null, liveBgGain=null;
     /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
   });
 });
+
+// A slow, warm, evolving pad — three detuned low sines with a breathing volume swell.
+// Sits quietly under everything else so the overall mix feels softer and less clinical.
+// A generic "premium ambience" layer for paid tiers, not a copy of any specific track.
+function addPremiumPadLayer(ctx, destination){
+  const padGain = ctx.createGain(); padGain.gain.value = 0;
+  padGain.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 4);
+  const padFilter = ctx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = 900;
+  padFilter.connect(padGain).connect(destination);
+
+  const voices = [110, 165, 220].map((hz, i) => {
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = hz + i*0.6;
+    o.connect(padFilter); o.start();
+    return o;
+  });
+  // Slow LFO breathing the volume up and down so it doesn't feel static
+  const lfo = ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value = 0.06;
+  const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.02;
+  lfo.connect(lfoGain).connect(padGain.gain); lfo.start();
+
+  return { stop(){ [...voices, lfo].forEach(n => { try{ n.stop(); }catch(e){} }); } };
+}
 
 function playFinal(){
   if (finalPlaying) return;
@@ -1208,6 +1267,14 @@ function playFinal(){
   bgGain.connect(finalCtx.destination);
   finalAmbience = buildAmbience(finalCtx, state.bg, bgGain);
   liveBgGain = bgGain;
+
+  // Paid tiers get an extra soft, slow-moving pad layer underneath everything —
+  // takes the edge off so the whole mix feels warmer, less clinical.
+  getMyTier().then(tier => {
+    if (tier !== 'none' && finalCtx && finalPlaying){
+      finalPremiumPad = addPremiumPadLayer(finalCtx, finalCtx.destination);
+    }
+  });
 
   let destForRecording = finalCtx.destination;
   if (state.voiceMode === 'own' && window.MediaRecorder){
@@ -1305,6 +1372,7 @@ function finishFinal(){
   }
   if (finalTone){ try{ finalTone.stop(); }catch(e){} }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
+  if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   if (finalAmbience){ finalAmbience.stop(); }
   if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
   liveToneGain = null; liveBgGain = null;
@@ -1318,6 +1386,7 @@ function stopFinal(){
   window.speechSynthesis.cancel();
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
+  if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   if (finalAmbience){ finalAmbience.stop(); finalAmbience=null; }
   if (finalRecorder && finalRecorder.state !== 'inactive'){
     finalRecorder.onstop = ()=>{ window._subliminallyDownloadBlob = new Blob(finalChunks, {type:'audio/webm'}); };
@@ -1392,6 +1461,8 @@ async function getMySubscriberRow(){
   return data; // null if they've never subscribed
 }
 
+const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, reverie: Infinity, ritual: Infinity };
+
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
   if (!currentUser){ openAuthModal(); return; }
@@ -1407,6 +1478,14 @@ async function saveSubliminal(){
     return;
   }
 
+  const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+  const subCap = TIER_SUBLIMINAL_CAPS[myTier];
+  if ((count || 0) >= subCap){
+    msg.innerHTML = `You've made ${count} subliminals — that's the limit on ${TIER_LABEL[myTier]}. <a href="#pricing" onclick="closeAuthModal();">Upgrade for more</a>.`;
+    msg.className = 'save-msg err';
+    return;
+  }
+
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
@@ -1416,7 +1495,12 @@ async function saveSubliminal(){
     background: state.bg,
     duration_seconds: seconds
   });
-  if (error){ msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err'; return; }
+  if (error){
+    console.error('saveSubliminal error:', error);
+    msg.textContent = `Couldn't save: ${error.message}`;
+    msg.className = 'save-msg err';
+    return;
+  }
   msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
 }
 
@@ -1641,21 +1725,29 @@ function renderAccountArea(){
 }
 
 /* ---------- profile ---------- */
-/* ---------- profile page toggle (separate "page" without a separate file) ---------- */
+/* ---------- page toggle: home / profile / my-library (all one file, no separate pages to keep in sync) ---------- */
 function showProfilePage(){
   if (!currentUser){ openAuthModal(); return; }
-  document.body.classList.add('view-profile');
+  document.body.setAttribute('data-view', 'profile');
   window.scrollTo(0,0);
   history.pushState({ page:'profile' }, '', '#profile');
 }
+function showMyLibraryPage(){
+  if (!currentUser){ openAuthModal(); return; }
+  document.body.setAttribute('data-view', 'mylibrary');
+  window.scrollTo(0,0);
+  history.pushState({ page:'mylibrary' }, '', '#mylibrary');
+  loadMyLibrary();
+}
 function goHome(){
-  document.body.classList.remove('view-profile');
+  document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
   history.pushState({ page:'home' }, '', location.pathname);
 }
 window.addEventListener('popstate', (e) => {
-  if (e.state && e.state.page === 'profile') document.body.classList.add('view-profile');
-  else document.body.classList.remove('view-profile');
+  if (e.state && e.state.page === 'profile') document.body.setAttribute('data-view','profile');
+  else if (e.state && e.state.page === 'mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+  else document.body.removeAttribute('data-view');
 });
 
 function renderProfileState(){
@@ -1678,26 +1770,35 @@ async function loadProfile(){
   const myTier = await getMyTier();
   document.getElementById('profileTierDisplay').textContent =
     myTier === 'none' ? 'Free account' : (myTier[0].toUpperCase()+myTier.slice(1)+' member');
+}
 
-  const list = document.getElementById('mySubliminalsList');
+async function loadMyLibrary(){
+  if (!sb || !currentUser) return;
+  const list = document.getElementById('myLibraryList');
+  list.innerHTML = '<div class="library-empty">Loading…</div>';
   const { data: subs, error } = await sb.from('subliminals').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
   if (error || !subs || !subs.length){ list.innerHTML = '<div class="library-empty">Nothing saved yet — build one and hit "Save to my library."</div>'; return; }
   list.innerHTML = subs.map(s => {
     const mins = Math.round((s.duration_seconds||0)/60);
-    const when = new Date(s.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+    const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+    const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
     return `<div class="profile-item">
-      <div>
-        <div>${s.title || (s.frequency_hz ? s.frequency_hz+' Hz' : 'Subliminal')}</div>
-        <div class="meta">${mins ? mins+' min · ' : ''}${when}</div>
+      <div class="profile-item-top">
+        <div>
+          <div>${s.title || (s.frequency_hz ? s.frequency_hz+' Hz' : 'Subliminal')}</div>
+          <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations · saved ${when}</div>
+        </div>
+        <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
-      <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
+      ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 }
+
 async function deleteMySubliminal(id){
   if (!sb || !currentUser) return;
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
-  loadProfile();
+  loadMyLibrary();
 }
 async function updateEmail(){
   const msg = document.getElementById('emailSettingsMsg');
@@ -1781,6 +1882,13 @@ async function addJournalEntry(){
    No Supabase fetch needed for it anymore. */
 
 /* ---------- boot ---------- */
+window.AMBIENCE_URLS = {};
+if (sb){
+  sb.from('ambience_tracks').select('*').then(({ data }) => {
+    if (data) data.forEach(row => { window.AMBIENCE_URLS[row.key] = row.url; });
+  });
+}
+
 if (sb){
   sb.auth.onAuthStateChange((_event, session) => {
     currentUser = session ? session.user : null;
@@ -1789,7 +1897,8 @@ if (sb){
   sb.auth.getSession().then(({ data }) => {
     currentUser = data.session ? data.session.user : null;
     renderAccountArea();
-    if (location.hash === '#profile' && currentUser) document.body.classList.add('view-profile');
+    if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
+    if (currentUser && location.hash === '#mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
   });
 } else {
   renderAccountArea();
