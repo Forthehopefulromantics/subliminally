@@ -159,6 +159,8 @@
   .mix-row label{ font-size:12px; color:var(--haze); min-width:110px; }
   .mix-row input[type=range]{ flex:1; accent-color:var(--lilac); }
   .mix-row .mix-val{ font-size:11.5px; color:var(--candle); min-width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+  .soothing-picker{ margin-top:18px; }
+  .soothing-picker label{ font-size:12.5px; color:var(--haze); display:block; margin-bottom:8px; }
   .mixer{ margin-top:16px; background:rgba(255,255,255,0.03); border-radius:14px; padding:14px 16px; border:1px solid rgba(255,255,255,0.06); }
 
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
@@ -417,7 +419,7 @@
   <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
   <h1>Your own voice becomes<br><em>your nightly environment.</em></h1>
-  <p class="hero-sub">Choose one of the nine Solfeggio frequencies, get affirmations built for what you're working through, and layer in rain, waterfall, birds, or soft guitar underneath your own voice.</p>
+  <p class="hero-sub">Choose one of the nine Solfeggio frequencies, get affirmations built for what you're working through, and layer in rain, waterfall, or birds underneath your own voice.</p>
   <div class="hero-ctas">
     <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
     <button class="btn btn-ghost" onclick="goTo('waitlist')">Join the waitlist</button>
@@ -466,7 +468,7 @@
       <div class="step-card"><div class="step-num">01</div><h3>Pick your frequency</h3><p>All nine Solfeggio tones, each with its traditional association explained.</p></div>
       <div class="step-card"><div class="step-num">02</div><h3>Tell us what you need</h3><p>One prompt, and we write 10–20 affirmations shaped around it.</p></div>
       <div class="step-card"><div class="step-num">03</div><h3>Choose your voice</h3><p>Your own voice (we recommend it) or a natural AI voice.</p></div>
-      <div class="step-card"><div class="step-num">04</div><h3>Layer your ambience</h3><p>Rain, waterfall, birds, soft guitar, ocean, and more — mixed to your levels.</p></div>
+      <div class="step-card"><div class="step-num">04</div><h3>Layer your ambience</h3><p>Rain, waterfall, birds, ocean, and more — mixed to your levels.</p></div>
       <div class="step-card"><div class="step-num">05</div><h3>Press play</h3><p>Hear it all come together, loop it, and take it with you.</p></div>
     </div>
   </div>
@@ -606,6 +608,17 @@
             <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><span class="mix-val" id="mixToneVal">55%</span></div>
             <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><span class="mix-val" id="mixBgVal">45%</span></div>
             <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><span class="mix-val" id="mixVoiceVal">90%</span></div>
+            <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><span class="mix-val" id="mixSoothingVal">45%</span></div>
+          </div>
+          <div class="soothing-picker">
+            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper, Reverie & Ritual)</span></label>
+            <div class="length-chip-grid" id="soothingChips">
+              <button class="length-chip sel" data-variant="none" onclick="pickSoothingLayer(this)">None</button>
+              <button class="length-chip" data-variant="pad" onclick="pickSoothingLayer(this)">Warm pad</button>
+              <button class="length-chip" data-variant="chimes" onclick="pickSoothingLayer(this)">Soft chimes</button>
+              <button class="length-chip" data-variant="hum" onclick="pickSoothingLayer(this)">Low hum</button>
+            </div>
+            <div class="length-msg" id="soothingMsg"></div>
           </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="startNextPhase()">Continue →</button></div>
@@ -861,14 +874,14 @@ const BACKGROUNDS = [
   { key:'none', label:'None', ic:'—' }, { key:'rain', label:'Rain', ic:'🌧' },
   { key:'ocean', label:'Ocean', ic:'🌊' }, { key:'waterfall', label:'Waterfall', ic:'💧' },
   { key:'forest', label:'Wind & forest', ic:'🌲' }, { key:'birds', label:'Birds', ic:'🐦' },
-  { key:'guitar', label:'Soft guitar', ic:'🎸' }, { key:'thunder', label:'Distant storm', ic:'⛈' },
+  { key:'thunder', label:'Distant storm', ic:'⛈' },
   { key:'brown', label:'Brown noise', ic:'▮' },
 ];
 
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5 };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none' };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -883,7 +896,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5 };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none' };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -892,6 +905,10 @@ function resetFlow(){
   document.getElementById('downloadBtn').disabled = true;
   const defaultChip = document.querySelector('.length-chip[data-min="5"]');
   if (defaultChip) defaultChip.classList.add('sel');
+  const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
+  if (defaultSoothing) defaultSoothing.classList.add('sel');
+  document.getElementById('soothingMixRow').style.display = 'none';
+  document.getElementById('soothingMsg').textContent = '';
   document.getElementById('lengthMsg').textContent = '';
   document.getElementById('sessionTarget').textContent = '';
   showStep(0);
@@ -1159,12 +1176,6 @@ function buildAmbience(ctx, key, destination){
     const id = setInterval(()=>{ chirp(ctx.currentTime + Math.random()*0.2, master); if (Math.random()<0.4) chirp(ctx.currentTime+0.3, master); }, 900);
     timers.push(id);
   }
-  else if (key === 'guitar'){
-    const notes = [196.0, 233.1, 261.6, 293.7, 349.2, 293.7, 261.6, 233.1];
-    let idx = 0;
-    const id = setInterval(()=>{ pluck(notes[idx % notes.length], ctx.currentTime + 0.02, master); idx++; }, 900);
-    timers.push(id);
-  }
   else if (key === 'thunder'){
     noiseLayer('brown', 40, 500, 0.18);
     const id = setInterval(()=>{
@@ -1195,10 +1206,47 @@ function prepareFinal(){
 
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
-let liveToneGain=null, liveBgGain=null;
+let liveToneGain=null, liveBgGain=null, liveSoothingGain=null;
+
+/* ---------- soothing layer picker ---------- */
+async function pickSoothingLayer(btn){
+  const msg = document.getElementById('soothingMsg');
+  const variant = btn.dataset.variant;
+  msg.textContent = '';
+
+  if (variant !== 'none'){
+    if (!currentUser){
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+    const myTier = await getMyTier();
+    if (myTier === 'none'){
+      msg.innerHTML = `The soothing layer is included on Whisper, Reverie & Ritual — <a href="#pricing">see plans</a>.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+  }
+
+  document.querySelectorAll('#soothingChips .length-chip').forEach(c => c.classList.remove('sel'));
+  btn.classList.add('sel');
+  state.soothingLayer = variant;
+  document.getElementById('soothingMixRow').style.display = variant === 'none' ? 'none' : 'flex';
+  if (finalPlaying) restartSoothingLayer();
+}
+function restartSoothingLayer(){
+  if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
+  if (state.soothingLayer && state.soothingLayer !== 'none' && finalCtx){
+    const g = finalCtx.createGain();
+    g.gain.value = document.getElementById('mixSoothing').value/100 * 0.4;
+    g.connect(finalCtx.destination);
+    liveSoothingGain = g;
+    finalPremiumPad = addPremiumPadLayer(finalCtx, finalCtx.destination, state.soothingLayer, g);
+  }
+}
 
 /* Live volume readouts + real-time gain updates while a session is playing */
-['mixTone','mixBg','mixVoice'].forEach(id=>{
+['mixTone','mixBg','mixVoice','mixSoothing'].forEach(id=>{
   const el = document.getElementById(id);
   const readout = document.getElementById(id+'Val');
   el.addEventListener('input', ()=>{
@@ -1206,6 +1254,7 @@ let liveToneGain=null, liveBgGain=null;
     if (!finalPlaying) return;
     if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = el.value/100 * 0.10;
     if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = el.value/100;
+    if (id==='mixSoothing' && liveSoothingGain) liveSoothingGain.gain.value = el.value/100 * 0.4;
     /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
   });
 });
@@ -1213,22 +1262,45 @@ let liveToneGain=null, liveBgGain=null;
 // A slow, warm, evolving pad — three detuned low sines with a breathing volume swell.
 // Sits quietly under everything else so the overall mix feels softer and less clinical.
 // A generic "premium ambience" layer for paid tiers, not a copy of any specific track.
-function addPremiumPadLayer(ctx, destination){
-  const padGain = ctx.createGain(); padGain.gain.value = 0;
-  padGain.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 4);
-  const padFilter = ctx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = 900;
-  padFilter.connect(padGain).connect(destination);
+function addPremiumPadLayer(ctx, destination, variant, gainNode){
+  const padGain = gainNode || ctx.createGain();
+  if (!gainNode){ padGain.gain.value = 0; padGain.gain.linearRampToValueAtTime(0.045, ctx.currentTime + 4); padGain.connect(destination); }
 
+  if (variant === 'chimes'){
+    const timers = [];
+    const notes = [523.3, 587.3, 659.3, 784.0, 880.0];
+    const id = setInterval(()=>{
+      if (Math.random() < 0.5){
+        const hz = notes[Math.floor(Math.random()*notes.length)];
+        const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = hz;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, ctx.currentTime);
+        g.gain.linearRampToValueAtTime(0.3, ctx.currentTime+0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+3.5);
+        o.connect(g).connect(padGain); o.start(); o.stop(ctx.currentTime+3.6);
+      }
+    }, 2600);
+    timers.push(id);
+    return { stop(){ timers.forEach(clearInterval); } };
+  }
+
+  if (variant === 'hum'){
+    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = 55;
+    const filter = ctx.createBiquadFilter(); filter.type='lowpass'; filter.frequency.value=180;
+    o.connect(filter).connect(padGain); o.start();
+    return { stop(){ try{ o.stop(); }catch(e){} } };
+  }
+
+  // default: 'pad' — a warm, slow-moving three-voice drone
+  const padFilter = ctx.createBiquadFilter(); padFilter.type='lowpass'; padFilter.frequency.value = 900;
+  padFilter.connect(padGain);
   const voices = [110, 165, 220].map((hz, i) => {
     const o = ctx.createOscillator(); o.type='sine'; o.frequency.value = hz + i*0.6;
     o.connect(padFilter); o.start();
     return o;
   });
-  // Slow LFO breathing the volume up and down so it doesn't feel static
   const lfo = ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value = 0.06;
   const lfoGain = ctx.createGain(); lfoGain.gain.value = 0.02;
   lfo.connect(lfoGain).connect(padGain.gain); lfo.start();
-
   return { stop(){ [...voices, lfo].forEach(n => { try{ n.stop(); }catch(e){} }); } };
 }
 
@@ -1268,13 +1340,9 @@ function playFinal(){
   finalAmbience = buildAmbience(finalCtx, state.bg, bgGain);
   liveBgGain = bgGain;
 
-  // Paid tiers get an extra soft, slow-moving pad layer underneath everything —
-  // takes the edge off so the whole mix feels warmer, less clinical.
-  getMyTier().then(tier => {
-    if (tier !== 'none' && finalCtx && finalPlaying){
-      finalPremiumPad = addPremiumPadLayer(finalCtx, finalCtx.destination);
-    }
-  });
+  // The soothing layer only plays if the person actually chose one in the ambience step
+  // (and their tier allows it — see pickSoothingLayer). Not automatic.
+  restartSoothingLayer();
 
   let destForRecording = finalCtx.destination;
   if (state.voiceMode === 'own' && window.MediaRecorder){
@@ -1788,11 +1856,30 @@ async function loadMyLibrary(){
           <div>${s.title || (s.frequency_hz ? s.frequency_hz+' Hz' : 'Subliminal')}</div>
           <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations · saved ${when}</div>
         </div>
+        <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
       ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+async function loadSavedIntoBuilder(id){
+  if (!sb || !currentUser) return;
+  const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
+  if (error || !s) return;
+  const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
+  state.freq = matchedFreq;
+  state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
+  state.bg = s.background || 'none';
+  state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
+  // We only ever save the affirmation text, not the audio you recorded — so reloading
+  // plays it back with the AI voice. Recording your own voice again is one click away in the flow.
+  state.voiceMode = 'ai';
+  goHome();
+  showStep(7);
+  prepareFinal();
+  setTimeout(() => goTo('flow-section'), 50);
 }
 
 async function deleteMySubliminal(id){
