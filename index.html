@@ -302,6 +302,8 @@
   /* ---- account area / auth modal ---- */
   #authArea{ display:flex; align-items:center; gap:10px; }
   .account-chip{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--haze); }
+  .nav-avatar{ width:26px; height:26px; border-radius:50%; background:var(--dusk); display:flex; align-items:center; justify-content:center; font-size:14px; overflow:hidden; flex-shrink:0; }
+  .nav-avatar img{ width:100%; height:100%; object-fit:cover; }
   .account-chip b{ color:var(--moonlight); font-weight:500; }
   .account-chip button{ background:none; border:none; color:var(--haze); cursor:pointer; font-size:12.5px; text-decoration:underline; padding:0; }
   .account-chip button:hover{ color:var(--candle); }
@@ -876,6 +878,19 @@
         </div>
       </div>
       <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
+
+      <h3 class="profile-subhead">Get in touch</h3>
+      <div class="journal-tabs" style="max-width:340px;">
+        <button class="active" data-fbtab="support" onclick="setFeedbackTab('support')">Contact support</button>
+        <button data-fbtab="idea" onclick="setFeedbackTab('idea')">Share an idea</button>
+      </div>
+      <div class="profile-field-card" style="max-width:520px; margin-top:16px;">
+        <label id="feedbackLabel">What's going on?</label>
+        <textarea id="feedbackMessage" rows="4" placeholder="Tell us what happened, as much detail as helps." style="width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; font-family:inherit; resize:vertical; margin-bottom:10px;"></textarea>
+        <button class="mini-btn ghostbtn" onclick="submitFeedback()" id="feedbackSubmitBtn">Send to support</button>
+        <div class="save-msg" id="feedbackMsg"></div>
+        <p style="font-size:11.5px; color:var(--haze); margin-top:12px;">Prefer email? Reach us directly at <a href="mailto:hello@subliminallybyfthr.com" style="color:var(--lilac);">hello@subliminallybyfthr.com</a></p>
+      </div>
     </div>
   </div>
 </section>
@@ -1605,7 +1620,8 @@ const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Rever
 
 async function getMyTier(){
   const subRow = await getMySubscriberRow();
-  return (subRow && subRow.status === 'active' && subRow.tier) ? subRow.tier : 'none';
+  const validStatuses = ['active', 'trialing'];
+  return (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
 }
 
 async function pickLength(btn){
@@ -1727,7 +1743,7 @@ async function downloadFinal(){
   if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
 
   const subRow = await getMySubscriberRow();
-  const tier = subRow && subRow.status === 'active' ? subRow.tier : null;
+  const tier = subRow && ['active','trialing'].includes(subRow.status) ? subRow.tier : null;
   const cap = TIER_DOWNLOAD_CAPS[tier] || 0;
   const used = (subRow && subRow.downloads_used) || 0;
 
@@ -2032,13 +2048,26 @@ async function logOut(){
 function renderAccountArea(){
   const area = document.getElementById('authArea');
   if (currentUser){
-    area.innerHTML = `<div class="account-chip"><button class="profile-icon-btn" onclick="showProfilePage()" title="Your profile"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button><b>${currentUser.email}</b><button onclick="logOut()">Log out</button></div>`;
+    area.innerHTML = `<div class="account-chip"><span class="nav-avatar" id="navAvatar">🌙</span><b id="navChipName">${currentUser.email.split('@')[0]}</b><button class="profile-icon-btn" onclick="showProfilePage()" title="Your profile"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button><button onclick="logOut()">Log out</button></div>`;
+    loadNavIdentity();
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
   renderJournalState();
   renderProfileState();
   renderMyLibraryState();
+}
+async function loadNavIdentity(){
+  if (!sb || !currentUser) return;
+  const { data: prof } = await sb.from('profiles').select('username, full_name, avatar, avatar_url').eq('id', currentUser.id).maybeSingle();
+  const nameEl = document.getElementById('navChipName');
+  const avatarEl = document.getElementById('navAvatar');
+  if (!nameEl || !avatarEl) return; // nav may have re-rendered already
+  if (prof){
+    nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
+    if (prof.avatar_url){ avatarEl.innerHTML = `<img src="${prof.avatar_url}" alt="">`; }
+    else if (prof.avatar){ avatarEl.textContent = prof.avatar; }
+  }
 }
 
 /* ---------- profile ---------- */
@@ -2218,6 +2247,35 @@ async function updatePassword(){
   if (error){ msg.textContent = error.message; msg.className = 'save-msg err'; return; }
   msg.textContent = 'Password updated.'; msg.className = 'save-msg ok';
   document.getElementById('settingsPassword').value = '';
+}
+
+/* ---------- contact support / share an idea ---------- */
+let feedbackTab = 'support';
+function setFeedbackTab(tab){
+  feedbackTab = tab;
+  document.querySelectorAll('[data-fbtab]').forEach(b => b.classList.toggle('active', b.dataset.fbtab === tab));
+  document.getElementById('feedbackLabel').textContent = tab === 'support' ? "What's going on?" : "What's your idea?";
+  document.getElementById('feedbackMessage').placeholder = tab === 'support'
+    ? 'Tell us what happened, as much detail as helps.'
+    : 'A feature, a tweak, a "what if" — we read all of these.';
+  document.getElementById('feedbackSubmitBtn').textContent = tab === 'support' ? 'Send to support' : 'Send idea';
+  document.getElementById('feedbackMsg').textContent = '';
+}
+async function submitFeedback(){
+  const msg = document.getElementById('feedbackMsg');
+  const message = document.getElementById('feedbackMessage').value.trim();
+  if (!message){ msg.textContent = 'Write a bit first.'; msg.className = 'save-msg err'; return; }
+  if (!sb){ msg.textContent = "Can't send right now — try emailing hello@subliminallybyfthr.com directly."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Sending…'; msg.className = 'save-msg';
+  const { error } = await sb.from('feedback').insert({
+    user_id: currentUser ? currentUser.id : null,
+    type: feedbackTab,
+    message,
+    contact_email: currentUser ? currentUser.email : null
+  });
+  if (error){ msg.textContent = "Couldn't send — try emailing hello@subliminallybyfthr.com directly."; msg.className = 'save-msg err'; return; }
+  msg.textContent = "Sent — thank you. We read every one of these."; msg.className = 'save-msg ok';
+  document.getElementById('feedbackMessage').value = '';
 }
 
 /* ---------- journal ---------- */
