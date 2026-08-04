@@ -79,6 +79,10 @@
   .quote-card p{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--moonlight); line-height:1.5; }
   .quote-card .who{ margin-top:16px; font-size:12.5px; color:var(--lilac); }
   .quote-card .who span{ display:block; font-size:11px; color:var(--haze); margin-top:2px; }
+  .reprogram-body{ max-width:680px; margin:52px auto 0; }
+  .reprogram-body h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); margin-top:32px; }
+  .reprogram-body h3:first-child{ margin-top:0; }
+  .reprogram-body p{ font-size:14px; color:var(--haze); line-height:1.7; margin-top:10px; }
 
   .how{ padding:76px 0; }
   .section-head{ text-align:center; margin-bottom:40px; }
@@ -218,11 +222,17 @@
   .save-msg.err{ color:#E39A9A; }
   .save-msg.ok{ color:var(--candle); }
   body[data-view="profile"] > nav ~ section:not(#profile),
-  body[data-view="mylibrary"] > nav ~ section:not(#mylibrary){ display:none !important; }
+  body[data-view="mylibrary"] > nav ~ section:not(#mylibrary),
+  body[data-view="journal"] > nav ~ section:not(#journal),
+  body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
   body[data-view="profile"] > footer,
-  body[data-view="mylibrary"] > footer{ display:none !important; }
+  body[data-view="mylibrary"] > footer,
+  body[data-view="journal"] > footer,
+  body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
   body:not([data-view="mylibrary"]) #mylibrary{ display:none !important; }
+  body:not([data-view="journal"]) #journal{ display:none !important; }
+  body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
   .profile-page-back{ display:none; }
   body[data-view] .profile-page-back{ display:inline-flex; }
   .profile-icon-btn{ background:none; border:none; cursor:pointer; font-size:17px; color:var(--haze); padding:0; line-height:1; transition:color .2s; }
@@ -289,6 +299,10 @@
   .modal-sub{ font-size:13px; color:var(--haze); margin-top:6px; }
   .auth-field{ margin-top:16px; }
   .auth-field label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
+  .pw-wrap{ position:relative; }
+  .pw-wrap input{ padding-right:42px !important; }
+  .pw-toggle{ position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:15px; opacity:0.6; padding:0; }
+  .pw-toggle:hover{ opacity:1; }
   .auth-field input, .auth-field select{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:12px 14px; color:var(--moonlight); font-size:14px; outline:none; transition:border-color .2s; font-family:inherit; }
   .auth-field input:focus, .auth-field select:focus{ border-color:var(--candle); }
   .auth-msg{ font-size:12.5px; min-height:16px; margin-top:10px; }
@@ -344,7 +358,8 @@
     <button onclick="goHome(); goTo('flow-section')">Build yours</button>
     <button onclick="goHome(); goTo('library')">Library</button>
     <button onclick="showMyLibraryPage()">My Library</button>
-    <button onclick="goHome(); goTo('journal')">Journal</button>
+    <button onclick="showJournalPage()">Journal</button>
+    <button onclick="showReprogramPage()">The Science</button>
     <button onclick="goHome(); goTo('pricing')">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
@@ -362,7 +377,17 @@
     </div>
     <div class="auth-field">
       <label>Password</label>
-      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+      <div class="pw-wrap">
+        <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPassword', this)">👁</button>
+      </div>
+    </div>
+    <div class="auth-field" id="confirmPwField">
+      <label>Confirm password</label>
+      <div class="pw-wrap">
+        <input type="password" id="authPasswordConfirm" placeholder="••••••••" autocomplete="new-password">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPasswordConfirm', this)">👁</button>
+      </div>
     </div>
     <div class="auth-msg" id="authMsg"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Create a free account</button>
@@ -453,6 +478,55 @@
         <p>"Your subconscious mind runs about 95 to 99 percent of your life."</p>
         <div class="who">Dr. Bruce Lipton<span>Cell biologist, author of "The Biology of Belief"</span></div>
       </div>
+    </div>
+    <div style="text-align:center; margin-top:36px;">
+      <button class="btn btn-ghost" onclick="showReprogramPage()">Go deeper on the science →</button>
+    </div>
+  </div>
+</section>
+
+<section class="science reprogram-page" id="reprogram">
+  <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+    <div class="section-head">
+      <div class="eyebrow">The Science</div>
+      <h2>How repetition actually reprograms your mind</h2>
+      <p>The short version from the home page, expanded — what's genuinely established, and how it maps to what happens when you build a session here.</p>
+    </div>
+
+    <div class="science-stat">
+      <div class="conscious"><div class="num">40 bits/sec</div><div class="lbl">Conscious mind</div></div>
+      <div class="subconscious"><div class="num">11,000,000 bits/sec</div><div class="lbl">Subconscious mind</div></div>
+    </div>
+    <p class="science-stat-note">Your subconscious processes roughly <b>275,000 times</b> more information per second than your conscious mind — <em>Encyclopedia Britannica</em>. Most of what shapes your mood, habits, and self-talk was never consciously decided; it was absorbed through repetition, long before you could evaluate it critically.</p>
+
+    <div class="quote-grid">
+      <div class="quote-card">
+        <p>"Until you make the unconscious conscious, it will direct your life and you will call it fate."</p>
+        <div class="who">Carl Jung<span>Psychiatrist, founder of analytical psychology</span></div>
+      </div>
+      <div class="quote-card">
+        <p>"I regard consciousness as fundamental. I regard matter as derivative from consciousness."</p>
+        <div class="who">Max Planck<span>Nobel laureate, founder of quantum theory</span></div>
+      </div>
+      <div class="quote-card">
+        <p>"Your subconscious mind runs about 95 to 99 percent of your life."</p>
+        <div class="who">Dr. Bruce Lipton<span>Cell biologist, author of "The Biology of Belief"</span></div>
+      </div>
+    </div>
+
+    <div class="reprogram-body">
+      <h3>Why repetition specifically</h3>
+      <p>Neuroplasticity — the brain's ability to physically reorganize itself — is one of the best-established findings in modern neuroscience. Neural pathways strengthen with repeated activation and weaken with disuse; it's the same basic mechanism behind learning a language or a habit. Hearing the same affirming line, in your own voice, night after night, is repetition doing what repetition reliably does: strengthening a pathway.</p>
+
+      <h3>Why your own voice, specifically</h3>
+      <p>Self-referential information — things framed as being about you, said by you — tends to get processed more deeply than the same information heard from a stranger. It's a big part of why journaling and self-talk work as therapeutic tools in the first place. That's the actual reasoning behind recommending your own voice over a generic narrator here.</p>
+
+      <h3>Why right before sleep</h3>
+      <p>In the relaxed, drowsy window before sleep, the mind's usual critical filtering eases. This is well-documented territory in sleep research — it's part of why racing thoughts feel louder at bedtime, and why calming input in that window tends to land differently than the same input during an alert, busy day.</p>
+
+      <h3>An honest caveat</h3>
+      <p>"Subliminal" messaging specifically — information presented below the threshold of conscious perception — has a genuinely mixed scientific record, and some of the earliest famous claims about it (like the 1950s "eat popcorn" theater experiment) were later admitted to be fabricated. What this app actually does is closer to conscious, repeated self-affirmation in a relaxed state layered with calming sound — a more modest and better-supported claim than "bypassing your mind entirely," and, we think, an honest one.</p>
     </div>
   </div>
 </section>
@@ -676,6 +750,7 @@
 
 <section class="journal-section" id="journal">
   <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your record</div>
       <h2>Your gratitude journal</h2>
@@ -1555,13 +1630,30 @@ async function saveSubliminal(){
   }
 
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
+
+  let recordingUrls = null;
+  if (state.voiceMode === 'own' && recordings.some(r => r)){
+    msg.textContent = 'Uploading your voice…'; msg.className = 'save-msg';
+    const folder = `${currentUser.id}/${Date.now()}`;
+    recordingUrls = [];
+    for (let i = 0; i < recordings.length; i++){
+      if (!recordings[i] || !recordings[i].blob){ recordingUrls.push(null); continue; }
+      const path = `${folder}/${i}.webm`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: 'audio/webm' });
+      if (upErr){ console.error('recording upload failed for line', i, upErr); recordingUrls.push(null); continue; }
+      recordingUrls.push(path); // store the storage path; we generate a signed URL when loading it back
+    }
+    msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  }
+
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
     title: (state.freq ? state.freq.hz + ' Hz' : 'My subliminal'),
     frequency_hz: state.freq ? state.freq.hz : null,
     affirmations: state.affirmations,
     background: state.bg,
-    duration_seconds: seconds
+    duration_seconds: seconds,
+    recording_urls: recordingUrls
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -1670,9 +1762,16 @@ function toggleAuthMode(){
   authMode = authMode === 'signup' ? 'login' : 'signup';
   document.getElementById('authTitle').textContent = authMode === 'signup' ? 'Create your account' : 'Welcome back';
   document.getElementById('authSubmitBtn').textContent = authMode === 'signup' ? 'Create a free account' : 'Log in';
+  document.getElementById('confirmPwField').style.display = authMode === 'signup' ? 'block' : 'none';
   document.getElementById('authToggle').innerHTML = authMode === 'signup'
     ? `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`
     : `New here? <button onclick="toggleAuthMode()">Create a free account</button>`;
+}
+function togglePwVisibility(inputId, btn){
+  const input = document.getElementById(inputId);
+  const showing = input.type === 'text';
+  input.type = showing ? 'password' : 'text';
+  btn.textContent = showing ? '👁' : '🙈';
 }
 async function submitAuth(){
   if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
@@ -1680,6 +1779,11 @@ async function submitAuth(){
   const password = document.getElementById('authPassword').value;
   const msg = document.getElementById('authMsg');
   if (!email || !password){ msg.textContent = 'Enter an email and password.'; msg.className = 'auth-msg err'; return; }
+  if (authMode === 'signup'){
+    const confirmPw = document.getElementById('authPasswordConfirm').value;
+    if (password.length < 6){ msg.textContent = 'Password needs at least 6 characters.'; msg.className = 'auth-msg err'; return; }
+    if (password !== confirmPw){ msg.textContent = "Passwords don't match — check both fields."; msg.className = 'auth-msg err'; return; }
+  }
   msg.textContent = 'Working on it…'; msg.className = 'auth-msg';
   const wasSignup = authMode === 'signup';
   const { data, error } = wasSignup
@@ -1807,14 +1911,27 @@ function showMyLibraryPage(){
   history.pushState({ page:'mylibrary' }, '', '#mylibrary');
   loadMyLibrary();
 }
+function showJournalPage(){
+  document.body.setAttribute('data-view', 'journal');
+  window.scrollTo(0,0);
+  history.pushState({ page:'journal' }, '', '#journal');
+}
+function showReprogramPage(){
+  document.body.setAttribute('data-view', 'reprogram');
+  window.scrollTo(0,0);
+  history.pushState({ page:'reprogram' }, '', '#reprogram');
+}
 function goHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
   history.pushState({ page:'home' }, '', location.pathname);
 }
 window.addEventListener('popstate', (e) => {
-  if (e.state && e.state.page === 'profile') document.body.setAttribute('data-view','profile');
-  else if (e.state && e.state.page === 'mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+  const page = e.state && e.state.page;
+  if (page === 'profile') document.body.setAttribute('data-view','profile');
+  else if (page === 'mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+  else if (page === 'journal') document.body.setAttribute('data-view','journal');
+  else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
   else document.body.removeAttribute('data-view');
 });
 
@@ -1873,9 +1990,27 @@ async function loadSavedIntoBuilder(id){
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
   state.bg = s.background || 'none';
   state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
-  // We only ever save the affirmation text, not the audio you recorded — so reloading
-  // plays it back with the AI voice. Recording your own voice again is one click away in the flow.
-  state.voiceMode = 'ai';
+
+  const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
+  if (hasRealRecordings){
+    recordings = [];
+    for (const path of s.recording_urls){
+      if (!path){ recordings.push(null); continue; }
+      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+      if (sErr || !signed){ recordings.push(null); continue; }
+      try {
+        const res = await fetch(signed.signedUrl);
+        const blob = await res.blob();
+        recordings.push({ url: URL.createObjectURL(blob), blob });
+      } catch(e){ recordings.push(null); }
+    }
+    state.voiceMode = 'own';
+  } else {
+    // No recorded audio was saved for this one (or it was AI voice originally) —
+    // reloading plays it back with the AI voice instead.
+    state.voiceMode = 'ai';
+  }
+
   goHome();
   showStep(7);
   prepareFinal();
@@ -1986,6 +2121,8 @@ if (sb){
     renderAccountArea();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (currentUser && location.hash === '#mylibrary'){ document.body.setAttribute('data-view','mylibrary'); loadMyLibrary(); }
+    if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
+    if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
   });
 } else {
   renderAccountArea();
