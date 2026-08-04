@@ -50,15 +50,21 @@ async function verifyStripeSignature(rawBody, sigHeader, secret) {
 }
 
 async function supabaseRequest(path, options) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+  } catch (e) {
+    throw new Error(`Network error calling Supabase at "${url}": ${e.message}`);
+  }
   if (!res.ok) {
     const text = await res.text();
     console.error('Supabase request failed:', res.status, text);
@@ -83,9 +89,14 @@ async function updateByStripeCustomerId(customerId, patch) {
 }
 
 async function fetchStripeSubscription(subscriptionId) {
-  const res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
-    headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}` },
-  });
+  let res;
+  try {
+    res = await fetch(`https://api.stripe.com/v1/subscriptions/${subscriptionId}`, {
+      headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}` },
+    });
+  } catch (e) {
+    throw new Error(`Network error calling Stripe: ${e.message}`);
+  }
   const json = await res.json();
   if (!res.ok) {
     throw new Error(`Stripe subscription lookup failed (${res.status}): ${JSON.stringify(json)}`);
@@ -96,6 +107,22 @@ async function fetchStripeSubscription(subscriptionId) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
+    return;
+  }
+
+  // Fail loudly and specifically if any required env var is missing/empty —
+  // this is what usually causes a mysterious "fetch failed" downstream.
+  const missing = [];
+  if (!STRIPE_SECRET_KEY) missing.push('STRIPE_SECRET_KEY');
+  if (!STRIPE_WEBHOOK_SECRET) missing.push('STRIPE_WEBHOOK_SECRET');
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (missing.length) {
+    res.status(500).json({ error: 'Missing environment variables', detail: missing.join(', ') });
+    return;
+  }
+  if (!/^https:\/\/.+\.supabase\.co$/.test(SUPABASE_URL.trim())) {
+    res.status(500).json({ error: 'SUPABASE_URL looks malformed', detail: `Current value: "${SUPABASE_URL}" — should look like https://xxxxx.supabase.co with no trailing slash, quotes, or spaces.` });
     return;
   }
 
