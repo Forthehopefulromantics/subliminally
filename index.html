@@ -257,7 +257,11 @@
   .profile-avatar{ width:64px; height:64px; border-radius:50%; background:var(--dusk); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; flex-shrink:0; }
   .profile-avatar img{ width:100%; height:100%; object-fit:cover; }
   .profile-name{ font-family:var(--serif); font-size:20px; color:var(--moonlight); }
-  .profile-tier{ font-size:12.5px; color:var(--lilac); margin-top:2px; }
+  .tier-badge{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; margin-top:6px; padding:5px 14px; border-radius:999px; letter-spacing:.02em; }
+  .tier-badge[data-tier="none"]{ background:rgba(255,255,255,0.06); color:var(--haze); }
+  .tier-badge[data-tier="whisper"]{ background:rgba(185,167,232,0.18); color:var(--lilac); }
+  .tier-badge[data-tier="reverie"]{ background:rgba(227,190,127,0.16); color:var(--candle); }
+  .tier-badge[data-tier="ritual"]{ background:linear-gradient(135deg, rgba(227,190,127,0.28), rgba(185,167,232,0.28)); color:var(--moonlight); border:1px solid rgba(227,190,127,0.4); }
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
   .mylibrary-section{ padding:80px 0; }
@@ -302,6 +306,9 @@
   /* ---- account area / auth modal ---- */
   #authArea{ display:flex; align-items:center; gap:10px; }
   .account-chip{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--haze); }
+  .nav-identity{ display:flex; align-items:center; gap:8px; background:none; border:none; cursor:pointer; padding:2px 4px; border-radius:20px; transition:background .2s; }
+  .nav-identity:hover{ background:rgba(255,255,255,0.06); }
+  .nav-identity b{ color:var(--moonlight); font-weight:500; }
   .nav-avatar{ width:26px; height:26px; border-radius:50%; background:var(--dusk); display:flex; align-items:center; justify-content:center; font-size:14px; overflow:hidden; flex-shrink:0; }
   .nav-avatar img{ width:100%; height:100%; object-fit:cover; }
   .account-chip b{ color:var(--moonlight); font-weight:500; }
@@ -733,15 +740,9 @@
       <!-- STEP 5: background ambience + mixer -->
       <div class="flow-step" data-step="5">
         <div class="flow-title">Layer your ambience</div>
-        <div class="flow-sub">Generated live in your browser — mix it under your frequency and voice.</div>
+        <div class="flow-sub">Generated live in your browser. You'll adjust every layer's volume on the final screen, once you can hear it.</div>
         <div class="flow-body">
           <div class="bg-grid" id="bgGrid"></div>
-          <div class="mixer">
-            <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><span class="mix-val" id="mixToneVal">55%</span></div>
-            <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><span class="mix-val" id="mixBgVal">45%</span></div>
-            <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><span class="mix-val" id="mixVoiceVal">90%</span></div>
-            <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><span class="mix-val" id="mixSoothingVal">45%</span></div>
-          </div>
           <div class="soothing-picker">
             <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper, Reverie & Ritual)</span></label>
             <div class="length-chip-grid" id="soothingChips">
@@ -751,6 +752,15 @@
               <button class="length-chip" data-variant="hum" onclick="pickSoothingLayer(this)">Low hum</button>
             </div>
             <div class="length-msg" id="soothingMsg"></div>
+          </div>
+          <div class="soothing-picker">
+            <label>Your own track <span style="color:var(--haze); font-weight:400;">(Ritual only — layer a melody of your choice underneath everything)</span></label>
+            <div id="customTrackArea">
+              <button class="mini-btn ghostbtn" onclick="triggerCustomTrackUpload()">Upload a track</button>
+              <input type="file" id="customTrackFile" accept="audio/*" style="display:none;">
+              <span id="customTrackName" style="font-size:12.5px; color:var(--lilac); margin-left:10px;"></span>
+            </div>
+            <div class="length-msg" id="customTrackMsg"></div>
           </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="startNextPhase()">Continue →</button></div>
@@ -786,17 +796,23 @@
             <div class="orb-wrap final-orb"><div class="orb"></div><div class="orb-inner"></div></div>
             <div class="final-title" id="finalTitle">528 Hz</div>
             <div class="final-line" id="finalLine">"…"</div>
+            <div class="mixer">
+              <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><span class="mix-val" id="mixToneVal">55%</span></div>
+              <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><span class="mix-val" id="mixBgVal">45%</span></div>
+              <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><span class="mix-val" id="mixVoiceVal">90%</span></div>
+              <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><span class="mix-val" id="mixSoothingVal">45%</span></div>
+              <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><span class="mix-val" id="mixCustomVal">50%</span></div>
+            </div>
             <div class="session-target" id="sessionTarget"></div>
             <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
               <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
               <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save to my library</button>
-              <button class="mini-btn ghostbtn" id="downloadBtn" onclick="downloadFinal()" disabled><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download</button>
               <button class="mini-btn ghostbtn" onclick="resetFlow()">Start over</button>
             </div>
             <div class="save-msg" id="saveMsg"></div>
-            <div class="demo-note" id="finalNote">This is a waking preview. The full nightly ritual — playing all night with the screen locked, plus an alarm — is coming to the Subliminally app.</div>
+            <div class="demo-note" id="finalNote">Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.</div>
           </div>
         </div>
         <div class="flow-nav"><span></span><button class="mini-btn candlebtn" onclick="goTo('waitlist')">Join the waitlist →</button></div>
@@ -856,7 +872,7 @@
         <div class="profile-avatar" id="profileAvatarDisplay">🌙</div>
         <div>
           <div class="profile-name" id="profileNameDisplay">—</div>
-          <div class="profile-tier" id="profileTierDisplay">Free account</div>
+          <div class="tier-badge" id="profileTierDisplay" data-tier="none">Free account</div>
         </div>
       </div>
 
@@ -910,8 +926,8 @@
         <ul class="price-feats">
           <li>All nine Solfeggio frequencies</li>
           <li>Custom affirmations, your voice or AI voice</li>
-          <li>Nature sound layers</li>
-          <li>Save and replay your sessions</li>
+          <li>Nature sounds + extra soothing layer (warm pad, chimes, hum)</li>
+          <li>Save up to 10 subliminals to your library</li>
         </ul>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00')">Get Whisper</a>
       </div>
@@ -921,9 +937,9 @@
         <div class="limit">Sessions up to 2 hours</div>
         <ul class="price-feats">
           <li>Everything in Whisper</li>
+          <li>Unlimited saved subliminals</li>
           <li>15-minute visualization sessions for athletes &amp; artists</li>
           <li>Success-story narration instead of affirmations</li>
-          <li>Performance-specific frequency pairings</li>
         </ul>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
       </div>
@@ -935,13 +951,14 @@
         <ul class="price-feats">
           <li>Everything in Reverie</li>
           <li>Full-night sessions with screen-lock playback</li>
+          <li>Upload your own track to layer underneath everything</li>
           <li>Share your frequencies with friends and followers</li>
-          <li>Request or gift a custom subliminal to someone else</li>
           <li>Devotional chants <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
         </ul>
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
     </div>
+    <p style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon) — no downloads, so your ritual stays with your membership.</p>
     <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Already a member? Manage your subscription →</a></div>
   </div>
 </section>
@@ -969,6 +986,8 @@
         <button onclick="goTo('flow-section')">Build yours</button>
         <button onclick="goTo('pricing')">Pricing</button>
         <button onclick="goTo('waitlist')">Waitlist</button>
+        <a href="/terms.html" style="color:var(--haze); text-decoration:none; font-size:13px;">Terms</a>
+        <a href="/privacy.html" style="color:var(--haze); text-decoration:none; font-size:13px;">Privacy</a>
       </div>
     </div>
     <div class="footer-copy">Subliminally by FTHR (For The Hopeful Romantics) — Frequency associations come from cultural and spiritual traditions, not medical treatment.</div>
@@ -1036,7 +1055,6 @@ function resetFlow(){
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
   document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
-  document.getElementById('downloadBtn').disabled = true;
   const defaultChip = document.querySelector('.length-chip[data-min="5"]');
   if (defaultChip) defaultChip.classList.add('sel');
   const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
@@ -1045,6 +1063,10 @@ function resetFlow(){
   document.getElementById('soothingMsg').textContent = '';
   document.getElementById('lengthMsg').textContent = '';
   document.getElementById('sessionTarget').textContent = '';
+  customTrackBlob = null;
+  document.getElementById('customTrackName').textContent = '';
+  document.getElementById('customTrackMsg').textContent = '';
+  document.getElementById('customMixRow').style.display = 'none';
   showStep(0);
 }
 
@@ -1332,17 +1354,45 @@ function buildAmbience(ctx, key, destination){
 function prepareFinal(){
   document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
-  document.getElementById('downloadBtn').disabled = (state.voiceMode !== 'own');
-  document.getElementById('finalNote').textContent = state.voiceMode === 'ai'
-    ? "AI-voice sessions play live in this tab but can't be downloaded as a file — that limitation lifts once this becomes a full app."
-    : "This is a waking preview. The full nightly ritual — playing all night with the screen locked, plus an alarm — is coming to the Subliminally app.";
+  document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
+  document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
 }
 
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
-let liveToneGain=null, liveBgGain=null, liveSoothingGain=null;
+let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null;
 
 /* ---------- soothing layer picker ---------- */
+/* ---------- custom track upload (Ritual only) ---------- */
+let customTrackBlob = null;
+async function triggerCustomTrackUpload(){
+  const msg = document.getElementById('customTrackMsg');
+  msg.textContent = '';
+  if (!currentUser){
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.className = 'length-msg err';
+    return;
+  }
+  const myTier = await getMyTier();
+  if (myTier !== 'ritual'){
+    msg.innerHTML = `Uploading your own track is a Ritual feature — <a href="#pricing">see plans</a>.`;
+    msg.className = 'length-msg err';
+    return;
+  }
+  document.getElementById('customTrackFile').click();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const f = document.getElementById('customTrackFile');
+  if (f){
+    f.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      customTrackBlob = file;
+      document.getElementById('customTrackName').textContent = file.name;
+    });
+  }
+});
+
 async function pickSoothingLayer(btn){
   const msg = document.getElementById('soothingMsg');
   const variant = btn.dataset.variant;
@@ -1380,7 +1430,7 @@ function restartSoothingLayer(){
 }
 
 /* Live volume readouts + real-time gain updates while a session is playing */
-['mixTone','mixBg','mixVoice','mixSoothing'].forEach(id=>{
+['mixTone','mixBg','mixVoice','mixSoothing','mixCustom'].forEach(id=>{
   const el = document.getElementById(id);
   const readout = document.getElementById(id+'Val');
   el.addEventListener('input', ()=>{
@@ -1389,6 +1439,7 @@ function restartSoothingLayer(){
     if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = el.value/100 * 0.10;
     if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = el.value/100;
     if (id==='mixSoothing' && liveSoothingGain) liveSoothingGain.gain.value = el.value/100 * 0.4;
+    if (id==='mixCustom' && liveCustomGain) liveCustomGain.gain.value = el.value/100 * 0.6;
     /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
   });
 });
@@ -1438,6 +1489,21 @@ function addPremiumPadLayer(ctx, destination, variant, gainNode){
   return { stop(){ [...voices, lfo].forEach(n => { try{ n.stop(); }catch(e){} }); } };
 }
 
+function startCustomTrackPlayback(){
+  if (!customTrackBlob || !finalCtx) return;
+  const g = finalCtx.createGain();
+  g.gain.value = document.getElementById('mixCustom').value/100 * 0.6;
+  g.connect(finalCtx.destination);
+  liveCustomGain = g;
+  customTrackBlob.arrayBuffer().then(buf => finalCtx.decodeAudioData(buf)).then(audioBuf => {
+    if (!finalPlaying) return; // stopped before it finished decoding
+    const src = finalCtx.createBufferSource();
+    src.buffer = audioBuf; src.loop = true;
+    src.connect(g); src.start();
+    customTrackSource = src;
+  }).catch(e => console.error('custom track playback failed:', e));
+}
+
 function playFinal(){
   if (finalPlaying) return;
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
@@ -1451,6 +1517,7 @@ function playFinal(){
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
   finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+  startCustomTrackPlayback();
   const toneGain = finalCtx.createGain();
   const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
   toneGain.gain.setValueAtTime(0, finalCtx.currentTime);
@@ -1576,8 +1643,9 @@ function finishFinal(){
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   if (finalAmbience){ finalAmbience.stop(); }
+  if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
-  liveToneGain = null; liveBgGain = null;
+  liveToneGain = null; liveBgGain = null; liveCustomGain = null;
 }
 
 function stopFinal(){
@@ -1590,12 +1658,13 @@ function stopFinal(){
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   if (finalAmbience){ finalAmbience.stop(); finalAmbience=null; }
+  if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalRecorder && finalRecorder.state !== 'inactive'){
     finalRecorder.onstop = ()=>{ window._subliminallyDownloadBlob = new Blob(finalChunks, {type:'audio/webm'}); };
     finalRecorder.stop();
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
-  liveToneGain = null; liveBgGain = null;
+  liveToneGain = null; liveBgGain = null; liveCustomGain = null;
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
@@ -1612,8 +1681,7 @@ function goToCheckout(evt, baseUrl){
   return false;
 }
 
-/* ---------------- ACCOUNT-GATED SAVE + DOWNLOAD ---------------- */
-const TIER_DOWNLOAD_CAPS = { whisper: 1, reverie: 3, ritual: 5 };
+/* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
 const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
 const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
@@ -1710,6 +1778,17 @@ async function saveSubliminal(){
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
+  let customTrackStoragePath = null;
+  if (customTrackBlob){
+    msg.textContent = 'Uploading your track…'; msg.className = 'save-msg';
+    const ext = (customTrackBlob.name || 'track.mp3').split('.').pop();
+    const path = `${currentUser.id}/${Date.now()}.${ext}`;
+    const { error: ctErr } = await sb.storage.from('custom-tracks').upload(path, customTrackBlob, { contentType: customTrackBlob.type || 'audio/mpeg' });
+    if (!ctErr) customTrackStoragePath = path;
+    else console.error('custom track upload failed:', ctErr);
+    msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  }
+
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
     title: (state.freq ? state.freq.hz + ' Hz' : 'My subliminal'),
@@ -1717,7 +1796,8 @@ async function saveSubliminal(){
     affirmations: state.affirmations,
     background: state.bg,
     duration_seconds: seconds,
-    recording_urls: recordingUrls
+    recording_urls: recordingUrls,
+    custom_track_url: customTrackStoragePath
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -1731,40 +1811,6 @@ async function saveSubliminal(){
   } else {
     msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
   }
-}
-
-async function downloadFinal(){
-  const msg = document.getElementById('saveMsg');
-  if (!window._subliminallyDownloadBlob){
-    document.getElementById('finalLine').textContent = "Play the full session once first, then download.";
-    return;
-  }
-  if (!currentUser){ openAuthModal(); return; }
-  if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
-
-  const subRow = await getMySubscriberRow();
-  const tier = subRow && ['active','trialing'].includes(subRow.status) ? subRow.tier : null;
-  const cap = TIER_DOWNLOAD_CAPS[tier] || 0;
-  const used = (subRow && subRow.downloads_used) || 0;
-
-  if (!tier){
-    msg.innerHTML = `Downloading needs a plan — <a href="#pricing" onclick="closeAuthModal();">see Whisper, Reverie & Ritual</a>.`;
-    msg.className = 'save-msg err';
-    return;
-  }
-  if (used >= cap){
-    msg.innerHTML = `You've used all ${cap} download${cap===1?'':'s'} on ${tier[0].toUpperCase()+tier.slice(1)} this period — <a href="#pricing" onclick="closeAuthModal();">upgrade for more</a>.`;
-    msg.className = 'save-msg err';
-    return;
-  }
-
-  const url = URL.createObjectURL(window._subliminallyDownloadBlob);
-  const a = document.createElement('a'); a.href = url; a.download = 'subliminally-by-fthr.webm';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-
-  await sb.from('subscribers').update({ downloads_used: used + 1 }).eq('user_id', currentUser.id);
-  msg.textContent = `Downloaded. ${cap - used - 1} download${(cap-used-1)===1?'':'s'} left on ${tier[0].toUpperCase()+tier.slice(1)} this period.`;
-  msg.className = 'save-msg ok';
 }
 
 /* ---------------- WAITLIST ---------------- */
@@ -2048,7 +2094,7 @@ async function logOut(){
 function renderAccountArea(){
   const area = document.getElementById('authArea');
   if (currentUser){
-    area.innerHTML = `<div class="account-chip"><span class="nav-avatar" id="navAvatar">🌙</span><b id="navChipName">${currentUser.email.split('@')[0]}</b><button class="profile-icon-btn" onclick="showProfilePage()" title="Your profile"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button><button onclick="logOut()">Log out</button></div>`;
+    area.innerHTML = `<div class="account-chip"><button class="nav-identity" onclick="showProfilePage()" title="Your profile"><span class="nav-avatar" id="navAvatar">🌙</span><b id="navChipName">${currentUser.email.split('@')[0]}</b></button><button onclick="logOut()">Log out</button></div>`;
     loadNavIdentity();
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
@@ -2159,8 +2205,10 @@ async function loadProfile(){
   }
 
   const myTier = await getMyTier();
-  document.getElementById('profileTierDisplay').textContent =
-    myTier === 'none' ? 'Free account' : (myTier[0].toUpperCase()+myTier.slice(1)+' member');
+  const tierIcons = { none: '', whisper: '✦ ', reverie: '✧ ', ritual: '★ ' };
+  const badge = document.getElementById('profileTierDisplay');
+  badge.dataset.tier = myTier;
+  badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
 }
 
 async function loadMyLibrary(){
@@ -2215,6 +2263,20 @@ async function loadSavedIntoBuilder(id){
     // No recorded audio was saved for this one (or it was AI voice originally) —
     // reloading plays it back with the AI voice instead.
     state.voiceMode = 'ai';
+  }
+
+  customTrackBlob = null;
+  document.getElementById('customTrackName').textContent = '';
+  if (s.custom_track_url){
+    const { data: signed, error: sErr } = await sb.storage.from('custom-tracks').createSignedUrl(s.custom_track_url, 3600);
+    if (!sErr && signed){
+      try {
+        const res = await fetch(signed.signedUrl);
+        const blob = await res.blob();
+        customTrackBlob = blob;
+        document.getElementById('customTrackName').textContent = 'Your uploaded track';
+      } catch(e){ console.error('custom track reload failed:', e); }
+    }
   }
 
   goHome();
@@ -2273,7 +2335,12 @@ async function submitFeedback(){
     message,
     contact_email: currentUser ? currentUser.email : null
   });
-  if (error){ msg.textContent = "Couldn't send — try emailing hello@subliminallybyfthr.com directly."; msg.className = 'save-msg err'; return; }
+  if (error){
+    console.error('submitFeedback error:', error);
+    msg.textContent = `Couldn't send: ${error.message} — or email hello@subliminallybyfthr.com directly.`;
+    msg.className = 'save-msg err';
+    return;
+  }
   msg.textContent = "Sent — thank you. We read every one of these."; msg.className = 'save-msg ok';
   document.getElementById('feedbackMessage').value = '';
 }

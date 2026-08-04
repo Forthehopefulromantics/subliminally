@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy Policy — Subliminally by FTHR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --midnight:#0D0B18; --midnight-2:#12101F; --veil:#1C1830; --dusk:#262040;
+    --moonlight:#EDE9F6; --haze:#9C93B8; --candle:#E3BE7F; --lilac:#B9A7E8;
+    --serif:'Fraunces', Georgia, serif; --sans:'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:var(--midnight); color:var(--moonlight); font-family:var(--sans); font-weight:300; line-height:1.7; }
+  .wrap{ max-width:760px; margin:0 auto; padding:60px 24px 100px; }
+  a{ color:var(--lilac); }
+  .back{ display:inline-flex; align-items:center; gap:6px; color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:32px; }
+  .brand{ font-family:var(--serif); font-size:22px; margin-bottom:6px; }
+  .updated{ font-size:12.5px; color:var(--haze); margin-bottom:40px; }
+  h1{ font-family:var(--serif); font-size:clamp(28px,4vw,38px); margin-bottom:8px; }
+  h2{ font-family:var(--serif); font-size:20px; color:var(--moonlight); margin-top:40px; margin-bottom:10px; }
+  p, li{ font-size:14.5px; color:var(--haze); margin-bottom:12px; }
+  li{ margin-left:20px; }
+  strong{ color:var(--moonlight); font-weight:500; }
+  .notice{ background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.25); border-radius:14px; padding:16px 20px; font-size:13px; color:var(--lilac); margin-bottom:36px; }
+  table{ width:100%; border-collapse:collapse; margin:16px 0 24px; font-size:13.5px; }
+  th{ text-align:left; color:var(--moonlight); font-weight:500; padding:8px 10px; border-bottom:1px solid var(--dusk); }
+  td{ padding:8px 10px; border-bottom:1px solid var(--dusk); color:var(--haze); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/" class="back">← Back to Subliminally</a>
+  <div class="brand">Subliminally <span style="color:var(--haze); font-weight:300;">by FTHR</span></div>
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: August 4, 2026</div>
+
+  <div class="notice">We built Subliminally to hold some genuinely personal things — your voice, your journal, what you're working through. This policy tries to be honest and specific about what we actually do with that, not vague boilerplate.</div>
+
+  <h2>1. What we collect</h2>
+  <table>
+    <tr><th>Data</th><th>Why we collect it</th></tr>
+    <tr><td>Email &amp; password</td><td>To create and secure your account (password is hashed by our auth provider, Supabase — we never see it in plain text)</td></tr>
+    <tr><td>Username &amp; avatar (photo or icon)</td><td>To personalize your account and, in future, for social features you opt into</td></tr>
+    <tr><td>Phone (optional)</td><td>Only if you choose to provide it during onboarding</td></tr>
+    <tr><td>Voice recordings</td><td>If you record affirmations in your own voice and save a session, the audio is stored so you can replay it later</td></tr>
+    <tr><td>Text you write</td><td>Affirmation prompts, journal entries, and support/feedback messages you submit</td></tr>
+    <tr><td>Uploaded audio tracks</td><td>If you use the custom track feature (Ritual tier), the file you upload</td></tr>
+    <tr><td>Payment info</td><td>Handled entirely by Stripe — we receive your subscription status and tier, never your full card number</td></tr>
+    <tr><td>Basic usage data</td><td>Things like when you signed up, how you found us (if you tell us), and general account activity</td></tr>
+  </table>
+
+  <h2>2. How we use it</h2>
+  <ul>
+    <li>To provide the Service — build and play back your sessions, save your library, keep your journal, remember your preferences</li>
+    <li>To process payments and manage your subscription</li>
+    <li>To send you account-related email (confirmation, password resets) and, if you've opted in, occasional product updates</li>
+    <li>To generate personalized affirmation text, your prompt is sent to Anthropic's API to generate the affirmation lines — Anthropic processes this text to return the result but Subliminally does not use it to train any model, and Anthropic's own handling is governed by their API terms</li>
+    <li>To respond to support requests or ideas you share with us</li>
+  </ul>
+  <p>We do not sell your personal data, ever.</p>
+
+  <h2>3. Who we share data with</h2>
+  <p>We use a small number of service providers to run Subliminally, each with access limited to what they need to do their job:</p>
+  <ul>
+    <li><strong>Supabase</strong> — database, authentication, and file storage (including voice recordings and uploaded tracks, stored privately per-account)</li>
+    <li><strong>Stripe</strong> — payment processing and subscription billing</li>
+    <li><strong>Resend</strong> — sending account and confirmation emails</li>
+    <li><strong>Anthropic</strong> — generating affirmation text from your prompts</li>
+    <li><strong>Vercel</strong> — hosting the website itself</li>
+  </ul>
+  <p>We don't share your data with advertisers or data brokers. We may disclose information if legally required to (such as in response to a valid subpoena) or to protect the safety of our users.</p>
+
+  <h2>4. Your voice recordings and journal entries specifically</h2>
+  <p>Voice recordings and uploaded custom tracks are stored in private storage accessible only to your account — they are not public by default and we don't listen to or review them unless you explicitly report an issue that requires us to investigate. Journal entries are similarly private to your account. Neither is used for any purpose beyond providing the Service back to you.</p>
+
+  <h2>5. How long we keep your data</h2>
+  <p>We keep your account data for as long as your account is active. If you delete your account, we'll delete your personal data, saved sessions, recordings, and journal entries within 30 days, except where we're required to retain certain records (like billing history) for legal or tax purposes.</p>
+
+  <h2>6. Your rights</h2>
+  <p>Depending on where you live, you may have rights to access, correct, export, or delete your personal data, and to object to certain uses of it. To exercise any of these, email us at <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a> and we'll respond within a reasonable timeframe. If you're in the EU/UK, you have rights under GDPR; if you're in California, you have rights under the CCPA — we honor these regardless of where you're located.</p>
+
+  <h2>7. Cookies and local storage</h2>
+  <p>We use minimal cookies/local browser storage necessary to keep you logged in and remember basic preferences. We don't use third-party advertising trackers.</p>
+
+  <h2>8. Children's privacy</h2>
+  <p>Subliminally isn't directed at children, and we don't knowingly collect data from anyone under 13. If we learn we've collected data from a child under 13, we'll delete it promptly.</p>
+
+  <h2>9. Security</h2>
+  <p>We use industry-standard practices (encryption in transit, access-controlled storage, hashed passwords) to protect your data. No system is perfectly secure, and we can't guarantee absolute security, but we take reasonable steps to protect what you share with us.</p>
+
+  <h2>10. Changes to this policy</h2>
+  <p>If we make material changes to this policy, we'll update the date above and make a reasonable effort to notify active users by email.</p>
+
+  <h2>11. Contact</h2>
+  <p>Questions about your data or this policy? Reach us at <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a>.</p>
+</div>
+</body>
+</html>
