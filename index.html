@@ -217,13 +217,13 @@
   .mix-pct-sign{ font-size:11.5px; color:var(--haze); margin-left:-6px; }
 
   /* playback progress bar, elapsed / remaining */
-  .session-progress{ margin-top:6px; }
+  .session-progress{ margin-top:6px; align-self:stretch; width:100%; box-sizing:border-box; }
   .session-progress-track{ position:relative; width:100%; height:4px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
   .session-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, var(--lilac), var(--candle)); border-radius:999px; transition:width 1s linear; }
   .session-progress-times{ display:flex; justify-content:space-between; font-size:11px; color:var(--haze); margin-top:5px; font-variant-numeric:tabular-nums; }
   .soothing-picker{ margin-top:18px; }
   .soothing-picker label{ font-size:12.5px; color:var(--haze); display:block; margin-bottom:8px; }
-  .mixer{ margin-top:16px; background:rgba(255,255,255,0.03); border-radius:14px; padding:14px 16px; border:1px solid rgba(255,255,255,0.06); }
+  .mixer{ margin-top:16px; background:rgba(255,255,255,0.03); border-radius:14px; padding:14px 16px; border:1px solid rgba(255,255,255,0.06); align-self:stretch; width:100%; box-sizing:border-box; }
 
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
   .record-line{ font-family:var(--serif); font-style:italic; font-size:18px; color:var(--moonlight); max-width:440px; line-height:1.4; }
@@ -240,7 +240,7 @@
   .mini-btn.candlebtn{ background:var(--candle); color:#241C0E; }
   .mini-btn.ghostbtn{ background:transparent; color:var(--haze); border:1px solid var(--dusk); }
 
-  .final-panel{ display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:6px 0; }
+  .final-panel{ display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:6px 0; width:100%; max-width:460px; margin:0 auto; }
   .final-orb{ width:110px; height:110px; }
   .final-title{ font-family:var(--serif); font-size:21px; color:var(--moonlight); }
   .final-line{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--candle); min-height:22px; }
@@ -279,6 +279,12 @@
   .final-freq-picker select{ background:var(--veil); color:var(--moonlight); border:1px solid var(--dusk); border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; }
   .final-freq-picker select:focus{ outline:none; border-color:var(--lilac); }
 
+  .final-title-input-wrap{ max-width:320px; margin:10px auto 0; text-align:left; }
+  .final-title-input-wrap label{ display:block; font-size:11px; color:var(--haze); text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
+  .final-title-input-wrap input{ width:100%; background:var(--veil); border:1px solid var(--dusk); border-radius:10px; color:var(--moonlight); font-family:inherit; font-size:14px; padding:10px 14px; }
+  .final-title-input-wrap input:focus{ outline:none; border-color:var(--lilac); }
+  .final-title-input-wrap input.needs-title{ border-color:var(--candle); }
+
   /* Ritual-only second voice layer */
   .layer-voice-toggle{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--moonlight); cursor:pointer; margin-top:6px; }
   .layer-voice-panel{ margin-top:12px; padding:14px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); display:none; }
@@ -289,9 +295,6 @@
   .layer-voice-options button.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
 
   /* inline frequency change for already-saved subliminals in My Library */
-  .item-freq-change{ display:flex; align-items:center; gap:6px; margin-top:8px; }
-  .item-freq-change select{ background:var(--midnight-2); color:var(--moonlight); border:1px solid var(--dusk); border-radius:8px; padding:6px 8px; font-size:12px; font-family:inherit; }
-  .item-freq-change button{ font-size:11.5px; padding:6px 10px; }
   .avatar-upload-label{ display:inline-block; margin-top:10px; font-size:12px; color:var(--lilac); cursor:pointer; text-decoration:underline; }
   .avatar-upload-label:hover{ color:var(--candle); }
   .avatar-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
@@ -365,6 +368,9 @@
   .waitlist-count b{ color:var(--lilac); font-weight:500; }
 
   footer{ padding:44px 0 32px; border-top:1px solid rgba(255,255,255,0.06); }
+  .footer-social{ display:flex; justify-content:center; gap:16px; margin-bottom:22px; }
+  .footer-social a{ display:flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,0.05); border:1px solid var(--dusk); color:var(--haze); transition:color .2s, border-color .2s, transform .2s; }
+  .footer-social a:hover{ color:var(--candle); border-color:var(--candle); transform:translateY(-2px); }
   .footer-grid{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; }
   .footer-motto{ font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--haze); }
   .footer-links{ display:flex; gap:18px; font-size:13px; flex-wrap:wrap; }
@@ -423,6 +429,10 @@
   .journal-entry{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; padding:14px 16px; }
   .journal-entry p{ font-size:14px; color:var(--moonlight); font-family:var(--serif); font-style:italic; }
   .journal-entry .date{ font-size:11px; color:var(--haze); margin-top:6px; }
+  .journal-entry-actions{ display:flex; justify-content:flex-end; margin-top:8px; }
+  .journal-entry-actions button{ background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); font-size:11.5px; font-family:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; transition:background .2s; }
+  .journal-entry-actions button:hover{ background:rgba(227,190,127,0.24); }
+  .journal-stat{ text-align:center; font-size:13px; color:var(--candle); background:rgba(227,190,127,0.08); border:1px solid rgba(227,190,127,0.2); border-radius:14px; padding:10px 16px; margin-bottom:16px; }
   .journal-empty{ text-align:center; font-size:13px; color:var(--haze); padding:30px 0; }
 
   /* ---- library ---- */
@@ -877,6 +887,11 @@
           <div class="final-panel">
             <div class="orb-wrap final-orb"><div class="orb"></div><div class="orb-inner"></div></div>
             <div class="final-title" id="finalTitle">528 Hz</div>
+            <div class="final-title-input-wrap" id="finalTitleWrap">
+              <label for="finalTitleInput">Title this subliminal</label>
+              <input type="text" id="finalTitleInput" placeholder="Name this subliminal" maxlength="60">
+              <div class="length-msg" id="finalTitleMsg"></div>
+            </div>
             <div class="final-freq-picker" id="finalFreqPicker" style="display:none;">
               <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
             </div>
@@ -888,12 +903,12 @@
               <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixSoothingVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixCustomVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="layerVoiceMixRow" style="display:none;"><label>Second voice</label><input type="range" id="mixLayerVoice" min="0" max="100" value="35"><input type="number" class="mix-val-input" id="mixLayerVoiceVal" min="0" max="100" value="35"><span class="mix-pct-sign">%</span></div>
-              <div class="mix-row"><label>Space between lines</label><input type="range" id="lineGap" min="1" max="5000" step="1" value="900"><input type="number" class="mix-val-input" id="lineGapVal" min="1" max="5000" step="1" value="900" style="width:56px;"><span class="mix-pct-sign">ms</span></div>
+              <div class="mix-row"><label>Time between affirmations</label><input type="range" id="lineGap" min="0.1" max="10" step="0.1" value="1"><input type="number" class="mix-val-input" id="lineGapVal" min="0.1" max="10" step="0.1" value="1" style="width:56px;"><span class="mix-pct-sign">s</span></div>
             </div>
             <div class="session-target" id="sessionTarget"></div>
             <div class="session-progress" id="sessionProgress" style="display:none;">
               <div class="session-progress-track"><div class="session-progress-fill" id="sessionProgressFill"></div></div>
-              <div class="session-progress-times"><span id="sessionElapsed">0:00</span><span id="sessionRemaining">-0:00</span></div>
+              <div class="session-progress-times"><span id="sessionElapsed">0:00:00</span><span id="sessionRemaining">-0:00:00</span></div>
             </div>
             <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
@@ -938,6 +953,7 @@
         <button class="mini-btn candlebtn" onclick="addJournalEntry()">Add</button>
       </div>
       <div class="save-msg" id="journalAddMsg"></div>
+      <div class="journal-stat" id="journalStat" style="display:none;"></div>
       <div class="journal-entries" id="journalEntries"></div>
     </div>
   </div>
@@ -1089,6 +1105,17 @@
 
 <footer>
   <div class="wrap">
+    <div class="footer-social">
+      <a href="https://www.youtube.com/@forthehopefulromantics" target="_blank" rel="noopener" aria-label="YouTube">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3.02 3.02 0 0 0-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.56A3.02 3.02 0 0 0 .5 6.2 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.8 3.02 3.02 0 0 0 2.12 2.14C4.5 20.5 12 20.5 12 20.5s7.5 0 9.38-.56a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>
+      </a>
+      <a href="https://www.instagram.com/forthehopefulromantics" target="_blank" rel="noopener" aria-label="Instagram">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="0.9" fill="currentColor" stroke="none"/></svg>
+      </a>
+      <a href="https://thehopefulromantics.substack.com/?utm_campaign=profile_chips" target="_blank" rel="noopener" aria-label="Substack">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.7 2h18.6v3.6H2.7V2zm0 6.4h18.6v3.6H2.7V8.4zm0 6.4h18.6V22L12 17.6 2.7 22V14.8z"/></svg>
+      </a>
+    </div>
     <div class="footer-grid">
       <div class="footer-motto">Be more Hopeful… Be more Romantic… Be more you.</div>
       <div class="footer-links">
@@ -1144,7 +1171,7 @@ const BACKGROUNDS = [
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:900 };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:1000 };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1170,7 +1197,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:900 };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:1000 };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1195,9 +1222,13 @@ function resetFlow(){
   document.getElementById('layerVoiceMsg').textContent = '';
   document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
   document.getElementById('layerVoiceMixRow').style.display = 'none';
-  affirmationGapMs = 900; state.affirmationGapMs = 900;
-  document.getElementById('lineGap').value = 900;
-  document.getElementById('lineGapVal').value = 900;
+  affirmationGapMs = 1000; state.affirmationGapMs = 1000;
+  document.getElementById('lineGap').value = 1;
+  document.getElementById('lineGapVal').value = 1;
+  editingExistingId = null;
+  document.getElementById('finalTitleInput').value = '';
+  document.getElementById('finalTitleMsg').textContent = '';
+  document.getElementById('finalTitleInput').classList.remove('needs-title');
   showStep(0);
 }
 
@@ -1561,6 +1592,10 @@ function buildAmbience(ctx, key, destination){
 }
 
 /* ---------------- step 7: final assembly & playback ---------------- */
+// Tracks whether the subliminal on screen is a fresh build or an edit of something
+// already saved — if it's an edit, saving must produce a new row with a new title,
+// rather than silently overwriting the original.
+let editingExistingId = null;
 function prepareFinal(){
   document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
@@ -1568,6 +1603,20 @@ function prepareFinal(){
   document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
   renderFinalFreqPicker();
+
+  const titleInput = document.getElementById('finalTitleInput');
+  const titleMsg = document.getElementById('finalTitleMsg');
+  titleMsg.textContent = '';
+  titleInput.classList.remove('needs-title');
+  if (editingExistingId){
+    // Any change to something already saved has to be re-titled and saved as its own,
+    // new subliminal — so the field starts empty rather than inheriting the old title.
+    titleInput.value = '';
+    titleInput.placeholder = "You've changed this one — give it a new title to save it";
+  } else {
+    titleInput.value = '';
+    titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
+  }
 }
 
 /* You can change the frequency right on the finished/loaded subliminal — no need to
@@ -1665,29 +1714,30 @@ function restartSoothingLayer(){
   }
 }
 
-/* Space between affirmation lines — 1ms up to 5 seconds, live-adjustable, applies to
-   the main voice and (if present) the second layered voice. */
-let affirmationGapMs = 900;
+/* Time between affirmations — 0.1 to 10 seconds, live-adjustable, applies to
+   the main voice and (if present) the second layered voice. Stored internally in
+   milliseconds (affirmationGapMs) since that's what setTimeout needs. */
+let affirmationGapMs = 1000;
 (function wireLineGap(){
   const el = document.getElementById('lineGap');
   const readout = document.getElementById('lineGapVal');
   if (!el || !readout) return;
-  function apply(v){
-    v = Math.max(1, Math.min(5000, v));
-    affirmationGapMs = v;
-    state.affirmationGapMs = v;
+  function apply(vSeconds){
+    vSeconds = Math.max(0.1, Math.min(10, vSeconds));
+    affirmationGapMs = Math.round(vSeconds * 1000);
+    state.affirmationGapMs = affirmationGapMs;
   }
-  el.addEventListener('input', ()=>{ readout.value = el.value; apply(parseInt(el.value,10)); });
+  el.addEventListener('input', ()=>{ readout.value = el.value; apply(parseFloat(el.value)); });
   readout.addEventListener('input', ()=>{
-    let v = parseInt(readout.value, 10);
+    let v = parseFloat(readout.value);
     if (isNaN(v)) return;
-    v = Math.max(1, Math.min(5000, v));
+    v = Math.max(0.1, Math.min(10, v));
     el.value = v; apply(v);
   });
   readout.addEventListener('blur', ()=>{
-    let v = parseInt(readout.value, 10);
-    if (isNaN(v)) v = parseInt(el.value, 10);
-    v = Math.max(1, Math.min(5000, v));
+    let v = parseFloat(readout.value);
+    if (isNaN(v)) v = parseFloat(el.value);
+    v = Math.max(0.1, Math.min(10, Math.round(v*10)/10));
     readout.value = v; el.value = v; apply(v);
   });
 })();
@@ -1935,8 +1985,8 @@ function playFinal(){
 
 function fmtClock(totalSec){
   const s = Math.max(0, Math.round(totalSec));
-  const mm = Math.floor(s/60), ss = s%60;
-  return `${mm}:${String(ss).padStart(2,'0')}`;
+  const hh = Math.floor(s/3600), mm = Math.floor((s%3600)/60), ss = s%60;
+  return `${hh}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
 }
 function updateSessionTimerLabel(){
   const el = document.getElementById('sessionTarget');
@@ -1962,7 +2012,7 @@ function updateSessionTimerLabel(){
     const pct = targetSec ? Math.min(100, (elapsedSec/targetSec)*100) : 0;
     fill.style.width = pct + '%';
     elapsedEl.textContent = fmtClock(elapsedSec);
-    remainingEl.textContent = remaining > 0 ? '-' + fmtClock(remaining) : (document.getElementById('loopToggle').checked ? 'looping' : '-0:00');
+    remainingEl.textContent = remaining > 0 ? '-' + fmtClock(remaining) : (document.getElementById('loopToggle').checked ? 'looping' : '-0:00:00');
   }
 }
 
@@ -2128,6 +2178,21 @@ async function saveSubliminal(){
   if (!currentUser){ openAuthModal(); return; }
   if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
 
+  const titleInput = document.getElementById('finalTitleInput');
+  const titleMsg = document.getElementById('finalTitleMsg');
+  const title = titleInput.value.trim();
+  if (!title){
+    titleInput.classList.add('needs-title');
+    titleMsg.textContent = editingExistingId
+      ? "Give this edited version its own title before saving — it'll be saved as a new subliminal."
+      : 'Give it a title first.';
+    titleMsg.className = 'length-msg err';
+    titleInput.focus();
+    return;
+  }
+  titleInput.classList.remove('needs-title');
+  titleMsg.textContent = '';
+
   const seconds = estimateSessionSeconds();
   const myTier = await getMyTier();
   const cap = TIER_LENGTH_SECONDS[myTier];
@@ -2196,7 +2261,7 @@ async function saveSubliminal(){
 
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
-    title: (state.freq ? state.freq.hz + ' Hz' : 'My subliminal'),
+    title: title,
     frequency_hz: state.freq ? state.freq.hz : null,
     affirmations: state.affirmations,
     background: state.bg,
@@ -2219,6 +2284,9 @@ async function saveSubliminal(){
   } else {
     msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
   }
+  // This is now its own saved subliminal — if they keep tweaking and save again,
+  // treat it as a fresh save rather than an edit of the thing they just made.
+  editingExistingId = null;
 }
 
 /* ---------------- WAITLIST ---------------- */
@@ -2704,7 +2772,6 @@ async function loadMyLibrary(){
     const mins = Math.round((s.duration_seconds||0)/60);
     const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
-    const freqOptions = FREQS.map(f => `<option value="${f.hz}" ${f.hz===s.frequency_hz?'selected':''}>${f.hz} Hz — ${f.word}</option>`).join('');
     return `<div class="profile-item">
       <div class="profile-item-top">
         <div>
@@ -2714,39 +2781,16 @@ async function loadMyLibrary(){
         <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
-      <div class="item-freq-change">
-        <select id="freqSel-${s.id}">${freqOptions}</select>
-        <button class="mini-btn ghostbtn" onclick="changeLibraryFrequency('${s.id}')">Change frequency</button>
-        <span class="save-msg" id="freqMsg-${s.id}" style="margin-top:0;"></span>
-      </div>
       ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
-}
-
-/* Change the frequency on a subliminal that's already been saved, without rebuilding it. */
-async function changeLibraryFrequency(id){
-  if (!sb || !currentUser) return;
-  const sel = document.getElementById(`freqSel-${id}`);
-  const msg = document.getElementById(`freqMsg-${id}`);
-  const hz = parseInt(sel.value, 10);
-  const match = FREQS.find(f => f.hz === hz);
-  if (!match) return;
-  msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { data: existing } = await sb.from('subliminals').select('title').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
-  const titleWasDefault = !existing || !existing.title || /^\d+\s*Hz/.test(existing.title);
-  const updates = { frequency_hz: hz };
-  if (titleWasDefault) updates.title = `${hz} Hz`;
-  const { error } = await sb.from('subliminals').update(updates).eq('id', id).eq('user_id', currentUser.id);
-  if (error){ msg.textContent = "Couldn't update."; msg.className = 'save-msg err'; return; }
-  msg.textContent = 'Updated.'; msg.className = 'save-msg ok';
-  loadMyLibrary();
 }
 
 async function loadSavedIntoBuilder(id){
   if (!sb || !currentUser) return;
   const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
   if (error || !s) return;
+  editingExistingId = id;
   const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
   state.freq = matchedFreq;
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
@@ -2901,19 +2945,43 @@ function renderJournalState(){
 async function loadJournalEntries(){
   if (!sb || !currentUser) return;
   const list = document.getElementById('journalEntries');
+  const stat = document.getElementById('journalStat');
   list.innerHTML = '<div class="journal-empty">Loading…</div>';
+  stat.style.display = 'none';
   const { data, error } = await sb
     .from('journal_entries')
     .select('*')
     .eq('category', journalTab)
     .order('created_at', { ascending: false });
   if (error){ list.innerHTML = `<div class="journal-empty">Couldn't load entries.</div>`; return; }
+
+  if (journalTab === 'received'){
+    const fulfilledCount = data.filter(e => e.fulfilled_from_manifesting).length;
+    if (fulfilledCount > 0){
+      stat.style.display = 'block';
+      stat.textContent = `✦ ${fulfilledCount} manifestation${fulfilledCount === 1 ? '' : 's'} you called in ${fulfilledCount === 1 ? 'has' : 'have'} come true.`;
+    }
+  }
+
   if (!data.length){ list.innerHTML = '<div class="journal-empty">Nothing here yet — add your first entry above.</div>'; return; }
   list.innerHTML = data.map(e => `
     <div class="journal-entry">
       <p>"${e.content.replace(/</g,'&lt;')}"</p>
-      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}</div>
+      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${e.fulfilled_from_manifesting ? ' · came true' : ''}</div>
+      ${journalTab === 'manifesting' ? `<div class="journal-entry-actions"><button onclick="markManifestationFulfilled('${e.id}')">✦ This came true — move to Already Mine</button></div>` : ''}
     </div>`).join('');
+}
+
+/* Moves an "on its way" entry into "already mine" once it's actually happened, and
+   tags it so the received tab can show how many manifestations have come to fruition. */
+async function markManifestationFulfilled(id){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('journal_entries')
+    .update({ category: 'received', fulfilled_from_manifesting: true })
+    .eq('id', id)
+    .eq('user_id', currentUser.id);
+  if (error){ console.error('markManifestationFulfilled error:', error); return; }
+  loadJournalEntries();
 }
 async function addJournalEntry(){
   const msg = document.getElementById('journalAddMsg');
