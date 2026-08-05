@@ -207,10 +207,20 @@
   .bg-card.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .bg-card .ic{ font-size:18px; display:block; margin-bottom:4px; }
   @media (max-width:560px){ .bg-grid{ grid-template-columns:repeat(2,1fr); } }
-  .mix-row{ display:flex; align-items:center; gap:12px; margin-top:8px; }
-  .mix-row label{ font-size:12px; color:var(--haze); min-width:110px; }
+  .mix-row{ display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .mix-row label{ font-size:12px; color:var(--haze); min-width:100px; }
   .mix-row input[type=range]{ flex:1; accent-color:var(--lilac); }
   .mix-row .mix-val{ font-size:11.5px; color:var(--candle); min-width:34px; text-align:right; font-variant-numeric:tabular-nums; }
+  .mix-val-input{ width:46px; font-size:11.5px; color:var(--candle); background:rgba(255,255,255,0.05); border:1px solid var(--dusk); border-radius:7px; padding:4px 3px; text-align:center; font-variant-numeric:tabular-nums; font-family:inherit; -moz-appearance:textfield; }
+  .mix-val-input::-webkit-outer-spin-button, .mix-val-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .mix-val-input:focus{ outline:none; border-color:var(--lilac); }
+  .mix-pct-sign{ font-size:11.5px; color:var(--haze); margin-left:-6px; }
+
+  /* playback progress bar, elapsed / remaining */
+  .session-progress{ margin-top:6px; }
+  .session-progress-track{ position:relative; width:100%; height:4px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
+  .session-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, var(--lilac), var(--candle)); border-radius:999px; transition:width 1s linear; }
+  .session-progress-times{ display:flex; justify-content:space-between; font-size:11px; color:var(--haze); margin-top:5px; font-variant-numeric:tabular-nums; }
   .soothing-picker{ margin-top:18px; }
   .soothing-picker label{ font-size:12.5px; color:var(--haze); display:block; margin-bottom:8px; }
   .mixer{ margin-top:16px; background:rgba(255,255,255,0.03); border-radius:14px; padding:14px 16px; border:1px solid rgba(255,255,255,0.06); }
@@ -260,6 +270,28 @@
   .length-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .length-chip.locked{ opacity:.55; }
   .length-chip.locked span{ color:var(--candle); }
+  /* tier-name captions under session-length chips only show for free/logged-out accounts */
+  #lengthChips span{ display:none; }
+  #lengthChips.show-tier-labels span{ display:block; }
+
+  /* frequency change on the final screen */
+  .final-freq-picker{ margin-top:8px; }
+  .final-freq-picker select{ background:var(--veil); color:var(--moonlight); border:1px solid var(--dusk); border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; }
+  .final-freq-picker select:focus{ outline:none; border-color:var(--lilac); }
+
+  /* Ritual-only second voice layer */
+  .layer-voice-toggle{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--moonlight); cursor:pointer; margin-top:6px; }
+  .layer-voice-panel{ margin-top:12px; padding:14px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); display:none; }
+  .layer-voice-panel.open{ display:block; }
+  .layer-voice-panel textarea{ width:100%; min-height:70px; margin-top:8px; background:var(--midnight-2); border:1px solid var(--dusk); border-radius:10px; color:var(--moonlight); font-family:inherit; font-size:13px; padding:10px; resize:vertical; }
+  .layer-voice-options{ display:flex; gap:8px; margin-top:10px; }
+  .layer-voice-options button{ flex:1; padding:9px; border-radius:10px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:12.5px; cursor:pointer; }
+  .layer-voice-options button.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+
+  /* inline frequency change for already-saved subliminals in My Library */
+  .item-freq-change{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .item-freq-change select{ background:var(--midnight-2); color:var(--moonlight); border:1px solid var(--dusk); border-radius:8px; padding:6px 8px; font-size:12px; font-family:inherit; }
+  .item-freq-change button{ font-size:11.5px; padding:6px 10px; }
   .avatar-upload-label{ display:inline-block; margin-top:10px; font-size:12px; color:var(--lilac); cursor:pointer; text-decoration:underline; }
   .avatar-upload-label:hover{ color:var(--candle); }
   .avatar-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
@@ -799,15 +831,28 @@
             </div>
             <div class="length-msg" id="customTrackMsg"></div>
           </div>
+          <div class="soothing-picker">
+            <label>Second voice layer <span style="color:var(--haze); font-weight:400;">(Ritual only — a second, quieter set of affirmations layered underneath the main ones)</span></label>
+            <label class="layer-voice-toggle"><input type="checkbox" id="layerVoiceToggle" onchange="toggleLayerVoice(this.checked)"> Add a second, layered voice</label>
+            <div class="layer-voice-panel" id="layerVoicePanel">
+              <label style="font-size:12px; color:var(--haze);">Lines for this layer — one per line. Leave blank to quietly reuse your main affirmations.</label>
+              <textarea id="layerAffText" placeholder="e.g.&#10;I am already becoming her.&#10;This is already mine."></textarea>
+              <div class="layer-voice-options">
+                <button class="sel" data-mode="ai" onclick="pickLayerVoiceMode(this)">AI voice</button>
+                <button data-mode="own" onclick="pickLayerVoiceMode(this)">Record it myself</button>
+              </div>
+              <div class="length-msg" id="layerVoiceMsg"></div>
+            </div>
+          </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="startNextPhase()">Continue →</button></div>
       </div>
 
       <!-- STEP 6: record (own voice) -->
       <div class="flow-step" data-step="6">
-        <div class="flow-title">Record in your own voice</div>
-        <div class="flow-sub">Press and hold, speak the line, then release.</div>
-        <div class="breath-note">Before you start — take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</div>
+        <div class="flow-title" id="recordFlowTitle">Record in your own voice</div>
+        <div class="flow-sub" id="recordFlowSub">Press and hold, speak the line, then release.</div>
+        <div class="breath-note" id="recordBreathNote">Before you start — take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</div>
         <div class="flow-body">
           <div class="record-panel">
             <div class="record-counter" id="recCounter">1 of 14</div>
@@ -832,15 +877,24 @@
           <div class="final-panel">
             <div class="orb-wrap final-orb"><div class="orb"></div><div class="orb-inner"></div></div>
             <div class="final-title" id="finalTitle">528 Hz</div>
+            <div class="final-freq-picker" id="finalFreqPicker" style="display:none;">
+              <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
+            </div>
             <div class="final-line" id="finalLine">"…"</div>
             <div class="mixer">
-              <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><span class="mix-val" id="mixToneVal">55%</span></div>
-              <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><span class="mix-val" id="mixBgVal">45%</span></div>
-              <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><span class="mix-val" id="mixVoiceVal">90%</span></div>
-              <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><span class="mix-val" id="mixSoothingVal">45%</span></div>
-              <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><span class="mix-val" id="mixCustomVal">50%</span></div>
+              <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><input type="number" class="mix-val-input" id="mixToneVal" min="0" max="100" value="55"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixBgVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><input type="number" class="mix-val-input" id="mixVoiceVal" min="0" max="100" value="90"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixSoothingVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixCustomVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row" id="layerVoiceMixRow" style="display:none;"><label>Second voice</label><input type="range" id="mixLayerVoice" min="0" max="100" value="35"><input type="number" class="mix-val-input" id="mixLayerVoiceVal" min="0" max="100" value="35"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Space between lines</label><input type="range" id="lineGap" min="1" max="5000" step="1" value="900"><input type="number" class="mix-val-input" id="lineGapVal" min="1" max="5000" step="1" value="900" style="width:56px;"><span class="mix-pct-sign">ms</span></div>
             </div>
             <div class="session-target" id="sessionTarget"></div>
+            <div class="session-progress" id="sessionProgress" style="display:none;">
+              <div class="session-progress-track"><div class="session-progress-fill" id="sessionProgressFill"></div></div>
+              <div class="session-progress-times"><span id="sessionElapsed">0:00</span><span id="sessionRemaining">-0:00</span></div>
+            </div>
             <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
@@ -852,7 +906,7 @@
             <div class="demo-note" id="finalNote">Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.</div>
           </div>
         </div>
-        <div class="flow-nav"><span></span><button class="mini-btn candlebtn" onclick="goTo('waitlist')">Join the waitlist →</button></div>
+        <div class="flow-nav"><span></span><button class="mini-btn candlebtn" onclick="goTo('waitlist')">Join app waitlist →</button></div>
       </div>
 
     </div>
@@ -1090,7 +1144,7 @@ const BACKGROUNDS = [
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none' };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:900 };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1100,12 +1154,23 @@ function showStep(n){
   document.querySelectorAll('.flow-step').forEach(s=>s.classList.remove('active'));
   document.querySelector(`.flow-step[data-step="${n}"]`).classList.add('active');
   step = n; renderProgress();
+  if (n === 1) applyLengthChipLabelVisibility();
+  if (n === 7) renderFinalFreqPicker();
+}
+/* Tier names under the session-length chips are only useful to someone who doesn't
+   have a paid tier yet — once you're subscribed to any tier, they'd just be clutter,
+   so they only show for free accounts (or logged-out visitors). */
+async function applyLengthChipLabelVisibility(){
+  const grid = document.getElementById('lengthChips');
+  if (!grid) return;
+  const myTier = currentUser ? await getMyTier() : 'none';
+  grid.classList.toggle('show-tier-labels', myTier === 'none');
 }
 function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none' };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:900 };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1123,6 +1188,16 @@ function resetFlow(){
   document.getElementById('customTrackName').textContent = '';
   document.getElementById('customTrackMsg').textContent = '';
   document.getElementById('customMixRow').style.display = 'none';
+  layerVoiceEnabled = false; layerVoiceMode = 'ai'; layerRecordings = []; recordTarget = 'primary';
+  document.getElementById('layerVoiceToggle').checked = false;
+  document.getElementById('layerVoicePanel').classList.remove('open');
+  document.getElementById('layerAffText').value = '';
+  document.getElementById('layerVoiceMsg').textContent = '';
+  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
+  document.getElementById('layerVoiceMixRow').style.display = 'none';
+  affirmationGapMs = 900; state.affirmationGapMs = 900;
+  document.getElementById('lineGap').value = 900;
+  document.getElementById('lineGapVal').value = 900;
   showStep(0);
 }
 
@@ -1233,33 +1308,112 @@ BACKGROUNDS.forEach(b=>{
   bgGrid.appendChild(c);
 });
 
+/* ---------------- Ritual-only: second, layered voice ---------------- */
+let layerVoiceEnabled = false;
+let layerVoiceMode = 'ai'; // 'ai' | 'own'
+async function toggleLayerVoice(checked){
+  const panel = document.getElementById('layerVoicePanel');
+  const msg = document.getElementById('layerVoiceMsg');
+  const toggle = document.getElementById('layerVoiceToggle');
+  msg.textContent = '';
+  if (!checked){ layerVoiceEnabled = false; panel.classList.remove('open'); return; }
+  if (!currentUser){
+    toggle.checked = false;
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.className = 'length-msg err';
+    return;
+  }
+  const myTier = await getMyTier();
+  if (myTier !== 'ritual'){
+    toggle.checked = false;
+    msg.innerHTML = `A second, layered voice is a Ritual feature — <a href="#pricing">see plans</a>.`;
+    msg.className = 'length-msg err';
+    return;
+  }
+  layerVoiceEnabled = true;
+  panel.classList.add('open');
+}
+function pickLayerVoiceMode(btn){
+  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  layerVoiceMode = btn.dataset.mode;
+}
+
 function startNextPhase(){
   state.affirmations = state.affirmations.filter(a=>a.trim().length>0);
   if (!state.affirmations.length) state.affirmations = buildFallbackList();
-  if (state.voiceMode === 'own'){
+
+  state.layerAffirmations = layerVoiceEnabled
+    ? document.getElementById('layerAffText').value.split('\n').map(l=>l.trim()).filter(Boolean)
+    : [];
+  if (layerVoiceEnabled && !state.layerAffirmations.length) state.layerAffirmations = state.affirmations.slice();
+  state.layerVoiceMode = layerVoiceEnabled ? layerVoiceMode : null;
+
+  const needsPrimaryRecording = state.voiceMode === 'own';
+  const needsLayerRecording = layerVoiceEnabled && layerVoiceMode === 'own';
+
+  if (needsPrimaryRecording){
+    recordTarget = 'primary';
     recIndex = 0; recordings = new Array(state.affirmations.length).fill(null);
+    setRecordStepCopy('primary');
+    showRecordLine(); showStep(6);
+  } else if (needsLayerRecording){
+    recordTarget = 'layer';
+    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
+    setRecordStepCopy('layer');
     showRecordLine(); showStep(6);
   } else {
     prepareFinal(); showStep(7);
   }
 }
 
+function setRecordStepCopy(target){
+  const title = document.getElementById('recordFlowTitle');
+  const sub = document.getElementById('recordFlowSub');
+  const breath = document.getElementById('recordBreathNote');
+  if (target === 'layer'){
+    title.textContent = "Record your second, layered voice";
+    sub.textContent = "This plays quietly underneath your main voice — press and hold, speak the line, then release.";
+    breath.style.display = 'none';
+  } else {
+    title.textContent = "Record in your own voice";
+    sub.textContent = "Press and hold, speak the line, then release.";
+    breath.style.display = '';
+  }
+}
+
 /* ---------------- step 6: recording (own voice) ---------------- */
 let recIndex = 0; let recordings = [];
+let recordTarget = 'primary'; // 'primary' | 'layer'
+let layerRecordings = [];
 const waveform = document.getElementById('waveform'); const bars = [];
 for (let i=0;i<20;i++){ const d=document.createElement('div'); d.style.height='4px'; waveform.appendChild(d); bars.push(d); }
 
+function activeRecordLines(){ return recordTarget === 'layer' ? state.layerAffirmations : state.affirmations; }
+function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings : recordings; }
+
 function showRecordLine(){
-  document.getElementById('recCounter').textContent = `${recIndex+1} of ${state.affirmations.length}`;
-  document.getElementById('recLine').textContent = '"'+state.affirmations[recIndex]+'"';
+  const lines = activeRecordLines(); const arr = activeRecordArray();
+  document.getElementById('recCounter').textContent = `${recIndex+1} of ${lines.length}`;
+  document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
   document.getElementById('recStatus').textContent = 'press and hold to record';
-  document.getElementById('nextLineBtn').disabled = !recordings[recIndex];
+  document.getElementById('nextLineBtn').disabled = !arr[recIndex];
 }
 function skipLine(){ advanceLine(); }
 function nextLine(){ advanceLine(); }
 function advanceLine(){
-  if (recIndex < state.affirmations.length-1){ recIndex++; showRecordLine(); }
-  else { prepareFinal(); showStep(7); }
+  const lines = activeRecordLines();
+  if (recIndex < lines.length-1){ recIndex++; showRecordLine(); return; }
+  // Finished this pass. If we just finished the primary voice and a layer recording
+  // is still needed, seamlessly continue into the layer pass instead of leaving step 6.
+  if (recordTarget === 'primary' && layerVoiceEnabled && layerVoiceMode === 'own'){
+    recordTarget = 'layer';
+    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
+    setRecordStepCopy('layer');
+    showRecordLine();
+    return;
+  }
+  prepareFinal(); showStep(7);
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
@@ -1278,7 +1432,7 @@ async function startRec(e){
     micStream.getTracks().forEach(t=>t.stop());
     const held = Date.now()-holdStart;
     if (held > 400){
-      recordings[recIndex] = { url, blob };
+      activeRecordArray()[recIndex] = { url, blob };
       document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
       document.getElementById('nextLineBtn').disabled=false;
     } else {
@@ -1411,12 +1565,38 @@ function prepareFinal(){
   document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
   document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
+  document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
+  renderFinalFreqPicker();
+}
+
+/* You can change the frequency right on the finished/loaded subliminal — no need to
+   rebuild the whole thing from scratch. Works for a freshly-built one and for anything
+   reloaded via "Load & adjust" in My Library. */
+function renderFinalFreqPicker(){
+  const wrap = document.getElementById('finalFreqPicker');
+  const sel = document.getElementById('finalFreqSelect');
+  if (!wrap || !sel || !state.freq) { if (wrap) wrap.style.display = 'none'; return; }
+  sel.innerHTML = FREQS.map(f => `<option value="${f.hz}" ${f.hz===state.freq.hz?'selected':''}>${f.hz} Hz — ${f.word}</option>`).join('');
+  wrap.style.display = 'block';
+}
+function changeFinalFrequency(hzStr){
+  const hz = parseInt(hzStr, 10);
+  const match = FREQS.find(f => f.hz === hz);
+  if (!match) return;
+  state.freq = match;
+  document.getElementById('finalTitle').textContent = `${match.hz} Hz · ${match.word}`;
+  // If it's currently playing, retune the live tone in place instead of restarting the session.
+  if (finalPlaying && finalTone){
+    const now = finalCtx.currentTime;
+    finalTone.frequency.linearRampToValueAtTime(match.hz, now + 1.2);
+    if (finalToneLayer2) finalToneLayer2.frequency.linearRampToValueAtTime(match.hz * 1.003, now + 1.2);
+  }
 }
 
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
-let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null;
+let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 
 /* ---------- soothing layer picker ---------- */
 /* ---------- custom track upload (Ritual only) ---------- */
@@ -1485,18 +1665,65 @@ function restartSoothingLayer(){
   }
 }
 
-/* Live volume readouts + real-time gain updates while a session is playing */
-['mixTone','mixBg','mixVoice','mixSoothing','mixCustom'].forEach(id=>{
+/* Space between affirmation lines — 1ms up to 5 seconds, live-adjustable, applies to
+   the main voice and (if present) the second layered voice. */
+let affirmationGapMs = 900;
+(function wireLineGap(){
+  const el = document.getElementById('lineGap');
+  const readout = document.getElementById('lineGapVal');
+  if (!el || !readout) return;
+  function apply(v){
+    v = Math.max(1, Math.min(5000, v));
+    affirmationGapMs = v;
+    state.affirmationGapMs = v;
+  }
+  el.addEventListener('input', ()=>{ readout.value = el.value; apply(parseInt(el.value,10)); });
+  readout.addEventListener('input', ()=>{
+    let v = parseInt(readout.value, 10);
+    if (isNaN(v)) return;
+    v = Math.max(1, Math.min(5000, v));
+    el.value = v; apply(v);
+  });
+  readout.addEventListener('blur', ()=>{
+    let v = parseInt(readout.value, 10);
+    if (isNaN(v)) v = parseInt(el.value, 10);
+    v = Math.max(1, Math.min(5000, v));
+    readout.value = v; el.value = v; apply(v);
+  });
+})();
+
+/* Live volume readouts + real-time gain updates while a session is playing.
+   Each row now has a slider AND a typeable percentage input, kept in sync both ways. */
+function applyLiveMixGain(id, value){
+  if (!finalPlaying) return;
+  if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = value/100 * 0.10;
+  if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = value/100;
+  if (id==='mixSoothing' && liveSoothingGain) liveSoothingGain.gain.value = value/100 * 0.4;
+  if (id==='mixCustom' && liveCustomGain) liveCustomGain.gain.value = value/100 * 0.6;
+  if (id==='mixLayerVoice' && liveLayerVoiceGain) liveLayerVoiceGain.gain.value = value/100;
+  /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
+}
+['mixTone','mixBg','mixVoice','mixSoothing','mixCustom','mixLayerVoice'].forEach(id=>{
   const el = document.getElementById(id);
   const readout = document.getElementById(id+'Val');
+  if (!el || !readout) return;
   el.addEventListener('input', ()=>{
-    readout.textContent = el.value + '%';
-    if (!finalPlaying) return;
-    if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = el.value/100 * 0.10;
-    if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = el.value/100;
-    if (id==='mixSoothing' && liveSoothingGain) liveSoothingGain.gain.value = el.value/100 * 0.4;
-    if (id==='mixCustom' && liveCustomGain) liveCustomGain.gain.value = el.value/100 * 0.6;
-    /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
+    readout.value = el.value;
+    applyLiveMixGain(id, el.value);
+  });
+  readout.addEventListener('input', ()=>{
+    let v = parseInt(readout.value, 10);
+    if (isNaN(v)) return;
+    v = Math.max(0, Math.min(100, v));
+    el.value = v;
+    applyLiveMixGain(id, v);
+  });
+  readout.addEventListener('blur', ()=>{
+    let v = parseInt(readout.value, 10);
+    if (isNaN(v)) v = parseInt(el.value, 10);
+    v = Math.max(0, Math.min(100, v));
+    readout.value = v; el.value = v;
+    applyLiveMixGain(id, v);
   });
 });
 
@@ -1609,6 +1836,47 @@ function playFinal(){
     destForRecording = dest;
   }
 
+  // Ritual-only: a second, quieter voice layered underneath the main one, looping on
+  // its own independent cycle so the two don't read as a single flat voice.
+  if (layerVoiceEnabled && state.layerAffirmations && state.layerAffirmations.length){
+    const layerGain = finalCtx.createGain();
+    layerGain.gain.value = document.getElementById('mixLayerVoice').value/100;
+    layerGain.connect(finalCtx.destination);
+    if (destForRecording !== finalCtx.destination) layerGain.connect(destForRecording);
+    liveLayerVoiceGain = layerGain;
+    runLayerSequence();
+  }
+  function runLayerSequence(){
+    let idx = 0;
+    const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
+    function playNextLayerLine(){
+      if (!finalPlaying) return;
+      const lines = state.layerAffirmations;
+      if (useOwn){
+        const recorded = layerRecordings.map((r,i)=>({r,i})).filter(x=>x.r);
+        if (!recorded.length) return;
+        if (idx >= recorded.length) idx = 0; // loops independently, doesn't need to match the main track's length
+        const { r } = recorded[idx];
+        fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
+          if (!finalPlaying) return;
+          const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
+          src.connect(liveLayerVoiceGain);
+          src.start();
+          src.onended = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+        });
+      } else {
+        if (idx >= lines.length) idx = 0;
+        const utter = new SpeechSynthesisUtterance(lines[idx]);
+        utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
+        utter.onend = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+        window.speechSynthesis.speak(utter);
+      }
+    }
+    // Starts a beat after the main voice so the two voices don't land on top of each other.
+    const t0 = setTimeout(playNextLayerLine, 2200);
+    finalTimeouts.push(t0);
+  }
+
   function runSequence(onDone){
     if (state.voiceMode === 'own'){
       const recorded = recordings.map((r,i)=>({r,i})).filter(x=>x.r);
@@ -1625,7 +1893,7 @@ function playFinal(){
           src.connect(g).connect(finalCtx.destination);
           if (destForRecording !== finalCtx.destination) g.connect(destForRecording);
           src.start();
-          src.onended = ()=>{ idx++; const t = setTimeout(playNext, 900); finalTimeouts.push(t); };
+          src.onended = ()=>{ idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t); };
         });
       }
       playNext();
@@ -1638,7 +1906,7 @@ function playFinal(){
         document.getElementById('finalLine').textContent = '"'+lines[idx]+'"';
         const utter = new SpeechSynthesisUtterance(lines[idx]);
         utter.rate = 0.92; utter.pitch = 1.0;
-        utter.onend = ()=>{ idx++; const t = setTimeout(speakNext, 700); finalTimeouts.push(t); };
+        utter.onend = ()=>{ idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t); };
         window.speechSynthesis.speak(utter);
       }
       speakNext();
@@ -1665,21 +1933,37 @@ function playFinal(){
   });
 }
 
+function fmtClock(totalSec){
+  const s = Math.max(0, Math.round(totalSec));
+  const mm = Math.floor(s/60), ss = s%60;
+  return `${mm}:${String(ss).padStart(2,'0')}`;
+}
 function updateSessionTimerLabel(){
   const el = document.getElementById('sessionTarget');
+  const progressWrap = document.getElementById('sessionProgress');
+  const fill = document.getElementById('sessionProgressFill');
+  const elapsedEl = document.getElementById('sessionElapsed');
+  const remainingEl = document.getElementById('sessionRemaining');
   if (!el) return;
   const targetMin = state.targetLengthMinutes;
   if (!finalPlaying || !targetMin){
     el.textContent = targetMin ? `Session length: ${targetMin >= 60 ? (targetMin/60)+' hr' : targetMin+' min'}` : '';
+    if (progressWrap) progressWrap.style.display = 'none';
     return;
   }
   const elapsedSec = Math.floor((Date.now() - finalStartTime)/1000);
   const targetSec = targetMin * 60;
   const remaining = Math.max(0, targetSec - elapsedSec);
   const mm = Math.floor(remaining/60), ss = remaining%60;
-  el.textContent = remaining > 0
-    ? `Playing… ${mm}:${String(ss).padStart(2,'0')} left in this session`
-    : `Wrapping up this loop…`;
+  el.textContent = remaining > 0 ? `Playing…` : `Wrapping up this loop…`;
+  // Music-app style scrubber line: elapsed time on the left, remaining (as a countdown) on the right.
+  if (progressWrap && fill && elapsedEl && remainingEl){
+    progressWrap.style.display = 'block';
+    const pct = targetSec ? Math.min(100, (elapsedSec/targetSec)*100) : 0;
+    fill.style.width = pct + '%';
+    elapsedEl.textContent = fmtClock(elapsedSec);
+    remainingEl.textContent = remaining > 0 ? '-' + fmtClock(remaining) : (document.getElementById('loopToggle').checked ? 'looping' : '-0:00');
+  }
 }
 
 function finishFinal(){
@@ -1701,7 +1985,7 @@ function finishFinal(){
   if (finalAmbience){ finalAmbience.stop(); }
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null;
+  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
 }
 
 function stopFinal(){
@@ -1720,7 +2004,7 @@ function stopFinal(){
     finalRecorder.stop();
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null;
+  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
@@ -1894,6 +2178,22 @@ async function saveSubliminal(){
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
+  // Ritual-only second voice layer — same upload pattern as the primary voice.
+  let layerRecordingUrls = null;
+  if (layerVoiceEnabled && state.layerVoiceMode === 'own' && layerRecordings.some(r => r)){
+    msg.textContent = 'Uploading your second voice layer…'; msg.className = 'save-msg';
+    const layerFolder = `${currentUser.id}/${Date.now()}-layer`;
+    layerRecordingUrls = [];
+    for (let i = 0; i < layerRecordings.length; i++){
+      if (!layerRecordings[i] || !layerRecordings[i].blob){ layerRecordingUrls.push(null); continue; }
+      const path = `${layerFolder}/${i}.webm`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: 'audio/webm' });
+      if (upErr){ console.error('layer recording upload failed for line', i, upErr); layerRecordingUrls.push(null); continue; }
+      layerRecordingUrls.push(path);
+    }
+    msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  }
+
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
     title: (state.freq ? state.freq.hz + ' Hz' : 'My subliminal'),
@@ -1902,7 +2202,10 @@ async function saveSubliminal(){
     background: state.bg,
     duration_seconds: seconds,
     recording_urls: recordingUrls,
-    custom_track_url: customTrackStoragePath
+    custom_track_url: customTrackStoragePath,
+    layer_affirmations: layerVoiceEnabled ? state.layerAffirmations : null,
+    layer_voice_mode: layerVoiceEnabled ? state.layerVoiceMode : null,
+    layer_recording_urls: layerRecordingUrls
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -2401,6 +2704,7 @@ async function loadMyLibrary(){
     const mins = Math.round((s.duration_seconds||0)/60);
     const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
+    const freqOptions = FREQS.map(f => `<option value="${f.hz}" ${f.hz===s.frequency_hz?'selected':''}>${f.hz} Hz — ${f.word}</option>`).join('');
     return `<div class="profile-item">
       <div class="profile-item-top">
         <div>
@@ -2410,9 +2714,33 @@ async function loadMyLibrary(){
         <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
+      <div class="item-freq-change">
+        <select id="freqSel-${s.id}">${freqOptions}</select>
+        <button class="mini-btn ghostbtn" onclick="changeLibraryFrequency('${s.id}')">Change frequency</button>
+        <span class="save-msg" id="freqMsg-${s.id}" style="margin-top:0;"></span>
+      </div>
       ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+/* Change the frequency on a subliminal that's already been saved, without rebuilding it. */
+async function changeLibraryFrequency(id){
+  if (!sb || !currentUser) return;
+  const sel = document.getElementById(`freqSel-${id}`);
+  const msg = document.getElementById(`freqMsg-${id}`);
+  const hz = parseInt(sel.value, 10);
+  const match = FREQS.find(f => f.hz === hz);
+  if (!match) return;
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { data: existing } = await sb.from('subliminals').select('title').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
+  const titleWasDefault = !existing || !existing.title || /^\d+\s*Hz/.test(existing.title);
+  const updates = { frequency_hz: hz };
+  if (titleWasDefault) updates.title = `${hz} Hz`;
+  const { error } = await sb.from('subliminals').update(updates).eq('id', id).eq('user_id', currentUser.id);
+  if (error){ msg.textContent = "Couldn't update."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Updated.'; msg.className = 'save-msg ok';
+  loadMyLibrary();
 }
 
 async function loadSavedIntoBuilder(id){
@@ -2456,6 +2784,30 @@ async function loadSavedIntoBuilder(id){
         customTrackBlob = blob;
         document.getElementById('customTrackName').textContent = 'Your uploaded track';
       } catch(e){ console.error('custom track reload failed:', e); }
+    }
+  }
+
+  // Ritual-only second voice layer, if this saved subliminal has one.
+  state.layerAffirmations = Array.isArray(s.layer_affirmations) ? s.layer_affirmations.slice() : [];
+  state.layerVoiceMode = s.layer_voice_mode || null;
+  layerVoiceEnabled = !!(state.layerAffirmations.length && state.layerVoiceMode);
+  layerVoiceMode = state.layerVoiceMode || 'ai';
+  document.getElementById('layerVoiceToggle').checked = layerVoiceEnabled;
+  document.getElementById('layerVoicePanel').classList.toggle('open', layerVoiceEnabled);
+  document.getElementById('layerAffText').value = state.layerAffirmations.join('\n');
+  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode===layerVoiceMode));
+  layerRecordings = [];
+  const hasLayerRecordings = Array.isArray(s.layer_recording_urls) && s.layer_recording_urls.some(p => p);
+  if (hasLayerRecordings){
+    for (const path of s.layer_recording_urls){
+      if (!path){ layerRecordings.push(null); continue; }
+      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+      if (sErr || !signed){ layerRecordings.push(null); continue; }
+      try {
+        const res = await fetch(signed.signedUrl);
+        const blob = await res.blob();
+        layerRecordings.push({ url: URL.createObjectURL(blob), blob });
+      } catch(e){ layerRecordings.push(null); }
     }
   }
 
