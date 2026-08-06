@@ -701,12 +701,12 @@
         <h3>What EFT tapping is</h3>
         <p>Emotional Freedom Technique, better known as tapping, is a practice that pairs a spoken statement with light, rhythmic tapping on a set sequence of points on the face and upper body. The idea, borrowed loosely from acupressure, is that stimulating those points while naming what you're feeling helps take some of the emotional charge out of it. It's used informally for stress, anxiety, and everyday overwhelm, and a growing body of small clinical studies has looked at its effects — though, like most mind-body techniques, the evidence base is still developing and it isn't a substitute for professional care. <a href="https://www.healthline.com/health/eft-tapping" target="_blank" rel="noopener">Healthline has a thorough overview</a> if you want the full picture before trying it.</p>
 
-        <h3>The nine points, in order</h3>
-        <p>A typical round moves through the same nine points every time, usually paired with a short phrase repeated at each stop:</p>
+        <h3>The setup, then the round</h3>
+        <p>You begin with a setup statement, tapping continuously on the Karate Chop point while repeating it three times: "Even though I have this [feeling], I deeply and completely love and accept myself." Then you move through a round of ten taps — starting and ending on Karate Chop, covering Top of Head, Eyebrow, Side of the Eye, Under the Eye, Under the Nose, Chin, Collarbone, and Under the Arm along the way — tapping 5 to 7 times on each point while repeating a short reminder phrase:</p>
         <ol class="eft-points-list" id="scienceEftPointsList"></ol>
 
         <h3>How it works inside a subliminal here</h3>
-        <p>On Ritual, you can build a session as "Subliminal + EFT Tapping" instead of subliminal only. Rather than the usual longer set of affirmations, you get exactly nine lines — one per point — recorded (or read aloud by the AI voice) with a real pause of a few seconds after each line by default, long enough to repeat it out loud a few times while you actually tap that point before moving to the next.</p>
+        <p>On Ritual, you can build a session as "Subliminal + EFT Tapping" instead of subliminal only. You get 11 lines total — the setup statement, then one line for each tap in the round. Each line repeats back-to-back (3 times for the setup, 5 to 7 times for each round point, your choice) with a pause between points so you have a moment to shift positions, whether you record it yourself or use the AI voice.</p>
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
@@ -826,9 +826,17 @@
             <div class="length-msg" id="ritualModeMsg"></div>
             <div class="eft-guide-panel" id="eftGuidePanel" style="display:none;">
               <h4>How EFT tapping works</h4>
-              <p>Emotional Freedom Technique (EFT), or "tapping," pairs a spoken affirmation with light tapping on nine points on the face and body, in order. Say the line for each point out loud while you tap it, a handful of times, then move to the next. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
-              <p>Tonight, you'll get one affirmation for each of the nine points instead of your usual set. When you record (or play the AI voice), each line is followed by a 5-second pause by default — long enough to repeat it a few times while you tap before the next point begins. You can still adjust that pause later on the final screen.</p>
-              <ol class="eft-points-list" id="eftPointsList"></ol>
+              <p>Emotional Freedom Technique (EFT), or "tapping," starts with a setup statement said on the Karate Chop point, repeated 3 times: "Even though I have this [feeling], I deeply and completely love and accept myself." Then you move through a round of ten taps — starting and ending on Karate Chop — repeating a short reminder phrase 5 to 7 times at each point. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
+              <p>Tonight you'll get 11 lines total: the setup statement first, then one line for each tap in the round below. Each round line repeats back-to-back the number of times you pick — matching how many times you'll actually tap that point — with a pause before the next point so you have a moment to shift positions.</p>
+              <p style="font-size:12.5px; color:var(--candle);">1. Setup Statement — Karate Chop, repeated 3 times</p>
+              <ol class="eft-points-list" id="eftPointsList" start="2"></ol>
+              <label style="display:block; margin-top:14px; font-size:12.5px; color:var(--moonlight);">Are you ready to decide? How many times do you want each line repeated while you tap? <span style="color:var(--candle);">*</span></label>
+              <div class="length-chip-grid" id="eftRepeatChips" style="grid-template-columns:repeat(3,1fr); max-width:280px;">
+                <button class="length-chip" data-count="5" onclick="pickEftRepeatCount(this)">5 times</button>
+                <button class="length-chip" data-count="6" onclick="pickEftRepeatCount(this)">6 times</button>
+                <button class="length-chip" data-count="7" onclick="pickEftRepeatCount(this)">7 times</button>
+              </div>
+              <div class="length-msg" id="eftRepeatMsg"></div>
             </div>
           </div>
           <div class="quiz-q" id="countRow">
@@ -1251,10 +1259,13 @@ const BACKGROUNDS = [
   { key:'thunder', label:'Distant storm', ic:'⛈' },
   { key:'brown', label:'Brown noise', ic:'▮' },
 ];
-/* The nine standard EFT tapping points, in the order they're usually worked through. */
-const EFT_POINTS = [
-  { key:'karate', label:'Karate Chop', where:'the outer edge of either hand, below the pinky' },
-  { key:'crown', label:'Top of the Head', where:'the crown, center top of your head' },
+/* The full 11-line EFT structure used here: line 0 is the Setup Statement (said on the
+   Karate Chop point, repeated 3x), and lines 1-10 are a 10-tap round that starts and
+   ends on Karate Chop, covering all eight core points (including Top of Head) in
+   between. */
+const EFT_LINE_POINTS = [
+  { key:'setup', label:'Setup Statement', where:'the Karate Chop point — outer edge of either hand, below the pinky', isSetup:true },
+  { key:'kc1', label:'Karate Chop', where:'the outer edge of either hand, below the pinky' },
   { key:'eyebrow', label:'Eyebrow', where:'the inner edge of one eyebrow, near the bridge of your nose' },
   { key:'sideeye', label:'Side of the Eye', where:'the bone at the outer corner of your eye' },
   { key:'undereye', label:'Under the Eye', where:'the bone directly under your eye' },
@@ -1262,12 +1273,21 @@ const EFT_POINTS = [
   { key:'chin', label:'Chin', where:'the crease between your lower lip and chin' },
   { key:'collarbone', label:'Collarbone', where:'just below where your collarbones meet' },
   { key:'underarm', label:'Under the Arm', where:'your side, about four inches below your armpit' },
+  { key:'crown', label:'Top of the Head', where:'the crown, center top of your head' },
+  { key:'kc2', label:'Karate Chop (closing)', where:'the outer edge of either hand, below the pinky' },
 ];
+/* How many times a given line plays back-to-back while tapping: the setup statement
+   is always said 3 times (standard EFT); every round point uses the person's 5-7 pick. */
+function eftRepeatsForIndex(i){
+  if (!state.eftMode) return 1;
+  if (i === 0) return 3;
+  return state.eftRepeatCount || 1;
+}
 
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1313,7 +1333,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1349,6 +1369,9 @@ function resetFlow(){
   document.getElementById('eftGuidePanel').style.display = 'none';
   document.getElementById('ritualModeMsg').textContent = '';
   document.getElementById('countRow').style.display = 'block';
+  state.eftRepeatCount = null;
+  document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
+  document.getElementById('eftRepeatMsg').textContent = '';
   editingExistingId = null;
   document.getElementById('finalTitleInput').value = '';
   document.getElementById('finalTitleMsg').textContent = '';
@@ -1388,7 +1411,9 @@ countRange.addEventListener('input', ()=>{ document.getElementById('countVal').t
 
 /* ---- Ritual-only: subliminal + EFT tapping mode ---- */
 const eftPointsList = document.getElementById('eftPointsList');
-EFT_POINTS.forEach((p, i) => {
+// Skip index 0 (the Setup Statement) here — it's described separately above the list.
+// This shows the 9-point round: Karate Chop -> ... -> Karate Chop again.
+EFT_LINE_POINTS.slice(1).forEach((p, i) => {
   const li = document.createElement('li');
   li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
   eftPointsList.appendChild(li);
@@ -1416,7 +1441,7 @@ async function pickRitualMode(btn){
   document.getElementById('eftGuidePanel').style.display = state.eftMode ? 'block' : 'none';
   document.getElementById('countRow').style.display = state.eftMode ? 'none' : 'block';
   if (state.eftMode){
-    state.count = 9;
+    state.count = 11; // 1 setup statement + a 10-tap round bookended by Karate Chop
     // EFT works best with a real pause to repeat the line while tapping — default to 5s.
     affirmationGapMs = 5000; state.affirmationGapMs = 5000;
     document.getElementById('lineGap').value = 5;
@@ -1426,7 +1451,16 @@ async function pickRitualMode(btn){
     affirmationGapMs = 100; state.affirmationGapMs = 100;
     document.getElementById('lineGap').value = 0.1;
     document.getElementById('lineGapVal').value = 0.1;
+    state.eftRepeatCount = null;
+    document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
+    document.getElementById('eftRepeatMsg').textContent = '';
   }
+}
+function pickEftRepeatCount(btn){
+  document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
+  btn.classList.add('sel');
+  state.eftRepeatCount = parseInt(btn.dataset.count, 10);
+  document.getElementById('eftRepeatMsg').textContent = '';
 }
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
@@ -1450,12 +1484,20 @@ async function generateAffirmations(){
   }
   msg.textContent = '';
 
+  if (state.eftMode && !state.eftRepeatCount){
+    const repMsg = document.getElementById('eftRepeatMsg');
+    repMsg.textContent = "Pick how many times you'll tap each point (5–7) before continuing.";
+    repMsg.className = 'length-msg err';
+    document.getElementById('eftRepeatChips').scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+
   state.goal = document.getElementById('quizGoal').value.trim();
-  state.count = state.eftMode ? 9 : parseInt(countRange.value);
+  state.count = state.eftMode ? 11 : parseInt(countRange.value);
   showStep(2);
   let lines = null;
-  try{ lines = await callClaudeForAffirmations(); }catch(err){ lines = null; }
-  if (!lines || !lines.length) lines = buildFallbackList();
+  try{ lines = state.eftMode ? await callClaudeForEftAffirmations() : await callClaudeForAffirmations(); }catch(err){ lines = null; }
+  if (!lines || !lines.length) lines = state.eftMode ? buildEftFallbackList() : buildFallbackList();
   state.affirmations = lines.slice(0, state.count);
   renderAffList();
   showStep(3);
@@ -1471,6 +1513,29 @@ async function callClaudeForAffirmations(){
   if (!response.ok) return null;
   const data = await response.json();
   return Array.isArray(data.affirmations) ? data.affirmations : null;
+}
+/* Builds the 11-line EFT structure: setup statement (from setupFeeling), then the
+   10-tap round (Karate Chop, 8 core points including Top of Head, Karate Chop again —
+   the kcReminder line
+   is reused for both the opening and closing tap). Hits its own endpoint so it never
+   touches /api/generate-affirmations, which the regular flow still uses untouched. */
+async function callClaudeForEftAffirmations(){
+  const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
+  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const response = await fetch("/api/generate-eft-affirmations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
+  });
+  if (!response.ok) return null;
+  const data = await response.json();
+  if (!data || !data.setupFeeling || !data.kcReminder || !Array.isArray(data.pointReminders) || data.pointReminders.length !== 8) return null;
+  return [
+    `Even though I have ${data.setupFeeling}, I deeply and completely love and accept myself.`,
+    data.kcReminder,
+    ...data.pointReminders,
+    data.kcReminder
+  ];
 }
 function buildFallbackList(){
   const bank = FALLBACK_BANK[state.intention] || FALLBACK_BANK.sleep;
@@ -1491,6 +1556,30 @@ function buildFallbackList(){
   }
   return lines.slice(0, state.count);
 }
+/* Offline fallback for EFT mode if the API call fails — same 11-line shape, generic
+   but usable, built entirely client-side. */
+function buildEftFallbackList(){
+  const feeling = state.goal
+    ? (state.goal.length > 50 ? state.goal.slice(0,50)+'…' : state.goal)
+    : 'this feeling';
+  const kcReminder = 'this feeling';
+  const pointReminders = [
+    "releasing this now",
+    "I'm allowed to let this go",
+    "it's safe to feel calm",
+    "I choose to soften here",
+    "this doesn't have to stay",
+    "I trust myself to move through this",
+    "I am already easing",
+    "I am settling into this moment"
+  ];
+  return [
+    `Even though I have ${feeling}, I deeply and completely love and accept myself.`,
+    kcReminder,
+    ...pointReminders,
+    kcReminder
+  ];
+}
 
 /* ---------------- review/edit ---------------- */
 function renderAffList(){
@@ -1498,7 +1587,7 @@ function renderAffList(){
   state.affirmations.forEach((line,i)=>{
     const row = document.createElement('div'); row.className='aff-row';
     const num = document.createElement('div'); num.className='num';
-    num.textContent = state.eftMode && EFT_POINTS[i] ? (i+1)+'. '+EFT_POINTS[i].label : (i+1)+'.';
+    num.textContent = state.eftMode && EFT_LINE_POINTS[i] ? (i+1)+'. '+EFT_LINE_POINTS[i].label : (i+1)+'.';
     const ta = document.createElement('textarea'); ta.value=line; ta.rows=1;
     ta.oninput = ()=>{ state.affirmations[i]=ta.value; };
     row.appendChild(num); row.appendChild(ta);
@@ -1618,12 +1707,16 @@ function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings 
 
 function showRecordLine(){
   const lines = activeRecordLines(); const arr = activeRecordArray();
-  const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_POINTS[recIndex];
+  const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_LINE_POINTS[recIndex];
   document.getElementById('recCounter').textContent = isEftPoint
-    ? `Point ${recIndex+1} of 9 — ${EFT_POINTS[recIndex].label}`
+    ? `Line ${recIndex+1} of 11 — ${EFT_LINE_POINTS[recIndex].label}`
     : `${recIndex+1} of ${lines.length}`;
   document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
-  document.getElementById('recTapHint').textContent = isEftPoint ? `Tap: ${EFT_POINTS[recIndex].where}` : '';
+  document.getElementById('recTapHint').textContent = isEftPoint
+    ? (EFT_LINE_POINTS[recIndex].isSetup
+        ? `Tap continuously: ${EFT_LINE_POINTS[recIndex].where}`
+        : `Tap: ${EFT_LINE_POINTS[recIndex].where}`)
+    : '';
   document.getElementById('recTapHint').style.display = isEftPoint ? 'block' : 'none';
   document.getElementById('recStatus').textContent = 'press and hold to record';
   document.getElementById('nextLineBtn').disabled = !arr[recIndex];
@@ -1817,14 +1910,17 @@ function prepareFinal(){
     titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
   }
 }
-/* Shows which of the nine tapping points the currently-playing line belongs to,
-   whenever this subliminal was built in EFT mode. */
+/* Shows which tapping point (or the setup statement) the currently-playing line
+   belongs to, whenever this subliminal was built in EFT mode. */
 function updateFinalPointTag(index){
   const tag = document.getElementById('finalPointTag');
   if (!tag) return;
-  if (state.eftMode && EFT_POINTS[index]){
+  if (state.eftMode && EFT_LINE_POINTS[index]){
+    const p = EFT_LINE_POINTS[index];
     tag.style.display = 'inline-block';
-    tag.textContent = `Point ${index+1} of 9 — ${EFT_POINTS[index].label} · tap ${EFT_POINTS[index].where}`;
+    tag.textContent = p.isSetup
+      ? `Setup Statement · tap ${p.where}`
+      : `Line ${index+1} of 11 — ${p.label} · tap ${p.where}`;
   } else {
     tag.style.display = 'none';
   }
@@ -2147,14 +2243,28 @@ function playFinal(){
         if (idx >= recorded.length){ onDone(); return; }
         const { r, i } = recorded[idx];
         document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
+        const repeatsForThisLine = eftRepeatsForIndex(i);
         fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
           if (!finalPlaying) return;
-          const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
-          const g = finalCtx.createGain(); g.gain.value = document.getElementById('mixVoice').value/100;
-          src.connect(g).connect(finalCtx.destination);
-          if (destForRecording !== finalCtx.destination) g.connect(destForRecording);
-          src.start();
-          src.onended = ()=>{ idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t); };
+          let rep = 0;
+          function playOnce(){
+            if (!finalPlaying) return;
+            const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
+            const g = finalCtx.createGain(); g.gain.value = document.getElementById('mixVoice').value/100;
+            src.connect(g).connect(finalCtx.destination);
+            if (destForRecording !== finalCtx.destination) g.connect(destForRecording);
+            src.start();
+            src.onended = ()=>{
+              rep++;
+              if (rep < repeatsForThisLine){
+                // Short beat between repeats of the same line, timed to a single tap.
+                const t = setTimeout(playOnce, 700); finalTimeouts.push(t);
+              } else {
+                idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
+              }
+            };
+          }
+          playOnce();
         });
       }
       playNext();
@@ -2165,10 +2275,23 @@ function playFinal(){
         if (!finalPlaying){ return; }
         if (idx >= lines.length){ onDone(); return; }
         document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
-        const utter = new SpeechSynthesisUtterance(lines[idx]);
-        utter.rate = 0.92; utter.pitch = 1.0;
-        utter.onend = ()=>{ idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t); };
-        window.speechSynthesis.speak(utter);
+        const repeatsForThisLine = eftRepeatsForIndex(idx);
+        let rep = 0;
+        function speakOnce(){
+          if (!finalPlaying) return;
+          const utter = new SpeechSynthesisUtterance(lines[idx]);
+          utter.rate = 0.92; utter.pitch = 1.0;
+          utter.onend = ()=>{
+            rep++;
+            if (rep < repeatsForThisLine){
+              const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
+            } else {
+              idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
+            }
+          };
+          window.speechSynthesis.speak(utter);
+        }
+        speakOnce();
       }
       speakNext();
     }
@@ -2463,7 +2586,9 @@ async function saveSubliminal(){
     layer_affirmations: layerVoiceEnabled ? state.layerAffirmations : null,
     layer_voice_mode: layerVoiceEnabled ? state.layerVoiceMode : null,
     layer_recording_urls: layerRecordingUrls,
-    eft_mode: state.eftMode || false  });
+    eft_mode: state.eftMode || false,
+    eft_repeat_count: state.eftMode ? state.eftRepeatCount : null
+  });
   if (error){
     console.error('saveSubliminal error:', error);
     msg.textContent = `Couldn't save: ${error.message}`;
@@ -2848,7 +2973,7 @@ function setScienceTab(tab){
 }
 const scienceEftPointsList = document.getElementById('scienceEftPointsList');
 if (scienceEftPointsList){
-  EFT_POINTS.forEach(p => {
+  EFT_LINE_POINTS.slice(1).forEach(p => {
     const li = document.createElement('li');
     li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
     scienceEftPointsList.appendChild(li);
@@ -3052,6 +3177,7 @@ async function loadSavedIntoBuilder(id){
   document.getElementById('sessionLengthSlider').value = restoredMinutes;
   document.getElementById('sessionLengthVal').textContent = formatSessionLength(restoredMinutes);
   state.eftMode = !!s.eft_mode;
+  state.eftRepeatCount = s.eft_repeat_count || null;
 
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
