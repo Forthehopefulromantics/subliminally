@@ -3342,7 +3342,7 @@ async function loadJournalEntries(){
     const fulfilledCount = data.filter(e => e.fulfilled_from_manifesting).length;
     if (fulfilledCount > 0){
       stat.style.display = 'block';
-      stat.textContent = `✦ ${fulfilledCount} manifestation${fulfilledCount === 1 ? '' : 's'} you called in ${fulfilledCount === 1 ? 'has' : 'have'} come true.`;
+      stat.textContent = `✦ ${fulfilledCount} manifestation${fulfilledCount === 1 ? '' : 's'} you called in ${fulfilledCount === 1 ? 'has' : 'have'} made it into your 3D.`;
     }
   }
 
@@ -3350,13 +3350,13 @@ async function loadJournalEntries(){
   list.innerHTML = data.map(e => `
     <div class="journal-entry">
       <p>"${e.content.replace(/</g,'&lt;')}"</p>
-      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${e.fulfilled_from_manifesting ? ' · came true' : ''}</div>
-      ${journalTab === 'manifesting' ? `<div class="journal-entry-actions"><button onclick="markManifestationFulfilled('${e.id}')">✦ This came true — move to Already Mine</button></div>` : ''}
+      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${e.fulfilled_from_manifesting ? ' · in my 3D now' : ''}</div>
+      ${journalTab === 'manifesting' ? `<div class="journal-entry-actions"><button onclick="markManifestationFulfilled('${e.id}')">✦ This made it into my 3D — move to Already Mine</button></div>` : ''}
     </div>`).join('');
 }
 
-/* Moves an "on its way" entry into "already mine" once it's actually happened, and
-   tags it so the received tab can show how many manifestations have come to fruition. */
+/* Moves an "on its way" entry into "already mine" once it's landed in the 3D, and
+   tags it so the received tab can show how many manifestations have made that move. */
 async function markManifestationFulfilled(id){
   if (!sb || !currentUser) return;
   const { error } = await sb.from('journal_entries')
