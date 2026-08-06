@@ -3361,7 +3361,7 @@ async function loadJournalEntries(){
   if (error){ list.innerHTML = `<div class="journal-empty">Couldn't load entries.</div>`; return; }
 
   if (journalTab === 'received'){
-    const fulfilledCount = data.filter(e => e.fulfilled_from_manifesting).length;
+    const fulfilledCount = data.filter(e => e.original_category === 'manifesting').length;
     if (fulfilledCount > 0){
       stat.style.display = 'block';
       stat.textContent = `✦ ${fulfilledCount} manifestation${fulfilledCount === 1 ? '' : 's'} you called in ${fulfilledCount === 1 ? 'has' : 'have'} made it into your 3D.`;
@@ -3370,10 +3370,10 @@ async function loadJournalEntries(){
 
   if (!data.length){ list.innerHTML = '<div class="journal-empty">Nothing here yet — add your first entry above.</div>'; return; }
   list.innerHTML = data.map(e => {
-    // The sticker only ever shows in "Already mine" — it marks an entry that made the
-    // 2D-to-3D trip from "On its way", so entries typed straight into "Already mine"
-    // stay plain, the way a regular one should.
-    const showBadge = journalTab === 'received' && e.fulfilled_from_manifesting;
+    // Only entries that originally started in "On its way" can ever move — once
+    // something's written straight into "Already mine," it stays put for good.
+    const canMove = e.original_category === 'manifesting';
+    const showBadge = journalTab === 'received' && canMove;
     const moveTarget = journalTab === 'received' ? 'manifesting' : 'received';
     const moveLabel = journalTab === 'received' ? '← Move to On its way' : '✦ This made it into my 3D — move to Already Mine';
     return `
@@ -3382,7 +3382,7 @@ async function loadJournalEntries(){
       <p>"${e.content.replace(/</g,'&lt;')}"</p>
       <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${showBadge ? ' · in my 3D now' : ''}</div>
       <div class="journal-entry-actions">
-        <button onclick="moveJournalEntry('${e.id}','${moveTarget}')">${moveLabel}</button>
+        ${canMove ? `<button onclick="moveJournalEntry('${e.id}','${moveTarget}')">${moveLabel}</button>` : ''}
         <button class="journal-entry-delete" onclick="deleteJournalEntry('${e.id}')" aria-label="Delete entry" title="Delete">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
@@ -3391,19 +3391,18 @@ async function loadJournalEntries(){
   }).join('');
 }
 
-/* Moves an entry between "On its way" and "Already mine" in either direction.
-   Moving manifesting -> received tags it as having made the 2D-to-3D trip (badge +
-   stat). Moving received -> manifesting clears that tag, since it's headed back out —
-   if it comes back to received later, it'll pick the tag back up. */
+/* Moves an entry between "On its way" and "Already mine" — only ever allowed for
+   entries whose original_category is "manifesting" (enforced both by hiding the
+   button client-side and by the caller only wiring it up for those entries).
+   original_category itself never changes after creation, so it always tells you
+   where something started, no matter how many times it's moved since. */
 async function moveJournalEntry(id, targetCategory){
   if (!sb || !currentUser) return;
-  const updates = { category: targetCategory };
-  if (targetCategory === 'received') updates.fulfilled_from_manifesting = true;
-  else updates.fulfilled_from_manifesting = false;
   const { error } = await sb.from('journal_entries')
-    .update(updates)
+    .update({ category: targetCategory })
     .eq('id', id)
-    .eq('user_id', currentUser.id);
+    .eq('user_id', currentUser.id)
+    .eq('original_category', 'manifesting');
   if (error){ console.error('moveJournalEntry error:', error); return; }
   loadJournalEntries();
 }
@@ -3423,7 +3422,7 @@ async function addJournalEntry(){
   const content = input.value.trim();
   if (!content) return;
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { error } = await sb.from('journal_entries').insert({ user_id: currentUser.id, category: journalTab, content });
+  const { error } = await sb.from('journal_entries').insert({ user_id: currentUser.id, category: journalTab, original_category: journalTab, content });
   if (error){
     console.error('journal insert error:', error);
     msg.textContent = "Couldn't save that entry — try again in a moment.";
