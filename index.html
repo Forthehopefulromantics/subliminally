@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Subliminally by FTHR — Your own voice becomes your nightly environment.</title>
+<title>Subliminally by FTHR — Fall asleep to your own voice, not a stranger's.</title>
 <meta name="description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <link rel="canonical" href="https://www.subliminallybyfthr.com/" />
 <meta name="theme-color" content="#0D0B18" />
@@ -12,7 +12,7 @@
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.subliminallybyfthr.com/" />
-<meta property="og:title" content="Subliminally by FTHR — Your own voice becomes your nightly environment." />
+<meta property="og:title" content="Subliminally by FTHR — Fall asleep to your own voice, not a stranger's." />
 <meta property="og:description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <meta property="og:image" content="https://www.subliminallybyfthr.com/og-image.png" />
 <meta property="og:site_name" content="Subliminally by FTHR" />
@@ -45,8 +45,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --midnight:#0D0B18; --midnight-2:#12101F; --veil:#1C1830; --dusk:#262040;
-    --moonlight:#EDE9F6; --haze:#9C93B8; --candle:#E3BE7F; --lilac:#B9A7E8;
+    --midnight:#0B0A0A; --midnight-2:#141210; --veil:#1E1B18; --dusk:#2B2622;
+    --moonlight:#F1EAE3; --haze:#A69C93; --candle:#E3BE7F; --lilac:#C98B77;
     --serif:'Fraunces', Georgia, serif; --sans:'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
@@ -56,15 +56,7 @@
   ::selection{ background:var(--candle); color:#241C0E; }
   body::before{
     content:""; position:fixed; inset:0; z-index:-2;
-    background:
-      radial-gradient(ellipse 800px 500px at 15% -5%, rgba(185,167,232,0.10), transparent 60%),
-      radial-gradient(ellipse 900px 600px at 90% 15%, rgba(227,190,127,0.07), transparent 55%),
-      radial-gradient(ellipse 700px 500px at 50% 100%, rgba(185,167,232,0.06), transparent 55%),
-      var(--midnight);
-  }
-  body::after{
-    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background-image:radial-gradient(rgba(237,233,246,0.035) 1px, transparent 1px); background-size:3px 3px;
+    background:var(--midnight);
   }
   .wrap{ max-width:1120px; margin:0 auto; padding:0 28px; }
   section{ position:relative; }
@@ -94,9 +86,11 @@
 
   .hero{ min-height:92vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 28px 70px; gap:24px; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
-  .orb{ position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(185,167,232,0.55), transparent 60%), radial-gradient(circle at 68% 72%, rgba(227,190,127,0.42), transparent 55%), radial-gradient(circle, #2E2650, var(--midnight-2) 75%); box-shadow:0 0 90px rgba(185,167,232,0.25), inset 0 0 50px rgba(227,190,127,0.18); animation:breathe 6s ease-in-out infinite; }
-  .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 40% 35%, rgba(237,233,246,0.14), transparent 65%); animation:breathe 6s ease-in-out infinite reverse; }
+  .orb{ position:absolute; inset:0; border-radius:50%; background:var(--midnight-2); border:1px solid rgba(227,190,127,0.35); box-shadow:0 0 60px rgba(227,190,127,0.15); animation:breathe 6s ease-in-out infinite; }
+  .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:rgba(227,190,127,0.10); animation:breathe 6s ease-in-out infinite reverse; }
   @keyframes breathe{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.09);} }
+  .moon-mark{ animation:breathe 7s ease-in-out infinite; filter:drop-shadow(0 0 40px rgba(227,190,127,0.35)); }
+  .motto .heart{ color:var(--candle); }
   @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
   .motto{ font-size:13px; letter-spacing:.1em; color:var(--haze); }
   .motto b{ color:var(--candle); font-weight:500; }
@@ -148,7 +142,7 @@
   @media (max-width:900px){ .steps{ grid-template-columns:repeat(2,1fr); } }
 
   .flow-section{ padding:80px 0 90px; border-top:1px solid rgba(255,255,255,0.06); }
-  .flow-card{ background:linear-gradient(160deg, var(--veil), var(--midnight-2)); border:1px solid var(--dusk); border-radius:28px; padding:40px; max-width:760px; margin:0 auto; min-height:480px; display:flex; flex-direction:column; }
+  .flow-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:28px; padding:40px; max-width:760px; margin:0 auto; min-height:480px; display:flex; flex-direction:column; }
   @media (max-width:640px){ .flow-card{ padding:24px 18px; } }
   .flow-progress{ display:flex; gap:5px; margin-bottom:26px; }
   .flow-progress div{ height:3px; flex:1; border-radius:2px; background:var(--dusk); transition:background .4s; }
@@ -164,12 +158,12 @@
 
   .freq-grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
   .freq-card3{ cursor:pointer; padding:14px 10px; border-radius:15px; text-align:center; background:var(--dusk); border:1px solid transparent; transition:all .2s; }
-  .freq-card3.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .freq-card3.sel{ background:rgba(201,139,119,0.16); border-color:var(--lilac); }
   .freq-card3 .hz{ font-family:var(--serif); font-size:17px; color:var(--moonlight); }
   .freq-card3 .word{ font-size:10.5px; color:var(--lilac); margin-top:2px; }
   @media (max-width:560px){ .freq-grid3{ grid-template-columns:repeat(2,1fr); } }
-  .freq-guide{ background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.2); border-radius:14px; padding:14px 16px; font-family:var(--serif); font-size:13.5px; color:var(--moonlight); line-height:1.5; min-height:20px; margin-top:10px; }
-  .disclaimer{ display:flex; gap:9px; padding:12px 14px; border-radius:12px; background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.18); margin-top:12px; }
+  .freq-guide{ background:rgba(201,139,119,0.08); border:1px solid rgba(201,139,119,0.2); border-radius:14px; padding:14px 16px; font-family:var(--serif); font-size:13.5px; color:var(--moonlight); line-height:1.5; min-height:20px; margin-top:10px; }
+  .disclaimer{ display:flex; gap:9px; padding:12px 14px; border-radius:12px; background:rgba(201,139,119,0.08); border:1px solid rgba(201,139,119,0.18); margin-top:12px; }
   .disclaimer span.i{ color:var(--lilac); font-size:13px; }
   .disclaimer p{ font-size:11.5px; color:var(--haze); line-height:1.5; }
 
@@ -210,7 +204,7 @@
 
   .bg-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .bg-card{ cursor:pointer; padding:12px 8px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; transition:all .2s; font-size:12px; }
-  .bg-card.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .bg-card.sel{ background:rgba(201,139,119,0.16); border-color:var(--lilac); }
   .bg-card .ic{ font-size:18px; display:block; margin-bottom:4px; }
   @media (max-width:560px){ .bg-grid{ grid-template-columns:repeat(2,1fr); } }
   .mix-row{ display:flex; align-items:center; gap:10px; margin-top:8px; }
@@ -225,7 +219,7 @@
   /* playback progress bar, elapsed / remaining */
   .session-progress{ margin-top:6px; align-self:stretch; width:100%; box-sizing:border-box; }
   .session-progress-track{ position:relative; width:100%; height:4px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; }
-  .session-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background:linear-gradient(90deg, var(--lilac), var(--candle)); border-radius:999px; transition:width 1s linear; }
+  .session-progress-fill{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--candle); border-radius:999px; transition:width 1s linear; }
   .session-progress-times{ display:flex; justify-content:space-between; font-size:11px; color:var(--haze); margin-top:5px; font-variant-numeric:tabular-nums; }
   .soothing-picker{ margin-top:18px; }
   .soothing-picker label{ font-size:12.5px; color:var(--haze); display:block; margin-bottom:8px; }
@@ -263,7 +257,7 @@
   @media (max-width:900px){ .pricing-grid{ grid-template-columns:1fr; max-width:420px; } }
   .price-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:32px 28px; text-align:left; position:relative; transition:border-color .3s, transform .3s; }
   .price-card:hover{ border-color:var(--lilac); transform:translateY(-3px); }
-  .price-card.featured{ border-color:var(--candle); background:linear-gradient(160deg, rgba(227,190,127,0.08), var(--veil)); }
+  .price-card.featured{ border-color:var(--candle); background:rgba(227,190,127,0.08); }
   .price-card .badge{ position:absolute; top:-11px; right:24px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#241C0E; background:var(--candle); padding:4px 12px; border-radius:999px; font-weight:500; }
   .price-card h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); }
   .price-amount{ font-family:var(--serif); font-size:38px; color:var(--candle); margin-top:10px; }
@@ -277,7 +271,7 @@
   .length-chip-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   .length-chip{ cursor:pointer; padding:12px 6px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:13px; font-family:inherit; transition:all .2s; }
   .length-chip span{ display:block; font-size:10px; color:var(--lilac); margin-top:3px; }
-  .length-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .length-chip.sel{ background:rgba(201,139,119,0.16); border-color:var(--lilac); }
   .length-chip.locked{ opacity:.55; }
   .length-chip.locked span{ color:var(--candle); }
   /* tier-name captions under session-length chips only show for free/logged-out accounts */
@@ -320,7 +314,7 @@
   .layer-voice-panel textarea{ width:100%; min-height:70px; margin-top:8px; background:var(--midnight-2); border:1px solid var(--dusk); border-radius:10px; color:var(--moonlight); font-family:inherit; font-size:13px; padding:10px; resize:vertical; }
   .layer-voice-options{ display:flex; gap:8px; margin-top:10px; }
   .layer-voice-options button{ flex:1; padding:9px; border-radius:10px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:12.5px; cursor:pointer; }
-  .layer-voice-options button.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .layer-voice-options button.sel{ background:rgba(201,139,119,0.16); border-color:var(--lilac); }
 
   /* inline frequency change for already-saved subliminals in My Library */
   .avatar-upload-label{ display:inline-block; margin-top:10px; font-size:12px; color:var(--lilac); cursor:pointer; text-decoration:underline; }
@@ -330,15 +324,15 @@
   .avatar-opt.sel{ border-color:var(--candle); }
   #avatarPreviewWrap img{ width:48px; height:48px; border-radius:50%; object-fit:cover; margin-top:8px; border:2px solid var(--candle); }
   .session-target{ font-size:12.5px; color:var(--lilac); margin-bottom:4px; min-height:16px; }
-  .breath-note{ font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--lilac); background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.2); border-radius:14px; padding:14px 18px; margin:14px 0; line-height:1.6; }
+  .breath-note{ font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--lilac); background:rgba(201,139,119,0.08); border:1px solid rgba(201,139,119,0.2); border-radius:14px; padding:14px 18px; margin:14px 0; line-height:1.6; }
   .length-msg{ font-size:12px; margin-top:10px; min-height:14px; }
-  .eft-guide-panel{ margin-top:14px; padding:16px; border-radius:14px; background:rgba(185,167,232,0.06); border:1px solid rgba(185,167,232,0.2); text-align:left; }
+  .eft-guide-panel{ margin-top:14px; padding:16px; border-radius:14px; background:rgba(201,139,119,0.06); border:1px solid rgba(201,139,119,0.2); text-align:left; }
   .eft-guide-panel h4{ font-family:var(--serif); font-size:15px; color:var(--moonlight); margin-bottom:6px; }
   .eft-guide-panel p{ font-size:13px; color:var(--haze); line-height:1.6; margin-bottom:8px; }
   .eft-guide-panel a{ color:var(--lilac); }
   .eft-points-list{ list-style:decimal; margin:10px 0 0 18px; font-size:13px; color:var(--moonlight); line-height:1.9; }
   .eft-points-list b{ color:var(--candle); font-weight:500; }
-  .eft-point-tag{ display:inline-block; font-size:11px; color:var(--lilac); background:rgba(185,167,232,0.14); border-radius:999px; padding:3px 10px; margin-bottom:6px; }
+  .eft-point-tag{ display:inline-block; font-size:11px; color:var(--lilac); background:rgba(201,139,119,0.14); border-radius:999px; padding:3px 10px; margin-bottom:6px; }
   .final-point-tag{ font-size:12px; color:var(--candle); background:rgba(227,190,127,0.12); border-radius:999px; padding:5px 14px; display:inline-block; }
   .length-msg.err{ color:#E39A9A; }
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
@@ -367,9 +361,9 @@
   .profile-name{ font-family:var(--serif); font-size:20px; color:var(--moonlight); }
   .tier-badge{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; margin-top:6px; padding:5px 14px; border-radius:999px; letter-spacing:.02em; }
   .tier-badge[data-tier="none"]{ background:rgba(255,255,255,0.06); color:var(--haze); }
-  .tier-badge[data-tier="whisper"]{ background:rgba(185,167,232,0.18); color:var(--lilac); }
+  .tier-badge[data-tier="whisper"]{ background:rgba(201,139,119,0.18); color:var(--lilac); }
   .tier-badge[data-tier="reverie"]{ background:rgba(227,190,127,0.16); color:var(--candle); }
-  .tier-badge[data-tier="ritual"]{ background:linear-gradient(135deg, rgba(227,190,127,0.28), rgba(185,167,232,0.28)); color:var(--moonlight); border:1px solid rgba(227,190,127,0.4); }
+  .tier-badge[data-tier="ritual"]{ background:rgba(227,190,127,0.22); color:var(--moonlight); border:1px solid rgba(227,190,127,0.4); }
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
   .mylibrary-section{ padding:80px 0; }
@@ -427,7 +421,7 @@
   .account-chip button:hover{ color:var(--candle); }
   .modal-overlay{ display:none; position:fixed; inset:0; z-index:500; background:rgba(8,7,15,0.72); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px; }
   .modal-overlay.open{ display:flex; }
-  .modal-card{ position:relative; background:linear-gradient(160deg, var(--veil), var(--midnight-2)); border:1px solid var(--dusk); border-radius:24px; padding:32px 28px; max-width:380px; width:100%; }
+  .modal-card{ position:relative; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:32px 28px; max-width:380px; width:100%; }
   .modal-close{ position:absolute; top:16px; right:16px; background:none; border:none; color:var(--haze); font-size:15px; cursor:pointer; }
   .modal-close:hover{ color:var(--candle); }
   .modal-title{ font-family:var(--serif); font-size:22px; color:var(--moonlight); }
@@ -450,9 +444,9 @@
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
   .journal-tabs button{ flex:1; background:none; border:none; color:var(--haze); font-size:13.5px; font-weight:500; padding:11px 14px; border-radius:999px; cursor:pointer; transition:all .2s; }
-  .journal-tabs button.active{ background:linear-gradient(135deg, var(--lilac), #7C6BC4); color:#fff; }
+  .journal-tabs button.active{ background:var(--lilac); color:#fff; }
   .journal-prompt{ max-width:520px; margin:0 auto 20px; text-align:center; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); }
-  .journal-philosophy{ max-width:560px; margin:0 auto 24px; background:rgba(185,167,232,0.06); border:1px solid rgba(185,167,232,0.2); border-radius:16px; padding:14px 18px; }
+  .journal-philosophy{ max-width:560px; margin:0 auto 24px; background:rgba(201,139,119,0.06); border:1px solid rgba(201,139,119,0.2); border-radius:16px; padding:14px 18px; }
   .journal-philosophy-toggle{ width:100%; display:flex; align-items:center; justify-content:space-between; background:none; border:none; color:var(--lilac); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:2px 0; }
   .journal-philosophy-toggle span{ transition:transform .25s; }
   .journal-philosophy.open .journal-philosophy-toggle span{ transform:rotate(180deg); }
@@ -606,10 +600,18 @@
 </div>
 
 <section class="hero">
-  <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
-  <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
-  <h1>Your own voice becomes<br><em>your nightly environment.</em></h1>
-  <p class="hero-sub">Choose one of the nine Solfeggio frequencies, get affirmations built for what you're working through, and layer in rain, waterfall, or birds underneath your own voice.</p>
+  <div class="orb-wrap">
+    <svg class="moon-mark" viewBox="0 0 180 180" width="150" height="150" aria-hidden="true">
+      <circle cx="90" cy="90" r="72" fill="#E3BE7F" opacity="0.9"/>
+      <path d="M90 18a72 72 0 1 0 0 144c-26-14-42-42-42-72s16-58 42-72z" fill="#0B0A0A" opacity="0.85"/>
+      <circle cx="128" cy="52" r="1.6" fill="#F1EAE3" opacity=".8"/>
+      <circle cx="146" cy="80" r="1" fill="#F1EAE3" opacity=".6"/>
+      <circle cx="118" cy="34" r="1" fill="#F1EAE3" opacity=".5"/>
+    </svg>
+  </div>
+  <div class="motto">Be more <b>Hopeful</b>. Be more <b>Romantic</b>. Be more <b>you</b> <span class="heart">♡</span></div>
+  <h1>Fall asleep to your own voice,<br><em>not a stranger's.</em></h1>
+  <p class="hero-sub">Pick a Solfeggio frequency, write the affirmations you actually need right now, and layer your voice over rain, waterfall, or birdsong. It's your ritual — you just build it once.</p>
   <div class="hero-ctas">
     <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
     <button class="btn btn-ghost" onclick="goTo('waitlist')">Join the waitlist</button>
@@ -1181,7 +1183,7 @@
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
       <h2 id="pricingHeading">Three ways in</h2>
-      <p id="pricingSub">Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.</p>
+      <p id="pricingSub">Every tier includes the full ritual builder — frequency, affirmations, your voice, nature sounds, and sessions with no time limit.</p>
     </div>
 
     <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
@@ -1192,7 +1194,7 @@
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
         <div class="price-amount">$10<span>/month</span></div>
-        <div class="limit">Sessions up to 30 minutes</div>
+        <div class="limit">No time limit — build a session as long as you want</div>
         <ul class="price-feats">
           <li>All nine Solfeggio frequencies</li>
           <li>Custom affirmations, your voice or AI voice</li>
@@ -1204,7 +1206,7 @@
       <div class="price-card" id="priceCardReverie">
         <h3>Reverie</h3>
         <div class="price-amount">$22<span>/month</span></div>
-        <div class="limit">Sessions up to 2 hours</div>
+        <div class="limit">No time limit, plus room to save more</div>
         <ul class="price-feats">
           <li>Everything in Whisper</li>
           <li>Unlimited saved subliminals</li>
@@ -1217,10 +1219,10 @@
         <h3>Ritual</h3>
         <p class="price-tagline">The full nightly ritual + social.</p>
         <div class="price-amount">$35<span>/month</span></div>
-        <div class="limit">Sessions up to 8 hours</div>
+        <div class="limit">Everything, plus lock-screen &amp; sharing</div>
         <ul class="price-feats">
           <li>Everything in Reverie</li>
-          <li>8-hour sessions with screen-lock playback</li>
+          <li>Screen-lock playback, so it keeps running overnight</li>
           <li>Subliminal + EFT Tapping — nine affirmations, one per tapping point</li>
           <li>Share your frequencies and subliminals with friends or followers</li>
           <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
@@ -1229,7 +1231,7 @@
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
     </div>
-    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
+    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon). Student on Whisper? Email <a href="mailto:hello@subliminallybyfthr.com" style="color:var(--lilac);">hello@subliminallybyfthr.com</a> from your .edu for 30% off.</p>
     <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
   </div>
 </section>
@@ -1262,7 +1264,7 @@
       </a>
     </div>
     <div class="footer-grid">
-      <div class="footer-motto">Be more Hopeful… Be more Romantic… Be more you.</div>
+      <div class="footer-motto">Be more Hopeful. Be more Romantic. Be more you ♡</div>
       <div class="footer-links">
         <button onclick="goTo('science')">The Science</button>
         <button onclick="goTo('flow-section')">Build yours</button>
@@ -2576,8 +2578,9 @@ function goToCheckout(evt, baseUrl){
 }
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
-// Matches the durations promised on the pricing cards.
-const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
+// Session length is no longer a paywalled dimension — every paid tier gets the
+// full 5min–8hr range. Only "none" (no account yet) gets a short preview.
+const TIER_LENGTH_SECONDS = { none: 300, whisper: 28800, reverie: 28800, ritual: 28800 };
 const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
 /* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
    tier that's allowed to actually generate/save a session that long. */
@@ -2626,18 +2629,18 @@ async function applyPricingVisibility(){
     cards.reverie.style.display = 'none';
     grid.classList.add('centered');
     document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
-    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, Subliminal + EFT Tapping, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
+    document.getElementById('pricingSub').textContent = "Screen-lock playback, Subliminal + EFT Tapping, your own uploaded track layered in, and sharing your frequencies with friends — all still out of reach on Reverie.";
     manageSub.style.display = 'block';
   } else if (myTier === 'whisper'){
     cards.whisper.style.display = 'none';
     grid.classList.add('centered');
     document.getElementById('pricingHeading').textContent = "You're missing the deeper tiers";
-    document.getElementById('pricingSub').textContent = "Unlimited saved subliminals, 2–8 hour sessions, visualization for performance, your own uploaded track — Whisper doesn't unlock any of it yet.";
+    document.getElementById('pricingSub').textContent = "Unlimited saved subliminals, Visualization Script for performance, your own uploaded track — Whisper doesn't unlock any of it yet.";
     manageSub.style.display = 'block';
   } else {
     grid.classList.remove('centered');
     document.getElementById('pricingHeading').textContent = 'Three ways in';
-    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.';
+    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, affirmations, your voice, nature sounds, and sessions with no time limit.';
     manageSub.style.display = 'none';
   }
 }
@@ -3114,7 +3117,7 @@ function renderMyLibraryState(){
 }
 /* ---------- interactive science quiz ---------- */
 const REPROGRAM_ANSWERS = {
-  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try Whisper's 30-minute sessions timed right as you're winding down, not after you're already trying to force sleep.`,
+  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try building a short session and timing it right as you're winding down, not after you're already trying to force sleep.`,
   confidence: `<b>On confidence:</b> this leans hardest on the self-referential processing point — information framed as being about you, in your own voice, tends to get encoded more deeply than the same words from someone else. That's a real finding behind why journaling and self-talk work as tools at all. Repetition strengthens whichever pathway gets used, so the actual mechanism here is closer to "practice" than "magic" — which is honestly a better guarantee.`,
   anxiety: `<b>On anxious, looping thoughts:</b> the honest framing is that this won't out-argue a racing mind mid-spiral — nothing bypasses your conscious mind that easily, despite what "subliminal" branding often implies. What it can do is give the pre-sleep window, when filtering naturally eases, something calmer to loop on instead of the same worry track. Pair a grounding frequency with a slower, present-tense line, and keep expectations realistic: this is a nightly practice, not a single-session fix.`,
   relationships: `<b>On relationships — with others or with yourself:</b> repetition and self-talk research both point to the same place: how you talk to yourself, repeatedly, shapes the baseline you bring into other relationships. There's nothing here that replaces communication or therapy where that's needed — but a consistent, calm, self-directed practice is a reasonable complement to that work, not a substitute for it.`
