@@ -447,6 +447,14 @@
   .journal-tabs button{ flex:1; background:none; border:none; color:var(--haze); font-size:13.5px; font-weight:500; padding:11px 14px; border-radius:999px; cursor:pointer; transition:all .2s; }
   .journal-tabs button.active{ background:linear-gradient(135deg, var(--lilac), #7C6BC4); color:#fff; }
   .journal-prompt{ max-width:520px; margin:0 auto 20px; text-align:center; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); }
+  .journal-philosophy{ max-width:560px; margin:0 auto 24px; background:rgba(185,167,232,0.06); border:1px solid rgba(185,167,232,0.2); border-radius:16px; padding:14px 18px; }
+  .journal-philosophy-toggle{ width:100%; display:flex; align-items:center; justify-content:space-between; background:none; border:none; color:var(--lilac); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:2px 0; }
+  .journal-philosophy-toggle span{ transition:transform .25s; }
+  .journal-philosophy.open .journal-philosophy-toggle span{ transform:rotate(180deg); }
+  .journal-philosophy-body{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
+  .journal-philosophy.open .journal-philosophy-body{ max-height:600px; margin-top:12px; }
+  .journal-philosophy-body p{ font-size:13px; color:var(--haze); line-height:1.7; margin-top:10px; }
+  .journal-philosophy-body p:first-child{ margin-top:0; }
   .journal-locked{ max-width:520px; margin:0 auto; text-align:center; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:44px 30px; }
   .journal-locked .ic{ font-size:30px; }
   .journal-locked h3{ font-family:var(--serif); font-size:21px; color:var(--moonlight); margin-top:14px; }
@@ -458,11 +466,14 @@
   .journal-add input:focus{ border-color:var(--candle); }
   .journal-entries{ display:flex; flex-direction:column; gap:10px; }
   .journal-entry{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; padding:14px 16px; }
+  .journal-entry-badge{ display:inline-flex; align-items:center; font-size:10.5px; color:var(--candle); background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); border-radius:999px; padding:3px 10px; margin-bottom:8px; letter-spacing:.02em; }
   .journal-entry p{ font-size:14px; color:var(--moonlight); font-family:var(--serif); font-style:italic; }
   .journal-entry .date{ font-size:11px; color:var(--haze); margin-top:6px; }
-  .journal-entry-actions{ display:flex; justify-content:flex-end; margin-top:8px; }
+  .journal-entry-actions{ display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:8px; flex-wrap:wrap; }
   .journal-entry-actions button{ background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); font-size:11.5px; font-family:inherit; padding:6px 12px; border-radius:999px; cursor:pointer; transition:background .2s; }
   .journal-entry-actions button:hover{ background:rgba(227,190,127,0.24); }
+  .journal-entry-delete{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0 !important; flex-shrink:0; background:rgba(255,255,255,0.05) !important; border-color:var(--dusk) !important; color:var(--haze) !important; }
+  .journal-entry-delete:hover{ background:rgba(227,154,154,0.16) !important; border-color:rgba(227,154,154,0.4) !important; color:#E39A9A !important; }
   .journal-stat{ text-align:center; font-size:13px; color:var(--candle); background:rgba(227,190,127,0.08); border:1px solid rgba(227,190,127,0.2); border-radius:14px; padding:10px 16px; margin-bottom:16px; }
   .journal-empty{ text-align:center; font-size:13px; color:var(--haze); padding:30px 0; }
 
@@ -1031,6 +1042,14 @@
       <button data-cat="manifesting" onclick="setJournalTab('manifesting')">On its way</button>
     </div>
     <div class="journal-prompt" id="journalPrompt">A good morning practice: write down three things you're grateful for, right when you wake up.</div>
+    <div class="journal-philosophy" id="journalPhilosophy" style="display:none;">
+      <button class="journal-philosophy-toggle" onclick="this.parentElement.classList.toggle('open')">Why hasn't this shown up yet? <span>↓</span></button>
+      <div class="journal-philosophy-body">
+        <p>An affirmation is 2D — words on paper, a thought in your head. Physical reality is 3D. Getting from one to the other isn't instant, and the gap between them is normal, not proof it isn't working.</p>
+        <p>Your inner state is the blueprint. Your affirmations are that blueprint spoken into words. The physical world around you right now is just an echo of an older blueprint — the assumptions you were running before. Reality takes time to catch up to a new mental state; that's the lag, not a sign you did something wrong.</p>
+        <p>So the practice isn't checking outside for proof. It's repeating the words until they stop feeling forced and start feeling true — and when the old, unwanted version of things shows up anyway, treating it as old news instead of new evidence. Your identity gets to stay steady while the world outside slowly updates to match it.</p>
+      </div>
+    </div>
     <div id="journalLocked" class="journal-locked">
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
       <h3>Keep your own record</h3>
@@ -3310,12 +3329,15 @@ function setJournalTab(cat){
   document.querySelectorAll('.journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
   const input = document.getElementById('journalInput');
   const prompt = document.getElementById('journalPrompt');
+  const philosophy = document.getElementById('journalPhilosophy');
   if (cat === 'received'){
     input.placeholder = 'I am so grateful for…';
     prompt.textContent = 'A good morning practice: write down three things you\'re grateful for, right when you wake up.';
+    philosophy.style.display = 'none';
   } else {
     input.placeholder = 'I am so grateful now that…';
     prompt.textContent = 'Try one thing you\'re grateful for that hasn\'t arrived yet — write it as if it already has.';
+    philosophy.style.display = 'block';
   }
   document.getElementById('journalAddMsg').textContent = '';
   loadJournalEntries();
@@ -3347,23 +3369,51 @@ async function loadJournalEntries(){
   }
 
   if (!data.length){ list.innerHTML = '<div class="journal-empty">Nothing here yet — add your first entry above.</div>'; return; }
-  list.innerHTML = data.map(e => `
+  list.innerHTML = data.map(e => {
+    // The sticker only ever shows in "Already mine" — it marks an entry that made the
+    // 2D-to-3D trip from "On its way", so entries typed straight into "Already mine"
+    // stay plain, the way a regular one should.
+    const showBadge = journalTab === 'received' && e.fulfilled_from_manifesting;
+    const moveTarget = journalTab === 'received' ? 'manifesting' : 'received';
+    const moveLabel = journalTab === 'received' ? '← Move to On its way' : '✦ This made it into my 3D — move to Already Mine';
+    return `
     <div class="journal-entry">
+      ${showBadge ? `<div class="journal-entry-badge" title="Made it from On its way to Already mine">✦ 2D → 3D</div>` : ''}
       <p>"${e.content.replace(/</g,'&lt;')}"</p>
-      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${e.fulfilled_from_manifesting ? ' · in my 3D now' : ''}</div>
-      ${journalTab === 'manifesting' ? `<div class="journal-entry-actions"><button onclick="markManifestationFulfilled('${e.id}')">✦ This made it into my 3D — move to Already Mine</button></div>` : ''}
-    </div>`).join('');
+      <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${showBadge ? ' · in my 3D now' : ''}</div>
+      <div class="journal-entry-actions">
+        <button onclick="moveJournalEntry('${e.id}','${moveTarget}')">${moveLabel}</button>
+        <button class="journal-entry-delete" onclick="deleteJournalEntry('${e.id}')" aria-label="Delete entry" title="Delete">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-/* Moves an "on its way" entry into "already mine" once it's landed in the 3D, and
-   tags it so the received tab can show how many manifestations have made that move. */
-async function markManifestationFulfilled(id){
+/* Moves an entry between "On its way" and "Already mine" in either direction.
+   Moving manifesting -> received tags it as having made the 2D-to-3D trip (badge +
+   stat). Moving received -> manifesting clears that tag, since it's headed back out —
+   if it comes back to received later, it'll pick the tag back up. */
+async function moveJournalEntry(id, targetCategory){
   if (!sb || !currentUser) return;
+  const updates = { category: targetCategory };
+  if (targetCategory === 'received') updates.fulfilled_from_manifesting = true;
+  else updates.fulfilled_from_manifesting = false;
   const { error } = await sb.from('journal_entries')
-    .update({ category: 'received', fulfilled_from_manifesting: true })
+    .update(updates)
     .eq('id', id)
     .eq('user_id', currentUser.id);
-  if (error){ console.error('markManifestationFulfilled error:', error); return; }
+  if (error){ console.error('moveJournalEntry error:', error); return; }
+  loadJournalEntries();
+}
+async function deleteJournalEntry(id){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('journal_entries')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', currentUser.id);
+  if (error){ console.error('deleteJournalEntry error:', error); return; }
   loadJournalEntries();
 }
 async function addJournalEntry(){
