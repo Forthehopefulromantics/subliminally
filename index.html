@@ -276,8 +276,10 @@
   .length-chip.locked{ opacity:.55; }
   .length-chip.locked span{ color:var(--candle); }
   /* tier-name captions under session-length chips only show for free/logged-out accounts */
-  #lengthChips span{ display:none; }
-  #lengthChips.show-tier-labels span{ display:block; }
+  .session-length-row{ display:flex; align-items:center; gap:12px; }
+  .session-length-row input[type=range]{ flex:1; accent-color:var(--lilac); }
+  .session-length-val{ font-size:12.5px; color:var(--candle); font-weight:500; font-variant-numeric:tabular-nums; }
+  .session-length-scale{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--haze); margin-top:4px; }
 
   /* frequency change on the final screen */
   .final-freq-picker{ margin-top:8px; }
@@ -293,12 +295,18 @@
   .final-title-save-btn{ display:flex; align-items:center; justify-content:center; width:40px; flex-shrink:0; background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); border-radius:10px; cursor:pointer; transition:background .2s, transform .2s; }
   .final-title-save-btn:hover{ background:rgba(227,190,127,0.24); transform:translateY(-1px); }
 
-  /* editable titles in My Library */
-  .lib-title-row{ display:flex; gap:6px; align-items:center; max-width:340px; }
+  /* editable titles in My Library — full title shown by default, only becomes an
+     input when the Edit button next to it is pressed */
+  .lib-title-view{ display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+  .lib-title-text{ font-size:15px; color:var(--moonlight); font-weight:500; word-break:break-word; overflow-wrap:anywhere; }
+  .lib-title-edit-btn{ display:inline-flex; align-items:center; gap:4px; flex-shrink:0; background:none; border:1px solid var(--dusk); color:var(--haze); font-size:11px; font-family:inherit; padding:4px 9px; border-radius:999px; cursor:pointer; transition:color .2s, border-color .2s; }
+  .lib-title-edit-btn:hover{ color:var(--candle); border-color:var(--candle); }
+  .lib-title-row{ display:flex; gap:6px; align-items:center; max-width:400px; }
   .lib-title-input{ flex:1; min-width:0; background:var(--midnight-2); border:1px solid var(--dusk); border-radius:8px; color:var(--moonlight); font-family:inherit; font-size:14px; padding:7px 10px; }
   .lib-title-input:focus{ outline:none; border-color:var(--lilac); }
-  .lib-title-save-btn{ display:flex; align-items:center; justify-content:center; width:30px; height:30px; flex-shrink:0; background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); border-radius:8px; cursor:pointer; transition:background .2s; }
-  .lib-title-save-btn:hover{ background:rgba(227,190,127,0.24); }
+  .lib-title-save-btn, .lib-title-cancel-btn{ display:flex; align-items:center; justify-content:center; width:30px; height:30px; flex-shrink:0; background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); border-radius:8px; cursor:pointer; transition:background .2s; }
+  .lib-title-save-btn:hover, .lib-title-cancel-btn:hover{ background:rgba(227,190,127,0.24); }
+  .lib-title-cancel-btn{ background:rgba(255,255,255,0.05); border-color:var(--dusk); color:var(--haze); font-size:13px; }
 
   /* Ritual-only second voice layer */
   .layer-voice-toggle{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--moonlight); cursor:pointer; margin-top:6px; }
@@ -683,7 +691,7 @@
 
         <div class="science-cta">
           <p>Ready to hear it in your own voice?</p>
-          <button class="btn btn-primary" onclick="goTo('flow-section')">Build your own subliminal →</button>
+          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Build your own subliminal →</button>
         </div>
       </div>
     </div>
@@ -702,8 +710,8 @@
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="goTo('flow-section')">Build a tapping session →</button>
-          <button class="btn btn-ghost" onclick="goTo('pricing')">Upgrade to Ritual</button>
+          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Build a tapping session →</button>
+          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
     </div>
@@ -828,13 +836,11 @@
             <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
           </div>
           <div class="quiz-q">
-            <label>How long should tonight's session run?</label>
-            <div class="length-chip-grid" id="lengthChips">
-              <button class="length-chip sel" data-min="5" data-tier="none" onclick="pickLength(this)">5 min<span>Free</span></button>
-              <button class="length-chip" data-min="30" data-tier="whisper" onclick="pickLength(this)">30 min<span>Whisper</span></button>
-              <button class="length-chip" data-min="120" data-tier="reverie" onclick="pickLength(this)">2 hr<span>Reverie</span></button>
-              <button class="length-chip" data-min="480" data-tier="ritual" onclick="pickLength(this)">8 hr<span>Ritual</span></button>
+            <label>How long should tonight's session run? <span class="session-length-val" id="sessionLengthVal">5 min</span></label>
+            <div class="session-length-row">
+              <input type="range" id="sessionLengthSlider" min="5" max="480" step="1" value="5" oninput="onSessionLengthInput()">
             </div>
+            <div class="session-length-scale"><span>5 min</span><span>8 hr</span></div>
             <div class="length-msg" id="lengthMsg"></div>
           </div>
         </div>
@@ -1154,6 +1160,7 @@
         <ul class="price-feats">
           <li>Everything in Reverie</li>
           <li>8-hour sessions with screen-lock playback</li>
+          <li>Subliminal + EFT Tapping — nine affirmations, one per tapping point</li>
           <li>Share your frequencies and subliminals with friends or followers</li>
           <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
           <li>Full session history &amp; library</li>
@@ -1270,17 +1277,37 @@ function showStep(n){
   document.querySelectorAll('.flow-step').forEach(s=>s.classList.remove('active'));
   document.querySelector(`.flow-step[data-step="${n}"]`).classList.add('active');
   step = n; renderProgress();
-  if (n === 1) applyLengthChipLabelVisibility();
+  if (n === 1) updateSessionLengthHint();
   if (n === 7) renderFinalFreqPicker();
 }
-/* Tier names under the session-length chips are only useful to someone who doesn't
-   have a paid tier yet — once you're subscribed to any tier, they'd just be clutter,
-   so they only show for free accounts (or logged-out visitors). */
-async function applyLengthChipLabelVisibility(){
-  const grid = document.getElementById('lengthChips');
-  if (!grid) return;
+/* The session-length slider runs from 5 minutes to 8 hours with no restriction on
+   dragging — nothing is gated until they try to actually generate/save a session
+   longer than their tier allows (see generateAffirmations). This hint just tells
+   free/underpowered accounts what a given length would require, so it isn't a
+   surprise later. Paid accounts that already qualify see nothing extra. */
+function formatSessionLength(minutes){
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes/60), m = minutes%60;
+  return m ? `${h} hr ${m} min` : `${h} hr`;
+}
+async function onSessionLengthInput(){
+  const minutes = parseInt(document.getElementById('sessionLengthSlider').value, 10);
+  state.targetLengthMinutes = minutes;
+  document.getElementById('sessionLengthVal').textContent = formatSessionLength(minutes);
+  await updateSessionLengthHint();
+  updateSessionTimerLabel();
+}
+async function updateSessionLengthHint(){
+  const hintEl = document.getElementById('lengthMsg');
+  if (!hintEl) return;
+  const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
+  const requiredTier = requiredTierForMinutes(minutes);
+  if (requiredTier === 'none'){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   const myTier = currentUser ? await getMyTier() : 'none';
-  grid.classList.toggle('show-tier-labels', myTier === 'none');
+  const order = ['none','whisper','reverie','ritual'];
+  if (order.indexOf(myTier) >= order.indexOf(requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
+  hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
+  hintEl.className = 'length-msg err';
 }
 function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
@@ -1292,8 +1319,8 @@ function resetFlow(){
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
   document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
-  const defaultChip = document.querySelector('.length-chip[data-min="5"]');
-  if (defaultChip) defaultChip.classList.add('sel');
+  document.getElementById('sessionLengthSlider').value = 5;
+  document.getElementById('sessionLengthVal').textContent = '5 min';
   const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
   if (defaultSoothing) defaultSoothing.classList.add('sel');
   document.getElementById('soothingMixRow').style.display = 'none';
@@ -1404,6 +1431,25 @@ async function pickRitualMode(btn){
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
 async function generateAffirmations(){
+  const msg = document.getElementById('lengthMsg');
+  const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
+  const requiredTier = requiredTierForMinutes(minutes);
+  if (requiredTier !== 'none'){
+    if (!currentUser){
+      msg.innerHTML = `${formatSessionLength(minutes)} needs an account — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+    const myTier = await getMyTier();
+    const order = ['none','whisper','reverie','ritual'];
+    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+      msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>, or drag the slider back down to build at your current tier.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+  }
+  msg.textContent = '';
+
   state.goal = document.getElementById('quizGoal').value.trim();
   state.count = state.eftMode ? 9 : parseInt(countRange.value);
   showStep(2);
@@ -2240,6 +2286,13 @@ function goToCheckout(evt, baseUrl){
 // Matches the durations promised on the pricing cards.
 const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
 const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
+/* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
+   tier that's allowed to actually generate/save a session that long. */
+function requiredTierForMinutes(minutes){
+  const order = ['none','whisper','reverie','ritual'];
+  for (const tier of order){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
+  return 'ritual';
+}
 
 async function getMyTier(){
   const subRow = await getMySubscriberRow();
@@ -2280,7 +2333,7 @@ async function applyPricingVisibility(){
     cards.reverie.style.display = 'none';
     grid.classList.add('centered');
     document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
-    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
+    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, Subliminal + EFT Tapping, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
     manageSub.style.display = 'block';
   } else if (myTier === 'whisper'){
     cards.whisper.style.display = 'none';
@@ -2296,32 +2349,6 @@ async function applyPricingVisibility(){
   }
 }
 
-async function pickLength(btn){
-  const msg = document.getElementById('lengthMsg');
-  const minutes = parseInt(btn.dataset.min, 10);
-  const requiredTier = btn.dataset.tier;
-  msg.textContent = '';
-
-  if (requiredTier !== 'none'){
-    if (!currentUser){
-      msg.innerHTML = `Log in to unlock longer sessions — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
-      msg.className = 'length-msg err';
-      return;
-    }
-    const myTier = await getMyTier();
-    const order = ['none','whisper','reverie','ritual'];
-    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
-      msg.innerHTML = `That length needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
-      msg.className = 'length-msg err';
-      return;
-    }
-  }
-
-  document.querySelectorAll('.length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
-  state.targetLengthMinutes = minutes;
-  updateSessionTimerLabel();
-}
 
 // Rough estimate: ~4 seconds per spoken affirmation line, looped or not.
 // If the person picked a target length, that takes priority.
@@ -2950,15 +2977,24 @@ async function loadMyLibrary(){
     const mins = Math.round((s.duration_seconds||0)/60);
     const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
+    const titleText = s.title || 'Untitled subliminal';
     const titleVal = (s.title || '').replace(/"/g,'&quot;');
     return `<div class="profile-item">
       <div class="profile-item-top">
         <div style="flex:1; min-width:0;">
-          <div class="lib-title-row">
+          <div class="lib-title-view" id="libTitleView-${s.id}">
+            <div class="lib-title-text">${titleText.replace(/</g,'&lt;')}</div>
+            <button class="lib-title-edit-btn" onclick="startEditLibraryTitle('${s.id}')" aria-label="Edit title" title="Edit title">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
+          </div>
+          <div class="lib-title-row" id="libTitleEdit-${s.id}" style="display:none;">
             <input type="text" class="lib-title-input" id="libTitle-${s.id}" value="${titleVal}" maxlength="60" placeholder="Untitled subliminal">
             <button class="lib-title-save-btn" onclick="renameLibraryItem('${s.id}')" aria-label="Save title" title="Save title">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             </button>
+            <button class="lib-title-cancel-btn" onclick="cancelEditLibraryTitle('${s.id}')" aria-label="Cancel">✕</button>
           </div>
           <div class="save-msg" id="libTitleMsg-${s.id}" style="margin-top:2px;"></div>
           <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations · saved ${when}</div>
@@ -2969,6 +3005,20 @@ async function loadMyLibrary(){
       ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+function startEditLibraryTitle(id){
+  document.getElementById(`libTitleView-${id}`).style.display = 'none';
+  const editRow = document.getElementById(`libTitleEdit-${id}`);
+  editRow.style.display = 'flex';
+  const input = document.getElementById(`libTitle-${id}`);
+  input.focus();
+  input.select();
+}
+function cancelEditLibraryTitle(id){
+  document.getElementById(`libTitleEdit-${id}`).style.display = 'none';
+  document.getElementById(`libTitleView-${id}`).style.display = 'flex';
+  document.getElementById(`libTitleMsg-${id}`).textContent = '';
 }
 
 /* Renaming in My Library updates the title in place — it's the one edit that doesn't
@@ -2982,7 +3032,10 @@ async function renameLibraryItem(id){
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
   const { error } = await sb.from('subliminals').update({ title }).eq('id', id).eq('user_id', currentUser.id);
   if (error){ console.error('renameLibraryItem error:', error); msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
-  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
+  msg.textContent = '';
+  document.getElementById(`libTitleView-${id}`).querySelector('.lib-title-text').textContent = title;
+  document.getElementById(`libTitleEdit-${id}`).style.display = 'none';
+  document.getElementById(`libTitleView-${id}`).style.display = 'flex';
 }
 
 async function loadSavedIntoBuilder(id){
@@ -2995,6 +3048,9 @@ async function loadSavedIntoBuilder(id){
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
   state.bg = s.background || 'none';
   state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
+  const restoredMinutes = Math.min(480, Math.max(5, state.targetLengthMinutes));
+  document.getElementById('sessionLengthSlider').value = restoredMinutes;
+  document.getElementById('sessionLengthVal').textContent = formatSessionLength(restoredMinutes);
   state.eftMode = !!s.eft_mode;
 
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
