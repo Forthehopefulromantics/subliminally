@@ -1557,21 +1557,22 @@ function buildFallbackList(){
   return lines.slice(0, state.count);
 }
 /* Offline fallback for EFT mode if the API call fails — same 11-line shape, generic
-   but usable, built entirely client-side. */
+   but usable, built entirely client-side. Every line is a full sentence, matching how
+   real EFT scripts read (not clipped phrases). */
 function buildEftFallbackList(){
   const feeling = state.goal
     ? (state.goal.length > 50 ? state.goal.slice(0,50)+'…' : state.goal)
     : 'this feeling';
-  const kcReminder = 'this feeling';
+  const kcReminder = "I trust myself to move through this.";
   const pointReminders = [
-    "releasing this now",
-    "I'm allowed to let this go",
-    "it's safe to feel calm",
-    "I choose to soften here",
-    "this doesn't have to stay",
-    "I trust myself to move through this",
-    "I am already easing",
-    "I am settling into this moment"
+    "I am releasing this, one breath at a time.",
+    "I'm allowed to let this go.",
+    "It's safe for me to feel calm right now.",
+    "I choose to soften instead of holding on.",
+    "This doesn't have to stay with me.",
+    "I am capable of moving through this.",
+    "I am already easing, even now.",
+    "I am settling into this moment as it is."
   ];
   return [
     `Even though I have ${feeling}, I deeply and completely love and accept myself.`,
