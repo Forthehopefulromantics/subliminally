@@ -190,6 +190,9 @@
   .aff-row{ display:flex; gap:8px; align-items:flex-start; background:var(--dusk); border-radius:12px; padding:9px 11px; }
   .aff-row .num{ font-size:11px; color:var(--haze); padding-top:3px; min-width:16px; }
   .aff-row textarea{ flex:1; background:none; border:none; color:var(--moonlight); font-family:var(--serif); font-style:italic; font-size:14px; resize:none; outline:none; line-height:1.4; min-height:20px; }
+  .aff-row-script{ flex-direction:column; padding:16px 18px; }
+  .aff-row-script .num{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--lilac); min-width:0; padding-top:0; margin-bottom:8px; }
+  .aff-row-script textarea{ width:100%; font-size:15px; line-height:1.7; min-height:220px; }
   .aff-remove{ background:none; border:none; color:var(--haze); cursor:pointer; font-size:14px; padding:2px 4px; }
   .aff-remove:hover{ color:#E39A9A; }
   .aff-add{ font-size:12px; color:var(--lilac); background:none; border:1px dashed var(--lilac); border-radius:10px; padding:7px 12px; cursor:pointer; align-self:flex-start; }
@@ -230,6 +233,7 @@
 
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
   .record-line{ font-family:var(--serif); font-style:italic; font-size:18px; color:var(--moonlight); max-width:440px; line-height:1.4; }
+  .record-line-script{ font-size:15px; text-align:left; max-height:220px; overflow-y:auto; padding:14px 16px; background:rgba(255,255,255,0.03); border-radius:14px; }
   .record-counter{ font-size:12px; color:var(--haze); }
   .rec-tap-hint{ font-size:12.5px; color:var(--candle); background:rgba(227,190,127,0.1); border-radius:999px; padding:6px 14px; margin-top:6px; }
   .rec-btn{ width:78px; height:78px; border-radius:50%; cursor:pointer; user-select:none; touch-action:none; background:var(--dusk); border:2px solid var(--candle); color:var(--candle); font-size:11px; letter-spacing:.05em; transition:all .2s; }
@@ -248,6 +252,7 @@
   .final-orb{ width:110px; height:110px; }
   .final-title{ font-family:var(--serif); font-size:21px; color:var(--moonlight); }
   .final-line{ font-family:var(--serif); font-style:italic; font-size:15px; color:var(--candle); min-height:22px; }
+  .final-line-script{ max-width:440px; max-height:160px; overflow-y:auto; text-align:left; padding:12px 16px; background:rgba(255,255,255,0.03); border-radius:14px; font-size:13.5px; }
   .final-toggle{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--haze); }
   .demo-note{ font-size:11px; color:var(--haze); background:rgba(255,255,255,0.04); border-radius:10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.06); text-align:left; }
 
@@ -474,6 +479,10 @@
   .journal-entry-actions button:hover{ background:rgba(227,190,127,0.24); }
   .journal-entry-delete{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0 !important; flex-shrink:0; background:rgba(255,255,255,0.05) !important; border-color:var(--dusk) !important; color:var(--haze) !important; }
   .journal-entry-delete:hover{ background:rgba(227,154,154,0.16) !important; border-color:rgba(227,154,154,0.4) !important; color:#E39A9A !important; }
+  .journal-entry-move{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0 !important; flex-shrink:0; }
+  .journal-move-confirm{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); }
+  .journal-move-confirm span{ font-size:12.5px; color:var(--haze); flex:1; min-width:140px; }
+  .journal-move-confirm .mini-btn{ font-size:11.5px; padding:6px 12px; }
   .journal-stat{ text-align:center; font-size:13px; color:var(--candle); background:rgba(227,190,127,0.08); border:1px solid rgba(227,190,127,0.2); border-radius:14px; padding:10px 16px; margin-bottom:16px; }
   .journal-empty{ text-align:center; font-size:13px; color:var(--haze); padding:30px 0; }
 
@@ -650,9 +659,10 @@
       <p>The short version from the home page, expanded — what's genuinely established, and how it maps to what happens when you build a session here.</p>
     </div>
 
-    <div class="journal-tabs" style="max-width:380px;">
+    <div class="journal-tabs" style="max-width:560px;">
       <button class="active" data-scitab="subliminals" onclick="setScienceTab('subliminals')">Subliminals</button>
       <button data-scitab="eft" onclick="setScienceTab('eft')">EFT Tapping</button>
+      <button data-scitab="visualization" onclick="setScienceTab('visualization')">Visualization</button>
     </div>
 
     <div id="scienceTabSubliminals">
@@ -723,6 +733,25 @@
           <p>This one's a Ritual feature.</p>
           <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Build a tapping session →</button>
           <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="scienceTabVisualization" style="display:none;">
+      <div class="reprogram-body">
+        <h3>What visualization scripting is</h3>
+        <p>Mental rehearsal — picturing a performance or moment in vivid, first-hand detail before it happens — is one of the more consistently studied tools in sports and performance psychology. The idea isn't that picturing something makes it happen on its own; it's that rehearsing a scene in specific sensory detail primes the same neural pathways you'd use while actually doing it, so the real moment feels more familiar and less overwhelming when it arrives. It's used by athletes, performers, public speakers, and anyone preparing for a high-stakes moment — or working to call in a specific outcome or situation.</p>
+
+        <h3>Why detail is the whole point</h3>
+        <p>A vague wish ("I hope it goes well") doesn't give your mind much to rehearse. A scene with specifics — what you see, hear, and feel, who's there, what happens step by step — gives it something real to run. That's why this feature hands you a blank page instead of a fill-in-the-blank template: the more precisely you describe it, the more useful the rehearsal.</p>
+
+        <h3>How it works inside a subliminal here</h3>
+        <p>On Reverie and Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
+
+        <div class="science-cta">
+          <p>This one's a Reverie &amp; Ritual feature.</p>
+          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Write your script →</button>
+          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">See plans</button>
         </div>
       </div>
     </div>
@@ -817,7 +846,7 @@
         <div class="flow-sub">One honest prompt is enough — we'll build the rest.</div>
         <div class="flow-body">
           <div class="quiz-q">
-            <label>Describe what you want, in your own words</label>
+            <label id="quizGoalLabel">Describe what you want, in your own words</label>
             <textarea id="quizGoal" rows="3" placeholder="e.g. I want to feel less anxious about money and actually believe I'm capable of building something stable..."></textarea>
           </div>
           <div class="quiz-q">
@@ -830,11 +859,17 @@
           </div>
           <div class="quiz-q">
             <label>How do you want to use this ritual tonight?</label>
-            <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(2,1fr);">
+            <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
               <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
               <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping<span>Ritual</span></button>
+              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Reverie &amp; Ritual</span></button>
             </div>
             <div class="length-msg" id="ritualModeMsg"></div>
+            <div class="eft-guide-panel" id="visualizationGuidePanel" style="display:none;">
+              <h4>Write your visualization</h4>
+              <p>This one's yours to write. Picture exactly what you want — a performance, a big moment, a specific situation or person, a game, a scene — and describe it in as much detail as you can: what you see, hear, feel, and who's there. Second person, present tense tends to work well: "You walk out and the crowd…"</p>
+              <p>Use the prompt above as a starting point and hit continue — if you've written something, you'll get a full draft script built from it that you can rewrite, trim, or keep as-is. Leave it blank and you'll land on an empty page to write the whole thing yourself.</p>
+            </div>
             <div class="eft-guide-panel" id="eftGuidePanel" style="display:none;">
               <h4>How EFT tapping works</h4>
               <p>Emotional Freedom Technique (EFT), or "tapping," starts with a setup statement said on the Karate Chop point, repeated 3 times: "Even though I have this [feeling], I deeply and completely love and accept myself." Then you move through a round of ten taps — starting and ending on Karate Chop — repeating a short reminder phrase 5 to 7 times at each point. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
@@ -863,20 +898,20 @@
             <div class="length-msg" id="lengthMsg"></div>
           </div>
         </div>
-        <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="generateAffirmations()">Generate my affirmations ✦</button></div>
+        <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="generateBtn" onclick="generateAffirmations()">Generate my affirmations ✦</button></div>
       </div>
 
       <!-- STEP 2: loading -->
       <div class="flow-step" data-step="2">
-        <div class="flow-title">Writing your affirmations…</div>
-        <div class="flow-sub">Shaping them around what you told us.</div>
+        <div class="flow-title" id="loadingTitle">Writing your affirmations…</div>
+        <div class="flow-sub" id="loadingSub">Shaping them around what you told us.</div>
         <div class="flow-body"><div class="loading-dots"><span></span><span></span><span></span></div></div>
       </div>
 
       <!-- STEP 3: review -->
       <div class="flow-step" data-step="3">
-        <div class="flow-title">Your affirmations</div>
-        <div class="flow-sub">See every line before it's ever recorded or played. Edit or remove anything.</div>
+        <div class="flow-title" id="reviewTitle">Your affirmations</div>
+        <div class="flow-sub" id="reviewSub">See every line before it's ever recorded or played. Edit or remove anything.</div>
         <div class="flow-body">
           <div class="aff-list" id="affList"></div>
           <button class="aff-add" id="addAffBtn" onclick="addAffirmation()">+ add your own line</button>
@@ -884,7 +919,7 @@
         <div class="flow-nav">
           <button class="flow-back" onclick="prevStep()">← Back</button>
           <div style="display:flex; gap:8px;">
-            <button class="mini-btn ghostbtn" onclick="generateAffirmations()">↻ Regenerate</button>
+            <button class="mini-btn ghostbtn" id="regenerateBtn" onclick="generateAffirmations()">↻ Regenerate</button>
             <button class="mini-btn candlebtn" onclick="nextStep()">Continue →</button>
           </div>
         </div>
@@ -1173,8 +1208,7 @@
         <ul class="price-feats">
           <li>Everything in Whisper</li>
           <li>Unlimited saved subliminals</li>
-          <li>15-minute visualization sessions for athletes &amp; artists</li>
-          <li>Success-story narration instead of affirmations</li>
+          <li>Visualization Script — write (or draft with AI) a full scene for performance, competition, or a specific outcome you're calling in</li>
         </ul>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
       </div>
@@ -1306,7 +1340,7 @@ function eftRepeatsForIndex(i){
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1352,7 +1386,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1384,10 +1418,13 @@ function resetFlow(){
   document.getElementById('mixBg').value = 50; document.getElementById('mixBgVal').value = 50;
   document.getElementById('mixVoice').value = 65; document.getElementById('mixVoiceVal').value = 65;
   state.eftMode = false;
+  state.visualizationMode = false;
   document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.mode==='subliminal'));
   document.getElementById('eftGuidePanel').style.display = 'none';
+  document.getElementById('visualizationGuidePanel').style.display = 'none';
   document.getElementById('ritualModeMsg').textContent = '';
   document.getElementById('countRow').style.display = 'block';
+  applyModeCopy('subliminal');
   state.eftRepeatCount = null;
   document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
   document.getElementById('eftRepeatMsg').textContent = '';
@@ -1441,15 +1478,17 @@ async function pickRitualMode(btn){
   const msg = document.getElementById('ritualModeMsg');
   const mode = btn.dataset.mode;
   msg.textContent = '';
-  if (mode === 'eft'){
+  if (mode === 'eft' || mode === 'visualization'){
     if (!currentUser){
-      msg.innerHTML = `Log in to unlock EFT Tapping — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
     const myTier = await getMyTier();
-    if (myTier !== 'ritual'){
-      msg.innerHTML = `Subliminal + EFT Tapping is a Ritual feature — <a href="#pricing">see plans</a>.`;
+    const order = ['none','whisper','reverie','ritual'];
+    const requiredTier = mode === 'eft' ? 'ritual' : 'reverie';
+    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Script'} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -1457,14 +1496,24 @@ async function pickRitualMode(btn){
   document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.remove('sel'));
   btn.classList.add('sel');
   state.eftMode = (mode === 'eft');
+  state.visualizationMode = (mode === 'visualization');
   document.getElementById('eftGuidePanel').style.display = state.eftMode ? 'block' : 'none';
-  document.getElementById('countRow').style.display = state.eftMode ? 'none' : 'block';
+  document.getElementById('visualizationGuidePanel').style.display = state.visualizationMode ? 'block' : 'none';
+  document.getElementById('countRow').style.display = (state.eftMode || state.visualizationMode) ? 'none' : 'block';
+  applyModeCopy(mode);
+
   if (state.eftMode){
     state.count = 11; // 1 setup statement + a 10-tap round bookended by Karate Chop
     // EFT works best with a real pause to repeat the line while tapping — default to 5s.
     affirmationGapMs = 5000; state.affirmationGapMs = 5000;
     document.getElementById('lineGap').value = 5;
     document.getElementById('lineGapVal').value = 5;
+  } else if (state.visualizationMode){
+    state.count = 1; // one continuous script, not discrete lines
+    affirmationGapMs = 1500; state.affirmationGapMs = 1500;
+    document.getElementById('lineGap').value = 1.5;
+    document.getElementById('lineGapVal').value = 1.5;
+    document.getElementById('eftRepeatMsg').textContent = '';
   } else {
     state.count = parseInt(countRange.value, 10);
     affirmationGapMs = 100; state.affirmationGapMs = 100;
@@ -1473,6 +1522,45 @@ async function pickRitualMode(btn){
     state.eftRepeatCount = null;
     document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
     document.getElementById('eftRepeatMsg').textContent = '';
+  }
+}
+/* Swaps the quiz-step copy (prompt label, generate button, loading/review titles)
+   to match whichever of the three modes is active. */
+function applyModeCopy(mode){
+  const goalLabel = document.getElementById('quizGoalLabel');
+  const generateBtn = document.getElementById('generateBtn');
+  const regenerateBtn = document.getElementById('regenerateBtn');
+  const loadingTitle = document.getElementById('loadingTitle');
+  const loadingSub = document.getElementById('loadingSub');
+  const reviewTitle = document.getElementById('reviewTitle');
+  const reviewSub = document.getElementById('reviewSub');
+  if (mode === 'visualization'){
+    goalLabel.textContent = 'Describe what you want to happen, in as much detail as you can';
+    document.getElementById('quizGoal').placeholder = 'e.g. I\'m walking out onto the court for the championship game. The crowd is loud, I can feel my heartbeat, but my hands are steady...';
+    generateBtn.textContent = 'Continue to my script ✦';
+    regenerateBtn.textContent = '↻ Get a new draft';
+    loadingTitle.textContent = 'Setting up your script…';
+    loadingSub.textContent = 'One moment.';
+    reviewTitle.textContent = 'Your visualization script';
+    reviewSub.textContent = 'Write it yourself, edit the draft, or both — this is entirely yours.';
+  } else if (mode === 'eft'){
+    goalLabel.textContent = 'Describe what you want, in your own words';
+    document.getElementById('quizGoal').placeholder = "e.g. I want to feel less anxious about money and actually believe I'm capable of building something stable...";
+    generateBtn.textContent = 'Generate my affirmations ✦';
+    regenerateBtn.textContent = '↻ Regenerate';
+    loadingTitle.textContent = 'Writing your affirmations…';
+    loadingSub.textContent = 'Shaping them around what you told us.';
+    reviewTitle.textContent = 'Your affirmations';
+    reviewSub.textContent = 'See every line before it\'s ever recorded or played. Edit or remove anything.';
+  } else {
+    goalLabel.textContent = 'Describe what you want, in your own words';
+    document.getElementById('quizGoal').placeholder = "e.g. I want to feel less anxious about money and actually believe I'm capable of building something stable...";
+    generateBtn.textContent = 'Generate my affirmations ✦';
+    regenerateBtn.textContent = '↻ Regenerate';
+    loadingTitle.textContent = 'Writing your affirmations…';
+    loadingSub.textContent = 'Shaping them around what you told us.';
+    reviewTitle.textContent = 'Your affirmations';
+    reviewSub.textContent = 'See every line before it\'s ever recorded or played. Edit or remove anything.';
   }
 }
 function pickEftRepeatCount(btn){
@@ -1512,8 +1600,24 @@ async function generateAffirmations(){
   }
 
   state.goal = document.getElementById('quizGoal').value.trim();
-  state.count = state.eftMode ? 11 : parseInt(countRange.value);
+  state.count = state.eftMode ? 11 : (state.visualizationMode ? 1 : parseInt(countRange.value));
   showStep(2);
+
+  if (state.visualizationMode){
+    // Nothing typed in the prompt = blank page, write it entirely yourself.
+    // Something typed = get a full draft to rewrite, trim, or keep.
+    if (!state.goal){
+      state.affirmations = [''];
+    } else {
+      let script = null;
+      try{ script = await callClaudeForVisualizationScript(); }catch(err){ script = null; }
+      state.affirmations = [script || buildVisualizationFallback()];
+    }
+    renderAffList();
+    showStep(3);
+    return;
+  }
+
   let lines = null;
   try{ lines = state.eftMode ? await callClaudeForEftAffirmations() : await callClaudeForAffirmations(); }catch(err){ lines = null; }
   if (!lines || !lines.length) lines = state.eftMode ? buildEftFallbackList() : buildFallbackList();
@@ -1601,17 +1705,52 @@ function buildEftFallbackList(){
   ];
 }
 
+/* Reverie/Ritual-only: a full narrative visualization script, written in second person
+   present tense, built from whatever the person typed in the prompt. This is meant to
+   be a starting draft — the review step gives them one large, freely-editable box, so
+   whatever comes back here is just raw material for them to rewrite. */
+async function callClaudeForVisualizationScript(){
+  const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
+  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const response = await fetch("/api/generate-visualization-script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
+  });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return (data && typeof data.script === 'string' && data.script.trim()) ? data.script.trim() : null;
+}
+/* Offline fallback if that call fails — generic but usable, built entirely client-side. */
+function buildVisualizationFallback(){
+  const goal = state.goal || 'the moment you\'ve been working toward';
+  return `You are standing right at the edge of it — ${goal}. Take a slow breath in, and notice how steady you feel.\n\nYour body already knows what to do here. Every rep, every rehearsal, every quiet hour you put in is right here with you now, backing you up. You feel calm, focused, and completely ready.\n\nAs it unfolds exactly the way you pictured it, notice how natural it feels. Not forced — just you, doing the thing you were always capable of.\n\nAnd when it's done, you feel that unmistakable click of knowing: this is who you are.`;
+}
+
 /* ---------------- review/edit ---------------- */
 function renderAffList(){
   const list = document.getElementById('affList'); list.innerHTML='';
   state.affirmations.forEach((line,i)=>{
     const row = document.createElement('div'); row.className='aff-row';
+    if (state.visualizationMode) row.classList.add('aff-row-script');
     const num = document.createElement('div'); num.className='num';
-    num.textContent = state.eftMode && EFT_LINE_POINTS[i] ? (i+1)+'. '+EFT_LINE_POINTS[i].label : (i+1)+'.';
-    const ta = document.createElement('textarea'); ta.value=line; ta.rows=1;
-    ta.oninput = ()=>{ state.affirmations[i]=ta.value; };
+    if (state.visualizationMode){
+      num.textContent = 'Your script';
+    } else {
+      num.textContent = state.eftMode && EFT_LINE_POINTS[i] ? (i+1)+'. '+EFT_LINE_POINTS[i].label : (i+1)+'.';
+    }
+    const ta = document.createElement('textarea'); ta.value=line;
+    if (state.visualizationMode){
+      ta.rows = 12;
+      ta.placeholder = 'Write it however you want — as detailed as you can. This is entirely yours.';
+      ta.oninput = ()=>{ state.affirmations[i]=ta.value; ta.style.height='auto'; ta.style.height=(ta.scrollHeight+4)+'px'; };
+      setTimeout(()=>{ ta.style.height='auto'; ta.style.height=(ta.scrollHeight+4)+'px'; }, 0);
+    } else {
+      ta.rows = 1;
+      ta.oninput = ()=>{ state.affirmations[i]=ta.value; };
+    }
     row.appendChild(num); row.appendChild(ta);
-    if (!state.eftMode){
+    if (!state.eftMode && !state.visualizationMode){
       // Removing a line would break the one-line-per-tapping-point mapping, so it's
       // disabled in EFT mode — the count has to stay at exactly nine.
       const rm = document.createElement('button'); rm.className='aff-remove'; rm.textContent='✕';
@@ -1620,7 +1759,7 @@ function renderAffList(){
     }
     list.appendChild(row);
   });
-  document.getElementById('addAffBtn').style.display = state.eftMode ? 'none' : '';
+  document.getElementById('addAffBtn').style.display = (state.eftMode || state.visualizationMode) ? 'none' : '';
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
@@ -1674,7 +1813,11 @@ function pickLayerVoiceMode(btn){
 
 function startNextPhase(){
   state.affirmations = state.affirmations.filter(a=>a.trim().length>0);
-  if (!state.affirmations.length) state.affirmations = buildFallbackList();
+  if (!state.affirmations.length){
+    if (state.visualizationMode) state.affirmations = [buildVisualizationFallback()];
+    else if (state.eftMode) state.affirmations = buildEftFallbackList();
+    else state.affirmations = buildFallbackList();
+  }
 
   state.layerAffirmations = layerVoiceEnabled
     ? document.getElementById('layerAffText').value.split('\n').map(l=>l.trim()).filter(Boolean)
@@ -1708,6 +1851,10 @@ function setRecordStepCopy(target){
     title.textContent = "Record your second, layered voice";
     sub.textContent = "This plays quietly underneath your main voice — press and hold, speak the line, then release.";
     breath.style.display = 'none';
+  } else if (state.visualizationMode){
+    title.textContent = "Read your visualization out loud";
+    sub.textContent = "Press and hold, read through the whole script in one take, then release when you're done.";
+    breath.style.display = '';
   } else {
     title.textContent = "Record in your own voice";
     sub.textContent = "Press and hold, speak the line, then release.";
@@ -1728,9 +1875,10 @@ function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings 
 function showRecordLine(){
   const lines = activeRecordLines(); const arr = activeRecordArray();
   const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_LINE_POINTS[recIndex];
+  const isScript = state.visualizationMode && recordTarget === 'primary';
   document.getElementById('recCounter').textContent = isEftPoint
     ? `Line ${recIndex+1} of 11 — ${EFT_LINE_POINTS[recIndex].label}`
-    : `${recIndex+1} of ${lines.length}`;
+    : (isScript ? 'Your full script — one continuous take' : `${recIndex+1} of ${lines.length}`);
   document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
   document.getElementById('recTapHint').textContent = isEftPoint
     ? (EFT_LINE_POINTS[recIndex].isSetup
@@ -1738,6 +1886,7 @@ function showRecordLine(){
         : `Tap: ${EFT_LINE_POINTS[recIndex].where}`)
     : '';
   document.getElementById('recTapHint').style.display = isEftPoint ? 'block' : 'none';
+  document.getElementById('recLine').classList.toggle('record-line-script', isScript);
   document.getElementById('recStatus').textContent = 'press and hold to record';
   document.getElementById('nextLineBtn').disabled = !arr[recIndex];
 }
@@ -1910,6 +2059,7 @@ let editingExistingId = null;
 function prepareFinal(){
   document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
+  document.getElementById('finalLine').classList.toggle('final-line-script', !!state.visualizationMode);
   document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
   document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
@@ -2607,7 +2757,8 @@ async function saveSubliminal(){
     layer_voice_mode: layerVoiceEnabled ? state.layerVoiceMode : null,
     layer_recording_urls: layerRecordingUrls,
     eft_mode: state.eftMode || false,
-    eft_repeat_count: state.eftMode ? state.eftRepeatCount : null
+    eft_repeat_count: state.eftMode ? state.eftRepeatCount : null,
+    visualization_mode: state.visualizationMode || false
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -2990,6 +3141,7 @@ function setScienceTab(tab){
   document.querySelectorAll('[data-scitab]').forEach(b => b.classList.toggle('active', b.dataset.scitab === tab));
   document.getElementById('scienceTabSubliminals').style.display = tab === 'subliminals' ? 'block' : 'none';
   document.getElementById('scienceTabEft').style.display = tab === 'eft' ? 'block' : 'none';
+  document.getElementById('scienceTabVisualization').style.display = tab === 'visualization' ? 'block' : 'none';
 }
 const scienceEftPointsList = document.getElementById('scienceEftPointsList');
 if (scienceEftPointsList){
@@ -3198,6 +3350,7 @@ async function loadSavedIntoBuilder(id){
   document.getElementById('sessionLengthVal').textContent = formatSessionLength(restoredMinutes);
   state.eftMode = !!s.eft_mode;
   state.eftRepeatCount = s.eft_repeat_count || null;
+  state.visualizationMode = !!s.visualization_mode;
 
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
@@ -3375,20 +3528,34 @@ async function loadJournalEntries(){
     const canMove = e.original_category === 'manifesting';
     const showBadge = journalTab === 'received' && canMove;
     const moveTarget = journalTab === 'received' ? 'manifesting' : 'received';
-    const moveLabel = journalTab === 'received' ? '← Move to On its way' : '✦ This made it into my 3D — move to Already Mine';
+    const moveTargetLabel = journalTab === 'received' ? 'On its way' : 'Already mine';
     return `
     <div class="journal-entry">
       ${showBadge ? `<div class="journal-entry-badge" title="Made it from On its way to Already mine">✦ 2D → 3D</div>` : ''}
       <p>"${e.content.replace(/</g,'&lt;')}"</p>
       <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${showBadge ? ' · in my 3D now' : ''}</div>
       <div class="journal-entry-actions">
-        ${canMove ? `<button onclick="moveJournalEntry('${e.id}','${moveTarget}')">${moveLabel}</button>` : ''}
+        ${canMove ? `<button class="journal-entry-move" onclick="toggleMoveConfirm('${e.id}')" aria-label="Move" title="Move">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>
+        </button>` : ''}
         <button class="journal-entry-delete" onclick="deleteJournalEntry('${e.id}')" aria-label="Delete entry" title="Delete">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
       </div>
+      ${canMove ? `<div class="journal-move-confirm" id="moveConfirm-${e.id}" style="display:none;">
+        <span>Move this to "${moveTargetLabel}"?</span>
+        <button class="mini-btn candlebtn" onclick="moveJournalEntry('${e.id}','${moveTarget}')">Yes, move it</button>
+        <button class="mini-btn ghostbtn" onclick="toggleMoveConfirm('${e.id}')">Cancel</button>
+      </div>` : ''}
     </div>`;
   }).join('');
+}
+function toggleMoveConfirm(id){
+  document.querySelectorAll('.journal-move-confirm').forEach(el => {
+    if (el.id !== `moveConfirm-${id}`) el.style.display = 'none';
+  });
+  const el = document.getElementById(`moveConfirm-${id}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
 }
 
 /* Moves an entry between "On its way" and "Already mine" — only ever allowed for
