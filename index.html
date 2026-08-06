@@ -131,6 +131,9 @@
   .reprogram-body h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); margin-top:32px; }
   .reprogram-body h3:first-child{ margin-top:0; }
   .reprogram-body p{ font-size:14px; color:var(--haze); line-height:1.7; margin-top:10px; }
+  .science-cta{ text-align:center; margin-top:40px; padding-top:28px; border-top:1px solid rgba(255,255,255,0.06); }
+  .science-cta p{ margin-top:0; margin-bottom:14px; color:var(--moonlight); font-family:var(--serif); font-style:italic; font-size:15px; }
+  .science-cta .btn{ margin:0 6px; }
 
   .how{ padding:76px 0; }
   .section-head{ text-align:center; margin-bottom:40px; }
@@ -228,6 +231,7 @@
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
   .record-line{ font-family:var(--serif); font-style:italic; font-size:18px; color:var(--moonlight); max-width:440px; line-height:1.4; }
   .record-counter{ font-size:12px; color:var(--haze); }
+  .rec-tap-hint{ font-size:12.5px; color:var(--candle); background:rgba(227,190,127,0.1); border-radius:999px; padding:6px 14px; margin-top:6px; }
   .rec-btn{ width:78px; height:78px; border-radius:50%; cursor:pointer; user-select:none; touch-action:none; background:var(--dusk); border:2px solid var(--candle); color:var(--candle); font-size:11px; letter-spacing:.05em; transition:all .2s; }
   .rec-btn.recording{ background:#C96A6A; border-color:#C96A6A; color:#fff; animation:breathe 1.2s ease-in-out infinite; }
   .rec-status{ font-size:12px; color:var(--lilac); min-height:16px; }
@@ -258,6 +262,7 @@
   .price-card .badge{ position:absolute; top:-11px; right:24px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#241C0E; background:var(--candle); padding:4px 12px; border-radius:999px; font-weight:500; }
   .price-card h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); }
   .price-amount{ font-family:var(--serif); font-size:38px; color:var(--candle); margin-top:10px; }
+  .price-tagline{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); margin-top:6px; }
   .price-amount span{ font-size:14px; color:var(--haze); font-family:var(--sans); }
   .price-card .limit{ font-size:13px; color:var(--lilac); margin-top:4px; }
   .price-feats{ list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:9px; }
@@ -281,9 +286,19 @@
 
   .final-title-input-wrap{ max-width:320px; margin:10px auto 0; text-align:left; }
   .final-title-input-wrap label{ display:block; font-size:11px; color:var(--haze); text-transform:uppercase; letter-spacing:.05em; margin-bottom:5px; }
-  .final-title-input-wrap input{ width:100%; background:var(--veil); border:1px solid var(--dusk); border-radius:10px; color:var(--moonlight); font-family:inherit; font-size:14px; padding:10px 14px; }
+  .final-title-input-row{ display:flex; gap:8px; align-items:stretch; }
+  .final-title-input-wrap input{ flex:1; min-width:0; background:var(--veil); border:1px solid var(--dusk); border-radius:10px; color:var(--moonlight); font-family:inherit; font-size:14px; padding:10px 14px; }
   .final-title-input-wrap input:focus{ outline:none; border-color:var(--lilac); }
   .final-title-input-wrap input.needs-title{ border-color:var(--candle); }
+  .final-title-save-btn{ display:flex; align-items:center; justify-content:center; width:40px; flex-shrink:0; background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); border-radius:10px; cursor:pointer; transition:background .2s, transform .2s; }
+  .final-title-save-btn:hover{ background:rgba(227,190,127,0.24); transform:translateY(-1px); }
+
+  /* editable titles in My Library */
+  .lib-title-row{ display:flex; gap:6px; align-items:center; max-width:340px; }
+  .lib-title-input{ flex:1; min-width:0; background:var(--midnight-2); border:1px solid var(--dusk); border-radius:8px; color:var(--moonlight); font-family:inherit; font-size:14px; padding:7px 10px; }
+  .lib-title-input:focus{ outline:none; border-color:var(--lilac); }
+  .lib-title-save-btn{ display:flex; align-items:center; justify-content:center; width:30px; height:30px; flex-shrink:0; background:rgba(227,190,127,0.14); border:1px solid rgba(227,190,127,0.3); color:var(--candle); border-radius:8px; cursor:pointer; transition:background .2s; }
+  .lib-title-save-btn:hover{ background:rgba(227,190,127,0.24); }
 
   /* Ritual-only second voice layer */
   .layer-voice-toggle{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--moonlight); cursor:pointer; margin-top:6px; }
@@ -304,6 +319,14 @@
   .session-target{ font-size:12.5px; color:var(--lilac); margin-bottom:4px; min-height:16px; }
   .breath-note{ font-family:var(--serif); font-style:italic; font-size:13.5px; color:var(--lilac); background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.2); border-radius:14px; padding:14px 18px; margin:14px 0; line-height:1.6; }
   .length-msg{ font-size:12px; margin-top:10px; min-height:14px; }
+  .eft-guide-panel{ margin-top:14px; padding:16px; border-radius:14px; background:rgba(185,167,232,0.06); border:1px solid rgba(185,167,232,0.2); text-align:left; }
+  .eft-guide-panel h4{ font-family:var(--serif); font-size:15px; color:var(--moonlight); margin-bottom:6px; }
+  .eft-guide-panel p{ font-size:13px; color:var(--haze); line-height:1.6; margin-bottom:8px; }
+  .eft-guide-panel a{ color:var(--lilac); }
+  .eft-points-list{ list-style:decimal; margin:10px 0 0 18px; font-size:13px; color:var(--moonlight); line-height:1.9; }
+  .eft-points-list b{ color:var(--candle); font-weight:500; }
+  .eft-point-tag{ display:inline-block; font-size:11px; color:var(--lilac); background:rgba(185,167,232,0.14); border-radius:999px; padding:3px 10px; margin-bottom:6px; }
+  .final-point-tag{ font-size:12px; color:var(--candle); background:rgba(227,190,127,0.12); border-radius:999px; padding:5px 14px; display:inline-block; }
   .length-msg.err{ color:#E39A9A; }
   .save-msg{ font-size:12.5px; margin-top:10px; min-height:16px; }
   .save-msg.err{ color:#E39A9A; }
@@ -608,49 +631,81 @@
       <p>The short version from the home page, expanded — what's genuinely established, and how it maps to what happens when you build a session here.</p>
     </div>
 
-    <div class="science-stat">
-      <div class="conscious"><div class="num">40 bits/sec</div><div class="lbl">Conscious mind</div></div>
-      <div class="subconscious"><div class="num">11,000,000 bits/sec</div><div class="lbl">Subconscious mind</div></div>
-    </div>
-    <p class="science-stat-note">Your subconscious processes roughly <b>275,000 times</b> more information per second than your conscious mind — <em>Encyclopedia Britannica</em>. Most of what shapes your mood, habits, and self-talk was never consciously decided; it was absorbed through repetition, long before you could evaluate it critically.</p>
-
-    <div class="quote-grid">
-      <div class="quote-card">
-        <p>"Until you make the unconscious conscious, it will direct your life and you will call it fate."</p>
-        <div class="who">Carl Jung<span>Psychiatrist, founder of analytical psychology</span></div>
-      </div>
-      <div class="quote-card">
-        <p>"I regard consciousness as fundamental. I regard matter as derivative from consciousness."</p>
-        <div class="who">Max Planck<span>Nobel laureate, founder of quantum theory</span></div>
-      </div>
-      <div class="quote-card">
-        <p>"Your subconscious mind runs about 95 to 99 percent of your life."</p>
-        <div class="who">Dr. Bruce Lipton<span>Cell biologist, author of "The Biology of Belief"</span></div>
-      </div>
+    <div class="journal-tabs" style="max-width:380px;">
+      <button class="active" data-scitab="subliminals" onclick="setScienceTab('subliminals')">Subliminals</button>
+      <button data-scitab="eft" onclick="setScienceTab('eft')">EFT Tapping</button>
     </div>
 
-    <div class="reprogram-body">
-      <h3>Why repetition specifically</h3>
-      <p>Neuroplasticity — the brain's ability to physically reorganize itself — is one of the best-established findings in modern neuroscience. Neural pathways strengthen with repeated activation and weaken with disuse; it's the same basic mechanism behind learning a language or a habit. Hearing the same affirming line, in your own voice, night after night, is repetition doing what repetition reliably does: strengthening a pathway.</p>
-
-      <h3>Why your own voice, specifically</h3>
-      <p>Self-referential information — things framed as being about you, said by you — tends to get processed more deeply than the same information heard from a stranger. It's a big part of why journaling and self-talk work as therapeutic tools in the first place. That's the actual reasoning behind recommending your own voice over a generic narrator here.</p>
-
-      <h3>Why right before sleep</h3>
-      <p>In the relaxed, drowsy window before sleep, the mind's usual critical filtering eases. This is well-documented territory in sleep research — it's part of why racing thoughts feel louder at bedtime, and why calming input in that window tends to land differently than the same input during an alert, busy day.</p>
-
-      <h3>What does this mean for you, specifically?</h3>
-      <p style="margin-bottom:14px;">Pick what you're actually working on, and we'll connect the research above to it directly.</p>
-      <div class="length-chip-grid" id="reprogramQuizChips" style="grid-template-columns:repeat(2,1fr); max-width:460px;">
-        <button class="length-chip" onclick="answerReprogramQuiz(this,'sleep')">Sleep</button>
-        <button class="length-chip" onclick="answerReprogramQuiz(this,'confidence')">Confidence</button>
-        <button class="length-chip" onclick="answerReprogramQuiz(this,'anxiety')">Anxious thoughts</button>
-        <button class="length-chip" onclick="answerReprogramQuiz(this,'relationships')">Relationships</button>
+    <div id="scienceTabSubliminals">
+      <div class="science-stat">
+        <div class="conscious"><div class="num">40 bits/sec</div><div class="lbl">Conscious mind</div></div>
+        <div class="subconscious"><div class="num">11,000,000 bits/sec</div><div class="lbl">Subconscious mind</div></div>
       </div>
-      <div class="reprogram-quiz-result" id="reprogramQuizResult"></div>
+      <p class="science-stat-note">Your subconscious processes roughly <b>275,000 times</b> more information per second than your conscious mind — <em>Encyclopedia Britannica</em>. Most of what shapes your mood, habits, and self-talk was never consciously decided; it was absorbed through repetition, long before you could evaluate it critically.</p>
 
-      <h3>An honest caveat</h3>
-      <p>"Subliminal" messaging specifically — information presented below the threshold of conscious perception — has a genuinely mixed scientific record, and some of the earliest famous claims about it (like the 1950s "eat popcorn" theater experiment) were later admitted to be fabricated. What this app actually does is closer to conscious, repeated self-affirmation in a relaxed state layered with calming sound — a more modest and better-supported claim than "bypassing your mind entirely," and, we think, an honest one.</p>
+      <div class="quote-grid">
+        <div class="quote-card">
+          <p>"Until you make the unconscious conscious, it will direct your life and you will call it fate."</p>
+          <div class="who">Carl Jung<span>Psychiatrist, founder of analytical psychology</span></div>
+        </div>
+        <div class="quote-card">
+          <p>"I regard consciousness as fundamental. I regard matter as derivative from consciousness."</p>
+          <div class="who">Max Planck<span>Nobel laureate, founder of quantum theory</span></div>
+        </div>
+        <div class="quote-card">
+          <p>"Your subconscious mind runs about 95 to 99 percent of your life."</p>
+          <div class="who">Dr. Bruce Lipton<span>Cell biologist, author of "The Biology of Belief"</span></div>
+        </div>
+      </div>
+
+      <div class="reprogram-body">
+        <h3>Why repetition specifically</h3>
+        <p>Neuroplasticity — the brain's ability to physically reorganize itself — is one of the best-established findings in modern neuroscience. Neural pathways strengthen with repeated activation and weaken with disuse; it's the same basic mechanism behind learning a language or a habit. Hearing the same affirming line, in your own voice, night after night, is repetition doing what repetition reliably does: strengthening a pathway.</p>
+
+        <h3>Why your own voice, specifically</h3>
+        <p>Self-referential information — things framed as being about you, said by you — tends to get processed more deeply than the same information heard from a stranger. It's a big part of why journaling and self-talk work as therapeutic tools in the first place. That's the actual reasoning behind recommending your own voice over a generic narrator here.</p>
+
+        <h3>Why right before sleep</h3>
+        <p>In the relaxed, drowsy window before sleep, the mind's usual critical filtering eases. This is well-documented territory in sleep research — it's part of why racing thoughts feel louder at bedtime, and why calming input in that window tends to land differently than the same input during an alert, busy day.</p>
+
+        <h3>What does this mean for you, specifically?</h3>
+        <p style="margin-bottom:14px;">Pick what you're actually working on, and we'll connect the research above to it directly.</p>
+        <div class="length-chip-grid" id="reprogramQuizChips" style="grid-template-columns:repeat(2,1fr); max-width:460px;">
+          <button class="length-chip" onclick="answerReprogramQuiz(this,'sleep')">Sleep</button>
+          <button class="length-chip" onclick="answerReprogramQuiz(this,'confidence')">Confidence</button>
+          <button class="length-chip" onclick="answerReprogramQuiz(this,'anxiety')">Anxious thoughts</button>
+          <button class="length-chip" onclick="answerReprogramQuiz(this,'relationships')">Relationships</button>
+        </div>
+        <div class="reprogram-quiz-result" id="reprogramQuizResult"></div>
+
+        <h3>An honest caveat</h3>
+        <p>"Subliminal" messaging specifically — information presented below the threshold of conscious perception — has a genuinely mixed scientific record, and some of the earliest famous claims about it (like the 1950s "eat popcorn" theater experiment) were later admitted to be fabricated. What this app actually does is closer to conscious, repeated self-affirmation in a relaxed state layered with calming sound — a more modest and better-supported claim than "bypassing your mind entirely," and, we think, an honest one.</p>
+
+        <div class="science-cta">
+          <p>Ready to hear it in your own voice?</p>
+          <button class="btn btn-primary" onclick="goTo('flow-section')">Build your own subliminal →</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="scienceTabEft" style="display:none;">
+      <div class="reprogram-body">
+        <h3>What EFT tapping is</h3>
+        <p>Emotional Freedom Technique, better known as tapping, is a practice that pairs a spoken statement with light, rhythmic tapping on a set sequence of points on the face and upper body. The idea, borrowed loosely from acupressure, is that stimulating those points while naming what you're feeling helps take some of the emotional charge out of it. It's used informally for stress, anxiety, and everyday overwhelm, and a growing body of small clinical studies has looked at its effects — though, like most mind-body techniques, the evidence base is still developing and it isn't a substitute for professional care. <a href="https://www.healthline.com/health/eft-tapping" target="_blank" rel="noopener">Healthline has a thorough overview</a> if you want the full picture before trying it.</p>
+
+        <h3>The nine points, in order</h3>
+        <p>A typical round moves through the same nine points every time, usually paired with a short phrase repeated at each stop:</p>
+        <ol class="eft-points-list" id="scienceEftPointsList"></ol>
+
+        <h3>How it works inside a subliminal here</h3>
+        <p>On Ritual, you can build a session as "Subliminal + EFT Tapping" instead of subliminal only. Rather than the usual longer set of affirmations, you get exactly nine lines — one per point — recorded (or read aloud by the AI voice) with a real pause of a few seconds after each line by default, long enough to repeat it out loud a few times while you actually tap that point before moving to the next.</p>
+
+        <div class="science-cta">
+          <p>This one's a Ritual feature.</p>
+          <button class="btn btn-primary" onclick="goTo('flow-section')">Build a tapping session →</button>
+          <button class="btn btn-ghost" onclick="goTo('pricing')">Upgrade to Ritual</button>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -755,6 +810,20 @@
             <div class="quiz-options" id="toneChips"></div>
           </div>
           <div class="quiz-q">
+            <label>How do you want to use this ritual tonight?</label>
+            <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(2,1fr);">
+              <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
+              <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping<span>Ritual</span></button>
+            </div>
+            <div class="length-msg" id="ritualModeMsg"></div>
+            <div class="eft-guide-panel" id="eftGuidePanel" style="display:none;">
+              <h4>How EFT tapping works</h4>
+              <p>Emotional Freedom Technique (EFT), or "tapping," pairs a spoken affirmation with light tapping on nine points on the face and body, in order. Say the line for each point out loud while you tap it, a handful of times, then move to the next. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
+              <p>Tonight, you'll get one affirmation for each of the nine points instead of your usual set. When you record (or play the AI voice), each line is followed by a 5-second pause by default — long enough to repeat it a few times while you tap before the next point begins. You can still adjust that pause later on the final screen.</p>
+              <ol class="eft-points-list" id="eftPointsList"></ol>
+            </div>
+          </div>
+          <div class="quiz-q" id="countRow">
             <label>How many affirmations?</label>
             <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
           </div>
@@ -785,7 +854,7 @@
         <div class="flow-sub">See every line before it's ever recorded or played. Edit or remove anything.</div>
         <div class="flow-body">
           <div class="aff-list" id="affList"></div>
-          <button class="aff-add" onclick="addAffirmation()">+ add your own line</button>
+          <button class="aff-add" id="addAffBtn" onclick="addAffirmation()">+ add your own line</button>
         </div>
         <div class="flow-nav">
           <button class="flow-back" onclick="prevStep()">← Back</button>
@@ -867,6 +936,7 @@
           <div class="record-panel">
             <div class="record-counter" id="recCounter">1 of 14</div>
             <div class="record-line" id="recLine">"..."</div>
+            <div class="rec-tap-hint" id="recTapHint" style="display:none;"></div>
             <button class="rec-btn" id="recBtn">HOLD</button>
             <div class="waveform" id="waveform"></div>
             <div class="rec-status" id="recStatus">press and hold to record</div>
@@ -888,22 +958,28 @@
             <div class="orb-wrap final-orb"><div class="orb"></div><div class="orb-inner"></div></div>
             <div class="final-title" id="finalTitle">528 Hz</div>
             <div class="final-title-input-wrap" id="finalTitleWrap">
-              <label for="finalTitleInput">Title this subliminal</label>
-              <input type="text" id="finalTitleInput" placeholder="Name this subliminal" maxlength="60">
+              <label for="finalTitleInput">Title this subliminal <span style="color:var(--candle);">*</span></label>
+              <div class="final-title-input-row">
+                <input type="text" id="finalTitleInput" placeholder="Name this subliminal" maxlength="60" required>
+                <button type="button" class="final-title-save-btn" id="finalTitleSaveBtn" onclick="saveSubliminal()" aria-label="Save title" title="Save">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                </button>
+              </div>
               <div class="length-msg" id="finalTitleMsg"></div>
             </div>
             <div class="final-freq-picker" id="finalFreqPicker" style="display:none;">
               <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
             </div>
             <div class="final-line" id="finalLine">"…"</div>
+            <div class="final-point-tag" id="finalPointTag" style="display:none;"></div>
             <div class="mixer">
-              <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="55"><input type="number" class="mix-val-input" id="mixToneVal" min="0" max="100" value="55"><span class="mix-pct-sign">%</span></div>
-              <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixBgVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
-              <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="90"><input type="number" class="mix-val-input" id="mixVoiceVal" min="0" max="100" value="90"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="30"><input type="number" class="mix-val-input" id="mixToneVal" min="0" max="100" value="30"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixBgVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
+              <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="65"><input type="number" class="mix-val-input" id="mixVoiceVal" min="0" max="100" value="65"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixSoothingVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixCustomVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="layerVoiceMixRow" style="display:none;"><label>Second voice</label><input type="range" id="mixLayerVoice" min="0" max="100" value="35"><input type="number" class="mix-val-input" id="mixLayerVoiceVal" min="0" max="100" value="35"><span class="mix-pct-sign">%</span></div>
-              <div class="mix-row"><label>Time between affirmations</label><input type="range" id="lineGap" min="0.1" max="10" step="0.1" value="1"><input type="number" class="mix-val-input" id="lineGapVal" min="0.1" max="10" step="0.1" value="1" style="width:56px;"><span class="mix-pct-sign">s</span></div>
+              <div class="mix-row"><label>Time between affirmations</label><input type="range" id="lineGap" min="0.1" max="10" step="0.1" value="0.1"><input type="number" class="mix-val-input" id="lineGapVal" min="0.1" max="10" step="0.1" value="0.1" style="width:56px;"><span class="mix-pct-sign">s</span></div>
             </div>
             <div class="session-target" id="sessionTarget"></div>
             <div class="session-progress" id="sessionProgress" style="display:none;">
@@ -1070,16 +1146,17 @@
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
       </div>
       <div class="price-card featured" id="priceCardRitual">
-        <span class="badge">All night</span>
+        <span class="badge">All night + social</span>
         <h3>Ritual</h3>
+        <p class="price-tagline">The full nightly ritual + social.</p>
         <div class="price-amount">$35<span>/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
         <ul class="price-feats">
           <li>Everything in Reverie</li>
-          <li>Full-night sessions with screen-lock playback</li>
-          <li>Upload your own track to layer underneath everything</li>
-          <li>Share your frequencies with friends and followers</li>
-          <li>Devotional chants <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
+          <li>8-hour sessions with screen-lock playback</li>
+          <li>Share your frequencies and subliminals with friends or followers</li>
+          <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
+          <li>Full session history &amp; library</li>
         </ul>
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
       </div>
@@ -1167,11 +1244,23 @@ const BACKGROUNDS = [
   { key:'thunder', label:'Distant storm', ic:'⛈' },
   { key:'brown', label:'Brown noise', ic:'▮' },
 ];
+/* The nine standard EFT tapping points, in the order they're usually worked through. */
+const EFT_POINTS = [
+  { key:'karate', label:'Karate Chop', where:'the outer edge of either hand, below the pinky' },
+  { key:'crown', label:'Top of the Head', where:'the crown, center top of your head' },
+  { key:'eyebrow', label:'Eyebrow', where:'the inner edge of one eyebrow, near the bridge of your nose' },
+  { key:'sideeye', label:'Side of the Eye', where:'the bone at the outer corner of your eye' },
+  { key:'undereye', label:'Under the Eye', where:'the bone directly under your eye' },
+  { key:'undernose', label:'Under the Nose', where:'the small area between your nose and upper lip' },
+  { key:'chin', label:'Chin', where:'the crease between your lower lip and chin' },
+  { key:'collarbone', label:'Collarbone', where:'just below where your collarbones meet' },
+  { key:'underarm', label:'Under the Arm', where:'your side, about four inches below your armpit' },
+];
 
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:1000 };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1197,7 +1286,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:1000 };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1222,9 +1311,17 @@ function resetFlow(){
   document.getElementById('layerVoiceMsg').textContent = '';
   document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
   document.getElementById('layerVoiceMixRow').style.display = 'none';
-  affirmationGapMs = 1000; state.affirmationGapMs = 1000;
-  document.getElementById('lineGap').value = 1;
-  document.getElementById('lineGapVal').value = 1;
+  affirmationGapMs = 100; state.affirmationGapMs = 100;
+  document.getElementById('lineGap').value = 0.1;
+  document.getElementById('lineGapVal').value = 0.1;
+  document.getElementById('mixTone').value = 30; document.getElementById('mixToneVal').value = 30;
+  document.getElementById('mixBg').value = 50; document.getElementById('mixBgVal').value = 50;
+  document.getElementById('mixVoice').value = 65; document.getElementById('mixVoiceVal').value = 65;
+  state.eftMode = false;
+  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.mode==='subliminal'));
+  document.getElementById('eftGuidePanel').style.display = 'none';
+  document.getElementById('ritualModeMsg').textContent = '';
+  document.getElementById('countRow').style.display = 'block';
   editingExistingId = null;
   document.getElementById('finalTitleInput').value = '';
   document.getElementById('finalTitleMsg').textContent = '';
@@ -1262,10 +1359,53 @@ const toneChips = document.getElementById('toneChips');
 const countRange = document.getElementById('countRange');
 countRange.addEventListener('input', ()=>{ document.getElementById('countVal').textContent = countRange.value; state.count = parseInt(countRange.value); });
 
+/* ---- Ritual-only: subliminal + EFT tapping mode ---- */
+const eftPointsList = document.getElementById('eftPointsList');
+EFT_POINTS.forEach((p, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
+  eftPointsList.appendChild(li);
+});
+async function pickRitualMode(btn){
+  const msg = document.getElementById('ritualModeMsg');
+  const mode = btn.dataset.mode;
+  msg.textContent = '';
+  if (mode === 'eft'){
+    if (!currentUser){
+      msg.innerHTML = `Log in to unlock EFT Tapping — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+    const myTier = await getMyTier();
+    if (myTier !== 'ritual'){
+      msg.innerHTML = `Subliminal + EFT Tapping is a Ritual feature — <a href="#pricing">see plans</a>.`;
+      msg.className = 'length-msg err';
+      return;
+    }
+  }
+  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.remove('sel'));
+  btn.classList.add('sel');
+  state.eftMode = (mode === 'eft');
+  document.getElementById('eftGuidePanel').style.display = state.eftMode ? 'block' : 'none';
+  document.getElementById('countRow').style.display = state.eftMode ? 'none' : 'block';
+  if (state.eftMode){
+    state.count = 9;
+    // EFT works best with a real pause to repeat the line while tapping — default to 5s.
+    affirmationGapMs = 5000; state.affirmationGapMs = 5000;
+    document.getElementById('lineGap').value = 5;
+    document.getElementById('lineGapVal').value = 5;
+  } else {
+    state.count = parseInt(countRange.value, 10);
+    affirmationGapMs = 100; state.affirmationGapMs = 100;
+    document.getElementById('lineGap').value = 0.1;
+    document.getElementById('lineGapVal').value = 0.1;
+  }
+}
+
 /* ---------------- AFFIRMATION GENERATION ---------------- */
 async function generateAffirmations(){
   state.goal = document.getElementById('quizGoal').value.trim();
-  state.count = parseInt(countRange.value);
+  state.count = state.eftMode ? 9 : parseInt(countRange.value);
   showStep(2);
   let lines = null;
   try{ lines = await callClaudeForAffirmations(); }catch(err){ lines = null; }
@@ -1311,14 +1451,21 @@ function renderAffList(){
   const list = document.getElementById('affList'); list.innerHTML='';
   state.affirmations.forEach((line,i)=>{
     const row = document.createElement('div'); row.className='aff-row';
-    const num = document.createElement('div'); num.className='num'; num.textContent=(i+1)+'.';
+    const num = document.createElement('div'); num.className='num';
+    num.textContent = state.eftMode && EFT_POINTS[i] ? (i+1)+'. '+EFT_POINTS[i].label : (i+1)+'.';
     const ta = document.createElement('textarea'); ta.value=line; ta.rows=1;
     ta.oninput = ()=>{ state.affirmations[i]=ta.value; };
-    const rm = document.createElement('button'); rm.className='aff-remove'; rm.textContent='✕';
-    rm.onclick = ()=>{ state.affirmations.splice(i,1); renderAffList(); };
-    row.appendChild(num); row.appendChild(ta); row.appendChild(rm);
+    row.appendChild(num); row.appendChild(ta);
+    if (!state.eftMode){
+      // Removing a line would break the one-line-per-tapping-point mapping, so it's
+      // disabled in EFT mode — the count has to stay at exactly nine.
+      const rm = document.createElement('button'); rm.className='aff-remove'; rm.textContent='✕';
+      rm.onclick = ()=>{ state.affirmations.splice(i,1); renderAffList(); };
+      row.appendChild(rm);
+    }
     list.appendChild(row);
   });
+  document.getElementById('addAffBtn').style.display = state.eftMode ? 'none' : '';
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
@@ -1425,8 +1572,13 @@ function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings 
 
 function showRecordLine(){
   const lines = activeRecordLines(); const arr = activeRecordArray();
-  document.getElementById('recCounter').textContent = `${recIndex+1} of ${lines.length}`;
+  const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_POINTS[recIndex];
+  document.getElementById('recCounter').textContent = isEftPoint
+    ? `Point ${recIndex+1} of 9 — ${EFT_POINTS[recIndex].label}`
+    : `${recIndex+1} of ${lines.length}`;
   document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
+  document.getElementById('recTapHint').textContent = isEftPoint ? `Tap: ${EFT_POINTS[recIndex].where}` : '';
+  document.getElementById('recTapHint').style.display = isEftPoint ? 'block' : 'none';
   document.getElementById('recStatus').textContent = 'press and hold to record';
   document.getElementById('nextLineBtn').disabled = !arr[recIndex];
 }
@@ -1603,6 +1755,7 @@ function prepareFinal(){
   document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
   renderFinalFreqPicker();
+  updateFinalPointTag(0);
 
   const titleInput = document.getElementById('finalTitleInput');
   const titleMsg = document.getElementById('finalTitleMsg');
@@ -1616,6 +1769,18 @@ function prepareFinal(){
   } else {
     titleInput.value = '';
     titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
+  }
+}
+/* Shows which of the nine tapping points the currently-playing line belongs to,
+   whenever this subliminal was built in EFT mode. */
+function updateFinalPointTag(index){
+  const tag = document.getElementById('finalPointTag');
+  if (!tag) return;
+  if (state.eftMode && EFT_POINTS[index]){
+    tag.style.display = 'inline-block';
+    tag.textContent = `Point ${index+1} of 9 — ${EFT_POINTS[index].label} · tap ${EFT_POINTS[index].where}`;
+  } else {
+    tag.style.display = 'none';
   }
 }
 
@@ -1717,7 +1882,7 @@ function restartSoothingLayer(){
 /* Time between affirmations — 0.1 to 10 seconds, live-adjustable, applies to
    the main voice and (if present) the second layered voice. Stored internally in
    milliseconds (affirmationGapMs) since that's what setTimeout needs. */
-let affirmationGapMs = 1000;
+let affirmationGapMs = 100;
 (function wireLineGap(){
   const el = document.getElementById('lineGap');
   const readout = document.getElementById('lineGapVal');
@@ -1935,7 +2100,7 @@ function playFinal(){
         if (!finalPlaying) return;
         if (idx >= recorded.length){ onDone(); return; }
         const { r, i } = recorded[idx];
-        document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"';
+        document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
         fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
           if (!finalPlaying) return;
           const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
@@ -1953,7 +2118,7 @@ function playFinal(){
       function speakNext(){
         if (!finalPlaying){ return; }
         if (idx >= lines.length){ onDone(); return; }
-        document.getElementById('finalLine').textContent = '"'+lines[idx]+'"';
+        document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
         const utter = new SpeechSynthesisUtterance(lines[idx]);
         utter.rate = 0.92; utter.pitch = 1.0;
         utter.onend = ()=>{ idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t); };
@@ -2270,8 +2435,8 @@ async function saveSubliminal(){
     custom_track_url: customTrackStoragePath,
     layer_affirmations: layerVoiceEnabled ? state.layerAffirmations : null,
     layer_voice_mode: layerVoiceEnabled ? state.layerVoiceMode : null,
-    layer_recording_urls: layerRecordingUrls
-  });
+    layer_recording_urls: layerRecordingUrls,
+    eft_mode: state.eftMode || false  });
   if (error){
     console.error('saveSubliminal error:', error);
     msg.textContent = `Couldn't save: ${error.message}`;
@@ -2649,6 +2814,19 @@ function showReprogramPage(){
   window.scrollTo(0,0);
   history.pushState({ page:'reprogram' }, '', '#reprogram');
 }
+function setScienceTab(tab){
+  document.querySelectorAll('[data-scitab]').forEach(b => b.classList.toggle('active', b.dataset.scitab === tab));
+  document.getElementById('scienceTabSubliminals').style.display = tab === 'subliminals' ? 'block' : 'none';
+  document.getElementById('scienceTabEft').style.display = tab === 'eft' ? 'block' : 'none';
+}
+const scienceEftPointsList = document.getElementById('scienceEftPointsList');
+if (scienceEftPointsList){
+  EFT_POINTS.forEach(p => {
+    const li = document.createElement('li');
+    li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
+    scienceEftPointsList.appendChild(li);
+  });
+}
 function goHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
@@ -2772,10 +2950,17 @@ async function loadMyLibrary(){
     const mins = Math.round((s.duration_seconds||0)/60);
     const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
+    const titleVal = (s.title || '').replace(/"/g,'&quot;');
     return `<div class="profile-item">
       <div class="profile-item-top">
-        <div>
-          <div>${s.title || (s.frequency_hz ? s.frequency_hz+' Hz' : 'Subliminal')}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="lib-title-row">
+            <input type="text" class="lib-title-input" id="libTitle-${s.id}" value="${titleVal}" maxlength="60" placeholder="Untitled subliminal">
+            <button class="lib-title-save-btn" onclick="renameLibraryItem('${s.id}')" aria-label="Save title" title="Save title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </button>
+          </div>
+          <div class="save-msg" id="libTitleMsg-${s.id}" style="margin-top:2px;"></div>
           <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations · saved ${when}</div>
         </div>
         <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
@@ -2784,6 +2969,20 @@ async function loadMyLibrary(){
       ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+/* Renaming in My Library updates the title in place — it's the one edit that doesn't
+   need to fork a new subliminal, since the content itself hasn't changed. */
+async function renameLibraryItem(id){
+  if (!sb || !currentUser) return;
+  const input = document.getElementById(`libTitle-${id}`);
+  const msg = document.getElementById(`libTitleMsg-${id}`);
+  const title = input.value.trim();
+  if (!title){ msg.textContent = "Title can't be empty."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.from('subliminals').update({ title }).eq('id', id).eq('user_id', currentUser.id);
+  if (error){ console.error('renameLibraryItem error:', error); msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
 }
 
 async function loadSavedIntoBuilder(id){
@@ -2796,6 +2995,7 @@ async function loadSavedIntoBuilder(id){
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
   state.bg = s.background || 'none';
   state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
+  state.eftMode = !!s.eft_mode;
 
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
