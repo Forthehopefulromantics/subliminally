@@ -1076,6 +1076,9 @@
             <div class="record-actions">
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
               <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
+              <button class="mini-btn ghostbtn" id="rerecordBtn" onclick="rerecordVoice()" style="display:none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>Re-record
+              </button>
               <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save to my library</button>
               <button class="mini-btn ghostbtn" onclick="resetFlow()">Start over</button>
             </div>
@@ -1472,6 +1475,7 @@ function resetFlow(){
   document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
   document.getElementById('eftRepeatMsg').textContent = '';
   editingExistingId = null;
+  contentAlreadySaved = false;
   document.getElementById('finalTitleInput').value = '';
   document.getElementById('finalTitleMsg').textContent = '';
   document.getElementById('finalTitleInput').classList.remove('needs-title');
@@ -2099,6 +2103,10 @@ function buildAmbience(ctx, key, destination){
 // already saved — if it's an edit, saving must produce a new row with a new title,
 // rather than silently overwriting the original.
 let editingExistingId = null;
+// True once this content has been saved at least once in the current session — even
+// a fresh build that was just saved needs a new title if it's changed again afterward
+// (e.g. re-recording), same as anything reopened via "Load & adjust".
+let contentAlreadySaved = false;
 function prepareFinal(){
   document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
@@ -2106,6 +2114,7 @@ function prepareFinal(){
   document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
   document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
+  document.getElementById('rerecordBtn').style.display = (state.voiceMode === 'own') ? 'inline-flex' : 'none';
   renderFinalFreqPicker();
   updateFinalPointTag(0);
 
@@ -2113,7 +2122,7 @@ function prepareFinal(){
   const titleMsg = document.getElementById('finalTitleMsg');
   titleMsg.textContent = '';
   titleInput.classList.remove('needs-title');
-  if (editingExistingId){
+  if (editingExistingId || contentAlreadySaved){
     // Any change to something already saved has to be re-titled and saved as its own,
     // new subliminal — so the field starts empty rather than inheriting the old title.
     titleInput.value = '';
@@ -2122,6 +2131,21 @@ function prepareFinal(){
     titleInput.value = '';
     titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
   }
+}
+/* Sends you back to the recording step to redo your voice on this subliminal.
+   Existing recordings come along, so lines you don't touch stay exactly as they
+   were — only the ones you actually hold-record again get replaced. */
+function rerecordVoice(){
+  if (state.voiceMode !== 'own') return;
+  stopFinal();
+  recordTarget = 'primary';
+  recIndex = 0;
+  if (!Array.isArray(recordings) || recordings.length !== state.affirmations.length){
+    recordings = new Array(state.affirmations.length).fill(null);
+  }
+  setRecordStepCopy('primary');
+  showRecordLine();
+  showStep(6);
 }
 /* Shows which tapping point (or the setup statement) the currently-playing line
    belongs to, whenever this subliminal was built in EFT mode. */
@@ -2853,6 +2877,7 @@ async function saveSubliminal(){
   // This is now its own saved subliminal — if they keep tweaking and save again,
   // treat it as a fresh save rather than an edit of the thing they just made.
   editingExistingId = null;
+  contentAlreadySaved = true;
 }
 
 /* ---------------- WAITLIST ---------------- */
