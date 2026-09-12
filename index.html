@@ -1201,7 +1201,7 @@
           <div class="save-msg" id="passwordSettingsMsg"></div>
         </div>
       </div>
-      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
+      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="profileManageSubLink">Manage your subscription →</a></div>
 
       <h3 class="profile-subhead">Get in touch</h3>
       <div class="journal-tabs" style="max-width:340px;">
@@ -1242,7 +1242,7 @@
           <li>Nature sounds + extra soothing layer (warm pad, chimes, hum)</li>
           <li>Save up to 10 subliminals to your library</li>
         </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00')">Get Whisper</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00','whisper')">Get Whisper</a>
       </div>
       <div class="price-card" id="priceCardReverie">
         <h3>Reverie</h3>
@@ -1253,7 +1253,7 @@
           <li>Unlimited saved subliminals</li>
           <li>Visualization Script — write (or draft with AI) a full scene for performance, competition, or a specific outcome you're calling in</li>
         </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01','reverie')">Get Reverie</a>
       </div>
       <div class="price-card featured" id="priceCardRitual">
         <span class="badge">All night + social</span>
@@ -1269,11 +1269,12 @@
           <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
           <li>Full session history &amp; library</li>
         </ul>
-        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
+        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02','ritual')">Get Ritual</a>
       </div>
     </div>
     <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
-    <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
+    <div class="save-msg" id="pricingPurchaseMsg" style="text-align:center; margin-top:14px;"></div>
+    <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="pricingManageSubLink">Manage your subscription →</a></div>
   </div>
 </section>
 
@@ -2678,16 +2679,118 @@ function stopFinal(){
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
 
-/* ---------------- CHECKOUT LINKING ---------------- */
-function goToCheckout(evt, baseUrl){
+/* ---------------- CHECKOUT LINKING ----------------
+   Web keeps the existing Stripe Payment Links. The native apps can't use
+   those — Apple/Google require subscriptions sold inside the app to go
+   through their own billing — so on native this hands off to RevenueCat
+   instead. See the RevenueCat block below for the purchase flow itself. */
+function goToCheckout(evt, baseUrl, tier){
   evt.preventDefault();
   if (!currentUser){
     openAuthModal();
     document.getElementById('authSub').textContent = 'Create an account first, then tap the plan again — this is how we link your subscription to your account.';
     return false;
   }
+  if (isNativeApp()){
+    purchaseTier(tier);
+    return false;
+  }
   window.open(baseUrl + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
   return false;
+}
+
+/* ---------------- REVENUECAT (native subscription purchases) ----------------
+   Fill these in once you've created a RevenueCat project:
+   RevenueCat dashboard -> Project -> API keys -> "Public app-specific keys".
+   These are public keys (safe to ship in the app), not secrets. */
+const REVENUECAT_API_KEY_IOS = 'YOUR_REVENUECAT_IOS_PUBLIC_API_KEY';
+const REVENUECAT_API_KEY_ANDROID = 'YOUR_REVENUECAT_ANDROID_PUBLIC_API_KEY';
+
+// Product identifiers to create — matching — in App Store Connect / Google
+// Play Console / RevenueCat. Each tier is one auto-renewable monthly
+// subscription. Entitlement identifiers are set in the RevenueCat dashboard
+// (Entitlements tab) and attached to the matching product there.
+const TIER_PRODUCT_IDS = {
+  whisper: 'com.fthr.subliminally.whisper.monthly',
+  reverie: 'com.fthr.subliminally.reverie.monthly',
+  ritual: 'com.fthr.subliminally.ritual.monthly',
+};
+const TIER_ENTITLEMENT_IDS = {
+  whisper: 'whisper',
+  reverie: 'reverie',
+  ritual: 'ritual',
+};
+
+function initRevenueCat(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.Purchases) return;
+  const { Purchases } = window.Capacitor.Plugins;
+  const apiKey = window.Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+  if (!apiKey || apiKey.startsWith('YOUR_')) { console.warn('RevenueCat API key not set yet — native purchases are disabled.'); return; }
+  Purchases.configure({ apiKey });
+}
+// Ties each purchase to the Supabase account rather than an anonymous
+// RevenueCat-generated ID, so the webhook below can upsert `subscribers`
+// straight off auth.uid().
+async function syncRevenueCatIdentity(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.Purchases) return;
+  const { Purchases } = window.Capacitor.Plugins;
+  try {
+    if (currentUser) await Purchases.logIn({ appUserID: currentUser.id });
+    else await Purchases.logOut();
+  } catch (e){ console.warn('RevenueCat identity sync failed:', e); }
+}
+
+async function purchaseTier(tier){
+  const msg = document.getElementById('pricingPurchaseMsg');
+  if (!window.Capacitor.Plugins.Purchases){ msg.textContent = 'Purchases are not available on this build yet.'; msg.className = 'save-msg err'; return; }
+  const { Purchases } = window.Capacitor.Plugins;
+  msg.textContent = 'Loading plan…'; msg.className = 'save-msg';
+  try {
+    const { current } = await Purchases.getOfferings();
+    const productId = TIER_PRODUCT_IDS[tier];
+    const pkg = current?.availablePackages.find(p => p.product.identifier === productId);
+    if (!pkg){
+      msg.textContent = "That plan isn't set up yet — check back soon.";
+      msg.className = 'save-msg err';
+      return;
+    }
+    msg.textContent = 'Opening purchase…'; msg.className = 'save-msg';
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+    const entitlementId = TIER_ENTITLEMENT_IDS[tier];
+    if (customerInfo.entitlements.active[entitlementId]){
+      msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
+      msg.className = 'save-msg ok';
+      // The RevenueCat webhook updates the subscribers table server-side;
+      // give it a moment to land, then refresh what the pricing page shows.
+      setTimeout(applyPricingVisibility, 1500);
+    } else {
+      msg.textContent = 'Purchase completed, but the plan is taking a moment to activate — check back shortly.';
+      msg.className = 'save-msg';
+    }
+  } catch (e){
+    if (e && e.userCancelled) { msg.textContent = ''; return; }
+    console.error('Purchase failed:', e);
+    msg.textContent = (e && e.message) || 'Something went wrong with the purchase — try again.';
+    msg.className = 'save-msg err';
+  }
+}
+
+// Stripe's billing portal only knows about web subscriptions; App Store /
+// Play Store subscriptions are managed in the platform's own screen instead.
+function updateManageSubscriptionLinks(){
+  let url = 'https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00';
+  let label = 'Manage your subscription →';
+  if (isNativeApp()){
+    const platform = window.Capacitor.getPlatform();
+    url = platform === 'ios' ? 'https://apps.apple.com/account/subscriptions' : 'https://play.google.com/store/account/subscriptions';
+    label = platform === 'ios' ? 'Manage in the App Store →' : 'Manage in Google Play →';
+  }
+  ['pricingManageSubLink', 'profileManageSubLink'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.href = url;
+    el.textContent = label;
+  });
 }
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
@@ -3917,12 +4020,15 @@ if (sb){
 if (sb){
   setupNativeOAuthCallback();
   setupPushNotifications();
+  initRevenueCat();
+  updateManageSubscriptionLinks();
   sb.auth.onAuthStateChange((event, session) => {
     currentUser = session ? session.user : null;
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
     if (currentUser && event === 'SIGNED_IN') promptOnboardingIfProfileIncomplete();
     if (currentUser) savePushToken();
+    syncRevenueCatIdentity();
   });
   sb.auth.getSession().then(({ data }) => {
     currentUser = data.session ? data.session.user : null;
