@@ -1360,6 +1360,7 @@
           <li>Personalized subliminals — align your frequency</li>
           <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
           <li>Your own voice or AI voice</li>
+          <li>Save 2 subliminals to your library (an account is required to save)</li>
           <li>Library of general subliminals on YouTube</li>
         </ul>
         <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal()">Create a free account</button>
@@ -3024,7 +3025,7 @@ async function getMySubscriberRow(){
   return data; // null if they've never subscribed
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 2, whisper: 10, ritual: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
@@ -3061,7 +3062,7 @@ async function saveSubliminal(){
   if ((count || 0) >= subCap){
     msg.innerHTML = myTier === 'whisper'
       ? `You've saved ${count} subliminals — that's the limit on Whisper. <a href="#pricing" onclick="closeAuthModal();">Upgrade to Ritual for unlimited</a>.`
-      : `You've saved ${count} subliminals — that's the limit on ${TIER_LABEL[myTier]}. <a href="#pricing" onclick="closeAuthModal();">Upgrade for more</a>.`;
+      : `You've saved ${count} subliminals — that's the limit on a free account. <a href="#pricing" onclick="closeAuthModal();">Whisper holds 10, Ritual is unlimited</a>.`;
     msg.className = 'save-msg err';
     return;
   }
