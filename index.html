@@ -468,7 +468,8 @@
   .journal-philosophy-toggle span{ transition:transform .25s; }
   .journal-philosophy.open .journal-philosophy-toggle span{ transform:rotate(180deg); }
   .journal-philosophy-body{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
-  .journal-philosophy.open .journal-philosophy-body{ max-height:600px; margin-top:12px; }
+  .journal-philosophy.open .journal-philosophy-body{ max-height:1600px; margin-top:12px; }
+  .journal-philosophy-body b{ color:var(--moonlight); font-weight:500; }
   .journal-philosophy-body p{ font-size:13px; color:var(--haze); line-height:1.7; margin-top:10px; }
   .journal-philosophy-body p:first-child{ margin-top:0; }
   .journal-locked{ max-width:520px; margin:0 auto; text-align:center; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:44px 30px; }
@@ -1179,9 +1180,11 @@
     <div class="journal-philosophy" id="journalPhilosophy" style="display:none;">
       <button class="journal-philosophy-toggle" onclick="this.parentElement.classList.toggle('open')">Why hasn't this shown up yet? <span>↓</span></button>
       <div class="journal-philosophy-body">
-        <p>An affirmation is 2D — words on paper, a thought in your head. Physical reality is 3D. Getting from one to the other isn't instant, and the gap between them is normal, not proof it isn't working.</p>
-        <p>Your inner state is the blueprint. Your affirmations are that blueprint spoken into words. The physical world around you right now is just an echo of an older blueprint — the assumptions you were running before. Reality takes time to catch up to a new mental state; that's the lag, not a sign you did something wrong.</p>
-        <p>So the practice isn't checking outside for proof. It's repeating the words until they stop feeling forced and start feeling true — and when the old, unwanted version of things shows up anyway, treating it as old news instead of new evidence. Your identity gets to stay steady while the world outside slowly updates to match it.</p>
+        <p><b>3D — the world of proof.</b> This is physical reality: what you can see, touch, and measure. 3D consciousness needs evidence first, belief second. It says "show me, then I'll believe it." This is also where most of your current environment lives — it's the echo of decisions and beliefs you held before you started shifting. It hasn't caught up yet, and that's not failure, that's lag.</p>
+        <p><b>4D — the world of mind and emotion.</b> This is the bridge layer — thought, feeling, imagination, belief. It's where affirmations actually live. When you speak a new identity into words, you're not yet in 3D proof — you're doing 4D construction. This is where the "unrealness" of an affirmation comes from: you're speaking a blueprint that hasn't been built yet. Repetition isn't about convincing reality; it's about convincing this layer until it becomes automatic.</p>
+        <p><b>5D — the world of knowing.</b> This is consciousness without needing proof or even active thought — just steady, embodied certainty. In 5D, you don't recite the affirmation anymore because you are it. When old 3D circumstances show up, 5D consciousness doesn't panic or take it personally — it recognizes them as outdated information still catching up, like light from a star that's already changed.</p>
+        <p><b>So why hasn't it shown up in 3D yet?</b> Because 3D is the last layer to update, not the first. The order is always: identity shifts in 5D → gets shaped by belief and emotion in 4D → eventually crystallizes into form in 3D. Looking at 3D for proof is checking the slowest-moving part of the system before it's had time to catch up.</p>
+        <p>The old paradigm is still playing out its momentum. That's not evidence the new one isn't working — it's just physics doing what physics does: taking time.</p>
       </div>
     </div>
     <div id="journalLocked" class="journal-locked">
@@ -4053,7 +4056,6 @@ function setJournalTab(cat){
   const copy = JOURNAL_TAB_COPY[cat];
   document.getElementById('journalPrompt').textContent = copy.prompt;
   if (copy.placeholder) document.getElementById('journalInput').placeholder = copy.placeholder;
-  document.getElementById('journalPhilosophy').style.display = cat === 'manifesting' ? 'block' : 'none';
   document.getElementById('journalAddMsg').textContent = '';
   renderJournalState();
 }
@@ -4061,8 +4063,12 @@ async function renderJournalState(){
   const locked = document.getElementById('journalLocked');
   const upgrade = document.getElementById('journalUpgrade');
   const panels = { entries: document.getElementById('journalPanel'), photos: document.getElementById('journalPhotoPanel'), habits: document.getElementById('habitsPanel') };
+  const philosophy = document.getElementById('journalPhilosophy');
   Object.values(panels).forEach(p => p.style.display = 'none');
   upgrade.style.display = 'none';
+  // The 3D/4D/5D explainer is a Whisper feature — it only appears once the
+  // tier check below has passed and the Manifesting tab is open.
+  philosophy.style.display = 'none';
   locked.style.display = currentUser ? 'none' : 'block';
   if (!currentUser) return;
 
@@ -4081,7 +4087,11 @@ async function renderJournalState(){
 
   if (journalTab === 'photos'){ panels.photos.style.display = 'block'; loadJournalPhotos(); }
   else if (journalTab === 'habits'){ panels.habits.style.display = 'block'; loadHabits(); }
-  else { panels.entries.style.display = 'block'; loadJournalEntries(); }
+  else {
+    panels.entries.style.display = 'block';
+    philosophy.style.display = journalTab === 'manifesting' ? 'block' : 'none';
+    loadJournalEntries();
+  }
 }
 
 /* Local calendar date as YYYY-MM-DD — habits and journal days are the
