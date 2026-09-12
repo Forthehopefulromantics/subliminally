@@ -22,9 +22,17 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Map each Stripe Price ID to your plan names.
 // Find these in Stripe -> Product catalog -> click each product -> copy the Price ID (starts with "price_").
+// The four REPLACE_ entries are the new $5.55/mo, $55/yr, $11.11/mo, $111/yr prices —
+// fill them in once those products exist in Stripe.
 const PRICE_TO_TIER = {
+  'REPLACE_WITH_WHISPER_MONTHLY_PRICE_ID': 'whisper',
+  'REPLACE_WITH_WHISPER_ANNUAL_PRICE_ID': 'whisper',
+  'REPLACE_WITH_RITUAL_MONTHLY_PRICE_ID': 'ritual',
+  'REPLACE_WITH_RITUAL_ANNUAL_PRICE_ID': 'ritual',
+  // Legacy prices from before the plan restructure. Reverie was retired; anyone
+  // still paying for it keeps everything they had, which now lives on Ritual.
   'price_1U00xTBiVHYI4vcXIDdi9kuF': 'whisper',
-  'price_1U00y5BiVHYI4vcXrtlN930K': 'reverie',
+  'price_1U00y5BiVHYI4vcXrtlN930K': 'ritual',
   'price_1U00yoBiVHYI4vcXirZnmnwI': 'ritual',
 };
 

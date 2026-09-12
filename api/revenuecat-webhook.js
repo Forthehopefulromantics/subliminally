@@ -35,8 +35,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // in App Store Connect / Google Play Console / RevenueCat.
 const PRODUCT_TO_TIER = {
   'com.fthr.subliminally.whisper.monthly': 'whisper',
-  'com.fthr.subliminally.reverie.monthly': 'reverie',
+  'com.fthr.subliminally.whisper.annual': 'whisper',
   'com.fthr.subliminally.ritual.monthly': 'ritual',
+  'com.fthr.subliminally.ritual.annual': 'ritual',
 };
 
 // Event types where the subscriber gained or renewed access.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Subliminally by FTHR — Your own voice becomes your nightly environment.</title>
+<title>Subliminally by FTHR — Your all in one wellness app.</title>
 <meta name="description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <link rel="canonical" href="https://www.subliminallybyfthr.com/" />
 <meta name="theme-color" content="#0D0B18" />
@@ -12,7 +12,7 @@
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.subliminallybyfthr.com/" />
-<meta property="og:title" content="Subliminally by FTHR — Your own voice becomes your nightly environment." />
+<meta property="og:title" content="Subliminally by FTHR — Your all in one wellness app." />
 <meta property="og:description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <meta property="og:image" content="https://www.subliminallybyfthr.com/og-image.png" />
 <meta property="og:site_name" content="Subliminally by FTHR" />
@@ -34,9 +34,9 @@
   "url": "https://www.subliminallybyfthr.com/",
   "description": "Build a personalized nightly audio ritual with a Solfeggio frequency, affirmations in your own voice, and layered ambience.",
   "offers": [
-    { "@type": "Offer", "name": "Whisper", "price": "10.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Reverie", "price": "22.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Ritual", "price": "35.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
+    { "@type": "Offer", "name": "Free", "price": "0.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
+    { "@type": "Offer", "name": "Whisper", "price": "5.55", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
+    { "@type": "Offer", "name": "Ritual", "price": "11.11", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
   ]
 }
 </script>
@@ -275,11 +275,17 @@
   .price-amount{ font-family:var(--serif); font-size:38px; color:var(--candle); margin-top:10px; }
   .price-tagline{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); margin-top:6px; }
   .price-amount span{ font-size:14px; color:var(--haze); font-family:var(--sans); }
+  .price-amount .price-figure{ font-size:inherit; color:inherit; font-family:inherit; }
   .price-card .limit{ font-size:13px; color:var(--lilac); margin-top:4px; }
   .price-feats{ list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:9px; }
   .price-feats li{ font-size:13px; color:var(--haze); padding-left:18px; position:relative; }
   .price-feats li::before{ content:"✦"; position:absolute; left:0; color:var(--lilac); font-size:11px; top:2px; }
   .price-card .btn{ width:100%; justify-content:center; margin-top:22px; }
+  .billing-toggle{ display:flex; gap:6px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; width:max-content; margin:0 auto 28px; }
+  .billing-toggle button{ background:none; border:none; color:var(--haze); font-family:inherit; font-size:13px; font-weight:500; padding:9px 18px; border-radius:999px; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:8px; }
+  .billing-toggle button span{ font-size:10.5px; color:var(--candle); letter-spacing:.04em; }
+  .billing-toggle button.active{ background:linear-gradient(135deg, var(--lilac), #7C6BC4); color:#fff; }
+  .billing-toggle button.active span{ color:rgba(255,255,255,0.8); }
   .length-chip-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   .length-chip{ cursor:pointer; padding:12px 6px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:13px; font-family:inherit; transition:all .2s; }
   .length-chip span{ display:block; font-size:10px; color:var(--lilac); margin-top:3px; }
@@ -374,7 +380,6 @@
   .tier-badge{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; margin-top:6px; padding:5px 14px; border-radius:999px; letter-spacing:.02em; }
   .tier-badge[data-tier="none"]{ background:rgba(255,255,255,0.06); color:var(--haze); }
   .tier-badge[data-tier="whisper"]{ background:rgba(185,167,232,0.18); color:var(--lilac); }
-  .tier-badge[data-tier="reverie"]{ background:rgba(227,190,127,0.16); color:var(--candle); }
   .tier-badge[data-tier="ritual"]{ background:linear-gradient(135deg, rgba(227,190,127,0.28), rgba(185,167,232,0.28)); color:var(--moonlight); border:1px solid rgba(227,190,127,0.4); }
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
@@ -491,6 +496,52 @@
   .journal-move-confirm .mini-btn{ font-size:11.5px; padding:6px 12px; }
   .journal-stat{ text-align:center; font-size:13px; color:var(--candle); background:rgba(227,190,127,0.08); border:1px solid rgba(227,190,127,0.2); border-radius:14px; padding:10px 16px; margin-bottom:16px; }
   .journal-empty{ text-align:center; font-size:13px; color:var(--haze); padding:30px 0; }
+  .journal-tabs-4{ max-width:600px; }
+  @media (max-width:520px){ .journal-tabs-4{ flex-wrap:wrap; border-radius:20px; } .journal-tabs-4 button{ flex:1 1 45%; padding:10px 8px; font-size:13px; } }
+
+  /* ---- daily log (photos of handwritten pages) ---- */
+  .photo-upload-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:18px; padding:18px 18px 16px; margin-bottom:20px; }
+  .photo-upload-fields{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .photo-upload-fields label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
+  .photo-upload-fields input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; font-family:inherit; outline:none; color-scheme:dark; }
+  .photo-upload-fields input:focus{ border-color:var(--candle); }
+  .photo-upload-actions{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .photo-upload-hint{ font-size:12px; color:var(--haze); }
+  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; }
+  .photo-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .photo-card img{ width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:var(--dusk); cursor:zoom-in; }
+  .photo-card .meta{ padding:9px 11px 10px; display:flex; flex-direction:column; gap:3px; }
+  .photo-card .date{ font-size:11.5px; color:var(--lilac); font-variant-numeric:tabular-nums; }
+  .photo-card .cap{ font-size:12px; color:var(--haze); font-family:var(--serif); font-style:italic; line-height:1.4; }
+  .photo-card .journal-entry-delete{ align-self:flex-end; margin-top:4px; }
+  .photo-lightbox{ position:fixed; inset:0; z-index:500; background:rgba(13,11,24,0.92); display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out; }
+  .photo-lightbox.open{ display:flex; }
+  .photo-lightbox img{ max-width:100%; max-height:100%; border-radius:12px; }
+
+  /* ---- habit tracker ---- */
+  .habit-block{ background:var(--veil); border:1px solid var(--dusk); border-radius:20px; padding:20px 20px 16px; margin-bottom:16px; }
+  .habit-block[data-time="morning"]{ background:linear-gradient(160deg, rgba(227,190,127,0.07), var(--veil)); }
+  .habit-block[data-time="night"]{ background:linear-gradient(160deg, rgba(185,167,232,0.08), var(--veil)); }
+  .habit-block-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .habit-block-head h3{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-top:4px; }
+  .habit-block-count{ font-size:12px; color:var(--haze); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .habit-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
+  .habit-check.done{ background:var(--candle); border-color:var(--candle); color:#241C0E; }
+  .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  .habit-name{ font-size:14px; color:var(--moonlight); min-width:0; overflow-wrap:anywhere; }
+  .habit-row.done-today .habit-name{ color:var(--haze); text-decoration:line-through; text-decoration-color:rgba(156,147,184,0.5); }
+  .habit-week{ display:flex; gap:4px; }
+  .habit-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.08); }
+  .habit-dot.on{ background:var(--lilac); }
+  .habit-dot.today{ box-shadow:0 0 0 1.5px rgba(227,190,127,0.6); }
+  .habit-streak{ font-size:11.5px; color:var(--candle); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .habit-streak.zero{ color:var(--haze); }
+  .habit-delete{ display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:none; border:1px solid transparent; color:var(--haze); cursor:pointer; padding:0; opacity:.55; transition:all .2s; }
+  .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
+  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
+  .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
 
   /* ---- library ---- */
   .library-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
@@ -518,12 +569,15 @@
     <button onclick="goHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
     <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
     <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
+    <button onclick="showJournalPage('habits'); closeMobileNav();">Habits</button>
     <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
     <button onclick="goHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
   <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
 </nav>
+
+<div class="photo-lightbox" id="photoLightbox" onclick="this.classList.remove('open')"><img id="photoLightboxImg" alt="Journal page"></div>
 
 <!-- ============ AUTH MODAL ============ -->
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
@@ -628,8 +682,8 @@
 <section class="hero">
   <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
-  <h1>Your own voice becomes<br><em>your nightly environment.</em></h1>
-  <p class="hero-sub">Choose a healing frequency — the nine Solfeggio tones plus 432 Hz — get affirmations built for what you're working through, and layer in rain, waterfall, or birds underneath your own voice.</p>
+  <h1>Your all in one<br><em>wellness app.</em></h1>
+  <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
   <div class="hero-ctas">
     <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
     <button class="btn btn-ghost" onclick="goTo('waitlist')">Join the waitlist</button>
@@ -774,12 +828,12 @@
         <p>A vague wish ("I hope it goes well") doesn't give your mind much to rehearse. A scene with specifics — what you see, hear, and feel, who's there, what happens step by step — gives it something real to run. That's why this feature hands you a blank page instead of a fill-in-the-blank template: the more precisely you describe it, the more useful the rehearsal.</p>
 
         <h3>How it works inside a subliminal here</h3>
-        <p>On Reverie and Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
+        <p>On Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
 
         <div class="science-cta">
-          <p>This one's a Reverie &amp; Ritual feature.</p>
+          <p>This one's a Ritual feature.</p>
           <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Write your script →</button>
-          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">See plans</button>
+          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
     </div>
@@ -890,7 +944,7 @@
             <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
               <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
               <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping<span>Ritual</span></button>
-              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Reverie &amp; Ritual</span></button>
+              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Ritual</span></button>
             </div>
             <div class="length-msg" id="ritualModeMsg"></div>
             <div class="eft-guide-panel" id="visualizationGuidePanel" style="display:none;">
@@ -980,7 +1034,7 @@
         <div class="flow-body">
           <div class="bg-grid" id="bgGrid"></div>
           <div class="soothing-picker">
-            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper, Reverie & Ritual)</span></label>
+            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper & Ritual)</span></label>
             <div class="length-chip-grid" id="soothingChips">
               <button class="length-chip sel" data-variant="none" onclick="pickSoothingLayer(this)">None</button>
               <button class="length-chip" data-variant="pad" onclick="pickSoothingLayer(this)">Warm pad</button>
@@ -1111,13 +1165,15 @@
   <div class="wrap">
     <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
-      <div class="eyebrow">Your record</div>
-      <h2>Your gratitude journal</h2>
-      <p>Written in present tense, always — for what's already yours, and what's already on its way.</p>
+      <div class="eyebrow">Your practice</div>
+      <h2>Journal &amp; rituals</h2>
+      <p>Gratitude in present tense, what you're calling in, the pages you write by hand, and the morning and night habits that hold it all together.</p>
     </div>
-    <div class="journal-tabs">
-      <button class="active" data-cat="received" onclick="setJournalTab('received')">Already mine</button>
-      <button data-cat="manifesting" onclick="setJournalTab('manifesting')">On its way</button>
+    <div class="journal-tabs journal-tabs-4">
+      <button class="active" data-cat="received" onclick="setJournalTab('received')">Gratitude</button>
+      <button data-cat="manifesting" onclick="setJournalTab('manifesting')">Manifesting</button>
+      <button data-cat="photos" onclick="setJournalTab('photos')">Daily log</button>
+      <button data-cat="habits" onclick="setJournalTab('habits')">Habits</button>
     </div>
     <div class="journal-prompt" id="journalPrompt">A good morning practice: write down three things you're grateful for, right when you wake up.</div>
     <div class="journal-philosophy" id="journalPhilosophy" style="display:none;">
@@ -1131,9 +1187,16 @@
     <div id="journalLocked" class="journal-locked">
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
       <h3>Keep your own record</h3>
-      <p>The Journal is where you write what you're grateful for — in present tense, whether it already happened or you're calling it in. Create a free account to start keeping it.</p>
-      <button class="btn btn-primary" onclick="openAuthModal()">Create a free account</button>
+      <p>Gratitude, manifestations, your handwritten pages, and your daily rituals all live here. Log in or create an account to get started.</p>
+      <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
     </div>
+    <div id="journalUpgrade" class="journal-locked" style="display:none;">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3 id="journalUpgradeTitle">The journal is part of Whisper</h3>
+      <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month.</p>
+      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="goHome(); goTo('pricing');">See plans</button>
+    </div>
+
     <div id="journalPanel" class="journal-panel" style="display:none;">
       <div class="journal-add">
         <input type="text" id="journalInput" placeholder="I am so grateful for…" onkeydown="if(event.key==='Enter') addJournalEntry()">
@@ -1142,6 +1205,58 @@
       <div class="save-msg" id="journalAddMsg"></div>
       <div class="journal-stat" id="journalStat" style="display:none;"></div>
       <div class="journal-entries" id="journalEntries"></div>
+    </div>
+
+    <!-- Daily log: photos of handwritten journal pages -->
+    <div id="journalPhotoPanel" class="journal-panel" style="display:none;">
+      <div class="photo-upload-card">
+        <div class="photo-upload-fields">
+          <div>
+            <label for="photoEntryDate">Entry date</label>
+            <input type="date" id="photoEntryDate">
+          </div>
+          <div style="flex:1; min-width:180px;">
+            <label for="photoCaption">A line about today <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
+            <input type="text" id="photoCaption" placeholder="What this page was about…" maxlength="140">
+          </div>
+        </div>
+        <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
+        <div class="photo-upload-actions">
+          <button class="mini-btn candlebtn" id="photoUploadBtn" onclick="document.getElementById('photoFile').click()">Photograph today's page</button>
+          <span class="photo-upload-hint">Snap your handwritten entry — it's stored privately to your account.</span>
+        </div>
+        <div class="save-msg" id="photoUploadMsg"></div>
+      </div>
+      <div class="journal-stat" id="photoStat" style="display:none;"></div>
+      <div class="photo-grid" id="photoGrid"></div>
+    </div>
+
+    <!-- Habit tracker: morning and night rituals -->
+    <div id="habitsPanel" class="journal-panel" style="display:none;">
+      <div class="journal-stat" id="habitsStat" style="display:none;"></div>
+      <div class="habit-block" data-time="morning">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Morning ritual</div><h3>How you start the day</h3></div>
+          <span class="habit-block-count" id="habitCountMorning"></span>
+        </div>
+        <div class="habit-list" id="habitListMorning"></div>
+        <div class="journal-add">
+          <input type="text" id="habitInputMorning" placeholder="Add a morning habit — e.g. Three gratitudes, Play my subliminal" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('morning')">
+          <button class="mini-btn candlebtn" onclick="addHabit('morning')">Add</button>
+        </div>
+      </div>
+      <div class="habit-block" data-time="night">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Night ritual</div><h3>How you close it</h3></div>
+          <span class="habit-block-count" id="habitCountNight"></span>
+        </div>
+        <div class="habit-list" id="habitListNight"></div>
+        <div class="journal-add">
+          <input type="text" id="habitInputNight" placeholder="Add a night habit — e.g. Journal by hand, Subliminal at lights out" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('night')">
+          <button class="mini-btn candlebtn" onclick="addHabit('night')">Add</button>
+        </div>
+      </div>
+      <div class="save-msg" id="habitsMsg"></div>
     </div>
   </div>
 </section>
@@ -1223,56 +1338,60 @@
   <div class="wrap">
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
-      <h2 id="pricingHeading">Three ways in</h2>
-      <p id="pricingSub">Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.</p>
+      <h2 id="pricingHeading">Your all in one wellness app</h2>
+      <p id="pricingSub">Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.</p>
     </div>
 
     <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
       <p style="font-size:14.5px; color:var(--haze);">You're on Ritual — the full ritual, unlocked. Nothing to upgrade to here.</p>
     </div>
 
+    <div class="billing-toggle" id="billingToggle">
+      <button class="active" data-period="monthly" onclick="setBillingPeriod('monthly')">Monthly</button>
+      <button data-period="annual" onclick="setBillingPeriod('annual')">Yearly <span>save ~17%</span></button>
+    </div>
+
     <div class="pricing-grid" id="pricingGrid">
+      <div class="price-card" id="priceCardFree">
+        <h3>Free</h3>
+        <div class="price-amount">$0<span>/forever</span></div>
+        <div class="limit">Sessions up to 20 minutes</div>
+        <ul class="price-feats">
+          <li>Personalized subliminals — align your frequency</li>
+          <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
+          <li>Your own voice or AI voice</li>
+          <li>Library of general subliminals on YouTube</li>
+        </ul>
+        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal()">Create a free account</button>
+      </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
-        <div class="price-amount">$10<span>/month</span></div>
-        <div class="limit">Sessions up to 30 minutes</div>
-        <ul class="price-feats">
-          <li>All nine Solfeggio frequencies</li>
-          <li>Custom affirmations, your voice or AI voice</li>
-          <li>Nature sounds + extra soothing layer (warm pad, chimes, hum)</li>
-          <li>Save up to 10 subliminals to your library</li>
-        </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00','whisper')">Get Whisper</a>
-      </div>
-      <div class="price-card" id="priceCardReverie">
-        <h3>Reverie</h3>
-        <div class="price-amount">$22<span>/month</span></div>
-        <div class="limit">Sessions up to 2 hours</div>
-        <ul class="price-feats">
-          <li>Everything in Whisper</li>
-          <li>Unlimited saved subliminals</li>
-          <li>Visualization Script — write (or draft with AI) a full scene for performance, competition, or a specific outcome you're calling in</li>
-        </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01','reverie')">Get Reverie</a>
-      </div>
-      <div class="price-card featured" id="priceCardRitual">
-        <span class="badge">All night + social</span>
-        <h3>Ritual</h3>
-        <p class="price-tagline">The full nightly ritual + social.</p>
-        <div class="price-amount">$35<span>/month</span></div>
+        <div class="price-amount"><span class="price-figure" data-monthly="$5.55" data-annual="$55">$5.55</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
         <ul class="price-feats">
-          <li>Everything in Reverie</li>
-          <li>8-hour sessions with screen-lock playback</li>
-          <li>Subliminal + EFT Tapping — nine affirmations, one per tapping point</li>
-          <li>Share your frequencies and subliminals with friends or followers</li>
-          <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
-          <li>Full session history &amp; library</li>
+          <li>Everything in Free, with sessions up to 8 hours</li>
+          <li>Gratitude Journal</li>
+          <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
+          <li>Manifestation tracker</li>
         </ul>
-        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02','ritual')">Get Ritual</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'whisper')">Get Whisper</a>
+      </div>
+      <div class="price-card featured" id="priceCardRitual">
+        <span class="badge">Mornings + nights</span>
+        <h3>Ritual</h3>
+        <p class="price-tagline">Ritualize your mornings and your nights.</p>
+        <div class="price-amount"><span class="price-figure" data-monthly="$11.11" data-annual="$111">$11.11</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
+        <div class="limit">Sessions up to 8 hours</div>
+        <ul class="price-feats">
+          <li>Everything in Whisper</li>
+          <li>Habit tracker — build your morning and night rituals</li>
+          <li>Subliminal + EFT Tapping</li>
+          <li>Visualization scripting</li>
+        </ul>
+        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'ritual')">Get Ritual</a>
       </div>
     </div>
-    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
+    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">We support written journals over digital — physical FTHR journals made for the app are coming soon.</p>
     <div class="save-msg" id="pricingPurchaseMsg" style="text-align:center; margin-top:14px;"></div>
     <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="pricingManageSubLink">Manage your subscription →</a></div>
   </div>
@@ -1435,8 +1554,7 @@ async function updateSessionLengthHint(){
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier === 'none'){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   const myTier = currentUser ? await getMyTier() : 'none';
-  const order = ['none','whisper','reverie','ritual'];
-  if (order.indexOf(myTier) >= order.indexOf(requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
+  if (tierAtLeast(myTier, requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
   hintEl.className = 'length-msg err';
 }
@@ -1547,10 +1665,8 @@ async function pickRitualMode(btn){
       return;
     }
     const myTier = await getMyTier();
-    const order = ['none','whisper','reverie','ritual'];
-    const requiredTier = mode === 'eft' ? 'ritual' : 'reverie';
-    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
-      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Script'} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
+    if (!tierAtLeast(myTier, 'ritual')){
+      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Scripting'} is a Ritual feature — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -1644,8 +1760,7 @@ async function generateAffirmations(){
       return;
     }
     const myTier = await getMyTier();
-    const order = ['none','whisper','reverie','ritual'];
-    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+    if (!tierAtLeast(myTier, requiredTier)){
       msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>, or drag the slider back down to build at your current tier.`;
       msg.className = 'length-msg err';
       return;
@@ -1767,7 +1882,7 @@ function buildEftFallbackList(){
   ];
 }
 
-/* Reverie/Ritual-only: a full narrative visualization script, written in second person
+/* Ritual-only: a full narrative visualization script, written in second person
    present tense, built from whatever the person typed in the prompt. This is meant to
    be a starting draft — the review step gives them one large, freely-editable box, so
    whatever comes back here is just raw material for them to rewrite. */
@@ -2269,7 +2384,7 @@ async function pickSoothingLayer(btn){
     }
     const myTier = await getMyTier();
     if (myTier === 'none'){
-      msg.innerHTML = `The soothing layer is included on Whisper, Reverie & Ritual — <a href="#pricing">see plans</a>.`;
+      msg.innerHTML = `The soothing layer is included on Whisper & Ritual — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2684,7 +2799,24 @@ function stopFinal(){
    those — Apple/Google require subscriptions sold inside the app to go
    through their own billing — so on native this hands off to RevenueCat
    instead. See the RevenueCat block below for the purchase flow itself. */
-function goToCheckout(evt, baseUrl, tier){
+// Stripe Payment Links, one per plan + billing period. Create these in
+// Stripe -> Payment Links (subscription, recurring monthly or yearly) and
+// paste the buy.stripe.com URLs here. The matching Price IDs also go into
+// PRICE_TO_TIER in api/stripe-webhook.js so the webhook knows which tier
+// a checkout was for.
+const STRIPE_LINKS = {
+  whisper: { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
+  ritual:  { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
+};
+let billingPeriod = 'monthly'; // 'monthly' | 'annual'
+
+function setBillingPeriod(period){
+  billingPeriod = period;
+  document.querySelectorAll('#billingToggle button').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+  document.querySelectorAll('.price-figure, .price-period').forEach(el => { el.textContent = el.dataset[period]; });
+}
+
+function goToCheckout(evt, tier){
   evt.preventDefault();
   if (!currentUser){
     openAuthModal();
@@ -2692,10 +2824,17 @@ function goToCheckout(evt, baseUrl, tier){
     return false;
   }
   if (isNativeApp()){
-    purchaseTier(tier);
+    purchaseTier(tier, billingPeriod);
     return false;
   }
-  window.open(baseUrl + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
+  const link = STRIPE_LINKS[tier] && STRIPE_LINKS[tier][billingPeriod];
+  if (!link || link.startsWith('REPLACE_')){
+    const msg = document.getElementById('pricingPurchaseMsg');
+    msg.textContent = "Checkout for this plan isn't connected yet — check back soon.";
+    msg.className = 'save-msg err';
+    return false;
+  }
+  window.open(link + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
   return false;
 }
 
@@ -2712,17 +2851,16 @@ const REVENUECAT_API_KEY_IOS = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
 const REVENUECAT_API_KEY_ANDROID = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
 
 // Product identifiers to create — matching — in App Store Connect / Google
-// Play Console / RevenueCat. Each tier is one auto-renewable monthly
-// subscription. Entitlement identifiers are set in the RevenueCat dashboard
-// (Entitlements tab) and attached to the matching product there.
+// Play Console / RevenueCat. Each tier is an auto-renewable subscription
+// with a monthly and a yearly product. Entitlement identifiers are set in
+// the RevenueCat dashboard (Entitlements tab) and attached to both of a
+// tier's products there.
 const TIER_PRODUCT_IDS = {
-  whisper: 'com.fthr.subliminally.whisper.monthly',
-  reverie: 'com.fthr.subliminally.reverie.monthly',
-  ritual: 'com.fthr.subliminally.ritual.monthly',
+  whisper: { monthly: 'com.fthr.subliminally.whisper.monthly', annual: 'com.fthr.subliminally.whisper.annual' },
+  ritual:  { monthly: 'com.fthr.subliminally.ritual.monthly',  annual: 'com.fthr.subliminally.ritual.annual' },
 };
 const TIER_ENTITLEMENT_IDS = {
   whisper: 'whisper',
-  reverie: 'reverie',
   ritual: 'ritual',
 };
 
@@ -2745,14 +2883,14 @@ async function syncRevenueCatIdentity(){
   } catch (e){ console.warn('RevenueCat identity sync failed:', e); }
 }
 
-async function purchaseTier(tier){
+async function purchaseTier(tier, period){
   const msg = document.getElementById('pricingPurchaseMsg');
   if (!window.Capacitor.Plugins.Purchases){ msg.textContent = 'Purchases are not available on this build yet.'; msg.className = 'save-msg err'; return; }
   const { Purchases } = window.Capacitor.Plugins;
   msg.textContent = 'Loading plan…'; msg.className = 'save-msg';
   try {
     const { current } = await Purchases.getOfferings();
-    const productId = TIER_PRODUCT_IDS[tier];
+    const productId = TIER_PRODUCT_IDS[tier][period || 'monthly'];
     const pkg = current?.availablePackages.find(p => p.product.identifier === productId);
     if (!pkg){
       msg.textContent = "That plan isn't set up yet — check back soon.";
@@ -2800,39 +2938,49 @@ function updateManageSubscriptionLinks(){
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
-const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
-const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
+const TIER_ORDER = ['none','whisper','ritual'];
+const TIER_LENGTH_SECONDS = { none: 1200, whisper: 28800, ritual: 28800 };
+const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', ritual: 'Ritual' };
+function tierAtLeast(myTier, requiredTier){
+  return TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier);
+}
 /* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
    tier that's allowed to actually generate/save a session that long. */
 function requiredTierForMinutes(minutes){
-  const order = ['none','whisper','reverie','ritual'];
-  for (const tier of order){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
+  for (const tier of TIER_ORDER){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
   return 'ritual';
 }
 
 async function getMyTier(){
   const subRow = await getMySubscriberRow();
   const validStatuses = ['active', 'trialing'];
-  return (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
+  const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
+  // Reverie was retired; anyone still on it keeps everything they paid for.
+  return tier === 'reverie' ? 'ritual' : tier;
 }
 
 /* Show pricing as an upsell only for tiers above what you already have.
    Ritual members see no marketing here at all — just account management. */
 async function applyPricingVisibility(){
   const myTier = await getMyTier();
-  const cards = { whisper: document.getElementById('priceCardWhisper'), reverie: document.getElementById('priceCardReverie'), ritual: document.getElementById('priceCardRitual') };
+  const cards = { free: document.getElementById('priceCardFree'), whisper: document.getElementById('priceCardWhisper'), ritual: document.getElementById('priceCardRitual') };
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
+  const toggle = document.getElementById('billingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
   if (!cards.whisper) return; // pricing markup not present yet
 
   Object.values(cards).forEach(c => c.style.display = '');
+  const freeBtn = document.getElementById('priceCardFreeBtn');
+  if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
+  else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
 
   if (myTier === 'ritual'){
     head.style.display = 'none';
     grid.style.display = 'none';
+    toggle.style.display = 'none';
     footnote.style.display = 'none';
     thanks.style.display = 'block';
     manageSub.style.display = 'block';
@@ -2842,25 +2990,20 @@ async function applyPricingVisibility(){
   thanks.style.display = 'none';
   head.style.display = 'block';
   grid.style.display = 'grid';
+  toggle.style.display = 'flex';
   footnote.style.display = 'block';
 
-  if (myTier === 'reverie'){
-    cards.whisper.style.display = 'none';
-    cards.reverie.style.display = 'none';
-    grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
-    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, Subliminal + EFT Tapping, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
-    manageSub.style.display = 'block';
-  } else if (myTier === 'whisper'){
+  if (myTier === 'whisper'){
+    cards.free.style.display = 'none';
     cards.whisper.style.display = 'none';
     grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = "You're missing the deeper tiers";
-    document.getElementById('pricingSub').textContent = "Unlimited saved subliminals, 2–8 hour sessions, visualization for performance, your own uploaded track — Whisper doesn't unlock any of it yet.";
+    document.getElementById('pricingHeading').textContent = 'Ritualize your mornings and nights';
+    document.getElementById('pricingSub').textContent = 'The habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
     manageSub.style.display = 'block';
   } else {
     grid.classList.remove('centered');
-    document.getElementById('pricingHeading').textContent = 'Three ways in';
-    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.';
+    document.getElementById('pricingHeading').textContent = 'Your all in one wellness app';
+    document.getElementById('pricingSub').textContent = 'Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.';
     manageSub.style.display = 'none';
   }
 }
@@ -2879,7 +3022,7 @@ async function getMySubscriberRow(){
   return data; // null if they've never subscribed
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, reverie: Infinity, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: Infinity, ritual: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
@@ -3507,7 +3650,7 @@ function renderMyLibraryState(){
 }
 /* ---------- interactive science quiz ---------- */
 const REPROGRAM_ANSWERS = {
-  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try Whisper's 30-minute sessions timed right as you're winding down, not after you're already trying to force sleep.`,
+  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try a longer Whisper or Ritual session timed right as you're winding down, not after you're already trying to force sleep.`,
   confidence: `<b>On confidence:</b> this leans hardest on the self-referential processing point — information framed as being about you, in your own voice, tends to get encoded more deeply than the same words from someone else. That's a real finding behind why journaling and self-talk work as tools at all. Repetition strengthens whichever pathway gets used, so the actual mechanism here is closer to "practice" than "magic" — which is honestly a better guarantee.`,
   anxiety: `<b>On anxious, looping thoughts:</b> the honest framing is that this won't out-argue a racing mind mid-spiral — nothing bypasses your conscious mind that easily, despite what "subliminal" branding often implies. What it can do is give the pre-sleep window, when filtering naturally eases, something calmer to loop on instead of the same worry track. Pair a grounding frequency with a slower, present-tense line, and keep expectations realistic: this is a nightly practice, not a single-session fix.`,
   relationships: `<b>On relationships — with others or with yourself:</b> repetition and self-talk research both point to the same place: how you talk to yourself, repeatedly, shapes the baseline you bring into other relationships. There's nothing here that replaces communication or therapy where that's needed — but a consistent, calm, self-directed practice is a reasonable complement to that work, not a substitute for it.`
@@ -3520,10 +3663,11 @@ function answerReprogramQuiz(btn, key){
   result.classList.add('show');
 }
 
-function showJournalPage(){
+function showJournalPage(tab){
   document.body.setAttribute('data-view', 'journal');
   window.scrollTo(0,0);
   history.pushState({ page:'journal' }, '', '#journal');
+  if (tab) setJournalTab(tab);
 }
 function showReprogramPage(){
   document.body.setAttribute('data-view', 'reprogram');
@@ -3606,7 +3750,7 @@ async function loadProfile(){
   }
 
   const myTier = await getMyTier();
-  const tierIcons = { none: '', whisper: '✦ ', reverie: '✧ ', ritual: '★ ' };
+  const tierIcons = { none: '', whisper: '✦ ', ritual: '★ ' };
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
@@ -3886,29 +4030,73 @@ async function submitFeedback(){
   document.getElementById('feedbackMessage').value = '';
 }
 
-/* ---------- journal ---------- */
+/* ---------- journal ----------
+   Four tabs share this page. 'received' and 'manifesting' are the written
+   gratitude/manifestation entries (journal_entries); 'photos' is the daily
+   log of photographed handwritten pages (journal_photos + storage bucket);
+   'habits' is the morning/night habit tracker (habits + habit_checkins).
+   Journal tabs need Whisper; habits need Ritual. */
+const JOURNAL_TAB_COPY = {
+  received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
+  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it as if it already has." },
+  photos:       { prompt: "Write today's entry by hand, then photograph the page — the app keeps the record, your journal keeps the practice." },
+  habits:       { prompt: 'A ritual is just a habit you decided to keep. Check each one off as you do it; the streak takes care of itself.' },
+};
 function setJournalTab(cat){
   journalTab = cat;
-  document.querySelectorAll('.journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
-  const input = document.getElementById('journalInput');
-  const prompt = document.getElementById('journalPrompt');
-  const philosophy = document.getElementById('journalPhilosophy');
-  if (cat === 'received'){
-    input.placeholder = 'I am so grateful for…';
-    prompt.textContent = 'A good morning practice: write down three things you\'re grateful for, right when you wake up.';
-    philosophy.style.display = 'none';
-  } else {
-    input.placeholder = 'I am so grateful now that…';
-    prompt.textContent = 'Try one thing you\'re grateful for that hasn\'t arrived yet — write it as if it already has.';
-    philosophy.style.display = 'block';
-  }
+  document.querySelectorAll('#journal .journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  const copy = JOURNAL_TAB_COPY[cat];
+  document.getElementById('journalPrompt').textContent = copy.prompt;
+  if (copy.placeholder) document.getElementById('journalInput').placeholder = copy.placeholder;
+  document.getElementById('journalPhilosophy').style.display = cat === 'manifesting' ? 'block' : 'none';
   document.getElementById('journalAddMsg').textContent = '';
-  loadJournalEntries();
+  renderJournalState();
 }
-function renderJournalState(){
-  document.getElementById('journalLocked').style.display = currentUser ? 'none' : 'block';
-  document.getElementById('journalPanel').style.display = currentUser ? 'block' : 'none';
-  if (currentUser) loadJournalEntries();
+async function renderJournalState(){
+  const locked = document.getElementById('journalLocked');
+  const upgrade = document.getElementById('journalUpgrade');
+  const panels = { entries: document.getElementById('journalPanel'), photos: document.getElementById('journalPhotoPanel'), habits: document.getElementById('habitsPanel') };
+  Object.values(panels).forEach(p => p.style.display = 'none');
+  upgrade.style.display = 'none';
+  locked.style.display = currentUser ? 'none' : 'block';
+  if (!currentUser) return;
+
+  const myTier = await getMyTier();
+  const requiredTier = journalTab === 'habits' ? 'ritual' : 'whisper';
+  if (!tierAtLeast(myTier, requiredTier)){
+    const isHabits = journalTab === 'habits';
+    document.getElementById('journalUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The journal is part of Whisper';
+    document.getElementById('journalUpgradeText').textContent = isHabits
+      ? 'Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — $11.11 a month, or $111 a year.'
+      : 'Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.';
+    document.getElementById('journalUpgradeBtn').textContent = isHabits ? 'Get Ritual' : 'Get Whisper';
+    upgrade.style.display = 'block';
+    return;
+  }
+
+  if (journalTab === 'photos'){ panels.photos.style.display = 'block'; loadJournalPhotos(); }
+  else if (journalTab === 'habits'){ panels.habits.style.display = 'block'; loadHabits(); }
+  else { panels.entries.style.display = 'block'; loadJournalEntries(); }
+}
+
+/* Local calendar date as YYYY-MM-DD — habits and journal days are the
+   person's own day, not UTC's. */
+function localDateStr(d){
+  const x = d || new Date();
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+}
+function shiftDateStr(dateStr, days){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return localDateStr(new Date(y, m-1, d+days));
+}
+/* Consecutive days (ending today, or yesterday if today isn't done yet)
+   present in a Set of YYYY-MM-DD strings. */
+function streakFromDays(daySet){
+  let cursor = localDateStr();
+  if (!daySet.has(cursor)) cursor = shiftDateStr(cursor, -1);
+  let n = 0;
+  while (daySet.has(cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  return n;
 }
 async function loadJournalEntries(){
   if (!sb || !currentUser) return;
@@ -4011,6 +4199,172 @@ async function addJournalEntry(){
   loadJournalEntries();
 }
 
+/* ---------- daily log: photos of handwritten pages ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  const dateInput = document.getElementById('photoEntryDate');
+  if (dateInput){ dateInput.value = localDateStr(); dateInput.max = localDateStr(); }
+  const fileInput = document.getElementById('photoFile');
+  if (fileInput) fileInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadJournalPhoto(e.target.files[0]); e.target.value = ''; });
+});
+async function uploadJournalPhoto(file){
+  const msg = document.getElementById('photoUploadMsg');
+  if (!sb || !currentUser) return;
+  if (file.size > 15 * 1024 * 1024){ msg.textContent = 'That photo is over 15 MB — try a smaller one.'; msg.className = 'save-msg err'; return; }
+  const entryDate = document.getElementById('photoEntryDate').value || localDateStr();
+  const caption = document.getElementById('photoCaption').value.trim() || null;
+  msg.textContent = 'Uploading your page…'; msg.className = 'save-msg';
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${currentUser.id}/${entryDate}-${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('journal-photos').upload(path, file, { contentType: file.type || 'image/jpeg' });
+  if (upErr){ console.error('photo upload error:', upErr); msg.textContent = "Couldn't upload that photo — try again in a moment."; msg.className = 'save-msg err'; return; }
+  const { error } = await sb.from('journal_photos').insert({ user_id: currentUser.id, storage_path: path, caption, entry_date: entryDate });
+  if (error){ console.error('journal_photos insert error:', error); msg.textContent = "Uploaded, but couldn't save the entry — try again."; msg.className = 'save-msg err'; return; }
+  document.getElementById('photoCaption').value = '';
+  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
+  setTimeout(() => { if (msg.textContent === 'Saved.') msg.textContent = ''; }, 2000);
+  loadJournalPhotos();
+}
+async function loadJournalPhotos(){
+  if (!sb || !currentUser) return;
+  const grid = document.getElementById('photoGrid');
+  const stat = document.getElementById('photoStat');
+  grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">Loading…</div>';
+  const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id).order('entry_date', { ascending: false }).order('created_at', { ascending: false });
+  if (error){ grid.innerHTML = `<div class="journal-empty" style="grid-column:1/-1;">Couldn't load your log.</div>`; return; }
+  if (!data.length){
+    stat.style.display = 'none';
+    grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">No pages yet — photograph your first entry above.</div>';
+    return;
+  }
+  const days = new Set(data.map(p => p.entry_date));
+  const streak = streakFromDays(days);
+  stat.style.display = 'block';
+  stat.textContent = `✦ ${days.size} day${days.size === 1 ? '' : 's'} logged` + (streak > 1 ? ` · ${streak}-day streak` : '');
+
+  const { data: signed } = await sb.storage.from('journal-photos').createSignedUrls(data.map(p => p.storage_path), 3600);
+  const urlByPath = {};
+  (signed || []).forEach(s => { if (s.signedUrl) urlByPath[s.path] = s.signedUrl; });
+  grid.innerHTML = data.map(p => {
+    const url = urlByPath[p.storage_path] || '';
+    const [y,m,d] = p.entry_date.split('-').map(Number);
+    const dateLabel = new Date(y, m-1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+    const cap = p.caption ? p.caption.replace(/</g,'&lt;') : '';
+    return `
+    <div class="photo-card">
+      <img src="${url}" alt="Journal page from ${dateLabel}" loading="lazy" onclick="openPhotoLightbox(this.src)">
+      <div class="meta">
+        <div class="date">${dateLabel}</div>
+        ${cap ? `<div class="cap">${cap}</div>` : ''}
+        <button class="journal-entry-delete" onclick="deleteJournalPhoto('${p.id}','${p.storage_path}')" aria-label="Delete page" title="Delete">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openPhotoLightbox(src){
+  document.getElementById('photoLightboxImg').src = src;
+  document.getElementById('photoLightbox').classList.add('open');
+}
+async function deleteJournalPhoto(id, path){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('journal_photos').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (error){ console.error('deleteJournalPhoto error:', error); return; }
+  await sb.storage.from('journal-photos').remove([path]);
+  loadJournalPhotos();
+}
+
+/* ---------- habit tracker: morning & night rituals ---------- */
+let habitsCache = [];        // rows from `habits`
+let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
+async function loadHabits(){
+  if (!sb || !currentUser) return;
+  const since = shiftDateStr(localDateStr(), -60);
+  const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await Promise.all([
+    sb.from('habits').select('*').eq('user_id', currentUser.id).eq('archived', false).order('created_at', { ascending: true }),
+    sb.from('habit_checkins').select('habit_id, done_on').eq('user_id', currentUser.id).gte('done_on', since),
+  ]);
+  const msg = document.getElementById('habitsMsg');
+  if (hErr || cErr){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; return; }
+  habitsCache = habits || [];
+  habitCheckins = {};
+  (checkins || []).forEach(c => { (habitCheckins[c.habit_id] = habitCheckins[c.habit_id] || new Set()).add(c.done_on); });
+  renderHabits();
+}
+function renderHabits(){
+  const today = localDateStr();
+  const week = Array.from({ length: 7 }, (_, i) => shiftDateStr(today, i - 6));
+  let doneToday = 0;
+  ['morning','night'].forEach(time => {
+    const rows = habitsCache.filter(h => h.time_of_day === time);
+    const list = document.getElementById(time === 'morning' ? 'habitListMorning' : 'habitListNight');
+    const count = document.getElementById(time === 'morning' ? 'habitCountMorning' : 'habitCountNight');
+    const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
+    doneToday += done;
+    count.textContent = rows.length ? `${done} of ${rows.length} today` : '';
+    if (!rows.length){
+      list.innerHTML = `<div class="habit-empty">${time === 'morning' ? 'Nothing here yet — what do you want your mornings to hold?' : 'Nothing here yet — how do you want to close the day?'}</div>`;
+      return;
+    }
+    list.innerHTML = rows.map(h => {
+      const days = habitCheckins[h.id] || new Set();
+      const isDone = days.has(today);
+      const streak = streakFromDays(days);
+      const dots = week.map(d => `<span class="habit-dot${days.has(d) ? ' on' : ''}${d === today ? ' today' : ''}" title="${d}"></span>`).join('');
+      return `
+      <div class="habit-row${isDone ? ' done-today' : ''}">
+        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${h.name.replace(/"/g,'&quot;')}" aria-pressed="${isDone}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <div class="habit-name">${h.name.replace(/</g,'&lt;')}</div>
+        <div class="habit-week" aria-hidden="true">${dots}</div>
+        <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
+        <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+  });
+  const stat = document.getElementById('habitsStat');
+  if (!habitsCache.length){ stat.style.display = 'none'; return; }
+  const allDays = new Set();
+  habitsCache.forEach(h => (habitCheckins[h.id] || new Set()).forEach(d => allDays.add(d)));
+  const practiceStreak = streakFromDays(allDays);
+  stat.style.display = 'block';
+  stat.textContent = doneToday === habitsCache.length
+    ? `✦ Every ritual done today${practiceStreak > 1 ? ` · ${practiceStreak} days in a row showing up` : ''}`
+    : `${doneToday} of ${habitsCache.length} done today${practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : ''}`;
+}
+async function addHabit(time){
+  if (!sb || !currentUser) return;
+  const input = document.getElementById(time === 'morning' ? 'habitInputMorning' : 'habitInputNight');
+  const name = input.value.trim();
+  if (!name) return;
+  const msg = document.getElementById('habitsMsg');
+  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time });
+  if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
+  input.value = ''; msg.textContent = '';
+  loadHabits();
+}
+async function toggleHabitToday(habitId){
+  if (!sb || !currentUser) return;
+  const today = localDateStr();
+  const days = habitCheckins[habitId] = habitCheckins[habitId] || new Set();
+  const wasDone = days.has(today);
+  // Flip locally first so the tap feels instant; reload only if the save fails.
+  if (wasDone) days.delete(today); else days.add(today);
+  renderHabits();
+  const { error } = wasDone
+    ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', today)
+    : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: today });
+  if (error){ console.error('toggleHabitToday error:', error); loadHabits(); }
+}
+async function deleteHabit(habitId){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('habits').delete().eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){ console.error('deleteHabit error:', error); return; }
+  loadHabits();
+}
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
 
