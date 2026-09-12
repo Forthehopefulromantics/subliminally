@@ -30,6 +30,15 @@
 	<string>Subliminally can use a photo from your library as your account avatar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Subliminally can use your camera to take a photo for your account avatar.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.fthr.subliminally</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
