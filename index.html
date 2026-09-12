@@ -541,6 +541,9 @@
         <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPassword', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
+      <div id="forgotPwRow" style="display:none; text-align:right; margin-top:6px;">
+        <button type="button" onclick="enterResetMode()" style="background:none; border:none; color:var(--lilac); font-size:12px; cursor:pointer; padding:0;">Forgot password?</button>
+      </div>
     </div>
     <div class="auth-field" id="confirmPwField">
       <label>Confirm password</label>
@@ -2926,10 +2929,35 @@ renderProgress();
    ================================================================ */
 const SUPABASE_URL = 'https://eiqylxcgexndzopesvhd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1g7zbin7PEQhi2e0Y-QM8Q_-0TAfubb';
+
+// In the native iOS/Android app, back the login session with Capacitor's
+// Preferences plugin (native storage) instead of plain WebView localStorage,
+// which iOS in particular can quietly evict — that used to mean people got
+// logged out for no reason. On the regular web site window.Capacitor doesn't
+// exist, so this just returns undefined and supabase-js falls back to its
+// normal localStorage-backed session storage.
+function nativeSessionStorage(){
+  const Preferences = window.Capacitor && window.Capacitor.isNativePlatform &&
+    window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences;
+  if (!Preferences) return undefined;
+  return {
+    async getItem(key){ const { value } = await Preferences.get({ key }); return value; },
+    async setItem(key, value){ await Preferences.set({ key, value }); },
+    async removeItem(key){ await Preferences.remove({ key }); },
+  };
+}
+
 let sb = null;
 try {
   if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase){
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: nativeSessionStorage(),
+      },
+    });
   } else {
     console.warn('Supabase client library did not load — accounts/journal/library will be disabled.');
   }
@@ -2938,13 +2966,21 @@ try {
 }
 
 let currentUser = null;
-let authMode = 'signup'; // 'signup' | 'login'
+let authMode = 'signup'; // 'signup' | 'login' | 'reset'
 let journalTab = 'received';
+
+// Where Supabase sends people after they click a password-reset email link.
+// This always points at the web site (not a custom app:// scheme) because the
+// link opens in the system browser/mail app, never inside the wrapped native
+// app — same pattern as the sign-up email-confirmation link.
+const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
 
 /* ---------- auth modal ---------- */
 function openAuthModal(){
+  if (authMode === 'reset') authMode = 'login';
   document.getElementById('authOverlay').classList.add('open');
   renderSignupAvatarGrid();
+  updateAuthModalUI();
 }
 function closeAuthModal(){
   document.getElementById('authOverlay').classList.remove('open');
@@ -2952,15 +2988,45 @@ function closeAuthModal(){
 }
 function toggleAuthMode(){
   authMode = authMode === 'signup' ? 'login' : 'signup';
+  updateAuthModalUI();
+}
+function enterResetMode(){
+  authMode = 'reset';
+  updateAuthModalUI();
+}
+function updateAuthModalUI(){
+  const msg = document.getElementById('authMsg');
+  msg.textContent = ''; msg.className = 'auth-msg';
+  document.getElementById('authPassword').value = '';
+
+  if (authMode === 'reset'){
+    document.getElementById('authTitle').textContent = 'Reset your password';
+    document.getElementById('authSub').textContent = "We'll email you a link to set a new one.";
+    document.getElementById('authSubmitBtn').textContent = 'Send reset link';
+    document.querySelector('#authPassword').closest('.auth-field').style.display = 'none';
+    document.getElementById('confirmPwField').style.display = 'none';
+    document.getElementById('signupUsernameField').style.display = 'none';
+    document.getElementById('signupAvatarField').style.display = 'none';
+    document.getElementById('authToggle').innerHTML = `<button onclick="toggleAuthModeFromReset()">Back to log in</button>`;
+    return;
+  }
+
   document.getElementById('authTitle').textContent = authMode === 'signup' ? 'Create your account' : 'Welcome back';
+  document.getElementById('authSub').textContent = 'Save your sessions, keep a journal, and build your library.';
   document.getElementById('authSubmitBtn').textContent = authMode === 'signup' ? 'Create a free account' : 'Log in';
+  document.querySelector('#authPassword').closest('.auth-field').style.display = 'block';
   const signupOnly = authMode === 'signup' ? 'block' : 'none';
   document.getElementById('confirmPwField').style.display = signupOnly;
   document.getElementById('signupUsernameField').style.display = signupOnly;
   document.getElementById('signupAvatarField').style.display = signupOnly;
+  document.getElementById('forgotPwRow').style.display = authMode === 'login' ? 'block' : 'none';
   document.getElementById('authToggle').innerHTML = authMode === 'signup'
     ? `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`
     : `New here? <button onclick="toggleAuthMode()">Create a free account</button>`;
+}
+function toggleAuthModeFromReset(){
+  authMode = 'login';
+  updateAuthModalUI();
 }
 function togglePwVisibility(inputId, btn){
   const input = document.getElementById(inputId);
@@ -2971,8 +3037,23 @@ function togglePwVisibility(inputId, btn){
 async function submitAuth(){
   if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
   const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
   const msg = document.getElementById('authMsg');
+
+  if (authMode === 'reset'){
+    if (!email){ msg.textContent = 'Enter the email on your account.'; msg.className = 'auth-msg err'; return; }
+    msg.textContent = 'Sending…'; msg.className = 'auth-msg';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: PASSWORD_RESET_REDIRECT_URL });
+    if (error){
+      msg.textContent = (error.message || 'Something went wrong — try again in a moment.');
+      msg.className = 'auth-msg err';
+      return;
+    }
+    msg.textContent = 'Check your email for a link to set a new password.';
+    msg.className = 'auth-msg ok';
+    return;
+  }
+
+  const password = document.getElementById('authPassword').value;
   if (!email || !password){ msg.textContent = 'Enter an email and password.'; msg.className = 'auth-msg err'; return; }
   let signupUsername = '';
   if (authMode === 'signup'){
