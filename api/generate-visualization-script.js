@@ -1,4 +1,5 @@
 // /api/generate-visualization-script.js
+import { applyCors } from '../lib/cors.js';
 //
 // Generates a draft visualization script for "Visualization Script" mode
 // (Reverie & Ritual). This is meant purely as a starting point — the review step
@@ -10,6 +11,7 @@
 // environment variable those already use.
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

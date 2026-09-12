@@ -1,4 +1,5 @@
 // /api/generate-eft-affirmations.js
+import { applyCors } from '../lib/cors.js';
 //
 // Generates the content for "Subliminal + EFT Tapping" mode (Ritual only).
 // Produces the pieces needed for an 11-line session:
@@ -20,6 +21,7 @@
 // different Claude model string, match those here instead of what's below.
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

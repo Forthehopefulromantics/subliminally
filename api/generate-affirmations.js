@@ -1,8 +1,11 @@
 export const config = { api: { bodyParser: true } };
 
+import { applyCors } from '../lib/cors.js';
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export default async function handler(req, res) {
+  if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
     return;
