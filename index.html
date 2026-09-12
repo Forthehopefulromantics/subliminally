@@ -2700,11 +2700,16 @@ function goToCheckout(evt, baseUrl, tier){
 }
 
 /* ---------------- REVENUECAT (native subscription purchases) ----------------
-   Fill these in once you've created a RevenueCat project:
+   Currently set to a RevenueCat Test Store key — that's RevenueCat's sandbox
+   for exercising the whole purchase flow with fake products before real
+   App Store/Play Store subscriptions exist or have been approved. It's the
+   same key for both platforms because Test Store isn't platform-specific.
+   Once your real subscriptions are live in App Store Connect / Google Play
+   Console, replace these with the real per-platform public keys from
    RevenueCat dashboard -> Project -> API keys -> "Public app-specific keys".
-   These are public keys (safe to ship in the app), not secrets. */
-const REVENUECAT_API_KEY_IOS = 'YOUR_REVENUECAT_IOS_PUBLIC_API_KEY';
-const REVENUECAT_API_KEY_ANDROID = 'YOUR_REVENUECAT_ANDROID_PUBLIC_API_KEY';
+   All of these are public keys (safe to ship in the app), not secrets. */
+const REVENUECAT_API_KEY_IOS = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
+const REVENUECAT_API_KEY_ANDROID = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
 
 // Product identifiers to create — matching — in App Store Connect / Google
 // Play Console / RevenueCat. Each tier is one auto-renewable monthly
