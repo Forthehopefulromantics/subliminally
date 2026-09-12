@@ -1368,9 +1368,9 @@
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
         <div class="price-amount"><span class="price-figure" data-monthly="$5.55" data-annual="$55">$5.55</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
-        <div class="limit">Sessions up to 8 hours</div>
+        <div class="limit">Sessions up to 2 hours</div>
         <ul class="price-feats">
-          <li>Everything in Free, with sessions up to 8 hours</li>
+          <li>Everything in Free, with sessions up to 2 hours</li>
           <li>Save up to 10 subliminals to your library</li>
           <li>Gratitude Journal</li>
           <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
@@ -1385,7 +1385,7 @@
         <div class="price-amount"><span class="price-figure" data-monthly="$11.11" data-annual="$111">$11.11</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
         <ul class="price-feats">
-          <li>Everything in Whisper</li>
+          <li>Everything in Whisper, with all-night sessions up to 8 hours</li>
           <li>Unlimited saved subliminals</li>
           <li>Habit tracker — build your morning and night rituals</li>
           <li>Subliminal + EFT Tapping</li>
@@ -2942,7 +2942,7 @@ function updateManageSubscriptionLinks(){
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
 const TIER_ORDER = ['none','whisper','ritual'];
-const TIER_LENGTH_SECONDS = { none: 1200, whisper: 28800, ritual: 28800 };
+const TIER_LENGTH_SECONDS = { none: 1200, whisper: 7200, ritual: 28800 };
 const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', ritual: 'Ritual' };
 function tierAtLeast(myTier, requiredTier){
   return TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier);
@@ -3001,7 +3001,7 @@ async function applyPricingVisibility(){
     cards.whisper.style.display = 'none';
     grid.classList.add('centered');
     document.getElementById('pricingHeading').textContent = 'Ritualize your mornings and nights';
-    document.getElementById('pricingSub').textContent = 'Unlimited saved subliminals, the habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
+    document.getElementById('pricingSub').textContent = 'All-night 8-hour sessions, unlimited saved subliminals, the habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
     manageSub.style.display = 'block';
   } else {
     grid.classList.remove('centered');
@@ -3052,7 +3052,7 @@ async function saveSubliminal(){
   const cap = TIER_LENGTH_SECONDS[myTier];
 
   if (seconds > cap){
-    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${Math.round(cap/60)} min. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
+    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${formatSessionLength(cap/60)}. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
     msg.className = 'save-msg err';
     return;
   }
