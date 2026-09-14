@@ -362,14 +362,17 @@
   body[data-view="profile"] > nav ~ section:not(#profile),
   body[data-view="library"] > nav ~ section:not(#library),
   body[data-view="journal"] > nav ~ section:not(#journal),
+  body[data-view="rituals"] > nav ~ section:not(#rituals),
   body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
   body[data-view="profile"] > footer,
   body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
+  body[data-view="rituals"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
   body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
+  body:not([data-view="rituals"]) #rituals{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
   .profile-page-back{ display:none; }
   body[data-view] .profile-page-back{ display:inline-flex; }
@@ -525,6 +528,16 @@
   .cal-day.has-entry .cal-day-num{ background:rgba(13,11,24,0.45); border-radius:5px; padding:0 3px; }
   .cal-day-plus{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--haze); opacity:0; transition:opacity .15s; }
   .cal-day:not(.is-future):not(.has-entry):hover .cal-day-plus{ opacity:1; color:var(--lilac); }
+  .cal-day-bar{ position:absolute; left:4px; right:4px; bottom:3px; height:3px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; }
+  .cal-day.has-entry .cal-day-bar{ background:rgba(13,11,24,0.55); }
+  .cal-day-bar i{ display:block; height:100%; background:var(--candle); }
+  .day-habit-time{ font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--lilac); margin:10px 0 4px; }
+  .day-habit-list{ display:flex; flex-direction:column; gap:6px; }
+  .day-habit{ display:flex; align-items:center; gap:10px; width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:10px; padding:8px 10px; color:var(--moonlight); font-family:inherit; font-size:13px; cursor:pointer; text-align:left; }
+  .day-habit-check{ width:18px; height:18px; border-radius:50%; border:1.5px solid var(--haze); display:inline-flex; align-items:center; justify-content:center; font-size:10px; color:transparent; flex-shrink:0; }
+  .day-habit.done .day-habit-check{ background:var(--candle); border-color:var(--candle); color:#241C0E; }
+  .day-habit.done{ color:var(--haze); }
+  .day-modal-section{ margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06); }
 
   .day-modal-overlay{ position:fixed; inset:0; z-index:500; background:rgba(13,11,24,0.85); display:none; align-items:center; justify-content:center; padding:20px; }
   .day-modal-overlay.open{ display:flex; }
@@ -548,7 +561,8 @@
   .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
   .habit-check.done{ background:var(--candle); border-color:var(--candle); color:#241C0E; }
   .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
-  .habit-name{ font-size:14px; color:var(--moonlight); min-width:0; overflow-wrap:anywhere; }
+  .habit-name{ width:100%; min-width:0; background:none; border:none; border-bottom:1px solid transparent; border-radius:0; font-size:14px; color:var(--moonlight); font-family:inherit; padding:2px 0; outline:none; transition:border-color .2s; }
+  .habit-name:focus{ border-bottom-color:var(--candle); }
   .habit-row.done-today .habit-name{ color:var(--haze); text-decoration:line-through; text-decoration-color:rgba(156,147,184,0.5); }
   .habit-week{ display:flex; gap:4px; }
   .habit-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.08); }
@@ -596,7 +610,7 @@
     <button onclick="goHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
     <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
     <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
-    <button onclick="showJournalPage('habits'); closeMobileNav();">Habits</button>
+    <button onclick="showRitualsPage(); closeMobileNav();">Rituals</button>
     <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
     <button onclick="goHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
   </div>
@@ -1202,15 +1216,13 @@
   <div class="wrap">
     <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
-      <div class="eyebrow">Your practice</div>
-      <h2>Journal &amp; rituals</h2>
-      <p>Gratitude in present tense, what you're calling in, the pages you write by hand, and the morning and night habits that hold it all together.</p>
+      <div class="eyebrow">Your journal</div>
+      <h2>Gratitude &amp; manifesting</h2>
+      <p>Written in present tense, always — for what's already yours, and what's already on its way.</p>
     </div>
-    <div class="journal-tabs journal-tabs-4">
+    <div class="journal-tabs" style="max-width:400px;">
       <button class="active" data-cat="received" onclick="setJournalTab('received')">Gratitude</button>
       <button data-cat="manifesting" onclick="setJournalTab('manifesting')">Manifesting</button>
-      <button data-cat="photos" onclick="setJournalTab('photos')">Daily log</button>
-      <button data-cat="habits" onclick="setJournalTab('habits')">Habits</button>
     </div>
     <div class="journal-prompt" id="journalPrompt">A good morning practice: write down three things you're grateful for, right when you wake up.</div>
     <div class="journal-philosophy" id="journalPhilosophy" style="display:none;">
@@ -1226,14 +1238,14 @@
     <div id="journalLocked" class="journal-locked">
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
       <h3>Keep your own record</h3>
-      <p>Gratitude, manifestations, your handwritten pages, and your daily rituals all live here. Log in or create an account to get started.</p>
+      <p>Gratitude and what you're calling in, written in present tense. Log in or create an account to start.</p>
       <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
     </div>
     <div id="journalUpgrade" class="journal-locked" style="display:none;">
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3 id="journalUpgradeTitle">The journal is part of Whisper</h3>
-      <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month.</p>
-      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="goHome(); goTo('pricing');">See plans</button>
+      <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.</p>
+      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="goHome(); goTo('pricing');">Get Whisper</button>
     </div>
 
     <div id="journalPanel" class="journal-panel" style="display:none;">
@@ -1245,14 +1257,45 @@
       <div class="journal-stat" id="journalStat" style="display:none;"></div>
       <div class="journal-entries" id="journalEntries"></div>
     </div>
+  </div>
+</section>
 
-    <!-- Daily log: photos of handwritten journal pages -->
+<!-- ============ RITUALS: daily log calendar + morning/night habits ============ -->
+<section class="journal-section" id="rituals">
+  <div class="wrap">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+    <div class="section-head">
+      <div class="eyebrow">Your rituals</div>
+      <h2>Morning and night, one day at a time</h2>
+      <p>Photograph the page you wrote by hand, check off the habits you kept, and watch the calendar fill in.</p>
+    </div>
+    <div class="journal-tabs" style="max-width:400px;">
+      <button class="active" data-rtab="calendar" onclick="setRitualsTab('calendar')">Calendar</button>
+      <button data-rtab="habits" onclick="setRitualsTab('habits')">Habits</button>
+    </div>
+    <div class="journal-prompt" id="ritualsPrompt">Write today's entry by hand, then photograph the page — the app keeps the record, your journal keeps the practice.</div>
+
+    <div id="ritualsLocked" class="journal-locked">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+      <h3>Your days, kept</h3>
+      <p>The daily log and your morning and night habits live here. Log in or create an account to start.</p>
+      <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
+    </div>
+    <div id="ritualsUpgrade" class="journal-locked" style="display:none;">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3 id="ritualsUpgradeTitle">The daily log is part of Whisper</h3>
+      <p id="ritualsUpgradeText"></p>
+      <button class="btn btn-primary" id="ritualsUpgradeBtn" onclick="goHome(); goTo('pricing');">See plans</button>
+    </div>
+
+    <!-- Daily log: calendar of handwritten pages + habits kept -->
     <div id="journalPhotoPanel" class="journal-panel" style="display:none;">
       <div class="log-reward" id="dailyLogReward">
         <div class="log-reward-flame">🔥</div>
         <div>
           <div class="log-reward-streak" id="logRewardStreak">0 days logged</div>
           <div class="log-reward-msg" id="logRewardMsg">Photograph today's page to start your streak.</div>
+          <div class="log-reward-msg" id="logRewardHabits" style="display:none;"></div>
         </div>
       </div>
       <div class="calendar-card">
@@ -3770,6 +3813,7 @@ function renderAccountArea(){
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
   renderJournalState();
+  renderRitualsState();
   renderProfileState();
   renderMyLibraryState();
   applyPricingVisibility();
@@ -3832,6 +3876,12 @@ function showJournalPage(tab){
   history.pushState({ page:'journal' }, '', '#journal');
   if (tab) setJournalTab(tab);
 }
+function showRitualsPage(tab){
+  document.body.setAttribute('data-view', 'rituals');
+  window.scrollTo(0,0);
+  history.pushState({ page:'rituals' }, '', '#rituals');
+  setRitualsTab(tab || ritualsTab);
+}
 function showReprogramPage(){
   document.body.setAttribute('data-view', 'reprogram');
   window.scrollTo(0,0);
@@ -3877,6 +3927,7 @@ window.addEventListener('popstate', (e) => {
   if (page === 'profile') document.body.setAttribute('data-view','profile');
   else if (page === 'library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
   else if (page === 'journal') document.body.setAttribute('data-view','journal');
+  else if (page === 'rituals'){ document.body.setAttribute('data-view','rituals'); renderRitualsState(); }
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
   else document.body.removeAttribute('data-view');
 });
@@ -4202,24 +4253,23 @@ async function submitFeedback(){
 const JOURNAL_TAB_COPY = {
   received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
   manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it as if it already has." },
-  photos:       { prompt: "Write today's entry by hand, then photograph the page — the app keeps the record, your journal keeps the practice." },
-  habits:       { prompt: 'A ritual is just a habit you decided to keep. Check each one off as you do it; the streak takes care of itself.' },
 };
 function setJournalTab(cat){
   journalTab = cat;
   document.querySelectorAll('#journal .journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
   const copy = JOURNAL_TAB_COPY[cat];
   document.getElementById('journalPrompt').textContent = copy.prompt;
-  if (copy.placeholder) document.getElementById('journalInput').placeholder = copy.placeholder;
+  document.getElementById('journalInput').placeholder = copy.placeholder;
   document.getElementById('journalAddMsg').textContent = '';
   renderJournalState();
 }
+/* Journal page — gratitude and manifesting, both Whisper features. */
 async function renderJournalState(){
   const locked = document.getElementById('journalLocked');
   const upgrade = document.getElementById('journalUpgrade');
-  const panels = { entries: document.getElementById('journalPanel'), photos: document.getElementById('journalPhotoPanel'), habits: document.getElementById('habitsPanel') };
+  const panel = document.getElementById('journalPanel');
   const philosophy = document.getElementById('journalPhilosophy');
-  Object.values(panels).forEach(p => p.style.display = 'none');
+  panel.style.display = 'none';
   upgrade.style.display = 'none';
   // The 3D/4D/5D explainer is a Whisper feature — it only appears once the
   // tier check below has passed and the Manifesting tab is open.
@@ -4227,25 +4277,56 @@ async function renderJournalState(){
   locked.style.display = currentUser ? 'none' : 'block';
   if (!currentUser) return;
 
+  if (!tierAtLeast(await getMyTier(), 'whisper')){ upgrade.style.display = 'block'; return; }
+
+  panel.style.display = 'block';
+  philosophy.style.display = journalTab === 'manifesting' ? 'block' : 'none';
+  loadJournalEntries();
+}
+
+/* Rituals page — the daily log calendar and the habit lists that fill it in. */
+let ritualsTab = 'calendar';
+const RITUALS_TAB_COPY = {
+  calendar: "Write today's entry by hand, then photograph the page — the app keeps the record, your journal keeps the practice.",
+  habits:   'A ritual is just a habit you decided to keep. Check each one off as you do it; the streak takes care of itself.',
+};
+function setRitualsTab(tab){
+  ritualsTab = tab;
+  document.querySelectorAll('#rituals .journal-tabs button').forEach(b => b.classList.toggle('active', b.dataset.rtab === tab));
+  document.getElementById('ritualsPrompt').textContent = RITUALS_TAB_COPY[tab];
+  renderRitualsState();
+}
+async function renderRitualsState(){
+  const locked = document.getElementById('ritualsLocked');
+  const upgrade = document.getElementById('ritualsUpgrade');
+  const calendarPanel = document.getElementById('journalPhotoPanel');
+  const habitsPanel = document.getElementById('habitsPanel');
+  calendarPanel.style.display = 'none';
+  habitsPanel.style.display = 'none';
+  upgrade.style.display = 'none';
+  locked.style.display = currentUser ? 'none' : 'block';
+  if (!currentUser) return;
+
   const myTier = await getMyTier();
-  const requiredTier = journalTab === 'habits' ? 'ritual' : 'whisper';
+  const requiredTier = ritualsTab === 'habits' ? 'ritual' : 'whisper';
   if (!tierAtLeast(myTier, requiredTier)){
-    const isHabits = journalTab === 'habits';
-    document.getElementById('journalUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The journal is part of Whisper';
-    document.getElementById('journalUpgradeText').textContent = isHabits
+    const isHabits = ritualsTab === 'habits';
+    document.getElementById('ritualsUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The daily log is part of Whisper';
+    document.getElementById('ritualsUpgradeText').textContent = isHabits
       ? 'Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — $11.11 a month, or $111 a year.'
-      : 'Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.';
-    document.getElementById('journalUpgradeBtn').textContent = isHabits ? 'Get Ritual' : 'Get Whisper';
+      : 'Daily Journaling — writing by hand and logging each page here — comes with Whisper, $5.55 a month or $55 a year.';
+    document.getElementById('ritualsUpgradeBtn').textContent = isHabits ? 'Get Ritual' : 'Get Whisper';
     upgrade.style.display = 'block';
     return;
   }
 
-  if (journalTab === 'photos'){ panels.photos.style.display = 'block'; loadJournalPhotos(); }
-  else if (journalTab === 'habits'){ panels.habits.style.display = 'block'; loadHabits(); }
+  // Both tabs want habit data: the calendar colours each day by how much of
+  // that day's ritual was kept, so it loads habits too.
+  if (ritualsTab === 'habits'){ habitsPanel.style.display = 'block'; loadHabits(); }
   else {
-    panels.entries.style.display = 'block';
-    philosophy.style.display = journalTab === 'manifesting' ? 'block' : 'none';
-    loadJournalEntries();
+    calendarPanel.style.display = 'block';
+    if (tierAtLeast(myTier, 'ritual')) await loadHabits({ silent: true });
+    loadJournalPhotos();
   }
 }
 
@@ -4426,9 +4507,15 @@ function renderPhotoCalendar(){
     if (isFuture) classes.push('is-future');
     if (dateStr === today) classes.push('is-today');
     const style = entry && entry.url ? ` style="background-image:url('${entry.url}')"` : '';
-    html += `<button type="button" class="${classes.join(' ')}"${style} ${isFuture ? 'disabled' : `onclick="openDayDetail('${dateStr}')"`}>
+    const pct = isFuture ? null : habitCompletionFor(dateStr);
+    const bar = pct !== null && pct > 0
+      ? `<span class="cal-day-bar"><i style="width:${Math.round(pct * 100)}%"></i></span>`
+      : '';
+    const title = isFuture ? '' : ` title="${dayNum}${pct !== null ? ` — ${Math.round(pct * 100)}% of habits kept` : ''}"`;
+    html += `<button type="button" class="${classes.join(' ')}"${style}${title} ${isFuture ? 'disabled' : `onclick="openDayDetail('${dateStr}')"`}>
       <span class="cal-day-num">${dayNum}</span>
       ${!entry && !isFuture ? '<span class="cal-day-plus">+</span>' : ''}
+      ${bar}
     </button>`;
   }
   document.getElementById('photoCalendarGrid').innerHTML = html;
@@ -4445,6 +4532,16 @@ function renderDailyLogReward(){
   else msg = "A month of showing up. That's who you are now.";
   document.getElementById('logRewardStreak').textContent = streak > 0 ? `${streak}-day streak` : `${days.size} day${days.size === 1 ? '' : 's'} logged`;
   document.getElementById('logRewardMsg').textContent = msg;
+
+  // Second line: how much of today's ritual is kept so far.
+  const habitLine = document.getElementById('logRewardHabits');
+  const pct = habitCompletionFor(localDateStr());
+  if (pct === null){ habitLine.style.display = 'none'; return; }
+  const done = (habitDoneByDate[localDateStr()] || new Set()).size;
+  habitLine.style.display = 'block';
+  habitLine.textContent = pct === 1
+    ? `Every habit kept today — all ${habitsCache.length}.`
+    : `${done} of ${habitsCache.length} habits kept today · ${Math.round(pct * 100)}%`;
 }
 
 function dayLabel(dateStr){
@@ -4459,23 +4556,40 @@ function dayModalContent(dateStr){
   const body = document.getElementById('dayModalBody');
   const entry = journalPhotosByDate[dateStr];
   if (dateStr > localDateStr()){ body.innerHTML = `<p class="journal-empty">This day hasn't happened yet.</p>`; return; }
-  if (entry){
-    body.innerHTML = `
-      <img class="day-modal-photo" src="${entry.url}" alt="Journal page from ${dayLabel(dateStr)}">
+  const pageHtml = entry
+    ? `<img class="day-modal-photo" src="${entry.url}" alt="Journal page from ${dayLabel(dateStr)}">
       <label class="day-modal-label">Summary of the page</label>
       <textarea id="dayModalCaption" rows="3" maxlength="200" placeholder="What this page was about…">${(entry.caption || '').replace(/</g,'&lt;')}</textarea>
       <div class="day-modal-actions">
         <button class="mini-btn candlebtn" onclick="saveDayCaption('${dateStr}')">Save summary</button>
         <button class="mini-btn ghostbtn" onclick="triggerCheckIn('${dateStr}')">Replace photo</button>
         <button class="habit-delete" onclick="deleteDayEntry('${dateStr}')" aria-label="Delete this day's page" title="Delete">${trashIconSvg()}</button>
-      </div>
-      <div class="save-msg" id="dayModalMsg"></div>`;
-  } else {
-    body.innerHTML = `
-      <p class="journal-empty">No page logged for this day yet.</p>
-      <button class="mini-btn candlebtn" onclick="triggerCheckIn('${dateStr}')">Check in — add a photo</button>
-      <div class="save-msg" id="dayModalMsg"></div>`;
-  }
+      </div>`
+    : `<p class="journal-empty">No page logged for this day yet.</p>
+      <button class="mini-btn candlebtn" onclick="triggerCheckIn('${dateStr}')">Check in — add a photo</button>`;
+
+  body.innerHTML = pageHtml + dayHabitsHtml(dateStr) + `<div class="save-msg" id="dayModalMsg"></div>`;
+}
+/* The day's habits, checkable right from the calendar — so a day you forgot
+   to tick off can be filled in later, same as a page you photograph late. */
+function dayHabitsHtml(dateStr){
+  if (!habitsCache.length) return '';
+  const done = habitDoneByDate[dateStr] || new Set();
+  const block = (time, label) => {
+    const rows = habitsCache.filter(h => h.time_of_day === time);
+    if (!rows.length) return '';
+    return `<div class="day-habit-time">${label}</div><div class="day-habit-list">` + rows.map(h => {
+      const isDone = done.has(h.id);
+      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${dateStr}')" aria-pressed="${isDone}">
+        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
+      </button>`;
+    }).join('') + `</div>`;
+  };
+  const pct = habitCompletionFor(dateStr);
+  return `<div class="day-modal-section">
+    <label class="day-modal-label">Habits kept — ${done.size} of ${habitsCache.length}${pct !== null ? ` (${Math.round(pct * 100)}%)` : ''}</label>
+    ${block('morning','Morning')}${block('night','Night')}
+  </div>`;
 }
 function openDayDetail(dateStr){
   if (dateStr > localDateStr()) return;
@@ -4532,19 +4646,33 @@ const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light thera
 
 let habitsCache = [];        // rows from `habits`
 let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
-async function loadHabits(){
+let habitDoneByDate = {};    // YYYY-MM-DD -> Set of habit_id (what the calendar colours by)
+async function loadHabits(options){
   if (!sb || !currentUser) return;
-  const since = shiftDateStr(localDateStr(), -60);
+  const silent = options && options.silent;   // calendar loads habits quietly, in the background
+  const since = shiftDateStr(localDateStr(), -400);
   const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await Promise.all([
     sb.from('habits').select('*').eq('user_id', currentUser.id).eq('archived', false).order('created_at', { ascending: true }),
     sb.from('habit_checkins').select('habit_id, done_on').eq('user_id', currentUser.id).gte('done_on', since),
   ]);
   const msg = document.getElementById('habitsMsg');
-  if (hErr || cErr){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; return; }
+  if (hErr || cErr){ if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
   habitsCache = habits || [];
   habitCheckins = {};
-  (checkins || []).forEach(c => { (habitCheckins[c.habit_id] = habitCheckins[c.habit_id] || new Set()).add(c.done_on); });
-  renderHabits();
+  habitDoneByDate = {};
+  (checkins || []).forEach(c => {
+    (habitCheckins[c.habit_id] = habitCheckins[c.habit_id] || new Set()).add(c.done_on);
+    (habitDoneByDate[c.done_on] = habitDoneByDate[c.done_on] || new Set()).add(c.habit_id);
+  });
+  if (!silent) renderHabits();
+}
+/* Share of that day's habits that got checked off, 0–1. Measured against the
+   habits you keep now, so the calendar reads as "how much of my ritual did I
+   keep" rather than a moving target. */
+function habitCompletionFor(dateStr){
+  if (!habitsCache.length) return null;
+  const done = habitDoneByDate[dateStr];
+  return (done ? done.size : 0) / habitsCache.length;
 }
 function renderHabits(){
   const today = localDateStr();
@@ -4569,7 +4697,9 @@ function renderHabits(){
         <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${h.name.replace(/"/g,'&quot;')}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
-        <div class="habit-name">${h.name.replace(/</g,'&lt;')}</div>
+        <input type="text" class="habit-name" value="${h.name.replace(/"/g,'&quot;')}" maxlength="80" aria-label="Habit name"
+          onkeydown="if(event.key==='Enter') this.blur();"
+          onblur="renameHabit('${h.id}', this.value)">
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
         <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
@@ -4623,18 +4753,37 @@ async function addHabit(time, name){
   msg.textContent = '';
   loadHabits();
 }
-async function toggleHabitToday(habitId){
-  if (!sb || !currentUser) return;
-  const today = localDateStr();
+function toggleHabitToday(habitId){ return toggleHabitOnDate(habitId, localDateStr()); }
+/* Check a habit off for any day — today from the habit list, or an earlier
+   day from its calendar square. */
+async function toggleHabitOnDate(habitId, dateStr){
+  if (!sb || !currentUser || dateStr > localDateStr()) return;
   const days = habitCheckins[habitId] = habitCheckins[habitId] || new Set();
-  const wasDone = days.has(today);
+  const dayDone = habitDoneByDate[dateStr] = habitDoneByDate[dateStr] || new Set();
+  const wasDone = days.has(dateStr);
   // Flip locally first so the tap feels instant; reload only if the save fails.
-  if (wasDone) days.delete(today); else days.add(today);
-  renderHabits();
+  if (wasDone){ days.delete(dateStr); dayDone.delete(habitId); }
+  else { days.add(dateStr); dayDone.add(habitId); }
+  if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
+  if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
+  renderPhotoCalendar();
+  renderDailyLogReward();
   const { error } = wasDone
-    ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', today)
-    : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: today });
-  if (error){ console.error('toggleHabitToday error:', error); loadHabits(); }
+    ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', dateStr)
+    : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: dateStr });
+  if (error){ console.error('toggleHabitOnDate error:', error); loadHabits(); }
+}
+/* Rename in place — edit the habit's text and it saves on blur or Enter,
+   keeping every check-in attached to it. */
+async function renameHabit(habitId, name){
+  if (!sb || !currentUser) return;
+  name = (name || '').trim();
+  const habit = habitsCache.find(h => h.id === habitId);
+  if (!habit || !name || name === habit.name){ renderHabits(); return; }
+  habit.name = name;
+  renderHabits();
+  const { error } = await sb.from('habits').update({ name }).eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){ console.error('renameHabit error:', error); loadHabits(); }
 }
 async function deleteHabit(habitId){
   if (!sb || !currentUser) return;
@@ -4672,6 +4821,7 @@ if (sb){
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
+    if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
     if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
   });
 } else {
