@@ -3740,6 +3740,17 @@ async function startOAuthSignIn(provider){
 
 // Native only: Google/Supabase redirect back into the app via the custom URL
 // scheme above; Capacitor's App plugin surfaces that as an appUrlOpen event.
+/* On a phone the app is almost never reloaded — it's backgrounded overnight and
+   reopened in the morning, which is exactly when the day needs to turn over.
+   visibilitychange covers most of this, but Capacitor's own resume event is the
+   reliable signal on native. */
+function setupNativeDayRollover(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) rollOverDayIfNeeded();
+  });
+}
+
 function setupNativeOAuthCallback(){
   if (!isNativeApp() || !sb || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
@@ -4257,6 +4268,49 @@ function greetingForHour(){
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+/* ---------- rolling over at midnight ----------
+   This is a bedtime app: you check your night ritual off in bed and open it
+   again the next morning, without ever reloading. The date used to be worked
+   out once when the page loaded and never again, so last night's ticks stayed
+   on screen all morning and the day only appeared to "reset" when the page
+   happened to refresh. Watch the real date instead — on a slow timer, and every
+   time the app comes back to the foreground, which is how a phone actually
+   returns to it — and turn the page over in place when it changes.
+
+   Nothing is erased by this. Each check-in is stored against its own date, so
+   yesterday keeps its ticks in the calendar and its place in the streak; today
+   simply starts empty. */
+let currentDayStr = localDateStr();
+async function rollOverDayIfNeeded(){
+  const now = localDateStr();
+  if (now === currentDayStr) return;
+  currentDayStr = now;
+  todayRitualTime = null;   // a new day follows the clock again, not last night's choice
+
+  const dateEl = document.getElementById('todayDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+  if (!sb || !currentUser) return;
+  // Refetch rather than trusting what's in memory — the day may also have been
+  // logged on another device before this one woke up.
+  await loadHabits({ silent: true });
+  await loadJournalPhotos({ silent: true });
+  if (document.body.getAttribute('data-view') === 'today'){
+    const greetEl = document.getElementById('todayGreeting');
+    if (greetEl) greetEl.textContent = greetingForHour() + (greetEl.textContent.includes(',') ? ',' + greetEl.textContent.split(',').slice(1).join(',') : '');
+    renderTodayRitual();
+    renderTodayPage_Page();
+  }
+  if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
+  renderPhotoCalendar();
+  renderDailyLogReward();
+}
+// Half a minute is often enough to turn over within moments of midnight, and
+// cheap enough to leave running all night.
+setInterval(rollOverDayIfNeeded, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) rollOverDayIfNeeded(); });
+window.addEventListener('focus', rollOverDayIfNeeded);
 async function renderTodayPage(){
   if (!sb || !currentUser) return;
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
@@ -5494,7 +5548,14 @@ async function toggleHabitOnDate(habitId, dateStr){
   const { error } = wasDone
     ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', dateStr)
     : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: dateStr });
-  if (error){ console.error('toggleHabitOnDate error:', error); loadHabits(); }
+  if (error){
+    // The tick was flipped locally a moment ago; if the save didn't land, put it
+    // back and say so, rather than letting it silently disappear on the next load.
+    console.error('toggleHabitOnDate error:', error);
+    const msg = document.getElementById('habitsMsg');
+    if (msg){ msg.textContent = "Couldn't save that check-in — check your connection and tap it again."; msg.className = 'save-msg err'; }
+    loadHabits();
+  }
 }
 /* Rename in place — edit the habit's text and it saves on blur or Enter,
    keeping every check-in attached to it. */
@@ -5527,6 +5588,7 @@ if (sb){
 
 if (sb){
   setupNativeOAuthCallback();
+  setupNativeDayRollover();
   setupPushNotifications();
   initRevenueCat();
   updateManageSubscriptionLinks();
