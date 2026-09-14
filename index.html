@@ -590,7 +590,8 @@
   .habit-block-head h3{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-top:4px; }
   .habit-block-count{ font-size:12px; color:var(--haze); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .habit-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
-  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-row:has(.habit-core-toggle.on){ border-color:rgba(224,196,138,0.22); }
   .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
   .habit-check.done{ background:var(--lilac); border-color:var(--lilac); color:#1B1630; }
   .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
@@ -601,11 +602,22 @@
   .habit-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.08); }
   .habit-dot.on{ background:var(--lilac); }
   .habit-dot.today{ box-shadow:0 0 0 1.5px rgba(227,190,127,0.6); }
+  .habit-core-toggle{ background:none; border:none; cursor:pointer; font-size:14px; line-height:1; padding:4px; color:rgba(156,147,184,0.35); transition:color .2s, transform .15s; }
+  .habit-core-toggle:hover{ color:var(--candle); transform:scale(1.15); }
+  .habit-core-toggle.on{ color:var(--candle); }
+  .habit-core-toggle:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; border-radius:6px; }
+  .habit-core-hint{ font-size:12px; color:var(--haze); line-height:1.6; margin:0 0 10px; }
+  /* A non-negotiable reads as the load-bearing one, without shouting. */
+  .day-habit.core{ border-color:rgba(224,196,138,0.28); }
+  .day-habit-core{ margin-left:auto; color:var(--candle); font-size:11px; flex-shrink:0; }
+  .today-ritual-group{ font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--haze); margin:14px 0 6px; }
+  .today-ritual-group:first-of-type{ margin-top:10px; }
+  .today-ritual-note{ font-size:12.5px; color:var(--haze); line-height:1.6; margin:12px 0 0; }
   .habit-streak{ font-size:11.5px; color:var(--lilac); white-space:nowrap; font-variant-numeric:tabular-nums; }
   .habit-streak.zero{ color:var(--haze); }
   .habit-delete{ display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:none; border:1px solid transparent; color:var(--haze); cursor:pointer; padding:0; opacity:.55; transition:all .2s; }
   .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
-  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
+  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
   .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
   .habit-row-blank{ background:none; border:1px dashed rgba(255,255,255,0.08); grid-template-columns:auto 1fr; }
   .habit-slot-num{ font-size:11px; color:var(--haze); width:20px; text-align:center; font-variant-numeric:tabular-nums; opacity:.6; }
@@ -4258,7 +4270,8 @@ function showTodayPage(){
 /* ---------- Today ----------
    The one screen a member should be able to open, act on, and close. Three
    cards at most: the session, the ritual that fits the hour, today's page. */
-let todayRitualTime = null;   // 'morning' | 'night' — null means follow the clock
+let todayRitualTime = null;       // 'morning' | 'night' — null means follow the clock
+let todayEssentialsOnly = false;  // the short-routine view, for the nights you have nothing left
 function currentRitualTime(){
   return todayRitualTime || (new Date().getHours() < 16 ? 'morning' : 'night');
 }
@@ -4286,7 +4299,8 @@ async function rollOverDayIfNeeded(){
   const now = localDateStr();
   if (now === currentDayStr) return;
   currentDayStr = now;
-  todayRitualTime = null;   // a new day follows the clock again, not last night's choice
+  todayRitualTime = null;      // a new day follows the clock again, not last night's choice
+  todayEssentialsOnly = false; // and opens on the full list again
 
   const dateEl = document.getElementById('todayDate');
   if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
@@ -4367,18 +4381,59 @@ function renderTodayRitual(){
   const today = localDateStr();
   const done = habitDoneByDate[today] || new Set();
   const doneCount = rows.filter(h => done.has(h.id)).length;
+  const core = rows.filter(h => h.is_core);
+  const extras = rows.filter(h => !h.is_core);
+  const st = routineStatusFor(time, today);
+  const left = shortRoutinesLeft(time, today);
+  const streak = routineStreak(time);
+  // On a short night the rest of the list is out of the way by default, so the
+  // screen doesn't open on nine things you already know you aren't doing.
+  const shortMode = todayEssentialsOnly && core.length > 0;
+
+  const habitBtn = h => {
+    const isDone = done.has(h.id);
+    return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
+      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+    </button>`;
+  };
+
+  // The headline is the whole point: finishing your non-negotiables has to read
+  // as having kept the ritual, not as having fallen short of the long list.
+  let headline;
+  if (!rows.length) headline = 'Nothing on this list yet.';
+  else if (st.state === 'full') headline = 'All done — nicely held.';
+  else if (st.state === 'essentials') headline = 'Your non-negotiables are done. That counts.';
+  else if (core.length) headline = `${st.coreDone} of ${core.length} non-negotiables`;
+  else headline = `${doneCount} of ${rows.length} so far`;
+
+  let note = '';
+  if (st.state === 'essentials'){
+    note = left > 0
+      ? `A short ${time}, and your streak holds. ${left} more left this week.`
+      : `That's both short ${time}s this week — your streak still holds today.`;
+  } else if (core.length && st.state !== 'full'){
+    note = left > 0
+      ? `Short on time? The ${core.length} marked ✦ are enough to keep the ritual. ${left} left this week.`
+      : `You've used both short ${time}s this week — tonight it's the full list that keeps the streak.`;
+  }
+
   card.style.display = 'block';
   card.innerHTML = `
-    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}</div>
-    <h3>${doneCount === rows.length && rows.length ? 'All done — nicely held.' : `${doneCount} of ${rows.length} so far`}</h3>
-    ${rows.length ? `<div class="today-ritual-list">${rows.map(h => {
-      const isDone = done.has(h.id);
-      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
-      </button>`;
-    }).join('')}</div>
-    <div class="today-progress"><i style="width:${rows.length ? Math.round(doneCount / rows.length * 100) : 0}%"></i></div>` : '<p>Nothing on this list yet.</p>'}
-    <button class="today-ritual-more" onclick="todayRitualTime='${other}'; renderTodayRitual();">Show my ${other} ritual →</button>`;
+    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}${streak > 1 ? ` · ${streak}-day streak` : ''}</div>
+    <h3>${headline}</h3>
+    ${rows.length ? `
+      ${core.length ? `<div class="today-ritual-group">Non-negotiable</div>` : ''}
+      <div class="today-ritual-list">${(core.length ? core : rows).map(habitBtn).join('')}</div>
+      ${core.length && extras.length ? (shortMode
+        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=false; renderTodayRitual();">Show the rest of my ${time} (${extras.filter(h=>done.has(h.id)).length} of ${extras.length} done) →</button>`
+        : `<div class="today-ritual-group">The rest</div>
+           <div class="today-ritual-list">${extras.map(habitBtn).join('')}</div>`) : ''}
+      ${note ? `<p class="today-ritual-note">${note}</p>` : ''}
+      <div class="today-progress"><i style="width:${Math.round(doneCount / rows.length * 100)}%"></i></div>
+      ${core.length && extras.length && !shortMode && st.state !== 'full'
+        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=true; renderTodayRitual();">Tired tonight? Just the non-negotiables →</button>` : ''}
+    ` : '<p>Nothing on this list yet. <button class="today-ritual-more" onclick="showRitualsPage(\'habits\')">Set it up →</button></p>'}
+    <button class="today-ritual-more" onclick="todayRitualTime='${other}'; todayEssentialsOnly=false; renderTodayRitual();">Show my ${other} ritual →</button>`;
 }
 function renderTodayPage_Page(){
   const card = document.getElementById('todayPageCard');
@@ -5338,10 +5393,14 @@ function dayHabitsHtml(dateStr){
   const block = (time, label) => {
     const rows = habitsCache.filter(h => h.time_of_day === time);
     if (!rows.length) return '';
-    return `<div class="day-habit-time">${label}</div><div class="day-habit-list">` + rows.map(h => {
+    const st = routineStatusFor(time, dateStr);
+    const verdict = st.state === 'full' ? ' · full routine'
+      : st.state === 'essentials' ? ' · non-negotiables kept'
+      : st.state === 'partial' ? ' · partly done' : '';
+    return `<div class="day-habit-time">${label}${verdict}</div><div class="day-habit-list">` + rows.map(h => {
       const isDone = done.has(h.id);
-      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${dateStr}')" aria-pressed="${isDone}">
-        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
+      return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${dateStr}')" aria-pressed="${isDone}">
+        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
       </button>`;
     }).join('') + `</div>`;
   };
@@ -5431,6 +5490,111 @@ async function loadHabits(options){
   });
   if (!silent) renderHabits();
 }
+/* ---------- non-negotiables, and the short routine ----------
+   Most people don't fall out of a ritual because it was too hard. They fall out
+   because they built a nine-item evening, missed three items once, decided they
+   had blown it, and stopped. So each routine gets a handful of non-negotiables:
+   the ones you do even on the night you have nothing left. Doing just those
+   still counts as keeping the ritual — twice a week, which is enough to cover a
+   bad week without quietly becoming the whole routine.
+
+   None of this needs storing. Whether a day was a full routine, a short one, or
+   a miss is worked out from the check-ins already on record, so there is no
+   second source of truth to fall out of step. */
+const CORE_HABIT_MAX = 5;
+const SHORT_ROUTINE_ALLOWANCE = 2;   // short routines per week, per routine
+
+/* Weeks run Monday to Sunday, so a rough Sunday night doesn't spend an
+   allowance that a fresh week is about to hand back anyway. */
+function weekStartStr(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dow = (new Date(y, m-1, d).getDay() + 6) % 7;   // Monday = 0
+  return shiftDateStr(dateStr, -dow);
+}
+
+/* How one routine went on one day:
+     full       - everything on the list
+     essentials - every non-negotiable, but not the whole list
+     partial    - something, but not all the non-negotiables
+     missed     - nothing                                        */
+function routineStatusFor(time, dateStr){
+  const rows = habitsCache.filter(h => h.time_of_day === time);
+  const done = habitDoneByDate[dateStr] || new Set();
+  const core = rows.filter(h => h.is_core);
+  const coreDone = core.filter(h => done.has(h.id)).length;
+  const allDone = rows.filter(h => done.has(h.id)).length;
+  let state = 'missed';
+  if (!rows.length) state = 'none';
+  else if (allDone === rows.length) state = 'full';
+  else if (core.length && coreDone === core.length) state = 'essentials';
+  else if (allDone > 0) state = 'partial';
+  return { state, done: allDone, total: rows.length, coreDone, coreTotal: core.length };
+}
+
+/* Short routines already spent in the week containing dateStr, counting up to
+   and including that day. */
+function shortRoutinesUsedBy(time, dateStr){
+  const start = weekStartStr(dateStr);
+  let used = 0;
+  for (let i = 0; i < 7; i++){
+    const d = shiftDateStr(start, i);
+    if (d > dateStr) break;
+    if (routineStatusFor(time, d).state === 'essentials') used++;
+  }
+  return used;
+}
+function shortRoutinesLeft(time, dateStr){
+  return Math.max(0, SHORT_ROUTINE_ALLOWANCE - shortRoutinesUsedBy(time, dateStr || localDateStr()));
+}
+
+/* Did this day keep the ritual? A full routine always does. A short one does
+   too, as long as there was still an allowance left that week. */
+function routineKept(time, dateStr){
+  const { state } = routineStatusFor(time, dateStr);
+  if (state === 'full') return true;
+  if (state !== 'essentials') return false;
+  return shortRoutinesUsedBy(time, dateStr) <= SHORT_ROUTINE_ALLOWANCE;
+}
+
+/* Consecutive days the ritual was kept — short nights included. This is the
+   number that should be hard to break, because it's the one people are
+   protecting when they push through a night they should have shortened. */
+function routineStreak(time){
+  let cursor = localDateStr();
+  // Today not being done yet shouldn't read as the streak already being over.
+  if (!routineKept(time, cursor)) cursor = shiftDateStr(cursor, -1);
+  let n = 0;
+  while (routineKept(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  return n;
+}
+
+/* Mark a habit as one of the non-negotiables, or take the mark off again. */
+async function toggleCoreHabit(habitId){
+  if (!sb || !currentUser) return;
+  const habit = habitsCache.find(h => h.id === habitId);
+  if (!habit) return;
+  const msg = document.getElementById('habitsMsg');
+  const turningOn = !habit.is_core;
+  if (turningOn){
+    const already = habitsCache.filter(h => h.time_of_day === habit.time_of_day && h.is_core).length;
+    if (already >= CORE_HABIT_MAX){
+      msg.textContent = `${CORE_HABIT_MAX} non-negotiables is the most for one routine — that's the point of them. Take one off first.`;
+      msg.className = 'save-msg';
+      return;
+    }
+  }
+  msg.textContent = '';
+  habit.is_core = turningOn;
+  renderHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+  const { error } = await sb.from('habits').update({ is_core: turningOn }).eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){
+    console.error('toggleCoreHabit error:', error);
+    msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err';
+    loadHabits();
+  }
+}
+
 /* Share of that day's habits that got checked off, 0–1. Measured against the
    habits you keep now, so the calendar reads as "how much of my ritual did I
    keep" rather than a moving target. */
@@ -5450,7 +5614,11 @@ function renderHabits(){
     const suggestWrap = document.getElementById(time === 'morning' ? 'habitSuggestMorning' : 'habitSuggestNight');
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
-    count.textContent = rows.length ? `${done} of ${rows.length} today · ${rows.length}/${HABIT_SLOTS} added` : `0/${HABIT_SLOTS} added`;
+    const coreCount = rows.filter(h => h.is_core).length;
+    const shortLeft = shortRoutinesLeft(time, today);
+    count.textContent = rows.length
+      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable · ${shortLeft} short ${time}${shortLeft === 1 ? '' : 's'} left this week`
+      : `0/${HABIT_SLOTS} added`;
 
     const realRowsHtml = rows.map(h => {
       const days = habitCheckins[h.id] || new Set();
@@ -5465,6 +5633,10 @@ function renderHabits(){
         <input type="text" class="habit-name" value="${h.name.replace(/"/g,'&quot;')}" maxlength="80" aria-label="Habit name"
           onkeydown="if(event.key==='Enter') this.blur();"
           onblur="renameHabit('${h.id}', this.value)">
+        <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
+          aria-pressed="${h.is_core ? 'true' : 'false'}"
+          title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
+          aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${h.name.replace(/"/g,'&quot;')} as non-negotiable">✦</button>
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
         <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
@@ -5494,7 +5666,11 @@ function renderHabits(){
       ? `<button type="button" class="habit-more-slots" onclick="expandHabitSlots('${time}')">+ ${hiddenSlots} more slot${hiddenSlots === 1 ? '' : 's'}</button>`
       : '';
 
-    list.innerHTML = realRowsHtml + blankRowsHtml + moreSlotsHtml;
+    // Said once, where the decision is actually made.
+    const coreHint = rows.length && !rows.some(h => h.is_core)
+      ? `<p class="habit-core-hint">Tap ✦ on the few you'd still do on your worst day. Doing just those counts as keeping the ritual — twice a week.</p>`
+      : '';
+    list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
       suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
@@ -5510,10 +5686,19 @@ function renderHabits(){
   const allDays = new Set();
   habitsCache.forEach(h => (habitCheckins[h.id] || new Set()).forEach(d => allDays.add(d)));
   const practiceStreak = streakFromDays(allDays);
+  // If non-negotiables are set, the streak worth showing is the one they protect
+  // — kept on the short nights as well as the full ones.
+  const kept = ['morning','night']
+    .filter(t => habitsCache.some(h => h.time_of_day === t && h.is_core))
+    .map(t => ({ t, n: routineStreak(t) }))
+    .filter(x => x.n > 1)
+    .map(x => `${x.n}-day ${x.t} streak`);
+  const streakText = kept.length ? ` · ${kept.join(' · ')}`
+    : practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : '';
   stat.style.display = 'block';
   stat.textContent = doneToday === habitsCache.length
-    ? `✦ Every ritual done today${practiceStreak > 1 ? ` · ${practiceStreak} days in a row showing up` : ''}`
-    : `${doneToday} of ${habitsCache.length} done today${practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : ''}`;
+    ? `✦ Every ritual done today${streakText}`
+    : `${doneToday} of ${habitsCache.length} done today${streakText}`;
 }
 async function addHabit(time, name){
   if (!sb || !currentUser) return;
