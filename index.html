@@ -2920,8 +2920,14 @@ function stopFinal(){
 // PRICE_TO_TIER in api/stripe-webhook.js so the webhook knows which tier
 // a checkout was for.
 const STRIPE_LINKS = {
-  whisper: { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
-  ritual:  { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
+  whisper: {
+    monthly: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',   // $5.55/mo
+    annual:  'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',   // $55/yr
+  },
+  ritual: {
+    monthly: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',   // $11.11/mo
+    annual:  'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',   // $111/yr
+  },
 };
 let billingPeriod = 'monthly'; // 'monthly' | 'annual'
 
