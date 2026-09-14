@@ -363,12 +363,15 @@
   body[data-view="library"] > nav ~ section:not(#library),
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="rituals"] > nav ~ section:not(#rituals),
+  body[data-view="today"] > nav ~ section:not(#today),
   body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
   body[data-view="profile"] > footer,
   body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
   body[data-view="rituals"] > footer,
+  body[data-view="today"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
+  body:not([data-view="today"]) #today{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
   body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
@@ -584,6 +587,32 @@
   .habit-suggest-chip:hover{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .habit-suggest-full{ font-size:12px; color:var(--candle); font-family:var(--serif); font-style:italic; }
 
+  /* ---- today (the signed-in home) ----
+     Deliberately the quietest screen in the app: one primary action, plenty
+     of room around it, and no marketing. */
+  .today-section{ padding:0; }
+  .today-wrap{ max-width:520px; padding-top:104px; padding-bottom:90px; }
+  .today-head{ margin-bottom:34px; }
+  .today-greeting{ font-family:var(--serif); font-size:clamp(26px,6vw,32px); color:var(--moonlight); line-height:1.2; text-wrap:balance; }
+  .today-date{ font-size:12.5px; color:var(--haze); margin-top:8px; letter-spacing:.04em; }
+  .today-card{ border:1px solid var(--dusk); border-radius:20px; padding:22px 22px 20px; margin-bottom:14px; }
+  .today-card-label{ font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--haze); margin-bottom:10px; }
+  .today-card h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); font-weight:400; line-height:1.35; }
+  .today-card p{ font-size:13.5px; color:var(--haze); margin-top:7px; line-height:1.6; }
+  .today-card .btn{ margin-top:18px; }
+  .today-card-primary{ border-color:rgba(227,190,127,0.35); background:linear-gradient(160deg, rgba(227,190,127,0.08), transparent 70%); }
+  .today-card-primary h3{ font-size:21px; }
+  .today-quiet{ display:flex; align-items:center; justify-content:space-between; gap:14px; }
+  .today-quiet-main{ min-width:0; }
+  .today-thumb{ width:52px; height:52px; border-radius:12px; object-fit:cover; flex-shrink:0; background:var(--dusk); border:1px solid var(--dusk); }
+  .today-ritual-list{ display:flex; flex-direction:column; gap:7px; margin-top:14px; }
+  .today-ritual-more{ background:none; border:none; color:var(--lilac); font-family:inherit; font-size:12.5px; cursor:pointer; padding:10px 0 0; }
+  .today-progress{ height:4px; border-radius:2px; background:rgba(255,255,255,0.07); overflow:hidden; margin-top:14px; }
+  .today-progress i{ display:block; height:100%; background:var(--candle); transition:width .3s; }
+  .today-links{ display:flex; flex-wrap:wrap; gap:18px; justify-content:center; margin-top:34px; }
+  .today-links button{ background:none; border:none; color:var(--haze); font-family:inherit; font-size:13px; cursor:pointer; padding:0; transition:color .2s; }
+  .today-links button:hover{ color:var(--candle); }
+
   /* ---- library ---- */
   .library-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .library-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
@@ -607,12 +636,13 @@
 <nav>
   <div class="brand" style="cursor:pointer;" onclick="goHome()"><span class="brand-mark">Subliminally</span><span class="brand-by">by FTHR</span></div>
   <div class="nav-links" id="navLinks">
-    <button onclick="goHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
+    <button id="navToday" style="display:none;" onclick="showTodayPage(); closeMobileNav();">Today</button>
+    <button onclick="showMarketingHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
     <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
     <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
     <button onclick="showRitualsPage(); closeMobileNav();">Rituals</button>
     <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
-    <button onclick="goHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
+    <button onclick="showMarketingHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
   </div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
   <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -730,6 +760,25 @@
   </div>
 </div>
 
+<!-- ============ TODAY: the signed-in home ============ -->
+<section class="today-section" id="today">
+  <div class="wrap today-wrap">
+    <div class="today-head">
+      <div class="today-greeting" id="todayGreeting">Welcome back</div>
+      <div class="today-date" id="todayDate"></div>
+    </div>
+    <div class="today-card today-card-primary" id="todaySessionCard"></div>
+    <div class="today-card" id="todayRitualCard" style="display:none;"></div>
+    <div class="today-card" id="todayPageCard" style="display:none;"></div>
+    <div class="today-links">
+      <button onclick="showJournalPage()">Journal</button>
+      <button onclick="showRitualsPage()">Rituals</button>
+      <button onclick="showLibraryPage()">Library</button>
+      <button onclick="showProfilePage()">Profile</button>
+    </div>
+  </div>
+</section>
+
 <section class="hero">
   <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
@@ -845,7 +894,7 @@
 
         <div class="science-cta">
           <p>Ready to hear it in your own voice?</p>
-          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Build your own subliminal →</button>
+          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Build your own subliminal →</button>
         </div>
       </div>
     </div>
@@ -864,8 +913,8 @@
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Build a tapping session →</button>
-          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
+          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Build a tapping session →</button>
+          <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
     </div>
@@ -883,8 +932,8 @@
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Write your script →</button>
-          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
+          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Write your script →</button>
+          <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
     </div>
@@ -1245,7 +1294,7 @@
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3 id="journalUpgradeTitle">The journal is part of Whisper</h3>
       <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.</p>
-      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="goHome(); goTo('pricing');">Get Whisper</button>
+      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="showMarketingHome(); goTo('pricing');">Get Whisper</button>
     </div>
 
     <div id="journalPanel" class="journal-panel" style="display:none;">
@@ -1285,7 +1334,7 @@
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3 id="ritualsUpgradeTitle">The daily log is part of Whisper</h3>
       <p id="ritualsUpgradeText"></p>
-      <button class="btn btn-primary" id="ritualsUpgradeBtn" onclick="goHome(); goTo('pricing');">See plans</button>
+      <button class="btn btn-primary" id="ritualsUpgradeBtn" onclick="showMarketingHome(); goTo('pricing');">See plans</button>
     </div>
 
     <!-- Daily log: calendar of handwritten pages + habits kept -->
@@ -3632,6 +3681,7 @@ async function submitAuth(){
   setTimeout(() => {
     closeAuthModal();
     if (wasSignup) openOnboardingModal();
+    else showTodayPage();
   }, 600);
 }
 
@@ -3812,11 +3862,15 @@ function renderAccountArea(){
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
+  document.getElementById('navToday').style.display = currentUser ? '' : 'none';
+  // Logging out from Today would leave you staring at a hidden page.
+  if (!currentUser && document.body.getAttribute('data-view') === 'today') showMarketingHome();
   renderJournalState();
   renderRitualsState();
   renderProfileState();
   renderMyLibraryState();
   applyPricingVisibility();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayPage();
 }
 async function loadNavIdentity(){
   if (!sb || !currentUser) return;
@@ -3917,10 +3971,132 @@ if (scienceBinauralGuideList){
     scienceBinauralGuideList.appendChild(card);
   });
 }
-function goHome(){
+/* The marketing page — hero, science, the builder, pricing. Anything that
+   scrolls to a section down there (goTo) has to come through here first. */
+function showMarketingHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
   history.pushState({ page:'home' }, '', location.pathname);
+}
+/* "Home" means Today once you're signed in, and the marketing page if not. */
+function goHome(){
+  if (currentUser){ showTodayPage(); return; }
+  showMarketingHome();
+}
+function showTodayPage(){
+  if (!currentUser){ showMarketingHome(); return; }
+  document.body.setAttribute('data-view', 'today');
+  window.scrollTo(0,0);
+  history.pushState({ page:'today' }, '', '#today');
+  renderTodayPage();
+}
+
+/* ---------- Today ----------
+   The one screen a member should be able to open, act on, and close. Three
+   cards at most: the session, the ritual that fits the hour, today's page. */
+let todayRitualTime = null;   // 'morning' | 'night' — null means follow the clock
+function currentRitualTime(){
+  return todayRitualTime || (new Date().getHours() < 16 ? 'morning' : 'night');
+}
+function greetingForHour(){
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+async function renderTodayPage(){
+  if (!sb || !currentUser) return;
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+  const [{ data: prof }, { data: subs }, myTier] = await Promise.all([
+    sb.from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle(),
+    sb.from('subliminals').select('id, title, duration_seconds').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(1),
+    getMyTier(),
+  ]);
+  const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
+  document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');
+
+  renderTodaySession(subs && subs[0]);
+  if (tierAtLeast(myTier, 'ritual')){ await loadHabits({ silent: true }); renderTodayRitual(); }
+  else document.getElementById('todayRitualCard').style.display = 'none';
+  if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
+  else document.getElementById('todayPageCard').style.display = 'none';
+}
+function renderTodaySession(lastSub){
+  const card = document.getElementById('todaySessionCard');
+  const evening = new Date().getHours() >= 16;
+  if (lastSub){
+    const mins = Math.round((lastSub.duration_seconds || 0) / 60);
+    card.innerHTML = `
+      <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
+      <h3>${(lastSub.title || 'Your subliminal').replace(/</g,'&lt;')}</h3>
+      <p>${mins ? `${formatSessionLength(mins)} · ` : ''}the last one you saved. Put your headphones in and press play.</p>
+      <button class="btn btn-primary" onclick="loadSavedIntoBuilder('${lastSub.id}')">Play it</button>
+      <div class="today-links" style="justify-content:flex-start; margin-top:14px;">
+        <button onclick="showMarketingHome(); goTo('flow-section');">Build a new one</button>
+      </div>`;
+  } else {
+    card.innerHTML = `
+      <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
+      <h3>Build your first subliminal</h3>
+      <p>Pick a frequency, say what you're working through, and record it in your own voice. It takes about five minutes.</p>
+      <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Start</button>`;
+  }
+}
+function renderTodayRitual(){
+  const card = document.getElementById('todayRitualCard');
+  if (!habitsCache.length){
+    card.style.display = 'block';
+    card.innerHTML = `
+      <div class="today-card-label">Your ritual</div>
+      <h3>Nothing set yet</h3>
+      <p>Choose the handful of things that start and end your day well — they'll be waiting here each morning and night.</p>
+      <button class="btn btn-ghost" onclick="showRitualsPage('habits')">Set up my rituals</button>`;
+    return;
+  }
+  const time = currentRitualTime();
+  const other = time === 'morning' ? 'night' : 'morning';
+  const rows = habitsCache.filter(h => h.time_of_day === time);
+  const today = localDateStr();
+  const done = habitDoneByDate[today] || new Set();
+  const doneCount = rows.filter(h => done.has(h.id)).length;
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}</div>
+    <h3>${doneCount === rows.length && rows.length ? 'All done — nicely held.' : `${doneCount} of ${rows.length} so far`}</h3>
+    ${rows.length ? `<div class="today-ritual-list">${rows.map(h => {
+      const isDone = done.has(h.id);
+      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
+        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
+      </button>`;
+    }).join('')}</div>
+    <div class="today-progress"><i style="width:${rows.length ? Math.round(doneCount / rows.length * 100) : 0}%"></i></div>` : '<p>Nothing on this list yet.</p>'}
+    <button class="today-ritual-more" onclick="todayRitualTime='${other}'; renderTodayRitual();">Show my ${other} ritual →</button>`;
+}
+function renderTodayPage_Page(){
+  const card = document.getElementById('todayPageCard');
+  const today = localDateStr();
+  const entry = journalPhotosByDate[today];
+  const streak = streakFromDays(new Set(Object.keys(journalPhotosByDate)));
+  card.style.display = 'block';
+  if (entry){
+    card.innerHTML = `
+      <div class="today-quiet">
+        <div class="today-quiet-main">
+          <div class="today-card-label">Today's page</div>
+          <h3>Logged${streak > 1 ? ` · ${streak}-day streak` : ''}</h3>
+          <p>${entry.caption ? entry.caption.replace(/</g,'&lt;') : 'Tap to add a summary of what you wrote.'}</p>
+        </div>
+        <img class="today-thumb" src="${entry.url}" alt="Today's journal page">
+      </div>
+      <button class="today-ritual-more" onclick="showRitualsPage('calendar')">Open the calendar →</button>`;
+  } else {
+    card.innerHTML = `
+      <div class="today-card-label">Today's page</div>
+      <h3>Not logged yet</h3>
+      <p>Write your entry by hand, then photograph the page — that's the whole practice.${streak > 0 ? ` You're ${streak} day${streak === 1 ? '' : 's'} in.` : ''}</p>
+      <button class="btn btn-ghost" onclick="showRitualsPage('calendar'); setTimeout(() => openDayDetail(localDateStr()), 250);">Check in</button>`;
+  }
 }
 window.addEventListener('popstate', (e) => {
   const page = e.state && e.state.page;
@@ -3928,6 +4104,7 @@ window.addEventListener('popstate', (e) => {
   else if (page === 'library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
   else if (page === 'journal') document.body.setAttribute('data-view','journal');
   else if (page === 'rituals'){ document.body.setAttribute('data-view','rituals'); renderRitualsState(); }
+  else if (page === 'today'){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
   else document.body.removeAttribute('data-view');
 });
@@ -4178,7 +4355,7 @@ async function loadSavedIntoBuilder(id){
     }
   }
 
-  goHome();
+  showMarketingHome();
   showStep(7);
   prepareFinal();
   setTimeout(() => goTo('flow-section'), 50);
@@ -4468,8 +4645,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-async function loadJournalPhotos(){
+async function loadJournalPhotos(options){
   if (!sb || !currentUser) return;
+  const silent = options && options.silent;   // Today loads the photos without drawing the calendar
   const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id);
   if (error){ console.error('loadJournalPhotos error:', error); return; }
   const rows = data || [];
@@ -4480,6 +4658,7 @@ async function loadJournalPhotos(){
   }
   journalPhotosByDate = {};
   rows.forEach(p => { journalPhotosByDate[p.entry_date] = { ...p, url: urlByPath[p.storage_path] || '' }; });
+  if (silent) return;
   renderPhotoCalendar();
   renderDailyLogReward();
 }
@@ -4823,6 +5002,8 @@ if (sb){
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
     if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
     if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
+    // Signed in with nowhere particular to be: open Today, not the sales page.
+    if (currentUser && (!location.hash || location.hash === '#today')){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
   });
 } else {
   renderAccountArea();
