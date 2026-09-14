@@ -503,24 +503,38 @@
   .journal-tabs-4{ max-width:600px; }
   @media (max-width:520px){ .journal-tabs-4{ flex-wrap:wrap; border-radius:20px; } .journal-tabs-4 button{ flex:1 1 45%; padding:10px 8px; font-size:13px; } }
 
-  /* ---- daily log (photos of handwritten pages) ---- */
-  .photo-upload-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:18px; padding:18px 18px 16px; margin-bottom:20px; }
-  .photo-upload-fields{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
-  .photo-upload-fields label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
-  .photo-upload-fields input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; font-family:inherit; outline:none; color-scheme:dark; }
-  .photo-upload-fields input:focus{ border-color:var(--candle); }
-  .photo-upload-actions{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  .photo-upload-hint{ font-size:12px; color:var(--haze); }
-  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; }
-  .photo-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
-  .photo-card img{ width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:var(--dusk); cursor:zoom-in; }
-  .photo-card .meta{ padding:9px 11px 10px; display:flex; flex-direction:column; gap:3px; }
-  .photo-card .date{ font-size:11.5px; color:var(--lilac); font-variant-numeric:tabular-nums; }
-  .photo-card .cap{ font-size:12px; color:var(--haze); font-family:var(--serif); font-style:italic; line-height:1.4; }
-  .photo-card .journal-entry-delete{ align-self:flex-end; margin-top:4px; }
-  .photo-lightbox{ position:fixed; inset:0; z-index:500; background:rgba(13,11,24,0.92); display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out; }
-  .photo-lightbox.open{ display:flex; }
-  .photo-lightbox img{ max-width:100%; max-height:100%; border-radius:12px; }
+  /* ---- daily log (calendar of handwritten pages) ---- */
+  .log-reward{ display:flex; align-items:center; gap:14px; background:linear-gradient(135deg, rgba(227,190,127,0.1), rgba(185,167,232,0.08)); border:1px solid rgba(227,190,127,0.25); border-radius:18px; padding:16px 20px; margin-bottom:20px; max-width:560px; margin-inline:auto; }
+  .log-reward-flame{ font-size:28px; line-height:1; }
+  .log-reward-streak{ font-family:var(--serif); font-size:19px; color:var(--candle); font-variant-numeric:tabular-nums; }
+  .log-reward-msg{ font-size:12.5px; color:var(--haze); margin-top:2px; }
+  .calendar-card{ max-width:560px; margin:0 auto; background:var(--veil); border:1px solid var(--dusk); border-radius:20px; padding:18px 18px 20px; }
+  .calendar-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .calendar-title{ font-family:var(--serif); font-size:17px; color:var(--moonlight); }
+  .cal-nav{ width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,0.05); border:1px solid var(--dusk); color:var(--moonlight); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .cal-nav:hover{ border-color:var(--lilac); }
+  .calendar-dow{ display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:6px; }
+  .calendar-dow span{ text-align:center; font-size:10.5px; color:var(--haze); letter-spacing:.04em; }
+  .calendar-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .cal-day{ position:relative; aspect-ratio:1; border-radius:9px; border:1px solid var(--dusk); background-color:rgba(255,255,255,0.03); background-size:cover; background-position:center; cursor:pointer; padding:0; overflow:hidden; }
+  .cal-day-empty{ border:none; background:none; cursor:default; }
+  .cal-day.is-future{ cursor:default; opacity:.35; }
+  .cal-day.is-today{ border-color:var(--candle); }
+  .cal-day.has-entry{ border-color:rgba(227,190,127,0.4); }
+  .cal-day-num{ position:absolute; top:3px; left:5px; font-size:10.5px; color:var(--moonlight); font-variant-numeric:tabular-nums; text-shadow:0 1px 3px rgba(0,0,0,0.7); }
+  .cal-day.has-entry .cal-day-num{ background:rgba(13,11,24,0.45); border-radius:5px; padding:0 3px; }
+  .cal-day-plus{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--haze); opacity:0; transition:opacity .15s; }
+  .cal-day:not(.is-future):not(.has-entry):hover .cal-day-plus{ opacity:1; color:var(--lilac); }
+
+  .day-modal-overlay{ position:fixed; inset:0; z-index:500; background:rgba(13,11,24,0.85); display:none; align-items:center; justify-content:center; padding:20px; }
+  .day-modal-overlay.open{ display:flex; }
+  .day-modal{ position:relative; width:100%; max-width:420px; max-height:90vh; overflow-y:auto; background:var(--midnight-2); border:1px solid var(--dusk); border-radius:22px; padding:26px 24px; }
+  .day-modal-date{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-bottom:14px; padding-right:20px; }
+  .day-modal-photo{ width:100%; border-radius:14px; margin-bottom:14px; display:block; background:var(--dusk); }
+  .day-modal-label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
+  #dayModalBody textarea{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; font-family:inherit; outline:none; resize:vertical; margin-bottom:12px; }
+  #dayModalBody textarea:focus{ border-color:var(--candle); }
+  .day-modal-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
   /* ---- habit tracker ---- */
   .habit-block{ background:var(--veil); border:1px solid var(--dusk); border-radius:20px; padding:20px 20px 16px; margin-bottom:16px; }
@@ -546,6 +560,15 @@
   .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
   @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
   .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
+  .habit-row-blank{ background:none; border:1px dashed rgba(255,255,255,0.08); grid-template-columns:auto 1fr; }
+  .habit-slot-num{ font-size:11px; color:var(--haze); width:20px; text-align:center; font-variant-numeric:tabular-nums; opacity:.6; }
+  .habit-blank-input{ width:100%; background:none; border:none; color:var(--moonlight); font-size:14px; font-family:inherit; outline:none; padding:4px 0; }
+  .habit-blank-input::placeholder{ color:var(--haze); opacity:.7; }
+  .habit-suggest-row{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:4px; }
+  .habit-suggest-label{ font-size:11.5px; color:var(--haze); margin-right:2px; }
+  .habit-suggest-chip{ font-size:12px; color:var(--lilac); background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.25); border-radius:999px; padding:5px 12px; cursor:pointer; font-family:inherit; transition:all .15s; }
+  .habit-suggest-chip:hover{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .habit-suggest-full{ font-size:12px; color:var(--candle); font-family:var(--serif); font-style:italic; }
 
   /* ---- library ---- */
   .library-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
@@ -581,7 +604,13 @@
   <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
 </nav>
 
-<div class="photo-lightbox" id="photoLightbox" onclick="this.classList.remove('open')"><img id="photoLightboxImg" alt="Journal page"></div>
+<div class="day-modal-overlay" id="dayModalOverlay" onclick="if(event.target===this) closeDayDetail()">
+  <div class="day-modal">
+    <button class="modal-close" onclick="closeDayDetail()">✕</button>
+    <div class="day-modal-date" id="dayModalDate"></div>
+    <div id="dayModalBody"></div>
+  </div>
+</div>
 
 <!-- ============ AUTH MODAL ============ -->
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
@@ -1219,26 +1248,23 @@
 
     <!-- Daily log: photos of handwritten journal pages -->
     <div id="journalPhotoPanel" class="journal-panel" style="display:none;">
-      <div class="photo-upload-card">
-        <div class="photo-upload-fields">
-          <div>
-            <label for="photoEntryDate">Entry date</label>
-            <input type="date" id="photoEntryDate">
-          </div>
-          <div style="flex:1; min-width:180px;">
-            <label for="photoCaption">A line about today <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
-            <input type="text" id="photoCaption" placeholder="What this page was about…" maxlength="140">
-          </div>
+      <div class="log-reward" id="dailyLogReward">
+        <div class="log-reward-flame">🔥</div>
+        <div>
+          <div class="log-reward-streak" id="logRewardStreak">0 days logged</div>
+          <div class="log-reward-msg" id="logRewardMsg">Photograph today's page to start your streak.</div>
         </div>
-        <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
-        <div class="photo-upload-actions">
-          <button class="mini-btn candlebtn" id="photoUploadBtn" onclick="document.getElementById('photoFile').click()">Photograph today's page</button>
-          <span class="photo-upload-hint">Snap your handwritten entry — it's stored privately to your account.</span>
-        </div>
-        <div class="save-msg" id="photoUploadMsg"></div>
       </div>
-      <div class="journal-stat" id="photoStat" style="display:none;"></div>
-      <div class="photo-grid" id="photoGrid"></div>
+      <div class="calendar-card">
+        <div class="calendar-head">
+          <button type="button" class="cal-nav" onclick="shiftPhotoMonth(-1)" aria-label="Previous month">‹</button>
+          <div class="calendar-title" id="photoCalendarTitle"></div>
+          <button type="button" class="cal-nav" onclick="shiftPhotoMonth(1)" aria-label="Next month">›</button>
+        </div>
+        <div class="calendar-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div class="calendar-grid" id="photoCalendarGrid"></div>
+      </div>
+      <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
     </div>
 
     <!-- Habit tracker: morning and night rituals -->
@@ -1250,10 +1276,7 @@
           <span class="habit-block-count" id="habitCountMorning"></span>
         </div>
         <div class="habit-list" id="habitListMorning"></div>
-        <div class="journal-add">
-          <input type="text" id="habitInputMorning" placeholder="Add a morning habit — e.g. Three gratitudes, Play my subliminal" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('morning')">
-          <button class="mini-btn candlebtn" onclick="addHabit('morning')">Add</button>
-        </div>
+        <div class="habit-suggest-row" id="habitSuggestMorning"></div>
       </div>
       <div class="habit-block" data-time="night">
         <div class="habit-block-head">
@@ -1261,10 +1284,7 @@
           <span class="habit-block-count" id="habitCountNight"></span>
         </div>
         <div class="habit-list" id="habitListNight"></div>
-        <div class="journal-add">
-          <input type="text" id="habitInputNight" placeholder="Add a night habit — e.g. Journal by hand, Subliminal at lights out" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('night')">
-          <button class="mini-btn candlebtn" onclick="addHabit('night')">Add</button>
-        </div>
+        <div class="habit-suggest-row" id="habitSuggestNight"></div>
       </div>
       <div class="save-msg" id="habitsMsg"></div>
     </div>
@@ -4349,82 +4369,167 @@ async function addJournalEntry(){
   loadJournalEntries();
 }
 
-/* ---------- daily log: photos of handwritten pages ---------- */
+/* ---------- daily log: calendar of handwritten pages ----------
+   One photo per day (journal_photos has a unique constraint on
+   user_id+entry_date — see the "one per day" migration). Tapping a day opens
+   a modal: check in with a photo if the day is empty, or view/replace the
+   photo and edit its summary if it already has one. */
+let journalPhotosByDate = {};
+let photoCalendarViewDate = new Date();
+let pendingCheckInDate = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-  const dateInput = document.getElementById('photoEntryDate');
-  if (dateInput){ dateInput.value = localDateStr(); dateInput.max = localDateStr(); }
   const fileInput = document.getElementById('photoFile');
-  if (fileInput) fileInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadJournalPhoto(e.target.files[0]); e.target.value = ''; });
+  if (fileInput) fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file && pendingCheckInDate) uploadJournalPhoto(file, pendingCheckInDate);
+    e.target.value = '';
+  });
 });
-async function uploadJournalPhoto(file){
-  const msg = document.getElementById('photoUploadMsg');
-  if (!sb || !currentUser) return;
-  if (file.size > 15 * 1024 * 1024){ msg.textContent = 'That photo is over 15 MB — try a smaller one.'; msg.className = 'save-msg err'; return; }
-  const entryDate = document.getElementById('photoEntryDate').value || localDateStr();
-  const caption = document.getElementById('photoCaption').value.trim() || null;
-  msg.textContent = 'Uploading your page…'; msg.className = 'save-msg';
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-  const path = `${currentUser.id}/${entryDate}-${Date.now()}.${ext}`;
-  const { error: upErr } = await sb.storage.from('journal-photos').upload(path, file, { contentType: file.type || 'image/jpeg' });
-  if (upErr){ console.error('photo upload error:', upErr); msg.textContent = "Couldn't upload that photo — try again in a moment."; msg.className = 'save-msg err'; return; }
-  const { error } = await sb.from('journal_photos').insert({ user_id: currentUser.id, storage_path: path, caption, entry_date: entryDate });
-  if (error){ console.error('journal_photos insert error:', error); msg.textContent = "Uploaded, but couldn't save the entry — try again."; msg.className = 'save-msg err'; return; }
-  document.getElementById('photoCaption').value = '';
-  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
-  setTimeout(() => { if (msg.textContent === 'Saved.') msg.textContent = ''; }, 2000);
-  loadJournalPhotos();
-}
+
 async function loadJournalPhotos(){
   if (!sb || !currentUser) return;
-  const grid = document.getElementById('photoGrid');
-  const stat = document.getElementById('photoStat');
-  grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">Loading…</div>';
-  const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id).order('entry_date', { ascending: false }).order('created_at', { ascending: false });
-  if (error){ grid.innerHTML = `<div class="journal-empty" style="grid-column:1/-1;">Couldn't load your log.</div>`; return; }
-  if (!data.length){
-    stat.style.display = 'none';
-    grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">No pages yet — photograph your first entry above.</div>';
-    return;
-  }
-  const days = new Set(data.map(p => p.entry_date));
-  const streak = streakFromDays(days);
-  stat.style.display = 'block';
-  stat.textContent = `✦ ${days.size} day${days.size === 1 ? '' : 's'} logged` + (streak > 1 ? ` · ${streak}-day streak` : '');
-
-  const { data: signed } = await sb.storage.from('journal-photos').createSignedUrls(data.map(p => p.storage_path), 3600);
+  const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id);
+  if (error){ console.error('loadJournalPhotos error:', error); return; }
+  const rows = data || [];
   const urlByPath = {};
-  (signed || []).forEach(s => { if (s.signedUrl) urlByPath[s.path] = s.signedUrl; });
-  grid.innerHTML = data.map(p => {
-    const url = urlByPath[p.storage_path] || '';
-    const [y,m,d] = p.entry_date.split('-').map(Number);
-    const dateLabel = new Date(y, m-1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
-    const cap = p.caption ? p.caption.replace(/</g,'&lt;') : '';
-    return `
-    <div class="photo-card">
-      <img src="${url}" alt="Journal page from ${dateLabel}" loading="lazy" onclick="openPhotoLightbox(this.src)">
-      <div class="meta">
-        <div class="date">${dateLabel}</div>
-        ${cap ? `<div class="cap">${cap}</div>` : ''}
-        <button class="journal-entry-delete" onclick="deleteJournalPhoto('${p.id}','${p.storage_path}')" aria-label="Delete page" title="Delete">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-        </button>
+  if (rows.length){
+    const { data: signed } = await sb.storage.from('journal-photos').createSignedUrls(rows.map(p => p.storage_path), 3600);
+    (signed || []).forEach(s => { if (s.signedUrl) urlByPath[s.path] = s.signedUrl; });
+  }
+  journalPhotosByDate = {};
+  rows.forEach(p => { journalPhotosByDate[p.entry_date] = { ...p, url: urlByPath[p.storage_path] || '' }; });
+  renderPhotoCalendar();
+  renderDailyLogReward();
+}
+
+function shiftPhotoMonth(delta){
+  photoCalendarViewDate = new Date(photoCalendarViewDate.getFullYear(), photoCalendarViewDate.getMonth() + delta, 1);
+  renderPhotoCalendar();
+}
+function renderPhotoCalendar(){
+  const year = photoCalendarViewDate.getFullYear(), month = photoCalendarViewDate.getMonth();
+  document.getElementById('photoCalendarTitle').textContent = photoCalendarViewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const firstDow = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  const today = localDateStr();
+  let html = '';
+  for (let i = 0; i < totalCells; i++){
+    const dayNum = i - firstDow + 1;
+    if (dayNum < 1 || dayNum > daysInMonth){ html += `<div class="cal-day cal-day-empty"></div>`; continue; }
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}`;
+    const entry = journalPhotosByDate[dateStr];
+    const isFuture = dateStr > today;
+    const classes = ['cal-day'];
+    if (entry) classes.push('has-entry');
+    if (isFuture) classes.push('is-future');
+    if (dateStr === today) classes.push('is-today');
+    const style = entry && entry.url ? ` style="background-image:url('${entry.url}')"` : '';
+    html += `<button type="button" class="${classes.join(' ')}"${style} ${isFuture ? 'disabled' : `onclick="openDayDetail('${dateStr}')"`}>
+      <span class="cal-day-num">${dayNum}</span>
+      ${!entry && !isFuture ? '<span class="cal-day-plus">+</span>' : ''}
+    </button>`;
+  }
+  document.getElementById('photoCalendarGrid').innerHTML = html;
+}
+function renderDailyLogReward(){
+  const days = new Set(Object.keys(journalPhotosByDate));
+  const streak = streakFromDays(days);
+  let msg;
+  if (streak === 0) msg = days.size ? "Log today to start a new streak." : "Photograph today's page to start your streak.";
+  else if (streak < 3) msg = 'Off to a good start.';
+  else if (streak < 7) msg = 'Building the habit.';
+  else if (streak < 14) msg = "A full week — that's a real practice now.";
+  else if (streak < 30) msg = 'Two weeks and still showing up.';
+  else msg = "A month of showing up. That's who you are now.";
+  document.getElementById('logRewardStreak').textContent = streak > 0 ? `${streak}-day streak` : `${days.size} day${days.size === 1 ? '' : 's'} logged`;
+  document.getElementById('logRewardMsg').textContent = msg;
+}
+
+function dayLabel(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+}
+function trashIconSvg(){
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+}
+function dayModalContent(dateStr){
+  document.getElementById('dayModalDate').textContent = dayLabel(dateStr);
+  const body = document.getElementById('dayModalBody');
+  const entry = journalPhotosByDate[dateStr];
+  if (dateStr > localDateStr()){ body.innerHTML = `<p class="journal-empty">This day hasn't happened yet.</p>`; return; }
+  if (entry){
+    body.innerHTML = `
+      <img class="day-modal-photo" src="${entry.url}" alt="Journal page from ${dayLabel(dateStr)}">
+      <label class="day-modal-label">Summary of the page</label>
+      <textarea id="dayModalCaption" rows="3" maxlength="200" placeholder="What this page was about…">${(entry.caption || '').replace(/</g,'&lt;')}</textarea>
+      <div class="day-modal-actions">
+        <button class="mini-btn candlebtn" onclick="saveDayCaption('${dateStr}')">Save summary</button>
+        <button class="mini-btn ghostbtn" onclick="triggerCheckIn('${dateStr}')">Replace photo</button>
+        <button class="habit-delete" onclick="deleteDayEntry('${dateStr}')" aria-label="Delete this day's page" title="Delete">${trashIconSvg()}</button>
       </div>
-    </div>`;
-  }).join('');
+      <div class="save-msg" id="dayModalMsg"></div>`;
+  } else {
+    body.innerHTML = `
+      <p class="journal-empty">No page logged for this day yet.</p>
+      <button class="mini-btn candlebtn" onclick="triggerCheckIn('${dateStr}')">Check in — add a photo</button>
+      <div class="save-msg" id="dayModalMsg"></div>`;
+  }
 }
-function openPhotoLightbox(src){
-  document.getElementById('photoLightboxImg').src = src;
-  document.getElementById('photoLightbox').classList.add('open');
+function openDayDetail(dateStr){
+  if (dateStr > localDateStr()) return;
+  dayModalContent(dateStr);
+  document.getElementById('dayModalOverlay').classList.add('open');
 }
-async function deleteJournalPhoto(id, path){
-  if (!sb || !currentUser) return;
-  const { error } = await sb.from('journal_photos').delete().eq('id', id).eq('user_id', currentUser.id);
-  if (error){ console.error('deleteJournalPhoto error:', error); return; }
-  await sb.storage.from('journal-photos').remove([path]);
+function closeDayDetail(){ document.getElementById('dayModalOverlay').classList.remove('open'); }
+function triggerCheckIn(dateStr){
+  pendingCheckInDate = dateStr;
+  document.getElementById('photoFile').click();
+}
+async function uploadJournalPhoto(file, dateStr){
+  const msg = document.getElementById('dayModalMsg');
+  if (!sb || !currentUser || !dateStr) return;
+  if (file.size > 15 * 1024 * 1024){ if (msg){ msg.textContent = 'That photo is over 15 MB — try a smaller one.'; msg.className = 'save-msg err'; } return; }
+  if (msg){ msg.textContent = 'Uploading your page…'; msg.className = 'save-msg'; }
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${currentUser.id}/${dateStr}.${ext}`;
+  const { error: upErr } = await sb.storage.from('journal-photos').upload(path, file, { contentType: file.type || 'image/jpeg', upsert: true });
+  if (upErr){ console.error('photo upload error:', upErr); if (msg){ msg.textContent = "Couldn't upload that photo — try again."; msg.className = 'save-msg err'; } return; }
+  // Caption is deliberately left out of this upsert payload so replacing a
+  // photo never wipes out a summary already written for that day.
+  const { error } = await sb.from('journal_photos').upsert({ user_id: currentUser.id, storage_path: path, entry_date: dateStr }, { onConflict: 'user_id,entry_date' });
+  if (error){ console.error('journal_photos upsert error:', error); if (msg){ msg.textContent = "Uploaded, but couldn't save — try again."; msg.className = 'save-msg err'; } return; }
+  await loadJournalPhotos();
+  if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
+}
+async function saveDayCaption(dateStr){
+  const msg = document.getElementById('dayModalMsg');
+  const caption = document.getElementById('dayModalCaption').value.trim() || null;
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.from('journal_photos').update({ caption }).eq('user_id', currentUser.id).eq('entry_date', dateStr);
+  if (error){ console.error('saveDayCaption error:', error); msg.textContent = "Couldn't save — try again."; msg.className = 'save-msg err'; return; }
+  if (journalPhotosByDate[dateStr]) journalPhotosByDate[dateStr].caption = caption;
+  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
+}
+async function deleteDayEntry(dateStr){
+  const entry = journalPhotosByDate[dateStr];
+  if (!sb || !currentUser || !entry) return;
+  const { error } = await sb.from('journal_photos').delete().eq('user_id', currentUser.id).eq('entry_date', dateStr);
+  if (error){ console.error('deleteDayEntry error:', error); return; }
+  await sb.storage.from('journal-photos').remove([entry.storage_path]);
+  closeDayDetail();
   loadJournalPhotos();
 }
 
-/* ---------- habit tracker: morning & night rituals ---------- */
+/* ---------- habit tracker: morning & night rituals ----------
+   Each time-of-day always shows 15 slots: real habits first, then blank
+   fill-in rows for the rest. Typing into a blank row (Enter or blur) creates
+   the habit; suggestion chips below do the same in one tap. */
+const HABIT_SLOTS = 15;
+const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read scripture','Pray','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
+const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
+
 let habitsCache = [];        // rows from `habits`
 let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
 async function loadHabits(){
@@ -4449,14 +4554,12 @@ function renderHabits(){
     const rows = habitsCache.filter(h => h.time_of_day === time);
     const list = document.getElementById(time === 'morning' ? 'habitListMorning' : 'habitListNight');
     const count = document.getElementById(time === 'morning' ? 'habitCountMorning' : 'habitCountNight');
+    const suggestWrap = document.getElementById(time === 'morning' ? 'habitSuggestMorning' : 'habitSuggestNight');
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
-    count.textContent = rows.length ? `${done} of ${rows.length} today` : '';
-    if (!rows.length){
-      list.innerHTML = `<div class="habit-empty">${time === 'morning' ? 'Nothing here yet — what do you want your mornings to hold?' : 'Nothing here yet — how do you want to close the day?'}</div>`;
-      return;
-    }
-    list.innerHTML = rows.map(h => {
+    count.textContent = rows.length ? `${done} of ${rows.length} today · ${rows.length}/${HABIT_SLOTS} added` : `0/${HABIT_SLOTS} added`;
+
+    const realRowsHtml = rows.map(h => {
       const days = habitCheckins[h.id] || new Set();
       const isDone = days.has(today);
       const streak = streakFromDays(days);
@@ -4474,6 +4577,30 @@ function renderHabits(){
         </button>
       </div>`;
     }).join('');
+
+    const already = new Set(rows.map(h => h.name.toLowerCase()));
+    const pool = (time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS).filter(s => !already.has(s.toLowerCase()));
+    const blanksNeeded = Math.max(0, HABIT_SLOTS - rows.length);
+    const blankRowsHtml = Array.from({ length: blanksNeeded }, (_, i) => {
+      const example = pool.length ? `e.g. ${pool[i % pool.length]}` : `Habit #${rows.length + i + 1}`;
+      return `
+      <div class="habit-row habit-row-blank">
+        <span class="habit-slot-num">${rows.length + i + 1}</span>
+        <input type="text" class="habit-blank-input" placeholder="${example}" maxlength="80"
+          onkeydown="if(event.key==='Enter'){ addHabit('${time}', this.value); this.value=''; this.blur(); }"
+          onblur="if(this.value.trim()){ addHabit('${time}', this.value); this.value=''; }">
+      </div>`;
+    }).join('');
+
+    list.innerHTML = realRowsHtml + blankRowsHtml;
+
+    if (suggestWrap){
+      suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
+        ? `<span class="habit-suggest-full">15 of 15 — this ritual is full.</span>`
+        : pool.length
+          ? `<span class="habit-suggest-label">Need ideas?</span>` + pool.map(s => `<button type="button" class="habit-suggest-chip" onclick="addHabit('${time}','${s}')">${s}</button>`).join('')
+          : '';
+    }
   });
   const stat = document.getElementById('habitsStat');
   if (!habitsCache.length){ stat.style.display = 'none'; return; }
@@ -4485,15 +4612,15 @@ function renderHabits(){
     ? `✦ Every ritual done today${practiceStreak > 1 ? ` · ${practiceStreak} days in a row showing up` : ''}`
     : `${doneToday} of ${habitsCache.length} done today${practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : ''}`;
 }
-async function addHabit(time){
+async function addHabit(time, name){
   if (!sb || !currentUser) return;
-  const input = document.getElementById(time === 'morning' ? 'habitInputMorning' : 'habitInputNight');
-  const name = input.value.trim();
+  name = (name || '').trim();
   if (!name) return;
+  if (habitsCache.filter(h => h.time_of_day === time).length >= HABIT_SLOTS) return;
   const msg = document.getElementById('habitsMsg');
   const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time });
   if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
-  input.value = ''; msg.textContent = '';
+  msg.textContent = '';
   loadHabits();
 }
 async function toggleHabitToday(habitId){
