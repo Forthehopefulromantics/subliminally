@@ -214,6 +214,14 @@
   @keyframes loadPulse{ 0%,100%{ opacity:.25; transform:scale(0.8);} 50%{ opacity:1; transform:scale(1);} }
 
   .voice-options{ display:grid; gap:10px; }
+  .voice-picker{ margin-top:16px; padding-top:16px; border-top:1px solid var(--dusk); }
+  .voice-picker-label{ font-size:12px; color:var(--haze); margin-bottom:10px; }
+  .voice-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .voice-chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; transition:border-color .2s, background .2s; }
+  .voice-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .voice-chip .voice-chip-desc{ color:var(--haze); font-size:11px; }
+  .voice-chip.mine{ border-color:var(--candle); }
+  .voice-chip-play{ opacity:.6; }
   .voice-card{ text-align:left; cursor:pointer; padding:16px; border-radius:16px; background:var(--dusk); border:1px solid transparent; transition:all .2s; position:relative; }
   .voice-card.sel{ background:rgba(227,190,127,0.12); border-color:var(--candle); }
   .voice-card .badge{ position:absolute; top:12px; right:14px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--candle); background:rgba(227,190,127,0.14); padding:3px 9px; border-radius:999px; }
@@ -259,6 +267,17 @@
   .mini-btn:disabled{ opacity:.35; cursor:not-allowed; }
   .mini-btn.candlebtn{ background:var(--candle); color:#241C0E; }
   .mini-btn.ghostbtn{ background:transparent; color:var(--haze); border:1px solid var(--dusk); }
+  .mini-btn.micbtn{ background:var(--dusk); color:var(--moonlight); display:inline-flex; align-items:center; padding:9px 13px; }
+  .mini-btn.micbtn:hover{ color:var(--candle); }
+  /* The row that replaces the text field while a spoken entry is being recorded. */
+  .voice-rec{ display:flex; align-items:center; gap:10px; margin-bottom:20px; padding:11px 14px; background:var(--dusk); border-radius:14px; flex-wrap:wrap; }
+  .voice-rec-dot{ width:9px; height:9px; border-radius:50%; background:#E06C6C; flex-shrink:0; animation:voicePulse 1.6s ease-in-out infinite; }
+  @keyframes voicePulse{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+  .voice-rec-label{ font-size:13px; color:var(--moonlight); flex:1; min-width:140px; }
+  .voice-rec-time{ font-size:13px; color:var(--haze); font-variant-numeric:tabular-nums; }
+  /* Playback of a spoken entry, inside its card in the list. */
+  .journal-entry audio{ width:100%; margin:4px 0 10px; height:36px; }
+  .journal-entry-spoken{ font-size:11.5px; color:var(--haze); display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 
   .final-panel{ display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:6px 0; width:100%; max-width:460px; margin:0 auto; }
   .final-orb{ width:110px; height:110px; }
@@ -406,6 +425,11 @@
   .profile-item .meta{ font-size:12px; color:var(--haze); margin-top:3px; }
   .profile-item button{ background:none; border:none; color:var(--haze); font-size:12px; cursor:pointer; text-decoration:underline; flex-shrink:0; }
   .profile-item button:hover{ color:#E39A9A; }
+  .voice-clone-card{ background:var(--dusk); border-radius:16px; padding:20px; margin-bottom:8px; }
+  .voice-clone-intro{ font-size:13px; color:var(--haze); line-height:1.6; margin:0 0 14px; }
+  .voice-clone-sample{ background:rgba(0,0,0,0.18); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.7; color:var(--moonlight); margin-bottom:14px; }
+  .voice-clone-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .voice-clone-have{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px; color:var(--moonlight); }
   .profile-settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:640px){ .profile-settings-grid{ grid-template-columns:1fr; } }
   .profile-field-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:18px; }
@@ -1076,9 +1100,15 @@
               <p>Hold to record each line yourself. Nothing is uploaded — it stays in this tab.</p>
             </button>
             <button class="voice-card" id="voiceAI" onclick="chooseVoice('ai')">
-              <h4>AI voice</h4>
-              <p>A natural browser voice reads each line aloud instead of recording.</p>
+              <h4>A studio voice</h4>
+              <p>Pick a voice to read each line aloud instead of recording it yourself.</p>
             </button>
+          </div>
+          <div class="voice-picker" id="voicePicker" style="display:none;">
+            <div class="voice-picker-label">Which voice?</div>
+            <div class="voice-chips" id="voiceChips"></div>
+            <audio id="voicePreview" style="display:none;"></audio>
+            <div class="save-msg" id="voicePickerMsg"></div>
           </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="toStep5" disabled onclick="nextStep()">Continue</button></div>
@@ -1262,7 +1292,17 @@
     <div id="journalPanel" class="journal-panel" style="display:none;">
       <div class="journal-add">
         <input type="text" id="journalInput" placeholder="I am so grateful for…" onkeydown="if(event.key==='Enter') addJournalEntry()">
+        <button class="mini-btn micbtn" id="journalMicBtn" onclick="startVoiceEntry()" title="Say it out loud instead" aria-label="Record this entry instead of typing it">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 19v3"/></svg>
+        </button>
         <button class="mini-btn candlebtn" onclick="addJournalEntry()">Add</button>
+      </div>
+      <div class="voice-rec" id="journalVoiceRec" style="display:none;">
+        <span class="voice-rec-dot"></span>
+        <span class="voice-rec-label">Listening… say it out loud.</span>
+        <span class="voice-rec-time" id="journalVoiceTime">0:00</span>
+        <button class="mini-btn candlebtn" onclick="finishVoiceEntry()">Save it</button>
+        <button class="mini-btn ghostbtn" onclick="cancelVoiceEntry()">Cancel</button>
       </div>
       <div class="save-msg" id="journalAddMsg"></div>
       <div class="journal-stat" id="journalStat" style="display:none;"></div>
@@ -1370,6 +1410,13 @@
       </div>
 
       <button class="mini-btn ghostbtn" onclick="showLibraryPage(); setLibraryTab('mine');"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>View my saved subliminals →</button>
+
+      <h3 class="profile-subhead">Your voice</h3>
+      <div class="voice-clone-card" id="voiceCloneCard">
+        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Read the passage below once and your voice becomes one of the voices you can choose when you build a subliminal.</p>
+        <div class="voice-clone-body" id="voiceCloneBody"></div>
+        <div class="save-msg" id="voiceCloneMsg"></div>
+      </div>
 
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
@@ -1628,7 +1675,7 @@ function eftRepeatsForIndex(i){
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1673,7 +1720,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -2051,12 +2098,134 @@ function renderAffList(){
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
-/* ---------------- step 4: voice choice ---------------- */
+/* ---------------- step 4: voice choice ----------------
+   Two things are being chosen here: whether to record yourself or not, and — if
+   not — which voice reads the lines. The studio voices are generated by
+   /api/tts; when that isn't configured (or the person isn't on a paid plan) the
+   app falls back to the device's own speech synthesis, which is how it has
+   always worked, so nothing breaks. */
+const AI_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',     desc: 'warm, calm' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', desc: 'soft, low' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',     desc: 'clear, steady' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',      desc: 'bright' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',    desc: 'deep, grounding' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',    desc: 'measured' },
+];
+const DEVICE_VOICE = 'device';   // the browser's own speechSynthesis
+const MY_CLONED_VOICE = 'mine';  // resolved to the profile's cloned_voice_id at play time
+
 function chooseVoice(mode){
   state.voiceMode = mode;
   document.getElementById('voiceOwn').classList.toggle('sel', mode==='own');
   document.getElementById('voiceAI').classList.toggle('sel', mode==='ai');
+  document.getElementById('voicePicker').style.display = mode === 'ai' ? 'block' : 'none';
+  if (mode === 'ai') renderVoiceChips();
   document.getElementById('toStep5').disabled = false;
+}
+
+function pickAiVoice(id){
+  state.aiVoiceId = id;
+  renderVoiceChips();
+  previewVoice(id);
+}
+
+async function renderVoiceChips(){
+  const wrap = document.getElementById('voiceChips');
+  if (!state.aiVoiceId) state.aiVoiceId = AI_VOICES[0].id;
+  const cloned = await myClonedVoiceId();
+  const chips = AI_VOICES.map(v => ({ id: v.id, name: v.name, desc: v.desc, mine: false }));
+  if (cloned) chips.unshift({ id: MY_CLONED_VOICE, name: 'My voice', desc: 'cloned', mine: true });
+  chips.push({ id: DEVICE_VOICE, name: 'This device', desc: 'built-in', mine: false });
+  wrap.innerHTML = chips.map(c => `
+    <button type="button" class="voice-chip${state.aiVoiceId === c.id ? ' sel' : ''}${c.mine ? ' mine' : ''}" onclick="pickAiVoice('${c.id}')">
+      ${c.name} <span class="voice-chip-desc">${c.desc}</span>
+    </button>`).join('');
+}
+
+/* The cloned voice id lives on the profile; cached so the picker doesn't refetch
+   it every repaint. */
+let clonedVoiceCache;
+async function myClonedVoiceId(){
+  if (clonedVoiceCache !== undefined) return clonedVoiceCache;
+  if (!sb || !currentUser){ clonedVoiceCache = null; return null; }
+  const { data } = await sb.from('profiles').select('cloned_voice_id').eq('id', currentUser.id).maybeSingle();
+  clonedVoiceCache = (data && data.cloned_voice_id) || null;
+  return clonedVoiceCache;
+}
+
+/* Resolve what the picker stores into the id the API actually wants. Returns
+   null when the line should be spoken by the device instead. */
+async function resolveVoiceId(picked){
+  if (!picked || picked === DEVICE_VOICE) return null;
+  if (picked === MY_CLONED_VOICE) return await myClonedVoiceId();
+  return picked;
+}
+
+async function previewVoice(picked){
+  const msg = document.getElementById('voicePickerMsg');
+  msg.textContent = ''; msg.className = 'save-msg';
+  const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
+  const voiceId = await resolveVoiceId(picked);
+  if (!voiceId){ speakWithDeviceVoice(line); return; }
+  msg.textContent = 'Loading the voice…';
+  try {
+    const url = await synthesizeLine(line, voiceId);
+    msg.textContent = '';
+    const el = document.getElementById('voicePreview');
+    el.src = url; el.play().catch(()=>{});
+  } catch (e){
+    msg.textContent = ttsErrorText(e);
+    msg.className = 'save-msg';
+    speakWithDeviceVoice(line);
+  }
+}
+function speakWithDeviceVoice(line){
+  try { window.speechSynthesis.cancel(); } catch(e){}
+  const u = new SpeechSynthesisUtterance(line);
+  u.rate = 0.92; u.pitch = 1.0;
+  window.speechSynthesis.speak(u);
+}
+function ttsErrorText(e){
+  const m = (e && e.message) || '';
+  if (m === 'upgrade_required') return 'Studio voices come with Whisper — using this device\'s voice for now.';
+  if (m === 'not_configured') return 'Studio voices aren\'t switched on yet — using this device\'s voice.';
+  return 'That voice is unavailable right now — using this device\'s voice.';
+}
+
+/* Generate one spoken line and hand back an object URL. Each line is only ever
+   generated once per session: the same words in the same voice always sound the
+   same, and every repeat after that is free. */
+const ttsCache = new Map();
+/* loadClip caches its decoded audio on the object it's handed, so each generated
+   line needs one stable handle rather than a fresh literal per repeat. */
+const studioClipHandles = new Map();
+function studioClipHandle(url){
+  if (!studioClipHandles.has(url)) studioClipHandles.set(url, { url });
+  return studioClipHandles.get(url);
+}
+async function synthesizeLine(text, voiceId){
+  const key = voiceId + '|' + text;
+  if (ttsCache.has(key)) return ttsCache.get(key);
+  const promise = (async () => {
+    const token = sb && (await sb.auth.getSession()).data.session?.access_token;
+    if (!token) throw new Error('not_signed_in');
+    const res = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text, voiceId }),
+    });
+    if (!res.ok){
+      let body = {};
+      try { body = await res.json(); } catch(e){}
+      throw new Error(body.error || `tts_failed_${res.status}`);
+    }
+    return URL.createObjectURL(await res.blob());
+  })();
+  ttsCache.set(key, promise);
+  // A failed line shouldn't be cached as permanently broken.
+  promise.catch(() => ttsCache.delete(key));
+  return promise;
 }
 
 /* ---------------- step 5: background + mixer ---------------- */
@@ -2195,6 +2364,91 @@ function advanceLine(){
   prepareFinal(); showStep(7);
 }
 
+/* Recording format. Chrome and Android record WebM/Opus; Safari records MP4/AAC.
+   decodeAudioData on Safari cannot read WebM at all, so a library recorded on a
+   laptop used to play back as pure silence on an iPhone — the decode promise
+   rejected and nothing caught it. Record in whatever this browser supports, keep
+   the real content type with the file, and fall back to an <audio> element
+   (which understands far more than decodeAudioData) when decoding fails. */
+function pickRecordingMime(){
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  const candidates = ['audio/webm;codecs=opus','audio/webm','audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/ogg;codecs=opus'];
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+function extForMime(mime){
+  const m = (mime || '').toLowerCase();
+  if (m.indexOf('webm') !== -1) return 'webm';
+  if (m.indexOf('mp4') !== -1 || m.indexOf('m4a') !== -1 || m.indexOf('aac') !== -1) return 'm4a';
+  if (m.indexOf('ogg') !== -1) return 'ogg';
+  if (m.indexOf('wav') !== -1) return 'wav';
+  if (m.indexOf('mpeg') !== -1 || m.indexOf('mp3') !== -1) return 'mp3';
+  return 'webm';
+}
+/* Clips saved before the fix all claim to be audio/webm whether they are or not,
+   so trust the bytes rather than the label when handing one to an <audio> tag. */
+function sniffAudioMime(bytes){
+  if (bytes.length > 4 && bytes[0]===0x1A && bytes[1]===0x45 && bytes[2]===0xDF && bytes[3]===0xA3) return 'audio/webm';
+  if (bytes.length > 12 && bytes[4]===0x66 && bytes[5]===0x74 && bytes[6]===0x79 && bytes[7]===0x70) return 'audio/mp4';
+  if (bytes.length > 4 && bytes[0]===0x4F && bytes[1]===0x67 && bytes[2]===0x67 && bytes[3]===0x53) return 'audio/ogg';
+  if (bytes.length > 4 && bytes[0]===0x52 && bytes[1]===0x49 && bytes[2]===0x46 && bytes[3]===0x46) return 'audio/wav';
+  if (bytes.length > 3 && bytes[0]===0x49 && bytes[1]===0x44 && bytes[2]===0x33) return 'audio/mpeg';
+  return '';
+}
+
+/* Turn a recording into something playable on THIS device, once per session.
+   Returns {kind:'buffer'} where decodeAudioData works, {kind:'element'} where it
+   doesn't. Rejects — loudly — when neither can play it, so the session can say so
+   instead of running silently for twenty minutes. */
+async function loadClip(ctx, rec){
+  if (rec._clip && rec._clipCtx === ctx) return rec._clip;
+  const raw = rec.blob || await (await fetch(rec.url)).blob();
+  const bytes = new Uint8Array(await raw.slice(0, 16).arrayBuffer());
+  const trueMime = sniffAudioMime(bytes) || raw.type || 'audio/webm';
+  const blob = raw.type === trueMime ? raw : new Blob([raw], { type: trueMime });
+  let clip = null;
+  try {
+    const buf = await blob.arrayBuffer();
+    clip = { kind: 'buffer', buffer: await ctx.decodeAudioData(buf) };
+  } catch (e){
+    const el = new Audio();
+    el.src = URL.createObjectURL(blob);
+    el.preload = 'auto';
+    await new Promise((resolve, reject) => {
+      el.oncanplaythrough = resolve;
+      el.onerror = () => reject(new Error('unplayable recording (' + trueMime + ')'));
+      el.load();
+    });
+    clip = { kind: 'element', el };
+  }
+  rec._clip = clip; rec._clipCtx = ctx;
+  return clip;
+}
+
+/* Play one loaded clip through `gainValue`, calling onended when it finishes. */
+function playClip(ctx, clip, gainValue, extraDest, onended){
+  if (clip.kind === 'buffer'){
+    const g = ctx.createGain(); g.gain.value = gainValue;
+    g.connect(ctx.destination);
+    if (extraDest && extraDest !== ctx.destination) g.connect(extraDest);
+    const src = ctx.createBufferSource(); src.buffer = clip.buffer;
+    src.connect(g); src.onended = onended; src.start();
+    return;
+  }
+  // createMediaElementSource can only ever be called once per <audio> element,
+  // so the element's graph is built once and reused for every repeat.
+  if (!clip.gain){
+    clip.gain = ctx.createGain();
+    ctx.createMediaElementSource(clip.el).connect(clip.gain);
+    clip.gain.connect(ctx.destination);
+    if (extraDest && extraDest !== ctx.destination) clip.gain.connect(extraDest);
+  }
+  clip.gain.gain.value = gainValue;
+  clip.el.onended = onended;
+  try { clip.el.currentTime = 0; } catch(e){}
+  const p = clip.el.play();
+  if (p && p.catch) p.catch(() => { if (onended) onended(); });
+}
+
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
 const recBtn = document.getElementById('recBtn');
 async function startRec(e){
@@ -2203,10 +2457,11 @@ async function startRec(e){
   try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(err){ document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
   holdStart = Date.now(); audioChunks=[];
-  mediaRecorder = new MediaRecorder(micStream);
+  const recMime = pickRecordingMime();
+  mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
   mediaRecorder.ondataavailable = ev=>audioChunks.push(ev.data);
   mediaRecorder.onstop = ()=>{
-    const blob = new Blob(audioChunks, {type:'audio/webm'});
+    const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || recMime || 'audio/webm'});
     const url = URL.createObjectURL(blob);
     micStream.getTracks().forEach(t=>t.stop());
     const held = Date.now()-holdStart;
@@ -2654,6 +2909,9 @@ function playFinal(){
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
   finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+  // Safari and the iOS app's web view hand back a suspended context. Resuming has
+  // to happen inside the tap that started the session, which is where we are.
+  if (finalCtx.state === 'suspended') finalCtx.resume().catch(()=>{});
   startCustomTrackPlayback();
   const toneGain = finalCtx.createGain();
   const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
@@ -2726,19 +2984,37 @@ function playFinal(){
         if (!recorded.length) return;
         if (idx >= recorded.length) idx = 0; // loops independently, doesn't need to match the main track's length
         const { r } = recorded[idx];
-        fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
+        loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
-          const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
-          src.connect(liveLayerVoiceGain);
-          src.start();
-          src.onended = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, ()=>{
+            idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
+          });
+        }).catch(e=>{
+          console.error('could not play layered line', e);
+          idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
         });
       } else {
         if (idx >= lines.length) idx = 0;
-        const utter = new SpeechSynthesisUtterance(lines[idx]);
-        utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
-        utter.onend = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
-        window.speechSynthesis.speak(utter);
+        const line = lines[idx];
+        const advance = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+        const deviceSpeak = ()=>{
+          if (!finalPlaying) return;
+          const utter = new SpeechSynthesisUtterance(line);
+          utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
+          utter.onend = advance;
+          window.speechSynthesis.speak(utter);
+        };
+        resolveVoiceId(state.layerAiVoiceId).catch(()=>null).then(voiceId => {
+          if (!finalPlaying) return;
+          if (!voiceId){ deviceSpeak(); return; }
+          return synthesizeLine(line, voiceId)
+            .then(url => loadClip(finalCtx, studioClipHandle(url)))
+            .then(clip => {
+              if (!finalPlaying) return;
+              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, advance);
+            })
+            .catch(deviceSpeak);
+        }).catch(deviceSpeak);
       }
     }
     // Starts a beat after the main voice so the two voices don't land on top of each other.
@@ -2756,17 +3032,12 @@ function playFinal(){
         const { r, i } = recorded[idx];
         document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
-        fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
+        loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
           let rep = 0;
           function playOnce(){
             if (!finalPlaying) return;
-            const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
-            const g = finalCtx.createGain(); g.gain.value = document.getElementById('mixVoice').value/100;
-            src.connect(g).connect(finalCtx.destination);
-            if (destForRecording !== finalCtx.destination) g.connect(destForRecording);
-            src.start();
-            src.onended = ()=>{
+            playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, ()=>{
               rep++;
               if (rep < repeatsForThisLine){
                 // Short beat between repeats of the same line, timed to a single tap.
@@ -2774,34 +3045,59 @@ function playFinal(){
               } else {
                 idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
               }
-            };
+            });
           }
           playOnce();
+        }).catch(e=>{
+          // Never fail silently — a session that plays no voice should say why.
+          console.error('could not play recorded line', i, e);
+          document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
+          idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
         });
       }
       playNext();
     } else {
       const lines = state.affirmations;
       let idx = 0;
+      // Resolved once per session: a studio voice id, or null to use the voice
+      // built into this device. Anything that goes wrong with a studio voice
+      // falls back to the device rather than leaving the session silent.
+      const voicePromise = resolveVoiceId(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
         if (idx >= lines.length){ onDone(); return; }
         document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
-        function speakOnce(){
+        function advance(){
+          rep++;
+          if (rep < repeatsForThisLine){
+            const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
+          } else {
+            idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
+          }
+        }
+        function deviceSpeak(){
           if (!finalPlaying) return;
           const utter = new SpeechSynthesisUtterance(lines[idx]);
           utter.rate = 0.92; utter.pitch = 1.0;
-          utter.onend = ()=>{
-            rep++;
-            if (rep < repeatsForThisLine){
-              const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
-            } else {
-              idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
-            }
-          };
+          utter.onend = advance;
           window.speechSynthesis.speak(utter);
+        }
+        function speakOnce(){
+          if (!finalPlaying) return;
+          const line = lines[idx];
+          voicePromise.then(voiceId => {
+            if (!finalPlaying) return;
+            if (!voiceId){ deviceSpeak(); return; }
+            return synthesizeLine(line, voiceId)
+              .then(url => loadClip(finalCtx, studioClipHandle(url)))
+              .then(clip => {
+                if (!finalPlaying) return;
+                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
+              })
+              .catch(() => deviceSpeak());
+          }).catch(deviceSpeak);
         }
         speakOnce();
       }
@@ -3213,8 +3509,9 @@ async function saveSubliminal(){
     let anyUploaded = false;
     for (let i = 0; i < recordings.length; i++){
       if (!recordings[i] || !recordings[i].blob){ recordingUrls.push(null); continue; }
-      const path = `${folder}/${i}.webm`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: 'audio/webm' });
+      const mime = recordings[i].blob.type || 'audio/webm';
+      const path = `${folder}/${i}.${extForMime(mime)}`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: mime });
       if (upErr){ console.error('recording upload failed for line', i, upErr); recordingUrls.push(null); continue; }
       recordingUrls.push(path); // store the storage path; we generate a signed URL when loading it back
       anyUploaded = true;
@@ -3242,8 +3539,9 @@ async function saveSubliminal(){
     layerRecordingUrls = [];
     for (let i = 0; i < layerRecordings.length; i++){
       if (!layerRecordings[i] || !layerRecordings[i].blob){ layerRecordingUrls.push(null); continue; }
-      const path = `${layerFolder}/${i}.webm`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: 'audio/webm' });
+      const mime = layerRecordings[i].blob.type || 'audio/webm';
+      const path = `${layerFolder}/${i}.${extForMime(mime)}`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: mime });
       if (upErr){ console.error('layer recording upload failed for line', i, upErr); layerRecordingUrls.push(null); continue; }
       layerRecordingUrls.push(path);
     }
@@ -3265,7 +3563,10 @@ async function saveSubliminal(){
     eft_mode: state.eftMode || false,
     eft_repeat_count: state.eftMode ? state.eftRepeatCount : null,
     visualization_mode: state.visualizationMode || false,
-    binaural_band: state.binauralBand || null
+    binaural_band: state.binauralBand || null,
+    // Remember which voice built this one, so reopening it sounds the same.
+    ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
+    layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -3750,6 +4051,9 @@ async function submitOnboarding(){
 }
 async function logOut(){
   if (!sb) return;
+  // Don't carry one account's cloned voice or generated lines into the next.
+  clonedVoiceCache = undefined;
+  ttsCache.clear(); studioClipHandles.clear();
   await sb.auth.signOut();
 }
 /* Apple requires in-app account deletion for any app with sign-up. The heavy
@@ -4074,6 +4378,7 @@ function renderProfileState(){
 async function loadProfile(){
   if (!sb || !currentUser) return;
   document.getElementById('settingsEmail').value = currentUser.email || '';
+  renderVoiceClone();
 
   const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if (prof){
@@ -4261,9 +4566,10 @@ async function loadSavedIntoBuilder(id){
     }
     state.voiceMode = 'own';
   } else {
-    // No recorded audio was saved for this one (or it was AI voice originally) —
-    // reloading plays it back with the AI voice instead.
+    // No recorded audio was saved for this one (or it was a studio voice
+    // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
+    state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
   }
 
   customTrackBlob = null;
@@ -4283,6 +4589,7 @@ async function loadSavedIntoBuilder(id){
   // Ritual-only second voice layer, if this saved subliminal has one.
   state.layerAffirmations = Array.isArray(s.layer_affirmations) ? s.layer_affirmations.slice() : [];
   state.layerVoiceMode = s.layer_voice_mode || null;
+  state.layerAiVoiceId = s.layer_ai_voice_id || DEVICE_VOICE;
   layerVoiceEnabled = !!(state.layerAffirmations.length && state.layerVoiceMode);
   layerVoiceMode = state.layerVoiceMode || 'ai';
   document.getElementById('layerVoiceToggle').checked = layerVoiceEnabled;
@@ -4315,6 +4622,155 @@ async function deleteMySubliminal(id){
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
   loadMyLibrary();
 }
+/* ---------- cloning your voice ----------
+   One sample, read once, and the studio can generate any line in that voice.
+   The recording is sent straight to /api/voice-clone and never stored here —
+   only the resulting voice id ends up on the profile. */
+const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not someday, and not once everything lines up — now, in the ordinary middle of things. I speak to myself the way I would speak to someone I love. I keep what I promised myself I would keep, on the days it is easy and on the days it is not.";
+let voiceCloneRecorder = null, voiceCloneChunks = [], voiceCloneStream = null,
+    voiceCloneTimer = null, voiceCloneStart = 0;
+
+async function renderVoiceClone(){
+  const body = document.getElementById('voiceCloneBody');
+  if (!body) return;
+  const cloned = await myClonedVoiceId();
+  if (voiceCloneRecorder){
+    const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
+    body.innerHTML = `
+      <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+      <div class="voice-clone-actions">
+        <span class="voice-rec-dot"></span>
+        <span class="voice-rec-label">Reading… take your time.</span>
+        <span class="voice-rec-time" id="voiceCloneTime">${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}</span>
+        <button class="mini-btn candlebtn" onclick="finishVoiceClone()">Done reading</button>
+        <button class="mini-btn ghostbtn" onclick="cancelVoiceClone()">Cancel</button>
+      </div>`;
+    return;
+  }
+  if (cloned){
+    body.innerHTML = `
+      <div class="voice-clone-have">
+        <span>✦ Your voice is ready — pick <b>My voice</b> when you choose a voice.</span>
+        <button class="mini-btn ghostbtn" onclick="startVoiceClone()">Record it again</button>
+        <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
+      </div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+    <div class="voice-clone-actions">
+      <button class="mini-btn candlebtn" onclick="startVoiceClone()">Read this to clone my voice</button>
+      <span class="voice-chip-desc">Somewhere quiet, normal speaking voice, about 30 seconds.</span>
+    </div>`;
+}
+
+async function startVoiceClone(){
+  const msg = document.getElementById('voiceCloneMsg');
+  msg.textContent = ''; msg.className = 'save-msg';
+  if (!sb || !currentUser) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder){
+    msg.textContent = "This browser can't record audio."; msg.className = 'save-msg err'; return;
+  }
+  try { voiceCloneStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(e){ msg.textContent = 'Microphone access is needed to record the sample.'; msg.className = 'save-msg err'; return; }
+  const mime = pickRecordingMime();
+  voiceCloneChunks = [];
+  voiceCloneRecorder = mime ? new MediaRecorder(voiceCloneStream, { mimeType: mime }) : new MediaRecorder(voiceCloneStream);
+  voiceCloneRecorder.ondataavailable = ev => voiceCloneChunks.push(ev.data);
+  voiceCloneRecorder.start();
+  voiceCloneStart = Date.now();
+  renderVoiceClone();
+  voiceCloneTimer = setInterval(() => {
+    const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
+    const el = document.getElementById('voiceCloneTime');
+    if (el) el.textContent = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+    if (secs >= 120) finishVoiceClone();  // well past what cloning needs
+  }, 250);
+}
+function stopVoiceCloneStream(){
+  clearInterval(voiceCloneTimer); voiceCloneTimer = null;
+  if (voiceCloneStream){ voiceCloneStream.getTracks().forEach(t => t.stop()); voiceCloneStream = null; }
+}
+function cancelVoiceClone(){
+  if (!voiceCloneRecorder) return;
+  voiceCloneRecorder.onstop = null;
+  try { voiceCloneRecorder.stop(); } catch(e){}
+  voiceCloneRecorder = null; voiceCloneChunks = [];
+  stopVoiceCloneStream();
+  renderVoiceClone();
+}
+function finishVoiceClone(){
+  if (!voiceCloneRecorder) return;
+  const seconds = Math.round((Date.now() - voiceCloneStart) / 1000);
+  const rec = voiceCloneRecorder;
+  voiceCloneRecorder = null;
+  rec.onstop = () => {
+    const blob = new Blob(voiceCloneChunks, { type: rec.mimeType || 'audio/webm' });
+    voiceCloneChunks = [];
+    stopVoiceCloneStream();
+    const msg = document.getElementById('voiceCloneMsg');
+    if (seconds < 8){
+      msg.textContent = 'That was very short — read the whole passage so the voice has enough to work from.';
+      msg.className = 'save-msg err';
+      renderVoiceClone();
+      return;
+    }
+    uploadVoiceClone(blob);
+  };
+  try { rec.stop(); } catch(e){ stopVoiceCloneStream(); renderVoiceClone(); }
+}
+async function uploadVoiceClone(blob){
+  const msg = document.getElementById('voiceCloneMsg');
+  const body = document.getElementById('voiceCloneBody');
+  body.innerHTML = '<div class="voice-clone-actions"><span class="voice-rec-label">Learning your voice — this takes a moment…</span></div>';
+  msg.textContent = ''; msg.className = 'save-msg';
+  try {
+    const token = (await sb.auth.getSession()).data.session?.access_token;
+    const res = await fetch(`${API_BASE}/api/voice-clone`, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/webm', Authorization: `Bearer ${token}` },
+      body: blob,
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok){
+      msg.textContent = out.error === 'upgrade_required'
+        ? 'Cloning your voice comes with Ritual — $11.11 a month, or $111 a year.'
+        : out.error === 'not_configured'
+          ? "Voice cloning isn't switched on yet."
+          : (out.error || "Couldn't clone your voice — try again in a moment.");
+      msg.className = 'save-msg err';
+      renderVoiceClone();
+      return;
+    }
+    clonedVoiceCache = out.voiceId;   // the picker reads this straight away
+    msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok';
+    renderVoiceClone();
+  } catch (e){
+    console.error('voice clone failed:', e);
+    msg.textContent = "Couldn't reach the voice service — try again in a moment.";
+    msg.className = 'save-msg err';
+    renderVoiceClone();
+  }
+}
+async function removeClonedVoice(){
+  const msg = document.getElementById('voiceCloneMsg');
+  msg.textContent = 'Removing…'; msg.className = 'save-msg';
+  try {
+    const token = (await sb.auth.getSession()).data.session?.access_token;
+    const res = await fetch(`${API_BASE}/api/voice-clone`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('remove failed');
+    clonedVoiceCache = null;
+    // Any subliminal set to "My voice" now falls back to the device voice.
+    if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
+    msg.textContent = 'Removed.'; msg.className = 'save-msg ok';
+    renderVoiceClone();
+  } catch (e){
+    msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err';
+  }
+}
+
 async function updateEmail(){
   const msg = document.getElementById('emailSettingsMsg');
   const newEmail = document.getElementById('settingsEmail').value.trim();
@@ -4378,7 +4834,7 @@ async function submitFeedback(){
    Journal tabs need Whisper; habits need Ritual. */
 const JOURNAL_TAB_COPY = {
   received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
-  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it as if it already has." },
+  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it, or say it out loud, as if it already has." },
 };
 function setJournalTab(cat){
   journalTab = cat;
@@ -4497,6 +4953,16 @@ async function loadJournalEntries(){
   }
 
   if (!data.length){ list.innerHTML = '<div class="journal-empty">Nothing here yet — add your first entry above.</div>'; return; }
+
+  // Spoken entries live in a private bucket, so sign them all in one round trip
+  // rather than one request per card.
+  const audioUrlByPath = {};
+  const audioPaths = data.filter(e => e.audio_path).map(e => e.audio_path);
+  if (audioPaths.length){
+    const { data: signed } = await sb.storage.from('voice-notes').createSignedUrls(audioPaths, 3600);
+    (signed || []).forEach(x => { if (x.signedUrl) audioUrlByPath[x.path] = x.signedUrl; });
+  }
+
   list.innerHTML = data.map(e => {
     // Only entries that originally started in "On its way" can ever move — once
     // something's written straight into "Already mine," it stays put for good.
@@ -4507,7 +4973,16 @@ async function loadJournalEntries(){
     return `
     <div class="journal-entry">
       ${showBadge ? `<div class="journal-entry-badge" title="Made it from On its way to Already mine">✦ 2D → 3D</div>` : ''}
-      <p>"${e.content.replace(/</g,'&lt;')}"</p>
+      ${e.audio_path ? `
+        <div class="journal-entry-spoken">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 19v3"/></svg>
+          Spoken${e.audio_seconds ? ` · ${Math.floor(e.audio_seconds/60)}:${String(e.audio_seconds%60).padStart(2,'0')}` : ''}
+        </div>
+        ${audioUrlByPath[e.audio_path]
+          ? `<audio controls preload="none" src="${audioUrlByPath[e.audio_path]}"></audio>`
+          : `<p style="color:var(--haze); font-size:13px;">This recording couldn't be loaded right now.</p>`}
+      ` : ''}
+      ${e.content ? `<p>"${e.content.replace(/</g,'&lt;')}"</p>` : ''}
       <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${showBadge ? ' · in my 3D now' : ''}</div>
       <div class="journal-entry-actions">
         ${canMove ? `<button class="journal-entry-move" onclick="toggleMoveConfirm('${e.id}')" aria-label="Move" title="Move">
@@ -4550,13 +5025,116 @@ async function moveJournalEntry(id, targetCategory){
 }
 async function deleteJournalEntry(id){
   if (!sb || !currentUser) return;
+  // Look up the audio first — once the row is gone there's nothing pointing at
+  // the file, and it would sit in storage forever.
+  const { data: entry } = await sb.from('journal_entries')
+    .select('audio_path').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
   const { error } = await sb.from('journal_entries')
     .delete()
     .eq('id', id)
     .eq('user_id', currentUser.id);
   if (error){ console.error('deleteJournalEntry error:', error); return; }
+  if (entry && entry.audio_path) await sb.storage.from('voice-notes').remove([entry.audio_path]);
   loadJournalEntries();
 }
+/* ---------- spoken gratitude & manifesting entries ----------
+   Some things are easier said than written, and saying an affirmation out loud
+   is the practice anyway. A spoken entry is stored as audio in the voice-notes
+   bucket with no text; everything else about it behaves like a written one. */
+let voiceEntryRecorder = null, voiceEntryChunks = [], voiceEntryStream = null,
+    voiceEntryTimer = null, voiceEntryStart = 0;
+const VOICE_ENTRY_MAX_SECONDS = 180;
+
+function voiceEntryUI(recording){
+  document.getElementById('journalVoiceRec').style.display = recording ? 'flex' : 'none';
+  document.querySelector('.journal-add').style.display = recording ? 'none' : 'flex';
+}
+async function startVoiceEntry(){
+  const msg = document.getElementById('journalAddMsg');
+  if (!sb || !currentUser) return;
+  if (voiceEntryRecorder) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder){
+    msg.textContent = "This browser can't record audio — you can still type your entry.";
+    msg.className = 'save-msg err'; return;
+  }
+  try { voiceEntryStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(e){
+    msg.textContent = 'Microphone access is needed to speak your entry — check your browser permissions.';
+    msg.className = 'save-msg err'; return;
+  }
+  msg.textContent = ''; msg.className = 'save-msg';
+  const mime = pickRecordingMime();
+  voiceEntryChunks = [];
+  voiceEntryRecorder = mime ? new MediaRecorder(voiceEntryStream, { mimeType: mime }) : new MediaRecorder(voiceEntryStream);
+  voiceEntryRecorder.ondataavailable = ev => voiceEntryChunks.push(ev.data);
+  voiceEntryRecorder.start();
+  voiceEntryStart = Date.now();
+  voiceEntryUI(true);
+  voiceEntryTimer = setInterval(() => {
+    const secs = Math.floor((Date.now() - voiceEntryStart) / 1000);
+    document.getElementById('journalVoiceTime').textContent = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+    // Long enough for anything worth saying, short enough to stay a quick habit.
+    if (secs >= VOICE_ENTRY_MAX_SECONDS) finishVoiceEntry();
+  }, 250);
+}
+function stopVoiceEntryStream(){
+  clearInterval(voiceEntryTimer); voiceEntryTimer = null;
+  if (voiceEntryStream){ voiceEntryStream.getTracks().forEach(t => t.stop()); voiceEntryStream = null; }
+  document.getElementById('journalVoiceTime').textContent = '0:00';
+  voiceEntryUI(false);
+}
+function cancelVoiceEntry(){
+  if (!voiceEntryRecorder) return;
+  voiceEntryRecorder.onstop = null;
+  try { voiceEntryRecorder.stop(); } catch(e){}
+  voiceEntryRecorder = null; voiceEntryChunks = [];
+  stopVoiceEntryStream();
+  document.getElementById('journalAddMsg').textContent = '';
+}
+function finishVoiceEntry(){
+  if (!voiceEntryRecorder) return;
+  const seconds = Math.max(1, Math.round((Date.now() - voiceEntryStart) / 1000));
+  const rec = voiceEntryRecorder;
+  voiceEntryRecorder = null;
+  rec.onstop = () => {
+    const blob = new Blob(voiceEntryChunks, { type: rec.mimeType || 'audio/webm' });
+    voiceEntryChunks = [];
+    stopVoiceEntryStream();
+    if (seconds < 1 || !blob.size){
+      document.getElementById('journalAddMsg').textContent = 'That was too short to save — try again.';
+      document.getElementById('journalAddMsg').className = 'save-msg err';
+      return;
+    }
+    saveVoiceEntry(blob, seconds);
+  };
+  try { rec.stop(); } catch(e){ stopVoiceEntryStream(); }
+}
+async function saveVoiceEntry(blob, seconds){
+  const msg = document.getElementById('journalAddMsg');
+  msg.textContent = 'Saving your recording…'; msg.className = 'save-msg';
+  const mime = blob.type || 'audio/webm';
+  const path = `${currentUser.id}/${Date.now()}.${extForMime(mime)}`;
+  const { error: upErr } = await sb.storage.from('voice-notes').upload(path, blob, { contentType: mime });
+  if (upErr){
+    console.error('voice entry upload failed:', upErr);
+    msg.textContent = "Couldn't upload that recording — try again in a moment.";
+    msg.className = 'save-msg err'; return;
+  }
+  const { error } = await sb.from('journal_entries').insert({
+    user_id: currentUser.id, category: journalTab, original_category: journalTab,
+    content: null, audio_path: path, audio_seconds: seconds,
+  });
+  if (error){
+    console.error('voice entry insert error:', error);
+    // Don't leave the orphaned file sitting in storage if the row didn't land.
+    await sb.storage.from('voice-notes').remove([path]);
+    msg.textContent = "Couldn't save that entry — try again in a moment.";
+    msg.className = 'save-msg err'; return;
+  }
+  msg.textContent = '';
+  loadJournalEntries();
+}
+
 async function addJournalEntry(){
   const msg = document.getElementById('journalAddMsg');
   if (!sb || !currentUser) return;
@@ -4907,6 +5485,10 @@ async function toggleHabitOnDate(habitId, dateStr){
   else { days.add(dateStr); dayDone.add(habitId); }
   if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
   if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
+  // Habits are checked off straight from Today as well as from the Rituals page,
+  // so that card has to repaint too — otherwise the tick never appears and the
+  // tap reads as broken even though it saved.
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
   renderPhotoCalendar();
   renderDailyLogReward();
   const { error } = wasDone

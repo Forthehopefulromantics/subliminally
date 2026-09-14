@@ -21,8 +21,9 @@ import { applyCors } from '../lib/cors.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
-const STORAGE_BUCKETS = ['recordings', 'avatars', 'custom-tracks', 'journal-photos'];
+const STORAGE_BUCKETS = ['recordings', 'avatars', 'custom-tracks', 'journal-photos', 'voice-notes'];
 // [table, column that holds the user's id]
 const USER_TABLES = [
   ['habit_checkins', 'user_id'],
@@ -81,6 +82,26 @@ async function deleteRows(table, column, userId) {
   }
 }
 
+async function deleteClonedVoice(userId) {
+  if (!ELEVENLABS_API_KEY) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=cloned_voice_id`, {
+      headers: serviceHeaders(),
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    const voiceId = rows && rows[0] && rows[0].cloned_voice_id;
+    if (!voiceId) return;
+    await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+      method: 'DELETE',
+      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+    });
+  } catch (e) {
+    // Best effort — never block deleting the account on the voice provider.
+    console.error('could not delete cloned voice for', userId, e);
+  }
+}
+
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -105,6 +126,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    // A cloned voice lives at the speech provider, not in Supabase, so deleting
+    // the account has to reach out and remove it too — otherwise a copy of
+    // someone's voice outlives the account that made it.
+    await deleteClonedVoice(user.id);
+
     for (const bucket of STORAGE_BUCKETS) await emptyBucketFolder(bucket, user.id);
     for (const [table, column] of USER_TABLES) await deleteRows(table, column, user.id);
 
