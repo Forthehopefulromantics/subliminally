@@ -666,7 +666,7 @@
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
   <div class="modal-card">
     <button class="modal-close" onclick="closeAuthModal()">✕</button>
-    <div class="modal-title" id="authTitle">Create your account</div>
+    <div class="modal-title" id="authTitle">Welcome back</div>
     <div class="modal-sub" id="authSub">Save your sessions, keep a journal, and build your library.</div>
     <div id="googleAuthRow">
       <button type="button" class="btn-google" onclick="signInWithGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#fff; color:#1f1f1f; border:1px solid var(--dusk); border-radius:999px; padding:11px 20px; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:18px;">
@@ -693,22 +693,22 @@
         <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPassword', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
-      <div id="forgotPwRow" style="display:none; text-align:right; margin-top:6px;">
+      <div id="forgotPwRow" style="text-align:right; margin-top:6px;">
         <button type="button" onclick="enterResetMode()" style="background:none; border:none; color:var(--lilac); font-size:12px; cursor:pointer; padding:0;">Forgot password?</button>
       </div>
     </div>
-    <div class="auth-field" id="confirmPwField">
+    <div class="auth-field" id="confirmPwField" style="display:none;">
       <label>Confirm password</label>
       <div class="pw-wrap">
         <input type="password" id="authPasswordConfirm" placeholder="••••••••" autocomplete="new-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPasswordConfirm', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </div>
-    <div class="auth-field" id="signupUsernameField">
+    <div class="auth-field" id="signupUsernameField" style="display:none;">
       <label>Username</label>
       <input type="text" id="signupUsername" placeholder="how others will know you" autocomplete="off">
     </div>
-    <div class="auth-field" id="signupAvatarField">
+    <div class="auth-field" id="signupAvatarField" style="display:none;">
       <label>Choose your avatar</label>
       <div class="avatar-grid" id="signupAvatarGrid"></div>
       <label class="avatar-upload-label" for="signupAvatarFile">or upload a photo</label>
@@ -716,8 +716,8 @@
       <div id="signupAvatarPreviewWrap"></div>
     </div>
     <div class="auth-msg" id="authMsg"></div>
-    <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Create a free account</button>
-    <div class="auth-toggle" id="authToggle">Already have an account? <button onclick="toggleAuthMode()">Log in</button></div>
+    <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Log in</button>
+    <div class="auth-toggle" id="authToggle">New here? <button onclick="toggleAuthMode()">Create a free account</button></div>
   </div>
 </div>
 
@@ -1471,7 +1471,7 @@
           <li>Save 2 subliminals to your library (an account is required to save)</li>
           <li>Library of general subliminals on YouTube</li>
         </ul>
-        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal()">Create a free account</button>
+        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal('signup')">Create a free account</button>
       </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
@@ -1775,7 +1775,7 @@ async function pickRitualMode(btn){
   msg.textContent = '';
   if (mode === 'eft' || mode === 'visualization'){
     if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -1870,7 +1870,7 @@ async function generateAffirmations(){
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier !== 'none'){
     if (!currentUser){
-      msg.innerHTML = `${formatSessionLength(minutes)} needs an account — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `${formatSessionLength(minutes)} needs an account — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2083,7 +2083,7 @@ async function toggleLayerVoice(checked){
   if (!checked){ layerVoiceEnabled = false; panel.classList.remove('open'); return; }
   if (!currentUser){
     toggle.checked = false;
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
     msg.className = 'length-msg err';
     return;
   }
@@ -2446,7 +2446,7 @@ async function triggerCustomTrackUpload(){
   const msg = document.getElementById('customTrackMsg');
   msg.textContent = '';
   if (!currentUser){
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
     msg.className = 'length-msg err';
     return;
   }
@@ -2493,7 +2493,7 @@ async function pickSoothingLayer(btn){
 
   if (variant !== 'none'){
     if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -3382,7 +3382,7 @@ try {
 }
 
 let currentUser = null;
-let authMode = 'signup'; // 'signup' | 'login' | 'reset'
+let authMode = 'login'; // 'login' | 'signup' | 'reset'
 let journalTab = 'received';
 
 // Where Supabase sends people after they click a password-reset email link.
@@ -3392,8 +3392,11 @@ let journalTab = 'received';
 const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
 
 /* ---------- auth modal ---------- */
-function openAuthModal(){
-  if (authMode === 'reset') authMode = 'login';
+/* Opens on log in unless a caller explicitly wants the sign-up form — most
+   people reaching this modal already have an account, and the ones who don't
+   get "New here? Create a free account" right underneath. */
+function openAuthModal(mode){
+  authMode = mode === 'signup' ? 'signup' : 'login';
   document.getElementById('authOverlay').classList.add('open');
   renderSignupAvatarGrid();
   updateAuthModalUI();
