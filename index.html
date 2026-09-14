@@ -144,6 +144,17 @@
   .science-cta p{ margin-top:0; margin-bottom:14px; color:var(--moonlight); font-family:var(--serif); font-style:italic; font-size:15px; }
   .science-cta .btn{ margin:0 6px; }
 
+  /* Progressive disclosure inside the builder — the defaults are good, so the
+     dials that refine them stay folded away until someone wants them. */
+  .more-options{ margin-top:10px; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px; }
+  .more-options > summary{ list-style:none; cursor:pointer; display:flex; align-items:baseline; gap:9px; font-size:13px; color:var(--lilac); padding:5px 0; }
+  .more-options > summary::-webkit-details-marker{ display:none; }
+  .more-options > summary::after{ content:"⌄"; margin-left:auto; font-size:13px; line-height:1; transition:transform .2s; }
+  .more-options[open] > summary::after{ transform:rotate(180deg); }
+  .more-options > summary:focus-visible{ outline:2px solid var(--lilac); outline-offset:3px; border-radius:6px; }
+  .more-options > summary em{ color:var(--haze); font-size:12px; font-style:normal; font-weight:300; }
+  .more-options-body{ padding-top:4px; }
+
   .section-head{ text-align:center; margin-bottom:40px; }
   .section-head h2{ font-family:var(--serif); font-size:clamp(24px,3.6vw,36px); color:var(--moonlight); margin-top:8px; }
   .section-head p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:480px; margin-inline:auto; }
@@ -971,14 +982,6 @@
             <textarea id="quizGoal" rows="3" placeholder="e.g. I want to feel less anxious about money and actually believe I'm capable of building something stable..."></textarea>
           </div>
           <div class="quiz-q">
-            <label>Quick tag (optional, helps us focus)</label>
-            <div class="chip-grid" id="intentionChips"></div>
-          </div>
-          <div class="quiz-q">
-            <label>Tone</label>
-            <div class="quiz-options" id="toneChips"></div>
-          </div>
-          <div class="quiz-q">
             <label>How do you want to use this ritual tonight?</label>
             <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
               <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
@@ -1006,10 +1009,6 @@
               <div class="length-msg" id="eftRepeatMsg"></div>
             </div>
           </div>
-          <div class="quiz-q" id="countRow">
-            <label>How many affirmations?</label>
-            <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
-          </div>
           <div class="quiz-q">
             <label>How long should tonight's session run? <span class="session-length-val" id="sessionLengthVal">5 min</span></label>
             <div class="session-length-row">
@@ -1018,6 +1017,23 @@
             <div class="session-length-scale"><span>5 min</span><span>8 hr</span></div>
             <div class="length-msg" id="lengthMsg"></div>
           </div>
+          <details class="more-options">
+            <summary>Fine-tune this <em>tone, a focus tag, how many lines</em></summary>
+            <div class="more-options-body">
+              <div class="quiz-q">
+                <label>Tone</label>
+                <div class="quiz-options" id="toneChips"></div>
+              </div>
+              <div class="quiz-q">
+                <label>Quick tag (optional, helps us focus)</label>
+                <div class="chip-grid" id="intentionChips"></div>
+              </div>
+              <div class="quiz-q" id="countRow">
+                <label>How many affirmations?</label>
+                <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
+              </div>
+            </div>
+          </details>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="generateBtn" onclick="generateAffirmations()">Generate my affirmations ✦</button></div>
       </div>
@@ -1072,6 +1088,9 @@
         <div class="flow-sub">Generated live in your browser. You'll adjust every layer's volume on the final screen, once you can hear it.</div>
         <div class="flow-body">
           <div class="bg-grid" id="bgGrid"></div>
+          <details class="more-options">
+            <summary>Add more layers <em>soothing pad, your own track, a second voice, binaural beats</em></summary>
+            <div class="more-options-body">
           <div class="soothing-picker">
             <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper & Ritual)</span></label>
             <div class="length-chip-grid" id="soothingChips">
@@ -1116,6 +1135,8 @@
             </div>
             <div class="freq-guide" id="binauralGuideText" style="display:none;"></div>
           </div>
+            </div>
+          </details>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" onclick="startNextPhase()">Continue →</button></div>
       </div>
