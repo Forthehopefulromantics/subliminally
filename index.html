@@ -34,9 +34,9 @@
   "url": "https://www.subliminallybyfthr.com/",
   "description": "Build a personalized nightly audio ritual with a Solfeggio frequency, affirmations in your own voice, and layered ambience.",
   "offers": [
-    { "@type": "Offer", "name": "Whisper", "price": "10.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Reverie", "price": "22.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Ritual", "price": "35.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
+    { "@type": "Offer", "name": "Free", "price": "0.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
+    { "@type": "Offer", "name": "Whisper", "price": "5.55", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
+    { "@type": "Offer", "name": "Ritual", "price": "11.11", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
   ]
 }
 </script>
@@ -263,6 +263,13 @@
   .demo-note{ font-size:11px; color:var(--haze); background:rgba(255,255,255,0.04); border-radius:10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.06); text-align:left; }
 
   .pricing{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
+  .pricing-toggle{ display:flex; align-items:center; justify-content:center; gap:12px; margin:0 auto 36px; }
+  .pricing-toggle span{ font-size:13px; color:var(--haze); transition:color .2s; }
+  .pricing-toggle span.active{ color:var(--moonlight); font-weight:500; }
+  .pricing-toggle .switch{ width:46px; height:26px; border-radius:999px; background:var(--dusk); border:1px solid var(--lilac); position:relative; cursor:pointer; flex-shrink:0; }
+  .pricing-toggle .switch::after{ content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--candle); transition:transform .2s; }
+  .pricing-toggle .switch.on::after{ transform:translateX(20px); }
+  .pricing-toggle .save-badge{ font-size:10.5px; color:var(--candle); background:rgba(227,190,127,0.14); padding:2px 9px; border-radius:999px; margin-left:2px; }
   .pricing-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; max-width:1020px; margin:0 auto; }
   .pricing-grid.centered{ display:flex; justify-content:center; flex-wrap:wrap; }
   .pricing-grid.centered .price-card{ width:320px; }
@@ -374,7 +381,6 @@
   .tier-badge{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; margin-top:6px; padding:5px 14px; border-radius:999px; letter-spacing:.02em; }
   .tier-badge[data-tier="none"]{ background:rgba(255,255,255,0.06); color:var(--haze); }
   .tier-badge[data-tier="whisper"]{ background:rgba(185,167,232,0.18); color:var(--lilac); }
-  .tier-badge[data-tier="reverie"]{ background:rgba(227,190,127,0.16); color:var(--candle); }
   .tier-badge[data-tier="ritual"]{ background:linear-gradient(135deg, rgba(227,190,127,0.28), rgba(185,167,232,0.28)); color:var(--moonlight); border:1px solid rgba(227,190,127,0.4); }
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
@@ -760,10 +766,10 @@
         <p>A vague wish ("I hope it goes well") doesn't give your mind much to rehearse. A scene with specifics — what you see, hear, and feel, who's there, what happens step by step — gives it something real to run. That's why this feature hands you a blank page instead of a fill-in-the-blank template: the more precisely you describe it, the more useful the rehearsal.</p>
 
         <h3>How it works inside a subliminal here</h3>
-        <p>On Reverie and Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
+        <p>On Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
 
         <div class="science-cta">
-          <p>This one's a Reverie &amp; Ritual feature.</p>
+          <p>This one's a Ritual feature.</p>
           <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Write your script →</button>
           <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">See plans</button>
         </div>
@@ -876,7 +882,7 @@
             <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
               <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
               <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping<span>Ritual</span></button>
-              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Reverie &amp; Ritual</span></button>
+              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Ritual</span></button>
             </div>
             <div class="length-msg" id="ritualModeMsg"></div>
             <div class="eft-guide-panel" id="visualizationGuidePanel" style="display:none;">
@@ -966,7 +972,7 @@
         <div class="flow-body">
           <div class="bg-grid" id="bgGrid"></div>
           <div class="soothing-picker">
-            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper, Reverie & Ritual)</span></label>
+            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper &amp; Ritual)</span></label>
             <div class="length-chip-grid" id="soothingChips">
               <button class="length-chip sel" data-variant="none" onclick="pickSoothingLayer(this)">None</button>
               <button class="length-chip" data-variant="pad" onclick="pickSoothingLayer(this)">Warm pad</button>
@@ -1209,53 +1215,68 @@
   <div class="wrap">
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
-      <h2 id="pricingHeading">Three ways in</h2>
-      <p id="pricingSub">Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.</p>
+      <h2 id="pricingHeading">Your all-in-one wellness app</h2>
+      <p id="pricingSub">Every tier includes the full ritual builder — frequency, binaural beats, affirmations, your voice, and nature sounds.</p>
     </div>
 
     <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
       <p style="font-size:14.5px; color:var(--haze);">You're on Ritual — the full ritual, unlocked. Nothing to upgrade to here.</p>
     </div>
 
+    <div class="pricing-toggle" id="pricingToggle">
+      <span id="pricingToggleMonthly" class="active">Monthly</span>
+      <div class="switch" id="pricingToggleSwitch" onclick="togglePricingPeriod()" role="button" aria-label="Toggle monthly or yearly pricing"></div>
+      <span id="pricingToggleYearly">Yearly</span>
+      <span class="save-badge">2 months free</span>
+    </div>
+
     <div class="pricing-grid" id="pricingGrid">
+      <div class="price-card" id="priceCardFree">
+        <h3>Free</h3>
+        <div class="price-amount">$0<span>/forever</span></div>
+        <div class="limit">Sessions up to 20 minutes</div>
+        <ul class="price-feats">
+          <li>Personalized subliminals — align your frequency</li>
+          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
+          <li>Personal voice or AI voice</li>
+          <li>Library of general subliminals</li>
+        </ul>
+        <a class="btn btn-ghost" href="#" onclick="goHome(); goTo('flow-section'); return false;">Start free</a>
+      </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
-        <div class="price-amount">$10<span>/month</span></div>
-        <div class="limit">Sessions up to 30 minutes</div>
-        <ul class="price-feats">
-          <li>All nine Solfeggio frequencies</li>
-          <li>Custom affirmations, your voice or AI voice</li>
-          <li>Nature sounds + extra soothing layer (warm pad, chimes, hum)</li>
-          <li>Save up to 10 subliminals to your library</li>
-        </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/28EdR8eyacFlczB6uFgYU00')">Get Whisper</a>
-      </div>
-      <div class="price-card" id="priceCardReverie">
-        <h3>Reverie</h3>
-        <div class="price-amount">$22<span>/month</span></div>
-        <div class="limit">Sessions up to 2 hours</div>
-        <ul class="price-feats">
-          <li>Everything in Whisper</li>
-          <li>Unlimited saved subliminals</li>
-          <li>Visualization Script — write (or draft with AI) a full scene for performance, competition, or a specific outcome you're calling in</li>
-        </ul>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM9AS3Tw20H2Z106hgYU01')">Get Reverie</a>
-      </div>
-      <div class="price-card featured" id="priceCardRitual">
-        <span class="badge">All night + social</span>
-        <h3>Ritual</h3>
-        <p class="price-tagline">The full nightly ritual + social.</p>
-        <div class="price-amount">$35<span>/month</span></div>
+        <div class="price-amount"><span class="pc-price" data-monthly="$5.55" data-yearly="$55">$5.55</span><span class="pc-period" data-monthly="/month" data-yearly="/year">/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
         <ul class="price-feats">
-          <li>Everything in Reverie</li>
-          <li>8-hour sessions with screen-lock playback</li>
-          <li>Subliminal + EFT Tapping — nine affirmations, one per tapping point</li>
-          <li>Share your frequencies and subliminals with friends or followers</li>
-          <li>Request or gift a custom subliminal to someone else <span style="color:var(--candle); font-size:11px;">— coming soon</span></li>
-          <li>Full session history &amp; library</li>
+          <li>Personalized subliminals — align your frequency, up to 8 hours</li>
+          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
+          <li>Personal voice or AI voice</li>
+          <li>Library of general subliminals</li>
+          <li>Gratitude journal</li>
+          <li>Daily journaling — upload entries from your physical journal</li>
+          <li>Manifestation tracker</li>
         </ul>
-        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'https://buy.stripe.com/4gM4gyfCe48P6bdf1bgYU02')">Get Ritual</a>
+        <a class="btn btn-ghost" href="#" onclick="return startCheckout(event,'whisper')">Get Whisper</a>
+      </div>
+      <div class="price-card featured" id="priceCardRitual">
+        <span class="badge">All night</span>
+        <h3>Ritual</h3>
+        <p class="price-tagline">The full nightly ritual.</p>
+        <div class="price-amount"><span class="pc-price" data-monthly="$11.11" data-yearly="$111">$11.11</span><span class="pc-period" data-monthly="/month" data-yearly="/year">/month</span></div>
+        <div class="limit">Sessions up to 8 hours</div>
+        <ul class="price-feats">
+          <li>Personalized subliminals — align your frequency, up to 8 hours</li>
+          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
+          <li>Personal voice or AI voice</li>
+          <li>Library of general subliminals</li>
+          <li>Subliminal + EFT Tapping</li>
+          <li>Habit tracker — ritualizing your mornings and nights</li>
+          <li>Gratitude journal</li>
+          <li>Daily journaling — upload entries from your physical journal</li>
+          <li>Manifestation tracker</li>
+          <li>Visualization scripting</li>
+        </ul>
+        <a class="btn btn-primary" href="#" onclick="return startCheckout(event,'ritual')">Get Ritual</a>
       </div>
     </div>
     <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
@@ -1420,8 +1441,7 @@ async function updateSessionLengthHint(){
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier === 'none'){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   const myTier = currentUser ? await getMyTier() : 'none';
-  const order = ['none','whisper','reverie','ritual'];
-  if (order.indexOf(myTier) >= order.indexOf(requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
+  if (TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
   hintEl.className = 'length-msg err';
 }
@@ -1532,9 +1552,8 @@ async function pickRitualMode(btn){
       return;
     }
     const myTier = await getMyTier();
-    const order = ['none','whisper','reverie','ritual'];
-    const requiredTier = mode === 'eft' ? 'ritual' : 'reverie';
-    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+    const requiredTier = 'ritual'; // both EFT Tapping and Visualization Script are Ritual features now
+    if (TIER_ORDER.indexOf(myTier) < TIER_ORDER.indexOf(requiredTier)){
       msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Script'} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
@@ -1629,8 +1648,7 @@ async function generateAffirmations(){
       return;
     }
     const myTier = await getMyTier();
-    const order = ['none','whisper','reverie','ritual'];
-    if (order.indexOf(myTier) < order.indexOf(requiredTier)){
+    if (TIER_ORDER.indexOf(myTier) < TIER_ORDER.indexOf(requiredTier)){
       msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>, or drag the slider back down to build at your current tier.`;
       msg.className = 'length-msg err';
       return;
@@ -1752,7 +1770,7 @@ function buildEftFallbackList(){
   ];
 }
 
-/* Reverie/Ritual-only: a full narrative visualization script, written in second person
+/* Ritual-only: a full narrative visualization script, written in second person
    present tense, built from whatever the person typed in the prompt. This is meant to
    be a starting draft — the review step gives them one large, freely-editable box, so
    whatever comes back here is just raw material for them to rewrite. */
@@ -2254,7 +2272,7 @@ async function pickSoothingLayer(btn){
     }
     const myTier = await getMyTier();
     if (myTier === 'none'){
-      msg.innerHTML = `The soothing layer is included on Whisper, Reverie & Ritual — <a href="#pricing">see plans</a>.`;
+      msg.innerHTML = `The soothing layer is included on Whisper &amp; Ritual — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2664,43 +2682,113 @@ function stopFinal(){
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
 
-/* ---------------- CHECKOUT LINKING ---------------- */
-function goToCheckout(evt, baseUrl){
-  evt.preventDefault();
+/* ================================================================
+   REVENUECAT — Web Billing checkout
+   TODO (Kyla): this is placeholder wiring, not a finished integration.
+   1. Create a RevenueCat account and add a "Web Billing" app.
+   2. Create products + an Offering with packages whose identifiers match
+      REVENUECAT_PACKAGE_IDS below (or edit the map to match your names),
+      and two entitlements named "whisper" and "ritual".
+   3. Paste your Web Billing PUBLIC API key into REVENUECAT_PUBLIC_API_KEY.
+   4. Load the RevenueCat Web SDK before this script as a module script that
+      imports { Purchases } from @revenuecat/purchases-js and sets
+      window.RCPurchases = Purchases. Confirm the current install method at
+      revenuecat.com/docs/web/web-billing/web-sdk before shipping.
+   Until those are done, startCheckout() shows a friendly "not connected yet"
+   message instead of erroring, and getMyTier() falls back to the existing
+   Supabase subscribers table (so current Stripe subscribers keep their tier).
+   ================================================================ */
+const REVENUECAT_PUBLIC_API_KEY = 'YOUR_REVENUECAT_PUBLIC_API_KEY';
+const REVENUECAT_PACKAGE_IDS = {
+  whisper: { monthly: 'whisper_monthly', yearly: 'whisper_annual' },
+  ritual:  { monthly: 'ritual_monthly',  yearly: 'ritual_annual'  },
+};
+let rcPurchases = null;
+function getRC(){
+  if (rcPurchases) return rcPurchases;
+  if (REVENUECAT_PUBLIC_API_KEY === 'YOUR_REVENUECAT_PUBLIC_API_KEY' || !window.RCPurchases || !currentUser) return null;
+  try {
+    rcPurchases = window.RCPurchases.configure({ apiKey: REVENUECAT_PUBLIC_API_KEY, appUserId: currentUser.id });
+  } catch (e){ console.error('RevenueCat configure failed:', e); rcPurchases = null; }
+  return rcPurchases;
+}
+
+/* Monthly / yearly toggle above the pricing cards */
+let pricingPeriod = 'monthly'; // 'monthly' | 'yearly'
+function togglePricingPeriod(){
+  pricingPeriod = pricingPeriod === 'monthly' ? 'yearly' : 'monthly';
+  const sw = document.getElementById('pricingToggleSwitch');
+  if (sw) sw.classList.toggle('on', pricingPeriod === 'yearly');
+  document.getElementById('pricingToggleMonthly').classList.toggle('active', pricingPeriod === 'monthly');
+  document.getElementById('pricingToggleYearly').classList.toggle('active', pricingPeriod === 'yearly');
+  document.querySelectorAll('.pc-price').forEach(el => { el.textContent = el.dataset[pricingPeriod]; });
+  document.querySelectorAll('.pc-period').forEach(el => { el.textContent = el.dataset[pricingPeriod]; });
+}
+
+async function startCheckout(evt, tier){
+  if (evt && evt.preventDefault) evt.preventDefault();
   if (!currentUser){
     openAuthModal();
     document.getElementById('authSub').textContent = 'Create an account first, then tap the plan again — this is how we link your subscription to your account.';
     return false;
   }
-  window.open(baseUrl + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
+  const rc = getRC();
+  if (!rc){
+    alert("Checkout isn't connected yet — RevenueCat still needs to be configured for this site. In the meantime, reach out at hello@subliminallybyfthr.com and we'll get you set up.");
+    return false;
+  }
+  const packageId = (REVENUECAT_PACKAGE_IDS[tier] || {})[pricingPeriod === 'yearly' ? 'yearly' : 'monthly'];
+  try {
+    const offerings = await rc.getOfferings();
+    const pkg = offerings.current && offerings.current.availablePackages.find(p => p.identifier === packageId);
+    if (!pkg){ alert("Couldn't find that plan — it may not be set up in RevenueCat yet."); return false; }
+    const { customerInfo } = await rc.purchase({ rcPackage: pkg });
+    console.log('Purchase complete, active entitlements:', customerInfo.entitlements.active);
+    applyPricingVisibility();
+  } catch (e){
+    console.error('RevenueCat purchase failed:', e);
+    alert('Something went wrong starting checkout — please try again in a moment.');
+  }
   return false;
 }
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
-const TIER_LENGTH_SECONDS = { none: 300, whisper: 1800, reverie: 7200, ritual: 28800 };
-const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', reverie: 'Reverie', ritual: 'Ritual' };
+const TIER_LENGTH_SECONDS = { none: 1200, whisper: 28800, ritual: 28800 };
+const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', ritual: 'Ritual' };
+const TIER_ORDER = ['none', 'whisper', 'ritual'];
 /* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
    tier that's allowed to actually generate/save a session that long. */
 function requiredTierForMinutes(minutes){
-  const order = ['none','whisper','reverie','ritual'];
-  for (const tier of order){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
+  for (const tier of TIER_ORDER){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
   return 'ritual';
 }
 
 async function getMyTier(){
+  const rc = getRC();
+  if (rc){
+    try {
+      const info = await rc.getCustomerInfo();
+      if ('ritual' in info.entitlements.active) return 'ritual';
+      if ('whisper' in info.entitlements.active) return 'whisper';
+    } catch (e){ console.error('getCustomerInfo failed:', e); }
+  }
+  // Fallback (and the only path until RevenueCat is configured): the Supabase
+  // subscribers table that the existing Stripe webhook keeps up to date.
   const subRow = await getMySubscriberRow();
   const validStatuses = ['active', 'trialing'];
-  return (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
+  const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
+  return tier === 'reverie' ? 'ritual' : tier; // legacy Reverie subscribers keep everything they had
 }
 
 /* Show pricing as an upsell only for tiers above what you already have.
    Ritual members see no marketing here at all — just account management. */
 async function applyPricingVisibility(){
   const myTier = await getMyTier();
-  const cards = { whisper: document.getElementById('priceCardWhisper'), reverie: document.getElementById('priceCardReverie'), ritual: document.getElementById('priceCardRitual') };
+  const cards = { free: document.getElementById('priceCardFree'), whisper: document.getElementById('priceCardWhisper'), ritual: document.getElementById('priceCardRitual') };
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
+  const toggle = document.getElementById('pricingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
@@ -2711,6 +2799,7 @@ async function applyPricingVisibility(){
   if (myTier === 'ritual'){
     head.style.display = 'none';
     grid.style.display = 'none';
+    toggle.style.display = 'none';
     footnote.style.display = 'none';
     thanks.style.display = 'block';
     manageSub.style.display = 'block';
@@ -2720,25 +2809,20 @@ async function applyPricingVisibility(){
   thanks.style.display = 'none';
   head.style.display = 'block';
   grid.style.display = 'grid';
+  toggle.style.display = 'flex';
   footnote.style.display = 'block';
 
-  if (myTier === 'reverie'){
+  if (myTier === 'whisper'){
+    cards.free.style.display = 'none';
     cards.whisper.style.display = 'none';
-    cards.reverie.style.display = 'none';
     grid.classList.add('centered');
     document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
-    document.getElementById('pricingSub').textContent = "Full-night, 8-hour sessions with screen-lock playback, Subliminal + EFT Tapping, your own uploaded track layered in, and sharing your frequencies — all still out of reach on Reverie.";
-    manageSub.style.display = 'block';
-  } else if (myTier === 'whisper'){
-    cards.whisper.style.display = 'none';
-    grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = "You're missing the deeper tiers";
-    document.getElementById('pricingSub').textContent = "Unlimited saved subliminals, 2–8 hour sessions, visualization for performance, your own uploaded track — Whisper doesn't unlock any of it yet.";
+    document.getElementById('pricingSub').textContent = "Subliminal + EFT Tapping, a habit tracker for your mornings and nights, and visualization scripting — all still out of reach on Whisper.";
     manageSub.style.display = 'block';
   } else {
     grid.classList.remove('centered');
-    document.getElementById('pricingHeading').textContent = 'Three ways in';
-    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, affirmations, your voice, and nature sounds.';
+    document.getElementById('pricingHeading').textContent = 'Your all-in-one wellness app';
+    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, binaural beats, affirmations, your voice, and nature sounds.';
     manageSub.style.display = 'none';
   }
 }
@@ -2757,7 +2841,7 @@ async function getMySubscriberRow(){
   return data; // null if they've never subscribed
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, reverie: Infinity, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, ritual: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
@@ -3316,7 +3400,7 @@ async function loadProfile(){
   }
 
   const myTier = await getMyTier();
-  const tierIcons = { none: '', whisper: '✦ ', reverie: '✧ ', ritual: '★ ' };
+  const tierIcons = { none: '', whisper: '✦ ', ritual: '★ ' };
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
