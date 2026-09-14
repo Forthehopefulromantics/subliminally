@@ -104,6 +104,9 @@
   h1 em{ font-style:italic; color:var(--candle); }
   .hero-sub{ font-size:16px; color:var(--haze); max-width:500px; }
   .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  .hero-note{ font-size:12.5px; color:var(--haze); max-width:430px; line-height:1.7; margin-top:6px; }
+  .hero-note b{ color:var(--moonlight); font-weight:500; }
+  .hero-note button{ background:none; border:none; color:var(--lilac); font-family:inherit; font-size:12.5px; cursor:pointer; padding:0; white-space:nowrap; }
   .btn{ font-weight:500; font-size:15px; cursor:pointer; padding:15px 28px; border-radius:999px; border:none; transition:transform .25s, box-shadow .25s, opacity .25s; display:inline-flex; align-items:center; gap:8px; }
   .btn-primary{ background:var(--candle); color:#241C0E; }
   .btn-primary:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(227,190,127,0.28); }
@@ -141,17 +144,9 @@
   .science-cta p{ margin-top:0; margin-bottom:14px; color:var(--moonlight); font-family:var(--serif); font-style:italic; font-size:15px; }
   .science-cta .btn{ margin:0 6px; }
 
-  .how{ padding:76px 0; }
   .section-head{ text-align:center; margin-bottom:40px; }
   .section-head h2{ font-family:var(--serif); font-size:clamp(24px,3.6vw,36px); color:var(--moonlight); margin-top:8px; }
   .section-head p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:480px; margin-inline:auto; }
-  .steps{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
-  .step-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:18px; padding:20px 16px; transition:border-color .3s, transform .3s; }
-  .step-card:hover{ border-color:var(--candle); transform:translateY(-3px); }
-  .step-num{ font-family:var(--serif); font-style:italic; font-size:24px; color:var(--candle); opacity:.85; }
-  .step-card h3{ font-family:var(--serif); font-size:15.5px; margin-top:8px; color:var(--moonlight); }
-  .step-card p{ font-size:11.5px; color:var(--haze); margin-top:5px; }
-  @media (max-width:900px){ .steps{ grid-template-columns:repeat(2,1fr); } }
 
   .flow-section{ padding:80px 0 90px; border-top:1px solid rgba(255,255,255,0.06); }
   .flow-card{ background:linear-gradient(160deg, var(--veil), var(--midnight-2)); border:1px solid var(--dusk); border-radius:28px; padding:40px; max-width:760px; margin:0 auto; min-height:480px; display:flex; flex-direction:column; }
@@ -635,15 +630,9 @@
 
 <nav>
   <div class="brand" style="cursor:pointer;" onclick="goHome()"><span class="brand-mark">Subliminally</span><span class="brand-by">by FTHR</span></div>
-  <div class="nav-links" id="navLinks">
-    <button id="navToday" style="display:none;" onclick="showTodayPage(); closeMobileNav();">Today</button>
-    <button onclick="showMarketingHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
-    <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
-    <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
-    <button onclick="showRitualsPage(); closeMobileNav();">Rituals</button>
-    <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
-    <button onclick="showMarketingHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
-  </div>
+  <!-- Filled by renderNavLinks(): the app's four places when you're signed in,
+       the marketing set when you're not. -->
+  <div class="nav-links" id="navLinks"></div>
   <div id="authArea"><button class="nav-cta" id="authBtn" onclick="openAuthModal()">Log in</button></div>
   <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
 </nav>
@@ -774,6 +763,7 @@
       <button onclick="showJournalPage()">Journal</button>
       <button onclick="showRitualsPage()">Rituals</button>
       <button onclick="showLibraryPage()">Library</button>
+      <button onclick="showReprogramPage()">The Science</button>
       <button onclick="showProfilePage()">Profile</button>
     </div>
   </div>
@@ -786,42 +776,8 @@
   <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
   <div class="hero-ctas">
     <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
-    <button class="btn btn-ghost" onclick="goTo('waitlist')">Join the waitlist</button>
   </div>
-</section>
-
-<section class="science" id="science">
-  <div class="wrap">
-    <div class="section-head">
-      <div class="eyebrow">The Science</div>
-      <h2>Your subconscious is already running the show</h2>
-      <p>This isn't just a nice idea — it's backed by neuroscience, quantum physics, and decades of clinical research.</p>
-    </div>
-
-    <div class="science-stat">
-      <div class="conscious"><div class="num">40 bits/sec</div><div class="lbl">Conscious mind</div></div>
-      <div class="subconscious"><div class="num">11,000,000 bits/sec</div><div class="lbl">Subconscious mind</div></div>
-    </div>
-    <p class="science-stat-note">Your subconscious processes roughly <b>275,000 times</b> more information per second than your conscious mind — <em>Encyclopedia Britannica</em>. It's not your willpower doing the heavy lifting each night; it's what's underneath it.</p>
-
-    <div class="quote-grid">
-      <div class="quote-card">
-        <p>"Until you make the unconscious conscious, it will direct your life and you will call it fate."</p>
-        <div class="who">Carl Jung<span>Psychiatrist, founder of analytical psychology</span></div>
-      </div>
-      <div class="quote-card">
-        <p>"I regard consciousness as fundamental. I regard matter as derivative from consciousness."</p>
-        <div class="who">Max Planck<span>Nobel laureate, founder of quantum theory</span></div>
-      </div>
-      <div class="quote-card">
-        <p>"Your subconscious mind runs about 95 to 99 percent of your life."</p>
-        <div class="who">Dr. Bruce Lipton<span>Cell biologist, author of "The Biology of Belief"</span></div>
-      </div>
-    </div>
-    <div style="text-align:center; margin-top:36px;">
-      <button class="btn btn-ghost" onclick="showReprogramPage()">Go deeper on the science →</button>
-    </div>
-  </div>
+  <p class="hero-note">Your subconscious takes in roughly <b>275,000 times</b> more per second than your conscious mind. <button onclick="showReprogramPage()">Why this works →</button></p>
 </section>
 
 <section class="science reprogram-page" id="reprogram">
@@ -936,23 +892,6 @@
           <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
-    </div>
-  </div>
-</section>
-
-<section class="how" id="how">
-  <div class="wrap">
-    <div class="section-head">
-      <div class="eyebrow">The ritual</div>
-      <h2>Five steps to tonight</h2>
-      <p>Every affirmation is visible before it ever plays — nothing hidden, nothing you didn't approve.</p>
-    </div>
-    <div class="steps">
-      <div class="step-card"><div class="step-num">01</div><h3>Pick your frequency</h3><p>All nine Solfeggio tones, each with its traditional association explained.</p></div>
-      <div class="step-card"><div class="step-num">02</div><h3>Tell us what you need</h3><p>One prompt, and we write 10–20 affirmations shaped around it.</p></div>
-      <div class="step-card"><div class="step-num">03</div><h3>Choose your voice</h3><p>Your own voice (we recommend it) or a natural AI voice.</p></div>
-      <div class="step-card"><div class="step-num">04</div><h3>Layer your ambience</h3><p>Rain, waterfall, birds, ocean, and more — mixed to your levels.</p></div>
-      <div class="step-card"><div class="step-num">05</div><h3>Press play</h3><p>Hear it all come together, loop it, and take it with you.</p></div>
     </div>
   </div>
 </section>
@@ -1576,7 +1515,7 @@
     <div class="footer-grid">
       <div class="footer-motto">Be more Hopeful… Be more Romantic… Be more you.</div>
       <div class="footer-links">
-        <button onclick="goTo('science')">The Science</button>
+        <button onclick="showReprogramPage()">The Science</button>
         <button onclick="goTo('flow-section')">Build yours</button>
         <button onclick="goTo('pricing')">Pricing</button>
         <button onclick="goTo('waitlist')">Waitlist</button>
@@ -3862,7 +3801,7 @@ function renderAccountArea(){
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
   }
-  document.getElementById('navToday').style.display = currentUser ? '' : 'none';
+  renderNavLinks();
   // Logging out from Today would leave you staring at a hidden page.
   if (!currentUser && document.body.getAttribute('data-view') === 'today') showMarketingHome();
   renderJournalState();
@@ -3871,6 +3810,28 @@ function renderAccountArea(){
   renderMyLibraryState();
   applyPricingVisibility();
   if (document.body.getAttribute('data-view') === 'today') renderTodayPage();
+}
+/* Two different navs for two different people. A member gets the four places
+   the practice lives; a visitor gets the marketing set. Pricing and the
+   science stay reachable for members — from Profile and the Today links —
+   they're just not the furniture they see every day. */
+function renderNavLinks(){
+  const links = currentUser
+    ? [
+        ['Today', 'showTodayPage()'],
+        ['Rituals', 'showRitualsPage()'],
+        ['Journal', 'showJournalPage()'],
+        ['Library', 'showLibraryPage()'],
+      ]
+    : [
+        ['Build yours', "showMarketingHome(); goTo('flow-section')"],
+        ['Library', 'showLibraryPage()'],
+        ['The Science', 'showReprogramPage()'],
+        ['Pricing', "showMarketingHome(); goTo('pricing')"],
+      ];
+  document.getElementById('navLinks').innerHTML = links
+    .map(([label, action]) => `<button onclick="${action}; closeMobileNav();">${label}</button>`)
+    .join('');
 }
 async function loadNavIdentity(){
   if (!sb || !currentUser) return;
