@@ -589,6 +589,12 @@
   .habit-blank-input::placeholder{ color:var(--haze); opacity:.7; }
   .habit-suggest-row{ display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:4px; }
   .habit-suggest-label{ font-size:11.5px; color:var(--haze); margin-right:2px; }
+  .habit-more-slots{ background:none; border:none; color:var(--haze); font-family:inherit; font-size:12.5px; cursor:pointer; padding:8px 2px 2px; text-align:left; transition:color .2s; }
+  .habit-more-slots:hover{ color:var(--lilac); }
+  .habit-ideas-toggle{ background:none; border:none; color:var(--lilac); font-family:inherit; font-size:12.5px; cursor:pointer; padding:2px 0; }
+  .habit-ideas-toggle::after{ content:" ⌄"; display:inline-block; transition:transform .2s; }
+  .habit-ideas-toggle[aria-expanded="true"]::after{ transform:rotate(180deg); }
+  .habit-ideas-chips{ display:flex; flex-wrap:wrap; gap:7px; width:100%; margin-top:4px; }
   .habit-suggest-chip{ font-size:12px; color:var(--lilac); background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.25); border-radius:999px; padding:5px 12px; cursor:pointer; font-family:inherit; transition:all .15s; }
   .habit-suggest-chip:hover{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .habit-suggest-full{ font-size:12px; color:var(--candle); font-family:var(--serif); font-style:italic; }
@@ -4802,6 +4808,11 @@ async function deleteDayEntry(dateStr){
    fill-in rows for the rest. Typing into a blank row (Enter or blur) creates
    the habit; suggestion chips below do the same in one tap. */
 const HABIT_SLOTS = 15;
+const HABIT_BLANKS_VISIBLE = 3;   // empty slots shown before "+ more slots"
+let habitSlotsExpanded = { morning: false, night: false };
+let habitIdeasOpen = { morning: false, night: false };
+function expandHabitSlots(time){ habitSlotsExpanded[time] = true; renderHabits(); }
+function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; renderHabits(); }
 const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read scripture','Pray','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
 
@@ -4871,8 +4882,11 @@ function renderHabits(){
 
     const already = new Set(rows.map(h => h.name.toLowerCase()));
     const pool = (time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS).filter(s => !already.has(s.toLowerCase()));
-    const blanksNeeded = Math.max(0, HABIT_SLOTS - rows.length);
-    const blankRowsHtml = Array.from({ length: blanksNeeded }, (_, i) => {
+    // All 15 slots are there, but showing 15 empty boxes at once reads as a
+    // chore list. Offer a few at a time and let people ask for the rest.
+    const remaining = Math.max(0, HABIT_SLOTS - rows.length);
+    const blanksShown = habitSlotsExpanded[time] ? remaining : Math.min(HABIT_BLANKS_VISIBLE, remaining);
+    const blankRowsHtml = Array.from({ length: blanksShown }, (_, i) => {
       const example = pool.length ? `e.g. ${pool[i % pool.length]}` : `Habit #${rows.length + i + 1}`;
       return `
       <div class="habit-row habit-row-blank">
@@ -4882,14 +4896,19 @@ function renderHabits(){
           onblur="if(this.value.trim()){ addHabit('${time}', this.value); this.value=''; }">
       </div>`;
     }).join('');
+    const hiddenSlots = remaining - blanksShown;
+    const moreSlotsHtml = hiddenSlots > 0
+      ? `<button type="button" class="habit-more-slots" onclick="expandHabitSlots('${time}')">+ ${hiddenSlots} more slot${hiddenSlots === 1 ? '' : 's'}</button>`
+      : '';
 
-    list.innerHTML = realRowsHtml + blankRowsHtml;
+    list.innerHTML = realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
       suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
         ? `<span class="habit-suggest-full">15 of 15 — this ritual is full.</span>`
         : pool.length
-          ? `<span class="habit-suggest-label">Need ideas?</span>` + pool.map(s => `<button type="button" class="habit-suggest-chip" onclick="addHabit('${time}','${s}')">${s}</button>`).join('')
+          ? `<button type="button" class="habit-ideas-toggle" onclick="toggleHabitIdeas('${time}')" aria-expanded="${habitIdeasOpen[time]}">Need ideas?</button>`
+            + (habitIdeasOpen[time] ? `<div class="habit-ideas-chips">${pool.map(s => `<button type="button" class="habit-suggest-chip" onclick="addHabit('${time}','${s}')">${s}</button>`).join('')}</div>` : '')
           : '';
     }
   });
