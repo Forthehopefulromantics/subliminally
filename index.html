@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Subliminally by FTHR — Your own voice becomes your nightly environment.</title>
+<title>Subliminally by FTHR — Your all in one wellness app.</title>
 <meta name="description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <link rel="canonical" href="https://www.subliminallybyfthr.com/" />
 <meta name="theme-color" content="#0D0B18" />
@@ -12,7 +12,7 @@
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://www.subliminallybyfthr.com/" />
-<meta property="og:title" content="Subliminally by FTHR — Your own voice becomes your nightly environment." />
+<meta property="og:title" content="Subliminally by FTHR — Your all in one wellness app." />
 <meta property="og:description" content="Choose a Solfeggio frequency, generate affirmations, record them in your own voice, layer in ambience, and build a bedtime ritual that's entirely yours." />
 <meta property="og:image" content="https://www.subliminallybyfthr.com/og-image.png" />
 <meta property="og:site_name" content="Subliminally by FTHR" />
@@ -263,13 +263,6 @@
   .demo-note{ font-size:11px; color:var(--haze); background:rgba(255,255,255,0.04); border-radius:10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.06); text-align:left; }
 
   .pricing{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
-  .pricing-toggle{ display:flex; align-items:center; justify-content:center; gap:12px; margin:0 auto 36px; }
-  .pricing-toggle span{ font-size:13px; color:var(--haze); transition:color .2s; }
-  .pricing-toggle span.active{ color:var(--moonlight); font-weight:500; }
-  .pricing-toggle .switch{ width:46px; height:26px; border-radius:999px; background:var(--dusk); border:1px solid var(--lilac); position:relative; cursor:pointer; flex-shrink:0; }
-  .pricing-toggle .switch::after{ content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--candle); transition:transform .2s; }
-  .pricing-toggle .switch.on::after{ transform:translateX(20px); }
-  .pricing-toggle .save-badge{ font-size:10.5px; color:var(--candle); background:rgba(227,190,127,0.14); padding:2px 9px; border-radius:999px; margin-left:2px; }
   .pricing-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; max-width:1020px; margin:0 auto; }
   .pricing-grid.centered{ display:flex; justify-content:center; flex-wrap:wrap; }
   .pricing-grid.centered .price-card{ width:320px; }
@@ -282,11 +275,20 @@
   .price-amount{ font-family:var(--serif); font-size:38px; color:var(--candle); margin-top:10px; }
   .price-tagline{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); margin-top:6px; }
   .price-amount span{ font-size:14px; color:var(--haze); font-family:var(--sans); }
+  .price-amount .price-figure{ font-size:inherit; color:inherit; font-family:inherit; }
   .price-card .limit{ font-size:13px; color:var(--lilac); margin-top:4px; }
   .price-feats{ list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:9px; }
   .price-feats li{ font-size:13px; color:var(--haze); padding-left:18px; position:relative; }
   .price-feats li::before{ content:"✦"; position:absolute; left:0; color:var(--lilac); font-size:11px; top:2px; }
   .price-card .btn{ width:100%; justify-content:center; margin-top:22px; }
+  .billing-toggle{ display:flex; gap:6px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; width:max-content; margin:0 auto 28px; }
+  .billing-toggle button{ background:none; border:none; color:var(--haze); font-family:inherit; font-size:13px; font-weight:500; padding:9px 18px; border-radius:999px; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:8px; }
+  .billing-toggle button span{ font-size:10.5px; color:var(--candle); letter-spacing:.04em; }
+  .billing-toggle button.active{ background:linear-gradient(135deg, var(--lilac), #7C6BC4); color:#fff; }
+  .billing-toggle button.active span{ color:rgba(255,255,255,0.8); }
+  .pricing-legal{ max-width:560px; margin:18px auto 0; text-align:center; }
+  .pricing-legal p{ font-size:11.5px; color:var(--haze); line-height:1.6; margin-top:8px; }
+  .pricing-legal a, .pricing-legal button{ color:var(--lilac); background:none; border:none; font-family:inherit; font-size:inherit; cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px; }
   .length-chip-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   .length-chip{ cursor:pointer; padding:12px 6px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:13px; font-family:inherit; transition:all .2s; }
   .length-chip span{ display:block; font-size:10px; color:var(--lilac); margin-top:3px; }
@@ -469,7 +471,8 @@
   .journal-philosophy-toggle span{ transition:transform .25s; }
   .journal-philosophy.open .journal-philosophy-toggle span{ transform:rotate(180deg); }
   .journal-philosophy-body{ max-height:0; overflow:hidden; transition:max-height .3s ease; }
-  .journal-philosophy.open .journal-philosophy-body{ max-height:600px; margin-top:12px; }
+  .journal-philosophy.open .journal-philosophy-body{ max-height:1600px; margin-top:12px; }
+  .journal-philosophy-body b{ color:var(--moonlight); font-weight:500; }
   .journal-philosophy-body p{ font-size:13px; color:var(--haze); line-height:1.7; margin-top:10px; }
   .journal-philosophy-body p:first-child{ margin-top:0; }
   .journal-locked{ max-width:520px; margin:0 auto; text-align:center; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:44px 30px; }
@@ -497,6 +500,52 @@
   .journal-move-confirm .mini-btn{ font-size:11.5px; padding:6px 12px; }
   .journal-stat{ text-align:center; font-size:13px; color:var(--candle); background:rgba(227,190,127,0.08); border:1px solid rgba(227,190,127,0.2); border-radius:14px; padding:10px 16px; margin-bottom:16px; }
   .journal-empty{ text-align:center; font-size:13px; color:var(--haze); padding:30px 0; }
+  .journal-tabs-4{ max-width:600px; }
+  @media (max-width:520px){ .journal-tabs-4{ flex-wrap:wrap; border-radius:20px; } .journal-tabs-4 button{ flex:1 1 45%; padding:10px 8px; font-size:13px; } }
+
+  /* ---- daily log (photos of handwritten pages) ---- */
+  .photo-upload-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:18px; padding:18px 18px 16px; margin-bottom:20px; }
+  .photo-upload-fields{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .photo-upload-fields label{ display:block; font-size:12px; color:var(--haze); margin-bottom:6px; }
+  .photo-upload-fields input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; font-family:inherit; outline:none; color-scheme:dark; }
+  .photo-upload-fields input:focus{ border-color:var(--candle); }
+  .photo-upload-actions{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .photo-upload-hint{ font-size:12px; color:var(--haze); }
+  .photo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; }
+  .photo-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .photo-card img{ width:100%; aspect-ratio:3/4; object-fit:cover; display:block; background:var(--dusk); cursor:zoom-in; }
+  .photo-card .meta{ padding:9px 11px 10px; display:flex; flex-direction:column; gap:3px; }
+  .photo-card .date{ font-size:11.5px; color:var(--lilac); font-variant-numeric:tabular-nums; }
+  .photo-card .cap{ font-size:12px; color:var(--haze); font-family:var(--serif); font-style:italic; line-height:1.4; }
+  .photo-card .journal-entry-delete{ align-self:flex-end; margin-top:4px; }
+  .photo-lightbox{ position:fixed; inset:0; z-index:500; background:rgba(13,11,24,0.92); display:none; align-items:center; justify-content:center; padding:24px; cursor:zoom-out; }
+  .photo-lightbox.open{ display:flex; }
+  .photo-lightbox img{ max-width:100%; max-height:100%; border-radius:12px; }
+
+  /* ---- habit tracker ---- */
+  .habit-block{ background:var(--veil); border:1px solid var(--dusk); border-radius:20px; padding:20px 20px 16px; margin-bottom:16px; }
+  .habit-block[data-time="morning"]{ background:linear-gradient(160deg, rgba(227,190,127,0.07), var(--veil)); }
+  .habit-block[data-time="night"]{ background:linear-gradient(160deg, rgba(185,167,232,0.08), var(--veil)); }
+  .habit-block-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .habit-block-head h3{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-top:4px; }
+  .habit-block-count{ font-size:12px; color:var(--haze); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .habit-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
+  .habit-check.done{ background:var(--candle); border-color:var(--candle); color:#241C0E; }
+  .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  .habit-name{ font-size:14px; color:var(--moonlight); min-width:0; overflow-wrap:anywhere; }
+  .habit-row.done-today .habit-name{ color:var(--haze); text-decoration:line-through; text-decoration-color:rgba(156,147,184,0.5); }
+  .habit-week{ display:flex; gap:4px; }
+  .habit-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.08); }
+  .habit-dot.on{ background:var(--lilac); }
+  .habit-dot.today{ box-shadow:0 0 0 1.5px rgba(227,190,127,0.6); }
+  .habit-streak{ font-size:11.5px; color:var(--candle); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .habit-streak.zero{ color:var(--haze); }
+  .habit-delete{ display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:none; border:1px solid transparent; color:var(--haze); cursor:pointer; padding:0; opacity:.55; transition:all .2s; }
+  .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
+  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
+  .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
 
   /* ---- library ---- */
   .library-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
@@ -524,6 +573,7 @@
     <button onclick="goHome(); goTo('flow-section'); closeMobileNav();">Build yours</button>
     <button onclick="showLibraryPage(); closeMobileNav();">Library</button>
     <button onclick="showJournalPage(); closeMobileNav();">Journal</button>
+    <button onclick="showJournalPage('habits'); closeMobileNav();">Habits</button>
     <button onclick="showReprogramPage(); closeMobileNav();">The Science</button>
     <button onclick="goHome(); goTo('pricing'); closeMobileNav();">Pricing</button>
   </div>
@@ -531,12 +581,29 @@
   <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="toggleMobileNav()" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
 </nav>
 
+<div class="photo-lightbox" id="photoLightbox" onclick="this.classList.remove('open')"><img id="photoLightboxImg" alt="Journal page"></div>
+
 <!-- ============ AUTH MODAL ============ -->
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
   <div class="modal-card">
     <button class="modal-close" onclick="closeAuthModal()">✕</button>
     <div class="modal-title" id="authTitle">Create your account</div>
     <div class="modal-sub" id="authSub">Save your sessions, keep a journal, and build your library.</div>
+    <div id="googleAuthRow">
+      <button type="button" class="btn-google" onclick="signInWithGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#fff; color:#1f1f1f; border:1px solid var(--dusk); border-radius:999px; padding:11px 20px; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:18px;">
+        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
+        Continue with Google
+      </button>
+      <button type="button" class="btn-apple" onclick="signInWithApple()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#000; color:#fff; border:1px solid #000; border-radius:999px; padding:11px 20px; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:18px;">
+        <svg width="16" height="18" viewBox="0 0 814 1000" fill="#fff"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127C46.7 790.7 0 663 0 541.8c0-194.4 126.4-297.5 250.8-297.5 66.1 0 121.2 43.4 162.7 43.4 39.5 0 101.1-46 176.3-46 28.5 0 130.9 2.6 198.3 99.2zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/></svg>
+        Continue with Apple
+      </button>
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <div style="flex:1; height:1px; background:var(--dusk);"></div>
+        <span style="font-size:11.5px; color:var(--haze);">or</span>
+        <div style="flex:1; height:1px; background:var(--dusk);"></div>
+      </div>
+    </div>
     <div class="auth-field">
       <label>Email</label>
       <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
@@ -546,6 +613,9 @@
       <div class="pw-wrap">
         <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPassword', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <div id="forgotPwRow" style="display:none; text-align:right; margin-top:6px;">
+        <button type="button" onclick="enterResetMode()" style="background:none; border:none; color:var(--lilac); font-size:12px; cursor:pointer; padding:0;">Forgot password?</button>
       </div>
     </div>
     <div class="auth-field" id="confirmPwField">
@@ -620,8 +690,8 @@
 <section class="hero">
   <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
-  <h1>Your own voice becomes<br><em>your nightly environment.</em></h1>
-  <p class="hero-sub">Choose a healing frequency — the nine Solfeggio tones plus 432 Hz — get affirmations built for what you're working through, and layer in rain, waterfall, or birds underneath your own voice.</p>
+  <h1>Your all in one<br><em>wellness app.</em></h1>
+  <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
   <div class="hero-ctas">
     <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
     <button class="btn btn-ghost" onclick="goTo('waitlist')">Join the waitlist</button>
@@ -771,7 +841,7 @@
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
           <button class="btn btn-primary" onclick="goHome(); goTo('flow-section');">Write your script →</button>
-          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">See plans</button>
+          <button class="btn btn-ghost" onclick="goHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
     </div>
@@ -972,7 +1042,7 @@
         <div class="flow-body">
           <div class="bg-grid" id="bgGrid"></div>
           <div class="soothing-picker">
-            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper &amp; Ritual)</span></label>
+            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper & Ritual)</span></label>
             <div class="length-chip-grid" id="soothingChips">
               <button class="length-chip sel" data-variant="none" onclick="pickSoothingLayer(this)">None</button>
               <button class="length-chip" data-variant="pad" onclick="pickSoothingLayer(this)">Warm pad</button>
@@ -1103,29 +1173,40 @@
   <div class="wrap">
     <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
     <div class="section-head">
-      <div class="eyebrow">Your record</div>
-      <h2>Your gratitude journal</h2>
-      <p>Written in present tense, always — for what's already yours, and what's already on its way.</p>
+      <div class="eyebrow">Your practice</div>
+      <h2>Journal &amp; rituals</h2>
+      <p>Gratitude in present tense, what you're calling in, the pages you write by hand, and the morning and night habits that hold it all together.</p>
     </div>
-    <div class="journal-tabs">
-      <button class="active" data-cat="received" onclick="setJournalTab('received')">Already mine</button>
-      <button data-cat="manifesting" onclick="setJournalTab('manifesting')">On its way</button>
+    <div class="journal-tabs journal-tabs-4">
+      <button class="active" data-cat="received" onclick="setJournalTab('received')">Gratitude</button>
+      <button data-cat="manifesting" onclick="setJournalTab('manifesting')">Manifesting</button>
+      <button data-cat="photos" onclick="setJournalTab('photos')">Daily log</button>
+      <button data-cat="habits" onclick="setJournalTab('habits')">Habits</button>
     </div>
     <div class="journal-prompt" id="journalPrompt">A good morning practice: write down three things you're grateful for, right when you wake up.</div>
     <div class="journal-philosophy" id="journalPhilosophy" style="display:none;">
       <button class="journal-philosophy-toggle" onclick="this.parentElement.classList.toggle('open')">Why hasn't this shown up yet? <span>↓</span></button>
       <div class="journal-philosophy-body">
-        <p>An affirmation is 2D — words on paper, a thought in your head. Physical reality is 3D. Getting from one to the other isn't instant, and the gap between them is normal, not proof it isn't working.</p>
-        <p>Your inner state is the blueprint. Your affirmations are that blueprint spoken into words. The physical world around you right now is just an echo of an older blueprint — the assumptions you were running before. Reality takes time to catch up to a new mental state; that's the lag, not a sign you did something wrong.</p>
-        <p>So the practice isn't checking outside for proof. It's repeating the words until they stop feeling forced and start feeling true — and when the old, unwanted version of things shows up anyway, treating it as old news instead of new evidence. Your identity gets to stay steady while the world outside slowly updates to match it.</p>
+        <p><b>3D — the world of proof.</b> This is physical reality: what you can see, touch, and measure. 3D consciousness needs evidence first, belief second. It says "show me, then I'll believe it." This is also where most of your current environment lives — it's the echo of decisions and beliefs you held before you started shifting. It hasn't caught up yet, and that's not failure, that's lag.</p>
+        <p><b>4D — the world of mind and emotion.</b> This is the bridge layer — thought, feeling, imagination, belief. It's where affirmations actually live. When you speak a new identity into words, you're not yet in 3D proof — you're doing 4D construction. This is where the "unrealness" of an affirmation comes from: you're speaking a blueprint that hasn't been built yet. Repetition isn't about convincing reality; it's about convincing this layer until it becomes automatic.</p>
+        <p><b>5D — the world of knowing.</b> This is consciousness without needing proof or even active thought — just steady, embodied certainty. In 5D, you don't recite the affirmation anymore because you are it. When old 3D circumstances show up, 5D consciousness doesn't panic or take it personally — it recognizes them as outdated information still catching up, like light from a star that's already changed.</p>
+        <p><b>So why hasn't it shown up in 3D yet?</b> Because 3D is the last layer to update, not the first. The order is always: identity shifts in 5D → gets shaped by belief and emotion in 4D → eventually crystallizes into form in 3D. Looking at 3D for proof is checking the slowest-moving part of the system before it's had time to catch up.</p>
+        <p>The old paradigm is still playing out its momentum. That's not evidence the new one isn't working — it's just physics doing what physics does: taking time.</p>
       </div>
     </div>
     <div id="journalLocked" class="journal-locked">
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
       <h3>Keep your own record</h3>
-      <p>The Journal is where you write what you're grateful for — in present tense, whether it already happened or you're calling it in. Create a free account to start keeping it.</p>
-      <button class="btn btn-primary" onclick="openAuthModal()">Create a free account</button>
+      <p>Gratitude, manifestations, your handwritten pages, and your daily rituals all live here. Log in or create an account to get started.</p>
+      <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
     </div>
+    <div id="journalUpgrade" class="journal-locked" style="display:none;">
+      <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+      <h3 id="journalUpgradeTitle">The journal is part of Whisper</h3>
+      <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month.</p>
+      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="goHome(); goTo('pricing');">See plans</button>
+    </div>
+
     <div id="journalPanel" class="journal-panel" style="display:none;">
       <div class="journal-add">
         <input type="text" id="journalInput" placeholder="I am so grateful for…" onkeydown="if(event.key==='Enter') addJournalEntry()">
@@ -1134,6 +1215,58 @@
       <div class="save-msg" id="journalAddMsg"></div>
       <div class="journal-stat" id="journalStat" style="display:none;"></div>
       <div class="journal-entries" id="journalEntries"></div>
+    </div>
+
+    <!-- Daily log: photos of handwritten journal pages -->
+    <div id="journalPhotoPanel" class="journal-panel" style="display:none;">
+      <div class="photo-upload-card">
+        <div class="photo-upload-fields">
+          <div>
+            <label for="photoEntryDate">Entry date</label>
+            <input type="date" id="photoEntryDate">
+          </div>
+          <div style="flex:1; min-width:180px;">
+            <label for="photoCaption">A line about today <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
+            <input type="text" id="photoCaption" placeholder="What this page was about…" maxlength="140">
+          </div>
+        </div>
+        <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
+        <div class="photo-upload-actions">
+          <button class="mini-btn candlebtn" id="photoUploadBtn" onclick="document.getElementById('photoFile').click()">Photograph today's page</button>
+          <span class="photo-upload-hint">Snap your handwritten entry — it's stored privately to your account.</span>
+        </div>
+        <div class="save-msg" id="photoUploadMsg"></div>
+      </div>
+      <div class="journal-stat" id="photoStat" style="display:none;"></div>
+      <div class="photo-grid" id="photoGrid"></div>
+    </div>
+
+    <!-- Habit tracker: morning and night rituals -->
+    <div id="habitsPanel" class="journal-panel" style="display:none;">
+      <div class="journal-stat" id="habitsStat" style="display:none;"></div>
+      <div class="habit-block" data-time="morning">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Morning ritual</div><h3>How you start the day</h3></div>
+          <span class="habit-block-count" id="habitCountMorning"></span>
+        </div>
+        <div class="habit-list" id="habitListMorning"></div>
+        <div class="journal-add">
+          <input type="text" id="habitInputMorning" placeholder="Add a morning habit — e.g. Three gratitudes, Play my subliminal" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('morning')">
+          <button class="mini-btn candlebtn" onclick="addHabit('morning')">Add</button>
+        </div>
+      </div>
+      <div class="habit-block" data-time="night">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Night ritual</div><h3>How you close it</h3></div>
+          <span class="habit-block-count" id="habitCountNight"></span>
+        </div>
+        <div class="habit-list" id="habitListNight"></div>
+        <div class="journal-add">
+          <input type="text" id="habitInputNight" placeholder="Add a night habit — e.g. Journal by hand, Subliminal at lights out" maxlength="80" onkeydown="if(event.key==='Enter') addHabit('night')">
+          <button class="mini-btn candlebtn" onclick="addHabit('night')">Add</button>
+        </div>
+      </div>
+      <div class="save-msg" id="habitsMsg"></div>
     </div>
   </div>
 </section>
@@ -1193,7 +1326,7 @@
           <div class="save-msg" id="passwordSettingsMsg"></div>
         </div>
       </div>
-      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
+      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="profileManageSubLink">Manage your subscription →</a></div>
 
       <h3 class="profile-subhead">Get in touch</h3>
       <div class="journal-tabs" style="max-width:340px;">
@@ -1207,6 +1340,26 @@
         <div class="save-msg" id="feedbackMsg"></div>
         <p style="font-size:11.5px; color:var(--haze); margin-top:12px;">Prefer email? Reach us directly at <a href="mailto:hello@subliminallybyfthr.com" style="color:var(--lilac);">hello@subliminallybyfthr.com</a></p>
       </div>
+
+      <h3 class="profile-subhead">Your account</h3>
+      <div class="profile-field-card" style="max-width:520px;">
+        <div id="profileRestoreRow" style="display:none; margin-bottom:18px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.06);">
+          <label>Subscribed on another device?</label>
+          <button class="mini-btn ghostbtn" onclick="restorePurchases()">Restore purchases</button>
+          <div class="save-msg" id="restoreMsg"></div>
+        </div>
+        <label>Delete your account</label>
+        <p style="font-size:12.5px; color:var(--haze); margin-bottom:10px;">Permanently removes your account, saved subliminals, recordings, journal entries, photos, and habits. If you have an active subscription, cancel it first — deleting your account doesn't stop the billing.</p>
+        <button class="mini-btn ghostbtn" id="deleteAccountBtn" onclick="document.getElementById('deleteAccountConfirm').style.display='block'">Delete my account</button>
+        <div id="deleteAccountConfirm" style="display:none; margin-top:12px;">
+          <p style="font-size:13px; color:#E39A9A; margin-bottom:10px;">This can't be undone. Delete everything?</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="mini-btn candlebtn" onclick="deleteMyAccount()">Yes, delete my account</button>
+            <button class="mini-btn ghostbtn" onclick="document.getElementById('deleteAccountConfirm').style.display='none'">Keep it</button>
+          </div>
+        </div>
+        <div class="save-msg" id="deleteAccountMsg"></div>
+      </div>
     </div>
   </div>
 </section>
@@ -1215,19 +1368,17 @@
   <div class="wrap">
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
-      <h2 id="pricingHeading">Your all-in-one wellness app</h2>
-      <p id="pricingSub">Every tier includes the full ritual builder — frequency, binaural beats, affirmations, your voice, and nature sounds.</p>
+      <h2 id="pricingHeading">Your all in one wellness app</h2>
+      <p id="pricingSub">Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.</p>
     </div>
 
     <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
       <p style="font-size:14.5px; color:var(--haze);">You're on Ritual — the full ritual, unlocked. Nothing to upgrade to here.</p>
     </div>
 
-    <div class="pricing-toggle" id="pricingToggle">
-      <span id="pricingToggleMonthly" class="active">Monthly</span>
-      <div class="switch" id="pricingToggleSwitch" onclick="togglePricingPeriod()" role="button" aria-label="Toggle monthly or yearly pricing"></div>
-      <span id="pricingToggleYearly">Yearly</span>
-      <span class="save-badge">2 months free</span>
+    <div class="billing-toggle" id="billingToggle">
+      <button class="active" data-period="monthly" onclick="setBillingPeriod('monthly')">Monthly</button>
+      <button data-period="annual" onclick="setBillingPeriod('annual')">Yearly <span>save ~17%</span></button>
     </div>
 
     <div class="pricing-grid" id="pricingGrid">
@@ -1237,50 +1388,49 @@
         <div class="limit">Sessions up to 20 minutes</div>
         <ul class="price-feats">
           <li>Personalized subliminals — align your frequency</li>
-          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
-          <li>Personal voice or AI voice</li>
-          <li>Library of general subliminals</li>
+          <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
+          <li>Your own voice or AI voice</li>
+          <li>Save 2 subliminals to your library (an account is required to save)</li>
+          <li>Library of general subliminals on YouTube</li>
         </ul>
-        <a class="btn btn-ghost" href="#" onclick="goHome(); goTo('flow-section'); return false;">Start free</a>
+        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal()">Create a free account</button>
       </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
-        <div class="price-amount"><span class="pc-price" data-monthly="$5.55" data-yearly="$55">$5.55</span><span class="pc-period" data-monthly="/month" data-yearly="/year">/month</span></div>
-        <div class="limit">Sessions up to 8 hours</div>
+        <div class="price-amount"><span class="price-figure" data-monthly="$5.55" data-annual="$55">$5.55</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
+        <div class="limit">Sessions up to 2 hours</div>
         <ul class="price-feats">
-          <li>Personalized subliminals — align your frequency, up to 8 hours</li>
-          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
-          <li>Personal voice or AI voice</li>
-          <li>Library of general subliminals</li>
-          <li>Gratitude journal</li>
-          <li>Daily journaling — upload entries from your physical journal</li>
+          <li>Everything in Free, with sessions up to 2 hours</li>
+          <li>Save up to 10 subliminals to your library</li>
+          <li>Gratitude Journal</li>
+          <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
           <li>Manifestation tracker</li>
         </ul>
-        <a class="btn btn-ghost" href="#" onclick="return startCheckout(event,'whisper')">Get Whisper</a>
+        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'whisper')">Get Whisper</a>
       </div>
       <div class="price-card featured" id="priceCardRitual">
-        <span class="badge">All night</span>
+        <span class="badge">Mornings + nights</span>
         <h3>Ritual</h3>
-        <p class="price-tagline">The full nightly ritual.</p>
-        <div class="price-amount"><span class="pc-price" data-monthly="$11.11" data-yearly="$111">$11.11</span><span class="pc-period" data-monthly="/month" data-yearly="/year">/month</span></div>
+        <p class="price-tagline">Ritualize your mornings and your nights.</p>
+        <div class="price-amount"><span class="price-figure" data-monthly="$11.11" data-annual="$111">$11.11</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
         <ul class="price-feats">
-          <li>Personalized subliminals — align your frequency, up to 8 hours</li>
-          <li>Layer frequency, nature sounds, binaural beats &amp; affirmations</li>
-          <li>Personal voice or AI voice</li>
-          <li>Library of general subliminals</li>
+          <li>Everything in Whisper, with all-night sessions up to 8 hours</li>
+          <li>Unlimited saved subliminals</li>
+          <li>Habit tracker — build your morning and night rituals</li>
           <li>Subliminal + EFT Tapping</li>
-          <li>Habit tracker — ritualizing your mornings and nights</li>
-          <li>Gratitude journal</li>
-          <li>Daily journaling — upload entries from your physical journal</li>
-          <li>Manifestation tracker</li>
           <li>Visualization scripting</li>
         </ul>
-        <a class="btn btn-primary" href="#" onclick="return startCheckout(event,'ritual')">Get Ritual</a>
+        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'ritual')">Get Ritual</a>
       </div>
     </div>
-    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Every plan streams on the website (app coming soon).</p>
-    <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener">Manage your subscription →</a></div>
+    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">We support written journals over digital — physical FTHR journals made for the app are coming soon.</p>
+    <div class="pricing-legal" id="pricingLegal">
+      <p>Paid plans renew automatically every month or every year at the price shown until you cancel. Cancel anytime — in the App Store or Google Play if you subscribed in the app, or through "Manage your subscription" below if you subscribed on the web.</p>
+      <p><a href="/terms.html" target="_blank" rel="noopener">Terms of Use</a> · <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span id="restorePurchasesRow" style="display:none;"> · <button type="button" onclick="restorePurchases()">Restore purchases</button></span></p>
+    </div>
+    <div class="save-msg" id="pricingPurchaseMsg" style="text-align:center; margin-top:14px;"></div>
+    <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="pricingManageSubLink">Manage your subscription →</a></div>
   </div>
 </section>
 
@@ -1441,7 +1591,7 @@ async function updateSessionLengthHint(){
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier === 'none'){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   const myTier = currentUser ? await getMyTier() : 'none';
-  if (TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
+  if (tierAtLeast(myTier, requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
   hintEl.className = 'length-msg err';
 }
@@ -1552,9 +1702,8 @@ async function pickRitualMode(btn){
       return;
     }
     const myTier = await getMyTier();
-    const requiredTier = 'ritual'; // both EFT Tapping and Visualization Script are Ritual features now
-    if (TIER_ORDER.indexOf(myTier) < TIER_ORDER.indexOf(requiredTier)){
-      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Script'} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>.`;
+    if (!tierAtLeast(myTier, 'ritual')){
+      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Scripting'} is a Ritual feature — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -1648,7 +1797,7 @@ async function generateAffirmations(){
       return;
     }
     const myTier = await getMyTier();
-    if (TIER_ORDER.indexOf(myTier) < TIER_ORDER.indexOf(requiredTier)){
+    if (!tierAtLeast(myTier, requiredTier)){
       msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>, or drag the slider back down to build at your current tier.`;
       msg.className = 'length-msg err';
       return;
@@ -1693,7 +1842,7 @@ async function generateAffirmations(){
 async function callClaudeForAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
-  const response = await fetch("/api/generate-affirmations", {
+  const response = await fetch(API_BASE + "/api/generate-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal })
@@ -1710,7 +1859,7 @@ async function callClaudeForAffirmations(){
 async function callClaudeForEftAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
-  const response = await fetch("/api/generate-eft-affirmations", {
+  const response = await fetch(API_BASE + "/api/generate-eft-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
@@ -1777,7 +1926,7 @@ function buildEftFallbackList(){
 async function callClaudeForVisualizationScript(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
-  const response = await fetch("/api/generate-visualization-script", {
+  const response = await fetch(API_BASE + "/api/generate-visualization-script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
@@ -2272,7 +2421,7 @@ async function pickSoothingLayer(btn){
     }
     const myTier = await getMyTier();
     if (myTier === 'none'){
-      msg.innerHTML = `The soothing layer is included on Whisper &amp; Ritual — <a href="#pricing">see plans</a>.`;
+      msg.innerHTML = `The soothing layer is included on Whisper & Ritual — <a href="#pricing">see plans</a>.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2682,81 +2831,177 @@ function stopFinal(){
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
 
-/* ================================================================
-   REVENUECAT — Web Billing checkout
-   TODO (Kyla): this is placeholder wiring, not a finished integration.
-   1. Create a RevenueCat account and add a "Web Billing" app.
-   2. Create products + an Offering with packages whose identifiers match
-      REVENUECAT_PACKAGE_IDS below (or edit the map to match your names),
-      and two entitlements named "whisper" and "ritual".
-   3. Paste your Web Billing PUBLIC API key into REVENUECAT_PUBLIC_API_KEY.
-   4. Load the RevenueCat Web SDK before this script as a module script that
-      imports { Purchases } from @revenuecat/purchases-js and sets
-      window.RCPurchases = Purchases. Confirm the current install method at
-      revenuecat.com/docs/web/web-billing/web-sdk before shipping.
-   Until those are done, startCheckout() shows a friendly "not connected yet"
-   message instead of erroring, and getMyTier() falls back to the existing
-   Supabase subscribers table (so current Stripe subscribers keep their tier).
-   ================================================================ */
-const REVENUECAT_PUBLIC_API_KEY = 'YOUR_REVENUECAT_PUBLIC_API_KEY';
-const REVENUECAT_PACKAGE_IDS = {
-  whisper: { monthly: 'whisper_monthly', yearly: 'whisper_annual' },
-  ritual:  { monthly: 'ritual_monthly',  yearly: 'ritual_annual'  },
+/* ---------------- CHECKOUT LINKING ----------------
+   Web keeps the existing Stripe Payment Links. The native apps can't use
+   those — Apple/Google require subscriptions sold inside the app to go
+   through their own billing — so on native this hands off to RevenueCat
+   instead. See the RevenueCat block below for the purchase flow itself. */
+// Stripe Payment Links, one per plan + billing period. Create these in
+// Stripe -> Payment Links (subscription, recurring monthly or yearly) and
+// paste the buy.stripe.com URLs here. The matching Price IDs also go into
+// PRICE_TO_TIER in api/stripe-webhook.js so the webhook knows which tier
+// a checkout was for.
+const STRIPE_LINKS = {
+  whisper: { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
+  ritual:  { monthly: 'REPLACE_WITH_STRIPE_LINK', annual: 'REPLACE_WITH_STRIPE_LINK' },
 };
-let rcPurchases = null;
-function getRC(){
-  if (rcPurchases) return rcPurchases;
-  if (REVENUECAT_PUBLIC_API_KEY === 'YOUR_REVENUECAT_PUBLIC_API_KEY' || !window.RCPurchases || !currentUser) return null;
-  try {
-    rcPurchases = window.RCPurchases.configure({ apiKey: REVENUECAT_PUBLIC_API_KEY, appUserId: currentUser.id });
-  } catch (e){ console.error('RevenueCat configure failed:', e); rcPurchases = null; }
-  return rcPurchases;
+let billingPeriod = 'monthly'; // 'monthly' | 'annual'
+
+function setBillingPeriod(period){
+  billingPeriod = period;
+  document.querySelectorAll('#billingToggle button').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+  document.querySelectorAll('.price-figure, .price-period').forEach(el => { el.textContent = el.dataset[period]; });
 }
 
-/* Monthly / yearly toggle above the pricing cards */
-let pricingPeriod = 'monthly'; // 'monthly' | 'yearly'
-function togglePricingPeriod(){
-  pricingPeriod = pricingPeriod === 'monthly' ? 'yearly' : 'monthly';
-  const sw = document.getElementById('pricingToggleSwitch');
-  if (sw) sw.classList.toggle('on', pricingPeriod === 'yearly');
-  document.getElementById('pricingToggleMonthly').classList.toggle('active', pricingPeriod === 'monthly');
-  document.getElementById('pricingToggleYearly').classList.toggle('active', pricingPeriod === 'yearly');
-  document.querySelectorAll('.pc-price').forEach(el => { el.textContent = el.dataset[pricingPeriod]; });
-  document.querySelectorAll('.pc-period').forEach(el => { el.textContent = el.dataset[pricingPeriod]; });
-}
-
-async function startCheckout(evt, tier){
-  if (evt && evt.preventDefault) evt.preventDefault();
+function goToCheckout(evt, tier){
+  evt.preventDefault();
   if (!currentUser){
     openAuthModal();
     document.getElementById('authSub').textContent = 'Create an account first, then tap the plan again — this is how we link your subscription to your account.';
     return false;
   }
-  const rc = getRC();
-  if (!rc){
-    alert("Checkout isn't connected yet — RevenueCat still needs to be configured for this site. In the meantime, reach out at hello@subliminallybyfthr.com and we'll get you set up.");
+  if (isNativeApp()){
+    purchaseTier(tier, billingPeriod);
     return false;
   }
-  const packageId = (REVENUECAT_PACKAGE_IDS[tier] || {})[pricingPeriod === 'yearly' ? 'yearly' : 'monthly'];
-  try {
-    const offerings = await rc.getOfferings();
-    const pkg = offerings.current && offerings.current.availablePackages.find(p => p.identifier === packageId);
-    if (!pkg){ alert("Couldn't find that plan — it may not be set up in RevenueCat yet."); return false; }
-    const { customerInfo } = await rc.purchase({ rcPackage: pkg });
-    console.log('Purchase complete, active entitlements:', customerInfo.entitlements.active);
-    applyPricingVisibility();
-  } catch (e){
-    console.error('RevenueCat purchase failed:', e);
-    alert('Something went wrong starting checkout — please try again in a moment.');
+  const link = STRIPE_LINKS[tier] && STRIPE_LINKS[tier][billingPeriod];
+  if (!link || link.startsWith('REPLACE_')){
+    const msg = document.getElementById('pricingPurchaseMsg');
+    msg.textContent = "Checkout for this plan isn't connected yet — check back soon.";
+    msg.className = 'save-msg err';
+    return false;
   }
+  window.open(link + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
   return false;
+}
+
+/* ---------------- REVENUECAT (native subscription purchases) ----------------
+   Currently set to a RevenueCat Test Store key — that's RevenueCat's sandbox
+   for exercising the whole purchase flow with fake products before real
+   App Store/Play Store subscriptions exist or have been approved. It's the
+   same key for both platforms because Test Store isn't platform-specific.
+   Once your real subscriptions are live in App Store Connect / Google Play
+   Console, replace these with the real per-platform public keys from
+   RevenueCat dashboard -> Project -> API keys -> "Public app-specific keys".
+   All of these are public keys (safe to ship in the app), not secrets. */
+const REVENUECAT_API_KEY_IOS = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
+const REVENUECAT_API_KEY_ANDROID = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
+
+// Product identifiers to create — matching — in App Store Connect / Google
+// Play Console / RevenueCat. Each tier is an auto-renewable subscription
+// with a monthly and a yearly product. Entitlement identifiers are set in
+// the RevenueCat dashboard (Entitlements tab) and attached to both of a
+// tier's products there.
+const TIER_PRODUCT_IDS = {
+  whisper: { monthly: 'com.fthr.subliminally.whisper.monthly', annual: 'com.fthr.subliminally.whisper.annual' },
+  ritual:  { monthly: 'com.fthr.subliminally.ritual.monthly',  annual: 'com.fthr.subliminally.ritual.annual' },
+};
+const TIER_ENTITLEMENT_IDS = {
+  whisper: 'whisper',
+  ritual: 'ritual',
+};
+
+function initRevenueCat(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.Purchases) return;
+  const { Purchases } = window.Capacitor.Plugins;
+  const apiKey = window.Capacitor.getPlatform() === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
+  if (!apiKey || apiKey.startsWith('YOUR_')) { console.warn('RevenueCat API key not set yet — native purchases are disabled.'); return; }
+  Purchases.configure({ apiKey });
+  // Apple requires a visible way to restore purchases in any app with subscriptions.
+  ['restorePurchasesRow', 'profileRestoreRow'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = id === 'restorePurchasesRow' ? 'inline' : 'block'; });
+}
+async function restorePurchases(){
+  const targets = ['pricingPurchaseMsg', 'restoreMsg'].map(id => document.getElementById(id)).filter(Boolean);
+  const say = (text, cls) => targets.forEach(el => { el.textContent = text; el.className = 'save-msg' + (cls ? ' ' + cls : ''); });
+  if (!isNativeApp() || !window.Capacitor.Plugins.Purchases){ say('Restore is only needed in the app.', 'err'); return; }
+  say('Checking with the store…');
+  try {
+    const { customerInfo } = await window.Capacitor.Plugins.Purchases.restorePurchases();
+    const active = Object.keys(customerInfo.entitlements.active);
+    if (active.length){
+      say(`Restored — ${TIER_LABEL[active.includes('ritual') ? 'ritual' : 'whisper']} is back on this device.`, 'ok');
+      setTimeout(applyPricingVisibility, 1500);
+    } else {
+      say('No active subscription found for this Apple ID / Google account.');
+    }
+  } catch (e){
+    console.error('restorePurchases error:', e);
+    say((e && e.message) || 'Could not restore right now — try again.', 'err');
+  }
+}
+// Ties each purchase to the Supabase account rather than an anonymous
+// RevenueCat-generated ID, so the webhook below can upsert `subscribers`
+// straight off auth.uid().
+async function syncRevenueCatIdentity(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.Purchases) return;
+  const { Purchases } = window.Capacitor.Plugins;
+  try {
+    if (currentUser) await Purchases.logIn({ appUserID: currentUser.id });
+    else await Purchases.logOut();
+  } catch (e){ console.warn('RevenueCat identity sync failed:', e); }
+}
+
+async function purchaseTier(tier, period){
+  const msg = document.getElementById('pricingPurchaseMsg');
+  if (!window.Capacitor.Plugins.Purchases){ msg.textContent = 'Purchases are not available on this build yet.'; msg.className = 'save-msg err'; return; }
+  const { Purchases } = window.Capacitor.Plugins;
+  msg.textContent = 'Loading plan…'; msg.className = 'save-msg';
+  try {
+    const { current } = await Purchases.getOfferings();
+    const productId = TIER_PRODUCT_IDS[tier][period || 'monthly'];
+    const pkg = current?.availablePackages.find(p => p.product.identifier === productId);
+    if (!pkg){
+      msg.textContent = "That plan isn't set up yet — check back soon.";
+      msg.className = 'save-msg err';
+      return;
+    }
+    msg.textContent = 'Opening purchase…'; msg.className = 'save-msg';
+    const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
+    const entitlementId = TIER_ENTITLEMENT_IDS[tier];
+    if (customerInfo.entitlements.active[entitlementId]){
+      msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
+      msg.className = 'save-msg ok';
+      // The RevenueCat webhook updates the subscribers table server-side;
+      // give it a moment to land, then refresh what the pricing page shows.
+      setTimeout(applyPricingVisibility, 1500);
+    } else {
+      msg.textContent = 'Purchase completed, but the plan is taking a moment to activate — check back shortly.';
+      msg.className = 'save-msg';
+    }
+  } catch (e){
+    if (e && e.userCancelled) { msg.textContent = ''; return; }
+    console.error('Purchase failed:', e);
+    msg.textContent = (e && e.message) || 'Something went wrong with the purchase — try again.';
+    msg.className = 'save-msg err';
+  }
+}
+
+// Stripe's billing portal only knows about web subscriptions; App Store /
+// Play Store subscriptions are managed in the platform's own screen instead.
+function updateManageSubscriptionLinks(){
+  let url = 'https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00';
+  let label = 'Manage your subscription →';
+  if (isNativeApp()){
+    const platform = window.Capacitor.getPlatform();
+    url = platform === 'ios' ? 'https://apps.apple.com/account/subscriptions' : 'https://play.google.com/store/account/subscriptions';
+    label = platform === 'ios' ? 'Manage in the App Store →' : 'Manage in Google Play →';
+  }
+  ['pricingManageSubLink', 'profileManageSubLink'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.href = url;
+    el.textContent = label;
+  });
 }
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
-const TIER_LENGTH_SECONDS = { none: 1200, whisper: 28800, ritual: 28800 };
+const TIER_ORDER = ['none','whisper','ritual'];
+const TIER_LENGTH_SECONDS = { none: 1200, whisper: 7200, ritual: 28800 };
 const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', ritual: 'Ritual' };
-const TIER_ORDER = ['none', 'whisper', 'ritual'];
+function tierAtLeast(myTier, requiredTier){
+  return TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier);
+}
 /* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
    tier that's allowed to actually generate/save a session that long. */
 function requiredTierForMinutes(minutes){
@@ -2765,20 +3010,11 @@ function requiredTierForMinutes(minutes){
 }
 
 async function getMyTier(){
-  const rc = getRC();
-  if (rc){
-    try {
-      const info = await rc.getCustomerInfo();
-      if ('ritual' in info.entitlements.active) return 'ritual';
-      if ('whisper' in info.entitlements.active) return 'whisper';
-    } catch (e){ console.error('getCustomerInfo failed:', e); }
-  }
-  // Fallback (and the only path until RevenueCat is configured): the Supabase
-  // subscribers table that the existing Stripe webhook keeps up to date.
   const subRow = await getMySubscriberRow();
   const validStatuses = ['active', 'trialing'];
   const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
-  return tier === 'reverie' ? 'ritual' : tier; // legacy Reverie subscribers keep everything they had
+  // Reverie was retired; anyone still on it keeps everything they paid for.
+  return tier === 'reverie' ? 'ritual' : tier;
 }
 
 /* Show pricing as an upsell only for tiers above what you already have.
@@ -2788,13 +3024,16 @@ async function applyPricingVisibility(){
   const cards = { free: document.getElementById('priceCardFree'), whisper: document.getElementById('priceCardWhisper'), ritual: document.getElementById('priceCardRitual') };
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
-  const toggle = document.getElementById('pricingToggle');
+  const toggle = document.getElementById('billingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
   if (!cards.whisper) return; // pricing markup not present yet
 
   Object.values(cards).forEach(c => c.style.display = '');
+  const freeBtn = document.getElementById('priceCardFreeBtn');
+  if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
+  else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
 
   if (myTier === 'ritual'){
     head.style.display = 'none';
@@ -2816,13 +3055,13 @@ async function applyPricingVisibility(){
     cards.free.style.display = 'none';
     cards.whisper.style.display = 'none';
     grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = "You're one tier from the full ritual";
-    document.getElementById('pricingSub').textContent = "Subliminal + EFT Tapping, a habit tracker for your mornings and nights, and visualization scripting — all still out of reach on Whisper.";
+    document.getElementById('pricingHeading').textContent = 'Ritualize your mornings and nights';
+    document.getElementById('pricingSub').textContent = 'All-night 8-hour sessions, unlimited saved subliminals, the habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
     manageSub.style.display = 'block';
   } else {
     grid.classList.remove('centered');
-    document.getElementById('pricingHeading').textContent = 'Your all-in-one wellness app';
-    document.getElementById('pricingSub').textContent = 'Every tier includes the full ritual builder — frequency, binaural beats, affirmations, your voice, and nature sounds.';
+    document.getElementById('pricingHeading').textContent = 'Your all in one wellness app';
+    document.getElementById('pricingSub').textContent = 'Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.';
     manageSub.style.display = 'none';
   }
 }
@@ -2841,7 +3080,7 @@ async function getMySubscriberRow(){
   return data; // null if they've never subscribed
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 5, whisper: 10, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 2, whisper: 10, ritual: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
@@ -2868,7 +3107,7 @@ async function saveSubliminal(){
   const cap = TIER_LENGTH_SECONDS[myTier];
 
   if (seconds > cap){
-    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${Math.round(cap/60)} min. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
+    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${formatSessionLength(cap/60)}. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
     msg.className = 'save-msg err';
     return;
   }
@@ -2876,7 +3115,9 @@ async function saveSubliminal(){
   const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
   const subCap = TIER_SUBLIMINAL_CAPS[myTier];
   if ((count || 0) >= subCap){
-    msg.innerHTML = `You've made ${count} subliminals — that's the limit on ${TIER_LABEL[myTier]}. <a href="#pricing" onclick="closeAuthModal();">Upgrade for more</a>.`;
+    msg.innerHTML = myTier === 'whisper'
+      ? `You've saved ${count} subliminals — that's the limit on Whisper. <a href="#pricing" onclick="closeAuthModal();">Upgrade to Ritual for unlimited</a>.`
+      : `You've saved ${count} subliminals — that's the limit on a free account. <a href="#pricing" onclick="closeAuthModal();">Whisper holds 10, Ritual is unlimited</a>.`;
     msg.className = 'save-msg err';
     return;
   }
@@ -3010,10 +3251,45 @@ renderProgress();
    ================================================================ */
 const SUPABASE_URL = 'https://eiqylxcgexndzopesvhd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_1g7zbin7PEQhi2e0Y-QM8Q_-0TAfubb';
+
+function isNativeApp(){
+  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+}
+// Where the website (and its /api functions) live. The native app is served
+// from its own bundle, not from this domain, so anything that calls /api has
+// to spell out the full address. Change this if the site moves domains.
+const SITE_ORIGIN = 'https://www.subliminallybyfthr.com';
+const API_BASE = isNativeApp() ? SITE_ORIGIN : '';
+
+// In the native iOS/Android app, back the login session with Capacitor's
+// Preferences plugin (native storage) instead of plain WebView localStorage,
+// which iOS in particular can quietly evict — that used to mean people got
+// logged out for no reason. On the regular web site window.Capacitor doesn't
+// exist, so this just returns undefined and supabase-js falls back to its
+// normal localStorage-backed session storage.
+function nativeSessionStorage(){
+  const Preferences = window.Capacitor && window.Capacitor.isNativePlatform &&
+    window.Capacitor.isNativePlatform() && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences;
+  if (!Preferences) return undefined;
+  return {
+    async getItem(key){ const { value } = await Preferences.get({ key }); return value; },
+    async setItem(key, value){ await Preferences.set({ key, value }); },
+    async removeItem(key){ await Preferences.remove({ key }); },
+  };
+}
+
 let sb = null;
 try {
   if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase){
-    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: nativeSessionStorage(),
+        flowType: 'pkce',
+      },
+    });
   } else {
     console.warn('Supabase client library did not load — accounts/journal/library will be disabled.');
   }
@@ -3022,29 +3298,202 @@ try {
 }
 
 let currentUser = null;
-let authMode = 'signup'; // 'signup' | 'login'
+let authMode = 'signup'; // 'signup' | 'login' | 'reset'
 let journalTab = 'received';
+
+// Where Supabase sends people after they click a password-reset email link.
+// This always points at the web site (not a custom app:// scheme) because the
+// link opens in the system browser/mail app, never inside the wrapped native
+// app — same pattern as the sign-up email-confirmation link.
+const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
 
 /* ---------- auth modal ---------- */
 function openAuthModal(){
+  if (authMode === 'reset') authMode = 'login';
   document.getElementById('authOverlay').classList.add('open');
   renderSignupAvatarGrid();
+  updateAuthModalUI();
 }
 function closeAuthModal(){
   document.getElementById('authOverlay').classList.remove('open');
   document.getElementById('authMsg').textContent = '';
 }
+
+/* ---------- Google sign-in (Supabase OAuth) ----------
+   Requires a Google provider enabled in the Supabase dashboard
+   (Authentication -> Sign In / Providers -> Google) with a Google Cloud
+   OAuth client's ID + secret pasted in there. Nothing Google-specific lives
+   in this file — Supabase brokers the whole exchange. */
+// Custom URL scheme the native apps register (see capacitor.config.json /
+// Info.plist / AndroidManifest.xml) so Google can hand control back to the
+// app instead of leaving people stranded in the system browser.
+const GOOGLE_OAUTH_NATIVE_CALLBACK = 'com.fthr.subliminally://login-callback';
+
+async function signInWithGoogle(){ return startOAuthSignIn('google'); }
+
+/* Browser-based OAuth round trip, shared by Google everywhere and by Apple on
+   web/Android. (Apple on iOS uses the native sheet instead — see below.) */
+async function startOAuthSignIn(provider){
+  if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
+  const msg = document.getElementById('authMsg');
+  const native = isNativeApp();
+  const { data, error } = await sb.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: native ? GOOGLE_OAUTH_NATIVE_CALLBACK : window.location.origin + '/',
+      skipBrowserRedirect: native, // on native we open it ourselves, in an in-app browser tab
+    },
+  });
+  if (error){
+    msg.textContent = error.message || `Could not start ${provider === 'apple' ? 'Apple' : 'Google'} sign-in — try again.`;
+    msg.className = 'auth-msg err';
+    return;
+  }
+  if (native && data && data.url && window.Capacitor.Plugins.Browser){
+    await window.Capacitor.Plugins.Browser.open({ url: data.url });
+  }
+  // On web, signInWithOAuth already redirected the page — nothing left to do here.
+}
+
+/* Sign in with Apple. Apple requires it in any iOS app that offers another
+   third-party login (Google). On iPhone it uses Apple's native sheet via the
+   apple-sign-in plugin and hands Supabase the identity token; everywhere else
+   it's the same browser OAuth flow as Google. Needs the Apple provider enabled
+   in Supabase with the bundle id (com.fthr.subliminally) listed as a client id. */
+async function signInWithApple(){
+  const native = isNativeApp();
+  const plugin = native && window.Capacitor.getPlatform() === 'ios' && window.Capacitor.Plugins.SignInWithApple;
+  if (!plugin) return startOAuthSignIn('apple');
+
+  const msg = document.getElementById('authMsg');
+  if (!sb){ msg.textContent = 'Accounts aren\'t connected yet — check back soon.'; msg.className='auth-msg err'; return; }
+  try {
+    // Apple gets the SHA-256 of the nonce; Supabase gets the raw nonce and
+    // checks that the token's nonce claim matches its hash.
+    const rawNonce = randomToken(); const hashedNonce = await sha256Hex(rawNonce);
+    const { response } = await plugin.authorize({
+      clientId: 'com.fthr.subliminally',
+      redirectURI: SITE_ORIGIN + '/',
+      scopes: 'email name',
+      state: randomToken(),
+      nonce: hashedNonce,
+    });
+    if (!response || !response.identityToken){ msg.textContent = 'Apple sign-in was cancelled.'; msg.className = 'auth-msg'; return; }
+    msg.textContent = 'Signing you in…'; msg.className = 'auth-msg';
+    const { error } = await sb.auth.signInWithIdToken({ provider: 'apple', token: response.identityToken, nonce: rawNonce });
+    if (error){ msg.textContent = error.message || 'Apple sign-in failed — try again.'; msg.className = 'auth-msg err'; return; }
+    closeAuthModal();
+  } catch (e){
+    if (e && /cancel/i.test(e.message || '')) { msg.textContent = ''; return; }
+    console.error('Apple sign-in error:', e);
+    msg.textContent = 'Apple sign-in failed — try again.'; msg.className = 'auth-msg err';
+  }
+}
+function randomToken(){
+  const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Native only: Google/Supabase redirect back into the app via the custom URL
+// scheme above; Capacitor's App plugin surfaces that as an appUrlOpen event.
+function setupNativeOAuthCallback(){
+  if (!isNativeApp() || !sb || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
+    if (!url || url.indexOf('login-callback') === -1) return;
+    if (window.Capacitor.Plugins.Browser){ try { await window.Capacitor.Plugins.Browser.close(); } catch(e){} }
+    const { error } = await sb.auth.exchangeCodeForSession(url);
+    if (!error) closeAuthModal();
+  });
+}
+
+// Google sign-in creates the auth user but skips our username/avatar
+// questionnaire, so send anyone who lands here without one through onboarding.
+async function promptOnboardingIfProfileIncomplete(){
+  if (!sb || !currentUser) return;
+  const { data: prof } = await sb.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+  if (prof && !prof.username) openOnboardingModal();
+}
+
+/* ---------- push notifications (native only) ----------
+   Needs a Firebase project's google-services.json (android/app/) and
+   GoogleService-Info.plist (ios/App/App/) in place before device
+   registration will actually succeed — see MOBILE_APP notes. Also expects a
+   `push_tokens` table in Supabase: user_id uuid, token text unique,
+   platform text, updated_at timestamptz default now(), RLS restricting
+   reads/writes to auth.uid() = user_id. */
+let lastPushToken = null;
+async function savePushToken(){
+  if (!sb || !currentUser || !lastPushToken) return;
+  await sb.from('push_tokens').upsert({
+    user_id: currentUser.id,
+    token: lastPushToken,
+    platform: window.Capacitor.getPlatform(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'token' });
+}
+// Off for v1: nothing sends pushes yet, and asking for permission with nothing
+// behind it is an App Review flag. Flip to true once Firebase is configured.
+const PUSH_NOTIFICATIONS_ENABLED = false;
+function setupPushNotifications(){
+  if (!PUSH_NOTIFICATIONS_ENABLED || !isNativeApp() || !window.Capacitor.Plugins.PushNotifications) return;
+  const { PushNotifications } = window.Capacitor.Plugins;
+  PushNotifications.addListener('registration', (token) => { lastPushToken = token.value; savePushToken(); });
+  PushNotifications.addListener('registrationError', (err) => console.warn('Push registration failed:', err));
+  PushNotifications.addListener('pushNotificationReceived', (n) => console.log('Push received in foreground:', n));
+  PushNotifications.addListener('pushNotificationActionPerformed', (a) => console.log('Push tapped:', a));
+  PushNotifications.checkPermissions().then((res) => {
+    if (res.receive === 'granted') PushNotifications.register();
+    else PushNotifications.requestPermissions().then((r) => { if (r.receive === 'granted') PushNotifications.register(); });
+  });
+}
+
 function toggleAuthMode(){
   authMode = authMode === 'signup' ? 'login' : 'signup';
+  updateAuthModalUI();
+}
+function enterResetMode(){
+  authMode = 'reset';
+  updateAuthModalUI();
+}
+function updateAuthModalUI(){
+  const msg = document.getElementById('authMsg');
+  msg.textContent = ''; msg.className = 'auth-msg';
+  document.getElementById('authPassword').value = '';
+
+  if (authMode === 'reset'){
+    document.getElementById('authTitle').textContent = 'Reset your password';
+    document.getElementById('authSub').textContent = "We'll email you a link to set a new one.";
+    document.getElementById('authSubmitBtn').textContent = 'Send reset link';
+    document.querySelector('#authPassword').closest('.auth-field').style.display = 'none';
+    document.getElementById('confirmPwField').style.display = 'none';
+    document.getElementById('signupUsernameField').style.display = 'none';
+    document.getElementById('signupAvatarField').style.display = 'none';
+    document.getElementById('authToggle').innerHTML = `<button onclick="toggleAuthModeFromReset()">Back to log in</button>`;
+    document.getElementById('googleAuthRow').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('googleAuthRow').style.display = 'block';
   document.getElementById('authTitle').textContent = authMode === 'signup' ? 'Create your account' : 'Welcome back';
+  document.getElementById('authSub').textContent = 'Save your sessions, keep a journal, and build your library.';
   document.getElementById('authSubmitBtn').textContent = authMode === 'signup' ? 'Create a free account' : 'Log in';
+  document.querySelector('#authPassword').closest('.auth-field').style.display = 'block';
   const signupOnly = authMode === 'signup' ? 'block' : 'none';
   document.getElementById('confirmPwField').style.display = signupOnly;
   document.getElementById('signupUsernameField').style.display = signupOnly;
   document.getElementById('signupAvatarField').style.display = signupOnly;
+  document.getElementById('forgotPwRow').style.display = authMode === 'login' ? 'block' : 'none';
   document.getElementById('authToggle').innerHTML = authMode === 'signup'
     ? `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`
     : `New here? <button onclick="toggleAuthMode()">Create a free account</button>`;
+}
+function toggleAuthModeFromReset(){
+  authMode = 'login';
+  updateAuthModalUI();
 }
 function togglePwVisibility(inputId, btn){
   const input = document.getElementById(inputId);
@@ -3055,8 +3504,23 @@ function togglePwVisibility(inputId, btn){
 async function submitAuth(){
   if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
   const email = document.getElementById('authEmail').value.trim();
-  const password = document.getElementById('authPassword').value;
   const msg = document.getElementById('authMsg');
+
+  if (authMode === 'reset'){
+    if (!email){ msg.textContent = 'Enter the email on your account.'; msg.className = 'auth-msg err'; return; }
+    msg.textContent = 'Sending…'; msg.className = 'auth-msg';
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: PASSWORD_RESET_REDIRECT_URL });
+    if (error){
+      msg.textContent = (error.message || 'Something went wrong — try again in a moment.');
+      msg.className = 'auth-msg err';
+      return;
+    }
+    msg.textContent = 'Check your email for a link to set a new password.';
+    msg.className = 'auth-msg ok';
+    return;
+  }
+
+  const password = document.getElementById('authPassword').value;
   if (!email || !password){ msg.textContent = 'Enter an email and password.'; msg.className = 'auth-msg err'; return; }
   let signupUsername = '';
   if (authMode === 'signup'){
@@ -3248,6 +3712,34 @@ async function logOut(){
   if (!sb) return;
   await sb.auth.signOut();
 }
+/* Apple requires in-app account deletion for any app with sign-up. The heavy
+   lifting (storage, rows, the auth user itself) happens in /api/delete-account
+   with the service role key; the browser only proves who's asking. */
+async function deleteMyAccount(){
+  const msg = document.getElementById('deleteAccountMsg');
+  if (!sb || !currentUser) return;
+  const { data } = await sb.auth.getSession();
+  const token = data.session && data.session.access_token;
+  if (!token){ msg.textContent = 'Log in again, then retry.'; msg.className = 'save-msg err'; return; }
+  document.getElementById('deleteAccountConfirm').style.display = 'none';
+  msg.textContent = 'Deleting your account…'; msg.className = 'save-msg';
+  try {
+    const res = await fetch(API_BASE + '/api/delete-account', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok){
+      const body = await res.json().catch(() => ({}));
+      msg.textContent = body.error || "Couldn't delete your account — email hello@subliminallybyfthr.com and we'll do it by hand.";
+      msg.className = 'save-msg err';
+      return;
+    }
+  } catch (e){
+    msg.textContent = "Couldn't reach the server — check your connection and try again.";
+    msg.className = 'save-msg err';
+    return;
+  }
+  await sb.auth.signOut();
+  goHome();
+  alert('Your account and everything in it has been deleted.');
+}
 
 function renderAccountArea(){
   const area = document.getElementById('authArea');
@@ -3301,7 +3793,7 @@ function renderMyLibraryState(){
 }
 /* ---------- interactive science quiz ---------- */
 const REPROGRAM_ANSWERS = {
-  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try Whisper's 30-minute sessions timed right as you're winding down, not after you're already trying to force sleep.`,
+  sleep: `<b>On sleep specifically:</b> the research on the pre-sleep window is genuinely one of the stronger pieces here. As you drift toward sleep, the brain shifts out of tight critical-analysis mode — it's the same territory where racing, looping thoughts tend to feel loudest. A calm, repeated line in your own voice, layered under a steady tone, gives that same drowsy window something gentler to loop on instead. Try a longer Whisper or Ritual session timed right as you're winding down, not after you're already trying to force sleep.`,
   confidence: `<b>On confidence:</b> this leans hardest on the self-referential processing point — information framed as being about you, in your own voice, tends to get encoded more deeply than the same words from someone else. That's a real finding behind why journaling and self-talk work as tools at all. Repetition strengthens whichever pathway gets used, so the actual mechanism here is closer to "practice" than "magic" — which is honestly a better guarantee.`,
   anxiety: `<b>On anxious, looping thoughts:</b> the honest framing is that this won't out-argue a racing mind mid-spiral — nothing bypasses your conscious mind that easily, despite what "subliminal" branding often implies. What it can do is give the pre-sleep window, when filtering naturally eases, something calmer to loop on instead of the same worry track. Pair a grounding frequency with a slower, present-tense line, and keep expectations realistic: this is a nightly practice, not a single-session fix.`,
   relationships: `<b>On relationships — with others or with yourself:</b> repetition and self-talk research both point to the same place: how you talk to yourself, repeatedly, shapes the baseline you bring into other relationships. There's nothing here that replaces communication or therapy where that's needed — but a consistent, calm, self-directed practice is a reasonable complement to that work, not a substitute for it.`
@@ -3314,10 +3806,11 @@ function answerReprogramQuiz(btn, key){
   result.classList.add('show');
 }
 
-function showJournalPage(){
+function showJournalPage(tab){
   document.body.setAttribute('data-view', 'journal');
   window.scrollTo(0,0);
   history.pushState({ page:'journal' }, '', '#journal');
+  if (tab) setJournalTab(tab);
 }
 function showReprogramPage(){
   document.body.setAttribute('data-view', 'reprogram');
@@ -3680,29 +4173,80 @@ async function submitFeedback(){
   document.getElementById('feedbackMessage').value = '';
 }
 
-/* ---------- journal ---------- */
+/* ---------- journal ----------
+   Four tabs share this page. 'received' and 'manifesting' are the written
+   gratitude/manifestation entries (journal_entries); 'photos' is the daily
+   log of photographed handwritten pages (journal_photos + storage bucket);
+   'habits' is the morning/night habit tracker (habits + habit_checkins).
+   Journal tabs need Whisper; habits need Ritual. */
+const JOURNAL_TAB_COPY = {
+  received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
+  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it as if it already has." },
+  photos:       { prompt: "Write today's entry by hand, then photograph the page — the app keeps the record, your journal keeps the practice." },
+  habits:       { prompt: 'A ritual is just a habit you decided to keep. Check each one off as you do it; the streak takes care of itself.' },
+};
 function setJournalTab(cat){
   journalTab = cat;
-  document.querySelectorAll('.journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
-  const input = document.getElementById('journalInput');
-  const prompt = document.getElementById('journalPrompt');
-  const philosophy = document.getElementById('journalPhilosophy');
-  if (cat === 'received'){
-    input.placeholder = 'I am so grateful for…';
-    prompt.textContent = 'A good morning practice: write down three things you\'re grateful for, right when you wake up.';
-    philosophy.style.display = 'none';
-  } else {
-    input.placeholder = 'I am so grateful now that…';
-    prompt.textContent = 'Try one thing you\'re grateful for that hasn\'t arrived yet — write it as if it already has.';
-    philosophy.style.display = 'block';
-  }
+  document.querySelectorAll('#journal .journal-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.cat===cat));
+  const copy = JOURNAL_TAB_COPY[cat];
+  document.getElementById('journalPrompt').textContent = copy.prompt;
+  if (copy.placeholder) document.getElementById('journalInput').placeholder = copy.placeholder;
   document.getElementById('journalAddMsg').textContent = '';
-  loadJournalEntries();
+  renderJournalState();
 }
-function renderJournalState(){
-  document.getElementById('journalLocked').style.display = currentUser ? 'none' : 'block';
-  document.getElementById('journalPanel').style.display = currentUser ? 'block' : 'none';
-  if (currentUser) loadJournalEntries();
+async function renderJournalState(){
+  const locked = document.getElementById('journalLocked');
+  const upgrade = document.getElementById('journalUpgrade');
+  const panels = { entries: document.getElementById('journalPanel'), photos: document.getElementById('journalPhotoPanel'), habits: document.getElementById('habitsPanel') };
+  const philosophy = document.getElementById('journalPhilosophy');
+  Object.values(panels).forEach(p => p.style.display = 'none');
+  upgrade.style.display = 'none';
+  // The 3D/4D/5D explainer is a Whisper feature — it only appears once the
+  // tier check below has passed and the Manifesting tab is open.
+  philosophy.style.display = 'none';
+  locked.style.display = currentUser ? 'none' : 'block';
+  if (!currentUser) return;
+
+  const myTier = await getMyTier();
+  const requiredTier = journalTab === 'habits' ? 'ritual' : 'whisper';
+  if (!tierAtLeast(myTier, requiredTier)){
+    const isHabits = journalTab === 'habits';
+    document.getElementById('journalUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The journal is part of Whisper';
+    document.getElementById('journalUpgradeText').textContent = isHabits
+      ? 'Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — $11.11 a month, or $111 a year.'
+      : 'Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.';
+    document.getElementById('journalUpgradeBtn').textContent = isHabits ? 'Get Ritual' : 'Get Whisper';
+    upgrade.style.display = 'block';
+    return;
+  }
+
+  if (journalTab === 'photos'){ panels.photos.style.display = 'block'; loadJournalPhotos(); }
+  else if (journalTab === 'habits'){ panels.habits.style.display = 'block'; loadHabits(); }
+  else {
+    panels.entries.style.display = 'block';
+    philosophy.style.display = journalTab === 'manifesting' ? 'block' : 'none';
+    loadJournalEntries();
+  }
+}
+
+/* Local calendar date as YYYY-MM-DD — habits and journal days are the
+   person's own day, not UTC's. */
+function localDateStr(d){
+  const x = d || new Date();
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+}
+function shiftDateStr(dateStr, days){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  return localDateStr(new Date(y, m-1, d+days));
+}
+/* Consecutive days (ending today, or yesterday if today isn't done yet)
+   present in a Set of YYYY-MM-DD strings. */
+function streakFromDays(daySet){
+  let cursor = localDateStr();
+  if (!daySet.has(cursor)) cursor = shiftDateStr(cursor, -1);
+  let n = 0;
+  while (daySet.has(cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  return n;
 }
 async function loadJournalEntries(){
   if (!sb || !currentUser) return;
@@ -3805,6 +4349,172 @@ async function addJournalEntry(){
   loadJournalEntries();
 }
 
+/* ---------- daily log: photos of handwritten pages ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  const dateInput = document.getElementById('photoEntryDate');
+  if (dateInput){ dateInput.value = localDateStr(); dateInput.max = localDateStr(); }
+  const fileInput = document.getElementById('photoFile');
+  if (fileInput) fileInput.addEventListener('change', (e) => { if (e.target.files[0]) uploadJournalPhoto(e.target.files[0]); e.target.value = ''; });
+});
+async function uploadJournalPhoto(file){
+  const msg = document.getElementById('photoUploadMsg');
+  if (!sb || !currentUser) return;
+  if (file.size > 15 * 1024 * 1024){ msg.textContent = 'That photo is over 15 MB — try a smaller one.'; msg.className = 'save-msg err'; return; }
+  const entryDate = document.getElementById('photoEntryDate').value || localDateStr();
+  const caption = document.getElementById('photoCaption').value.trim() || null;
+  msg.textContent = 'Uploading your page…'; msg.className = 'save-msg';
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const path = `${currentUser.id}/${entryDate}-${Date.now()}.${ext}`;
+  const { error: upErr } = await sb.storage.from('journal-photos').upload(path, file, { contentType: file.type || 'image/jpeg' });
+  if (upErr){ console.error('photo upload error:', upErr); msg.textContent = "Couldn't upload that photo — try again in a moment."; msg.className = 'save-msg err'; return; }
+  const { error } = await sb.from('journal_photos').insert({ user_id: currentUser.id, storage_path: path, caption, entry_date: entryDate });
+  if (error){ console.error('journal_photos insert error:', error); msg.textContent = "Uploaded, but couldn't save the entry — try again."; msg.className = 'save-msg err'; return; }
+  document.getElementById('photoCaption').value = '';
+  msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
+  setTimeout(() => { if (msg.textContent === 'Saved.') msg.textContent = ''; }, 2000);
+  loadJournalPhotos();
+}
+async function loadJournalPhotos(){
+  if (!sb || !currentUser) return;
+  const grid = document.getElementById('photoGrid');
+  const stat = document.getElementById('photoStat');
+  grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">Loading…</div>';
+  const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id).order('entry_date', { ascending: false }).order('created_at', { ascending: false });
+  if (error){ grid.innerHTML = `<div class="journal-empty" style="grid-column:1/-1;">Couldn't load your log.</div>`; return; }
+  if (!data.length){
+    stat.style.display = 'none';
+    grid.innerHTML = '<div class="journal-empty" style="grid-column:1/-1;">No pages yet — photograph your first entry above.</div>';
+    return;
+  }
+  const days = new Set(data.map(p => p.entry_date));
+  const streak = streakFromDays(days);
+  stat.style.display = 'block';
+  stat.textContent = `✦ ${days.size} day${days.size === 1 ? '' : 's'} logged` + (streak > 1 ? ` · ${streak}-day streak` : '');
+
+  const { data: signed } = await sb.storage.from('journal-photos').createSignedUrls(data.map(p => p.storage_path), 3600);
+  const urlByPath = {};
+  (signed || []).forEach(s => { if (s.signedUrl) urlByPath[s.path] = s.signedUrl; });
+  grid.innerHTML = data.map(p => {
+    const url = urlByPath[p.storage_path] || '';
+    const [y,m,d] = p.entry_date.split('-').map(Number);
+    const dateLabel = new Date(y, m-1, d).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+    const cap = p.caption ? p.caption.replace(/</g,'&lt;') : '';
+    return `
+    <div class="photo-card">
+      <img src="${url}" alt="Journal page from ${dateLabel}" loading="lazy" onclick="openPhotoLightbox(this.src)">
+      <div class="meta">
+        <div class="date">${dateLabel}</div>
+        ${cap ? `<div class="cap">${cap}</div>` : ''}
+        <button class="journal-entry-delete" onclick="deleteJournalPhoto('${p.id}','${p.storage_path}')" aria-label="Delete page" title="Delete">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function openPhotoLightbox(src){
+  document.getElementById('photoLightboxImg').src = src;
+  document.getElementById('photoLightbox').classList.add('open');
+}
+async function deleteJournalPhoto(id, path){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('journal_photos').delete().eq('id', id).eq('user_id', currentUser.id);
+  if (error){ console.error('deleteJournalPhoto error:', error); return; }
+  await sb.storage.from('journal-photos').remove([path]);
+  loadJournalPhotos();
+}
+
+/* ---------- habit tracker: morning & night rituals ---------- */
+let habitsCache = [];        // rows from `habits`
+let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
+async function loadHabits(){
+  if (!sb || !currentUser) return;
+  const since = shiftDateStr(localDateStr(), -60);
+  const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await Promise.all([
+    sb.from('habits').select('*').eq('user_id', currentUser.id).eq('archived', false).order('created_at', { ascending: true }),
+    sb.from('habit_checkins').select('habit_id, done_on').eq('user_id', currentUser.id).gte('done_on', since),
+  ]);
+  const msg = document.getElementById('habitsMsg');
+  if (hErr || cErr){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; return; }
+  habitsCache = habits || [];
+  habitCheckins = {};
+  (checkins || []).forEach(c => { (habitCheckins[c.habit_id] = habitCheckins[c.habit_id] || new Set()).add(c.done_on); });
+  renderHabits();
+}
+function renderHabits(){
+  const today = localDateStr();
+  const week = Array.from({ length: 7 }, (_, i) => shiftDateStr(today, i - 6));
+  let doneToday = 0;
+  ['morning','night'].forEach(time => {
+    const rows = habitsCache.filter(h => h.time_of_day === time);
+    const list = document.getElementById(time === 'morning' ? 'habitListMorning' : 'habitListNight');
+    const count = document.getElementById(time === 'morning' ? 'habitCountMorning' : 'habitCountNight');
+    const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
+    doneToday += done;
+    count.textContent = rows.length ? `${done} of ${rows.length} today` : '';
+    if (!rows.length){
+      list.innerHTML = `<div class="habit-empty">${time === 'morning' ? 'Nothing here yet — what do you want your mornings to hold?' : 'Nothing here yet — how do you want to close the day?'}</div>`;
+      return;
+    }
+    list.innerHTML = rows.map(h => {
+      const days = habitCheckins[h.id] || new Set();
+      const isDone = days.has(today);
+      const streak = streakFromDays(days);
+      const dots = week.map(d => `<span class="habit-dot${days.has(d) ? ' on' : ''}${d === today ? ' today' : ''}" title="${d}"></span>`).join('');
+      return `
+      <div class="habit-row${isDone ? ' done-today' : ''}">
+        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${h.name.replace(/"/g,'&quot;')}" aria-pressed="${isDone}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+        <div class="habit-name">${h.name.replace(/</g,'&lt;')}</div>
+        <div class="habit-week" aria-hidden="true">${dots}</div>
+        <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
+        <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`;
+    }).join('');
+  });
+  const stat = document.getElementById('habitsStat');
+  if (!habitsCache.length){ stat.style.display = 'none'; return; }
+  const allDays = new Set();
+  habitsCache.forEach(h => (habitCheckins[h.id] || new Set()).forEach(d => allDays.add(d)));
+  const practiceStreak = streakFromDays(allDays);
+  stat.style.display = 'block';
+  stat.textContent = doneToday === habitsCache.length
+    ? `✦ Every ritual done today${practiceStreak > 1 ? ` · ${practiceStreak} days in a row showing up` : ''}`
+    : `${doneToday} of ${habitsCache.length} done today${practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : ''}`;
+}
+async function addHabit(time){
+  if (!sb || !currentUser) return;
+  const input = document.getElementById(time === 'morning' ? 'habitInputMorning' : 'habitInputNight');
+  const name = input.value.trim();
+  if (!name) return;
+  const msg = document.getElementById('habitsMsg');
+  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time });
+  if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
+  input.value = ''; msg.textContent = '';
+  loadHabits();
+}
+async function toggleHabitToday(habitId){
+  if (!sb || !currentUser) return;
+  const today = localDateStr();
+  const days = habitCheckins[habitId] = habitCheckins[habitId] || new Set();
+  const wasDone = days.has(today);
+  // Flip locally first so the tap feels instant; reload only if the save fails.
+  if (wasDone) days.delete(today); else days.add(today);
+  renderHabits();
+  const { error } = wasDone
+    ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', today)
+    : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: today });
+  if (error){ console.error('toggleHabitToday error:', error); loadHabits(); }
+}
+async function deleteHabit(habitId){
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('habits').delete().eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){ console.error('deleteHabit error:', error); return; }
+  loadHabits();
+}
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
 
@@ -3817,10 +4527,17 @@ if (sb){
 }
 
 if (sb){
-  sb.auth.onAuthStateChange((_event, session) => {
+  setupNativeOAuthCallback();
+  setupPushNotifications();
+  initRevenueCat();
+  updateManageSubscriptionLinks();
+  sb.auth.onAuthStateChange((event, session) => {
     currentUser = session ? session.user : null;
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
+    if (currentUser && event === 'SIGNED_IN') promptOnboardingIfProfileIncomplete();
+    if (currentUser) savePushToken();
+    syncRevenueCatIdentity();
   });
   sb.auth.getSession().then(({ data }) => {
     currentUser = data.session ? data.session.user : null;
