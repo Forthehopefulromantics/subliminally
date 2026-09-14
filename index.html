@@ -499,6 +499,9 @@
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
+  /* Members lead with their own library; signed-out visitors lead with the
+     ready-made one, since "Mine" would only ever be an empty locked panel. */
+  body[data-signed-in="yes"] [data-libtab="mine"]{ order:-1; }
   .journal-tabs button{ flex:1; background:none; border:none; color:var(--haze); font-size:13.5px; font-weight:500; padding:11px 14px; border-radius:999px; cursor:pointer; transition:all .2s; }
   .journal-tabs button.active{ background:rgba(185,167,232,0.16); color:var(--lilac); }
   .journal-prompt{ max-width:520px; margin:0 auto 20px; text-align:center; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); }
@@ -589,9 +592,29 @@
   .habit-block-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
   .habit-block-head h3{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-top:4px; }
   .habit-block-count{ font-size:12px; color:var(--haze); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  /* On a phone the count is longer than the row it shares, so the head stacks
+     and the count is allowed to wrap rather than run off the card. */
+  @media (max-width:640px){
+    .habit-block-head{ flex-direction:column; align-items:flex-start; gap:4px; }
+    .habit-block-count{ white-space:normal; line-height:1.5; }
+  }
   .habit-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
-  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-row{ display:grid; grid-template-columns:auto auto 1fr auto auto auto; align-items:center; gap:10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
   .habit-row:has(.habit-core-toggle.on){ border-color:rgba(224,196,138,0.22); }
+  /* Lifted off the list while it follows your finger. */
+  .habit-row.dragging{ position:relative; z-index:5; border-color:var(--lilac); box-shadow:0 10px 28px rgba(0,0,0,0.45); cursor:grabbing; }
+  body.habit-dragging{ user-select:none; }
+  .habit-grip{ background:none; border:none; padding:4px 2px; color:rgba(156,147,184,0.5); cursor:grab; touch-action:none; display:flex; align-items:center; }
+  .habit-grip:hover{ color:var(--lilac); }
+  .habit-grip:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; border-radius:6px; }
+  .habit-actions{ display:flex; align-items:center; gap:2px; }
+  .habit-move{ background:none; border:none; color:rgba(156,147,184,0.55); font-size:14px; line-height:1; padding:5px 6px; cursor:pointer; border-radius:6px; transition:color .2s, background .2s; }
+  .habit-move:hover:not(:disabled){ color:var(--moonlight); background:rgba(255,255,255,0.06); }
+  .habit-move:disabled{ opacity:.25; cursor:default; }
+  .habit-move:focus-visible{ outline:2px solid var(--lilac); outline-offset:1px; }
+  .habit-undo-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .habit-undo-label{ font-size:12.5px; color:var(--haze); margin-right:2px; }
+  .habit-undo-bar .mini-btn{ font-size:12px; padding:7px 14px; }
   .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
   .habit-check.done{ background:var(--lilac); border-color:var(--lilac); color:#1B1630; }
   .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
@@ -617,7 +640,11 @@
   .habit-streak.zero{ color:var(--haze); }
   .habit-delete{ display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:none; border:1px solid transparent; color:var(--haze); cursor:pointer; padding:0; opacity:.55; transition:all .2s; }
   .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
-  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
+  @media (max-width:640px){
+    .habit-row{ grid-template-columns:auto auto 1fr auto; }
+    .habit-week{ grid-column:3; }
+    .habit-streak{ display:none; }
+  }
   .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
   .habit-row-blank{ background:none; border:1px dashed rgba(255,255,255,0.08); grid-template-columns:auto 1fr; }
   .habit-slot-num{ font-size:11px; color:var(--haze); width:20px; text-align:center; font-variant-numeric:tabular-nums; opacity:.6; }
@@ -954,7 +981,7 @@
       <p>Browse generalized subliminals, or everything you've personally built and saved.</p>
     </div>
     <div class="journal-tabs" style="max-width:340px;">
-      <button class="active" data-libtab="premade" onclick="setLibraryTab('premade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>Premade</button>
+      <button data-libtab="premade" onclick="setLibraryTab('premade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>Premade</button>
       <button data-libtab="mine" onclick="setLibraryTab('mine')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Mine</button>
     </div>
 
@@ -1376,6 +1403,11 @@
     <!-- Habit tracker: morning and night rituals -->
     <div id="habitsPanel" class="journal-panel" style="display:none;">
       <div class="journal-stat" id="habitsStat" style="display:none;"></div>
+      <div class="habit-undo-bar" id="habitUndoBar" style="display:none;">
+        <span class="habit-undo-label">Changed something?</span>
+        <button class="mini-btn ghostbtn" id="habitUndoBtn" onclick="undoHabits()">↩ Undo</button>
+        <button class="mini-btn ghostbtn" id="habitRedoBtn" onclick="redoHabits()">↪ Redo</button>
+      </div>
       <div class="habit-block" data-time="morning">
         <div class="habit-block-head">
           <div><div class="eyebrow">Morning ritual</div><h3>How you start the day</h3></div>
@@ -4173,6 +4205,9 @@ function showLibraryPage(){
   document.body.setAttribute('data-view', 'library');
   window.scrollTo(0,0);
   history.pushState({ page:'library' }, '', '#library');
+  // Your own subliminals are the reason you opened this — the ready-made ones
+  // are a browse, not a destination. Signed out there's nothing of yours to show.
+  setLibraryTab(currentUser ? 'mine' : 'premade');
 }
 function setLibraryTab(tab){
   document.querySelectorAll('.journal-tabs [data-libtab]').forEach(b => b.classList.toggle('active', b.dataset.libtab === tab));
@@ -4181,6 +4216,7 @@ function setLibraryTab(tab){
   if (tab === 'mine') renderMyLibraryState();
 }
 function renderMyLibraryState(){
+  document.body.setAttribute('data-signed-in', currentUser ? 'yes' : 'no');
   document.getElementById('myLibraryLocked').style.display = currentUser ? 'none' : 'block';
   document.getElementById('myLibraryPanel').style.display = currentUser ? 'block' : 'none';
   if (currentUser) loadMyLibrary();
@@ -5463,10 +5499,31 @@ const HABIT_SLOTS = 15;
 const HABIT_BLANKS_VISIBLE = 3;   // empty slots shown before "+ more slots"
 let habitSlotsExpanded = { morning: false, night: false };
 let habitIdeasOpen = { morning: false, night: false };
+function renderHabitUndoBar(){
+  const bar = document.getElementById('habitUndoBar');
+  if (!bar) return;
+  const u = document.getElementById('habitUndoBtn');
+  const r = document.getElementById('habitRedoBtn');
+  u.disabled = !habitUndoStack.length;
+  r.disabled = !habitRedoStack.length;
+  bar.style.display = (habitUndoStack.length || habitRedoStack.length) ? 'flex' : 'none';
+}
 function expandHabitSlots(time){ habitSlotsExpanded[time] = true; renderHabits(); }
 function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; renderHabits(); }
 const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read scripture','Pray','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
+
+/* Habits show in the order you do them, not the order you typed them. Sorting
+   client-side keeps working if sort_order hasn't been added yet, where every
+   row reads as 0 and the list falls back to oldest-first. */
+function sortHabitsCache(){
+  habitsCache.sort((a, b) => {
+    if (a.time_of_day !== b.time_of_day) return a.time_of_day === 'morning' ? -1 : 1;
+    const d = (a.sort_order || 0) - (b.sort_order || 0);
+    if (d) return d;
+    return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
+  });
+}
 
 let habitsCache = [];        // rows from `habits`
 let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
@@ -5482,6 +5539,7 @@ async function loadHabits(options){
   const msg = document.getElementById('habitsMsg');
   if (hErr || cErr){ if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
   habitsCache = habits || [];
+  sortHabitsCache();
   habitCheckins = {};
   habitDoneByDate = {};
   (checkins || []).forEach(c => {
@@ -5584,6 +5642,7 @@ async function toggleCoreHabit(habitId){
     }
   }
   msg.textContent = '';
+  pushHabitUndo();
   habit.is_core = turningOn;
   renderHabits();
   if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
@@ -5620,28 +5679,36 @@ function renderHabits(){
       ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable · ${shortLeft} short ${time}${shortLeft === 1 ? '' : 's'} left this week`
       : `0/${HABIT_SLOTS} added`;
 
-    const realRowsHtml = rows.map(h => {
+    const realRowsHtml = rows.map((h, i) => {
       const days = habitCheckins[h.id] || new Set();
       const isDone = days.has(today);
       const streak = streakFromDays(days);
       const dots = week.map(d => `<span class="habit-dot${days.has(d) ? ' on' : ''}${d === today ? ' today' : ''}" title="${d}"></span>`).join('');
+      const safeName = h.name.replace(/"/g,'&quot;');
       return `
-      <div class="habit-row${isDone ? ' done-today' : ''}">
-        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${h.name.replace(/"/g,'&quot;')}" aria-pressed="${isDone}">
+      <div class="habit-row${isDone ? ' done-today' : ''}" data-habit-id="${h.id}" data-time="${time}">
+        <button class="habit-grip" aria-label="Drag ${safeName} to reorder" title="Drag to reorder">
+          <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><circle cx="3" cy="2" r="1.4" fill="currentColor"/><circle cx="9" cy="2" r="1.4" fill="currentColor"/><circle cx="3" cy="7" r="1.4" fill="currentColor"/><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="3" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/></svg>
+        </button>
+        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
-        <input type="text" class="habit-name" value="${h.name.replace(/"/g,'&quot;')}" maxlength="80" aria-label="Habit name"
+        <input type="text" class="habit-name" value="${safeName}" maxlength="80" aria-label="Habit name"
           onkeydown="if(event.key==='Enter') this.blur();"
           onblur="renameHabit('${h.id}', this.value)">
-        <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
-          aria-pressed="${h.is_core ? 'true' : 'false'}"
-          title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
-          aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${h.name.replace(/"/g,'&quot;')} as non-negotiable">✦</button>
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
-        <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="habit-actions">
+          <button class="habit-move" onclick="moveHabit('${h.id}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move ${safeName} up" title="Move up">↑</button>
+          <button class="habit-move" onclick="moveHabit('${h.id}',1)" ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Move ${safeName} down" title="Move down">↓</button>
+          <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
+            aria-pressed="${h.is_core ? 'true' : 'false'}"
+            title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
+            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>
+          <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove ${safeName}" title="Remove">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>`;
     }).join('');
 
@@ -5681,6 +5748,7 @@ function renderHabits(){
           : '';
     }
   });
+  renderHabitUndoBar();
   const stat = document.getElementById('habitsStat');
   if (!habitsCache.length){ stat.style.display = 'none'; return; }
   const allDays = new Set();
@@ -5706,7 +5774,9 @@ async function addHabit(time, name){
   if (!name) return;
   if (habitsCache.filter(h => h.time_of_day === time).length >= HABIT_SLOTS) return;
   const msg = document.getElementById('habitsMsg');
-  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time });
+  pushHabitUndo();
+  const sortOrder = habitsCache.filter(h => h.time_of_day === time).length;
+  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time, sort_order: sortOrder });
   if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
   msg.textContent = '';
   loadHabits();
@@ -5742,6 +5812,166 @@ async function toggleHabitOnDate(habitId, dateStr){
     loadHabits();
   }
 }
+/* ---------- undo and redo ----------
+   Reordering, renaming, archiving and marking non-negotiables are all easy to
+   do by accident and tedious to put back by hand. Rather than tracking an
+   inverse for each kind of change, every change records what the list looked
+   like beforehand; undo simply puts one of those back. Check-offs aren't part
+   of this — a tick is one tap to undo on its own, and mixing the two would make
+   the button mean two different things.
+
+   Deleting archives the row rather than removing it, so undoing a delete brings
+   back the habit *and* every check-in ever made against it. */
+let habitUndoStack = [], habitRedoStack = [];
+const HABIT_UNDO_LIMIT = 40;
+
+function habitSnapshot(){
+  return habitsCache.map(h => ({
+    id: h.id, name: h.name, time_of_day: h.time_of_day,
+    is_core: !!h.is_core, sort_order: h.sort_order || 0,
+  }));
+}
+function pushHabitUndo(){
+  habitUndoStack.push(habitSnapshot());
+  if (habitUndoStack.length > HABIT_UNDO_LIMIT) habitUndoStack.shift();
+  habitRedoStack = [];   // a fresh change forks the history; the old redos are gone
+}
+
+/* Put the list back exactly as a snapshot had it. Only rows that actually
+   differ are written, so undoing a single rename is a single update. */
+async function applyHabitSnapshot(snap){
+  if (!sb || !currentUser) return;
+  const inSnap = new Set(snap.map(h => h.id));
+  const updates = [];
+  // Anything added after the snapshot goes away again.
+  habitsCache.forEach(h => { if (!inSnap.has(h.id)) updates.push({ id: h.id, fields: { archived: true } }); });
+  snap.forEach(sv => {
+    const cur = habitsCache.find(h => h.id === sv.id);
+    if (cur && cur.name === sv.name && !!cur.is_core === sv.is_core && (cur.sort_order || 0) === sv.sort_order) return;
+    updates.push({ id: sv.id, fields: { name: sv.name, is_core: sv.is_core, sort_order: sv.sort_order, archived: false } });
+  });
+  for (const u of updates){
+    const { error } = await sb.from('habits').update(u.fields).eq('id', u.id).eq('user_id', currentUser.id);
+    if (error) console.error('undo/redo failed for habit', u.id, error);
+  }
+  await loadHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+}
+
+async function undoHabits(){
+  if (!habitUndoStack.length) return;
+  const before = habitUndoStack.pop();
+  habitRedoStack.push(habitSnapshot());
+  await applyHabitSnapshot(before);
+}
+async function redoHabits(){
+  if (!habitRedoStack.length) return;
+  const after = habitRedoStack.pop();
+  habitUndoStack.push(habitSnapshot());
+  await applyHabitSnapshot(after);
+}
+
+/* ---------- dragging a habit into place ----------
+   Pointer events rather than HTML5 drag-and-drop, because drag-and-drop does
+   nothing at all on a touchscreen and this is a phone app first. The row
+   follows your finger, its neighbours slide out of the way as you pass their
+   midpoints, and the new order is saved once on release. The up and down
+   buttons do the same job for anyone using a keyboard or a screen reader. */
+let habitDrag = null;
+
+function startHabitDrag(e){
+  const grip = e.target.closest('.habit-grip');
+  if (!grip || e.button > 0) return;
+  const row = grip.closest('.habit-row');
+  const list = row && row.parentElement;
+  if (!row || !list) return;
+  e.preventDefault();
+
+  const rows = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')];
+  habitDrag = {
+    row, list, rows,
+    time: row.dataset.time,
+    startY: e.clientY,
+    height: row.getBoundingClientRect().height,
+  };
+  row.classList.add('dragging');
+  grip.setPointerCapture(e.pointerId);
+  document.body.classList.add('habit-dragging');
+}
+
+function moveHabitDrag(e){
+  if (!habitDrag) return;
+  e.preventDefault();
+  const { row, startY } = habitDrag;
+  const dy = e.clientY - startY;
+  row.style.transform = `translateY(${dy}px)`;
+
+  // Swap with whichever neighbour the pointer has moved past the middle of.
+  const mid = row.getBoundingClientRect().top + habitDrag.height / 2;
+  const siblings = [...habitDrag.list.querySelectorAll('.habit-row:not(.habit-row-blank)')].filter(r => r !== row);
+  for (const other of siblings){
+    const box = other.getBoundingClientRect();
+    const otherMid = box.top + box.height / 2;
+    const before = other.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (before && mid < otherMid){ habitDrag.list.insertBefore(row, other); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
+    if (!before && mid > otherMid){ habitDrag.list.insertBefore(row, other.nextSibling); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
+  }
+}
+
+async function endHabitDrag(){
+  if (!habitDrag) return;
+  const { row, list, time } = habitDrag;
+  habitDrag = null;
+  row.classList.remove('dragging');
+  row.style.transform = '';
+  document.body.classList.remove('habit-dragging');
+
+  const orderedIds = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')].map(r => r.dataset.habitId);
+  const current = habitsCache.filter(h => h.time_of_day === time);
+  const ordered = orderedIds.map(id => current.find(h => h.id === id)).filter(Boolean);
+  if (ordered.length !== current.length){ renderHabits(); return; }   // something's out of step; repaint from truth
+  if (ordered.every((h, i) => h === current[i])){ renderHabits(); return; }  // nothing actually moved
+  pushHabitUndo();
+  await persistHabitOrder(time, ordered);
+}
+
+document.addEventListener('pointerdown', startHabitDrag);
+document.addEventListener('pointermove', moveHabitDrag, { passive: false });
+document.addEventListener('pointerup', endHabitDrag);
+document.addEventListener('pointercancel', endHabitDrag);
+
+/* ---------- putting habits in order ---------- */
+async function persistHabitOrder(time, ordered){
+  ordered.forEach((h, i) => { h.sort_order = i; });
+  sortHabitsCache();
+  renderHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+  for (const h of ordered){
+    const { error } = await sb.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id).eq('user_id', currentUser.id);
+    if (error){
+      console.error('persistHabitOrder error:', error);
+      const msg = document.getElementById('habitsMsg');
+      if (msg){ msg.textContent = "Couldn't save the new order — check your connection."; msg.className = 'save-msg err'; }
+      loadHabits();
+      return;
+    }
+  }
+}
+
+/* Nudge one habit up or down its own routine. */
+async function moveHabit(habitId, dir){
+  if (!sb || !currentUser) return;
+  const habit = habitsCache.find(h => h.id === habitId);
+  if (!habit) return;
+  const siblings = habitsCache.filter(h => h.time_of_day === habit.time_of_day);
+  const from = siblings.indexOf(habit);
+  const to = from + dir;
+  if (to < 0 || to >= siblings.length) return;
+  pushHabitUndo();
+  siblings.splice(to, 0, siblings.splice(from, 1)[0]);
+  await persistHabitOrder(habit.time_of_day, siblings);
+}
+
 /* Rename in place — edit the habit's text and it saves on blur or Enter,
    keeping every check-in attached to it. */
 async function renameHabit(habitId, name){
@@ -5749,16 +5979,21 @@ async function renameHabit(habitId, name){
   name = (name || '').trim();
   const habit = habitsCache.find(h => h.id === habitId);
   if (!habit || !name || name === habit.name){ renderHabits(); return; }
+  pushHabitUndo();
   habit.name = name;
   renderHabits();
   const { error } = await sb.from('habits').update({ name }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){ console.error('renameHabit error:', error); loadHabits(); }
 }
+/* Archived, not deleted: the row and its check-ins stay put, so Undo can bring
+   the whole history back rather than an empty habit with the same name. */
 async function deleteHabit(habitId){
   if (!sb || !currentUser) return;
-  const { error } = await sb.from('habits').delete().eq('id', habitId).eq('user_id', currentUser.id);
+  pushHabitUndo();
+  const { error } = await sb.from('habits').update({ archived: true }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){ console.error('deleteHabit error:', error); return; }
-  loadHabits();
+  await loadHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
 }
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
