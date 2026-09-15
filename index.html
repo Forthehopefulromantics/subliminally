@@ -92,7 +92,12 @@
     nav{ position:relative; flex-wrap:wrap; }
   }
 
-  .hero{ min-height:92vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 28px 70px; gap:24px; }
+  .hero{ position:relative; min-height:88vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 28px 70px; gap:24px; overflow:hidden; }
+  .hero-bg{ position:absolute; inset:0; z-index:0; }
+  .hero-bg img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .hero-bg::after{ content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(13,11,24,0.52) 0%, rgba(13,11,24,0.40) 38%, var(--midnight) 100%); }
+  .hero > *:not(.hero-bg){ position:relative; z-index:1; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
   .orb{ position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(185,167,232,0.55), transparent 60%), radial-gradient(circle at 68% 72%, rgba(227,190,127,0.42), transparent 55%), radial-gradient(circle, #2E2650, var(--midnight-2) 75%); box-shadow:0 0 90px rgba(185,167,232,0.25), inset 0 0 50px rgba(227,190,127,0.18); animation:breathe 6s ease-in-out infinite; }
   .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 40% 35%, rgba(237,233,246,0.14), transparent 65%); animation:breathe 6s ease-in-out infinite reverse; }
@@ -159,7 +164,27 @@
   .section-head h2{ font-family:var(--serif); font-size:clamp(24px,3.6vw,36px); color:var(--moonlight); margin-top:8px; }
   .section-head p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:480px; margin-inline:auto; }
 
-  .flow-section{ padding:80px 0 90px; border-top:1px solid rgba(255,255,255,0.06); }
+  .flow-section{ padding:0 0 90px; border-top:1px solid rgba(255,255,255,0.06); }
+  body[data-view="build"] .flow-section{ border-top:none; }
+
+  /* Imagery. Every photograph sits under a scrim so type stays readable whatever
+     image replaces it — swap the file, the layout holds. See img/README.md. */
+  .page-hero{ position:relative; margin-bottom:34px; }
+  .page-hero img{ width:100%; height:clamp(200px,34vw,320px); object-fit:cover; display:block; }
+  .page-hero::after{ content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(13,11,24,0.30) 0%, rgba(13,11,24,0.74) 60%, var(--midnight) 100%); }
+  .page-hero-text{ position:absolute; inset:auto 0 0 0; z-index:1; padding:0 22px 24px; max-width:720px; margin:0 auto; left:0; right:0; }
+  .page-hero-text h2{ font-family:var(--serif); font-size:clamp(24px,5vw,32px); font-weight:500; margin-top:6px; text-wrap:balance; }
+  .page-hero-text p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:46ch; }
+  .page-hero-text .profile-page-back{ color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:14px; display:inline-flex; align-items:center; gap:6px; }
+
+  /* A full-width photograph between sections — somewhere for the eye to rest. */
+  .breath{ position:relative; margin:0; }
+  .breath img{ width:100%; height:clamp(190px,30vw,300px); object-fit:cover; display:block; }
+  .breath::after{ content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, var(--midnight) 0%, rgba(13,11,24,0.30) 32%, rgba(13,11,24,0.34) 68%, var(--midnight) 100%); }
+  .breath-quote{ position:absolute; inset:0; z-index:1; display:grid; place-items:center; padding:20px; text-align:center; }
+  .breath-quote p{ font-family:var(--serif); font-size:clamp(17px,3.6vw,24px); color:var(--moonlight); max-width:22ch; line-height:1.4; text-wrap:balance; }
   .flow-card{ background:linear-gradient(160deg, var(--veil), var(--midnight-2)); border:1px solid var(--dusk); border-radius:28px; padding:40px; max-width:760px; margin:0 auto; min-height:480px; display:flex; flex-direction:column; }
   @media (max-width:640px){ .flow-card{ padding:24px 18px; } }
   .flow-progress{ display:flex; gap:5px; margin-bottom:26px; }
@@ -292,7 +317,7 @@
   .pricing-grid.centered{ display:flex; justify-content:center; flex-wrap:wrap; }
   .pricing-grid.centered .price-card{ width:320px; }
   @media (max-width:900px){ .pricing-grid{ grid-template-columns:1fr; max-width:420px; } }
-  .price-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:32px 28px; text-align:left; position:relative; transition:border-color .3s, transform .3s; }
+  .price-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:24px 22px; text-align:left; position:relative; transition:border-color .3s, transform .3s; }
   .price-card:hover{ border-color:var(--lilac); transform:translateY(-3px); }
   .price-card.featured{ border-color:var(--candle); background:linear-gradient(160deg, rgba(227,190,127,0.08), var(--veil)); }
   .price-card .badge{ position:absolute; top:-11px; right:24px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#241C0E; background:var(--candle); padding:4px 12px; border-radius:999px; font-weight:500; }
@@ -302,7 +327,14 @@
   .price-amount span{ font-size:14px; color:var(--haze); font-family:var(--sans); }
   .price-amount .price-figure{ font-size:inherit; color:inherit; font-family:inherit; }
   .price-card .limit{ font-size:13px; color:var(--lilac); margin-top:4px; }
-  .price-feats{ list-style:none; margin-top:18px; display:flex; flex-direction:column; gap:9px; }
+  .price-feats{ list-style:none; margin-top:14px; display:flex; flex-direction:column; gap:9px; }
+  /* Collapsed by default — a phone shouldn't open on eighteen bullet points. */
+  .price-more{ margin-top:16px; }
+  .price-more > summary{ cursor:pointer; list-style:none; font-size:12.5px; color:var(--haze); display:inline-flex; align-items:center; gap:6px; padding:4px 0; }
+  .price-more > summary::-webkit-details-marker{ display:none; }
+  .price-more > summary::after{ content:'›'; transform:rotate(90deg); display:inline-block; transition:transform .2s; }
+  .price-more[open] > summary::after{ transform:rotate(-90deg); }
+  .price-more > summary:focus-visible{ outline:2px solid var(--lilac); outline-offset:3px; border-radius:6px; }
   .price-feats li{ font-size:13px; color:var(--haze); padding-left:18px; position:relative; }
   .price-feats li::before{ content:"✦"; position:absolute; left:0; color:var(--lilac); font-size:11px; top:2px; }
   .price-card .btn{ width:100%; justify-content:center; margin-top:22px; }
@@ -389,12 +421,17 @@
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="rituals"] > nav ~ section:not(#rituals),
   body[data-view="today"] > nav ~ section:not(#today),
+  /* The builder is its own page now, so it's not part of the scroll down the
+     marketing home — that's where the "too busy" was coming from. */
+  body:not([data-view]) #flow-section,
+  body[data-view="build"] > nav ~ section:not(#flow-section),
   body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
   body[data-view="profile"] > footer,
   body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
   body[data-view="rituals"] > footer,
   body[data-view="today"] > footer,
+  body[data-view="build"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="today"]) #today{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
@@ -498,6 +535,7 @@
 
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
+  .journal-section:has(> .page-hero){ padding-top:0; border-top:none; }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
   /* Members lead with their own library; signed-out visitors lead with the
      ready-made one, since "Mine" would only ever be an empty locked panel. */
@@ -846,12 +884,13 @@
 </section>
 
 <section class="hero">
+  <div class="hero-bg"><img src="img/hero.jpg" alt="" aria-hidden="true"></div>
   <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
   <h1>Your all in one<br><em>wellness app.</em></h1>
   <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
   <div class="hero-ctas">
-    <button class="btn btn-primary" onclick="goTo('flow-section')">Build my subliminal ✦</button>
+    <button class="btn btn-primary" onclick="showBuildPage()">Build my subliminal ✦</button>
   </div>
   <p class="hero-note">Your subconscious takes in roughly <b>275,000 times</b> more per second than your conscious mind. <button onclick="showReprogramPage()">Why this works →</button></p>
 </section>
@@ -926,7 +965,7 @@
 
         <div class="science-cta">
           <p>Ready to hear it in your own voice?</p>
-          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Build your own subliminal →</button>
+          <button class="btn btn-primary" onclick="showBuildPage()">Build your own subliminal →</button>
         </div>
       </div>
     </div>
@@ -945,7 +984,7 @@
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Build a tapping session →</button>
+          <button class="btn btn-primary" onclick="showBuildPage()">Build a tapping session →</button>
           <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
@@ -964,7 +1003,7 @@
 
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Write your script →</button>
+          <button class="btn btn-primary" onclick="showBuildPage()">Write your script →</button>
           <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
         </div>
       </div>
@@ -1016,12 +1055,16 @@
 
 <!-- ============ GUIDED FLOW ============ -->
 <section class="flow-section" id="flow-section">
-  <div class="wrap">
-    <div class="section-head">
+  <div class="page-hero">
+    <img src="img/build.jpg" alt="" aria-hidden="true">
+    <div class="page-hero-text">
+      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
       <div class="eyebrow">Build yours</div>
       <h2>Your subliminal, start to finish</h2>
+      <p>Five minutes: a frequency, what you're working through, and your own voice saying it.</p>
     </div>
-
+  </div>
+  <div class="wrap">
     <div class="flow-card">
       <div class="flow-progress" id="flowProgress"></div>
 
@@ -1352,13 +1395,16 @@
 
 <!-- ============ RITUALS: daily log calendar + morning/night habits ============ -->
 <section class="journal-section" id="rituals">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
-    <div class="section-head">
+  <div class="page-hero">
+    <img src="img/journal.jpg" alt="" aria-hidden="true">
+    <div class="page-hero-text">
+      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
       <div class="eyebrow">Your rituals</div>
       <h2>Morning and night, one day at a time</h2>
       <p>Photograph the page you wrote by hand, check off the habits you kept, and watch the calendar fill in.</p>
     </div>
+  </div>
+  <div class="wrap">
     <div class="journal-tabs" style="max-width:400px;">
       <button class="active" data-rtab="calendar" onclick="setRitualsTab('calendar')">Calendar</button>
       <button data-rtab="habits" onclick="setRitualsTab('habits')">Habits</button>
@@ -1529,6 +1575,11 @@
   </div>
 </section>
 
+<section class="breath">
+  <img src="img/ritual.jpg" alt="" aria-hidden="true">
+  <div class="breath-quote"><p>Say it out loud, in your own voice, until you believe it.</p></div>
+</section>
+
 <section class="pricing" id="pricing">
   <div class="wrap">
     <div class="section-head" id="pricingHead">
@@ -1549,28 +1600,36 @@
     <div class="pricing-grid" id="pricingGrid">
       <div class="price-card" id="priceCardFree">
         <h3>Free</h3>
+        <p class="price-tagline">Build subliminals in your own voice.</p>
         <div class="price-amount">$0<span>/forever</span></div>
         <div class="limit">Sessions up to 20 minutes</div>
-        <ul class="price-feats">
-          <li>Personalized subliminals — align your frequency</li>
-          <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
-          <li>Your own voice or AI voice</li>
-          <li>Save 2 subliminals to your library (an account is required to save)</li>
-          <li>Library of general subliminals on YouTube</li>
-        </ul>
+        <details class="price-more">
+          <summary>What's included</summary>
+          <ul class="price-feats">
+            <li>Personalized subliminals — align your frequency</li>
+            <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
+            <li>Your own voice or AI voice</li>
+            <li>Save 2 subliminals to your library (an account is required to save)</li>
+            <li>Library of general subliminals on YouTube</li>
+          </ul>
+        </details>
         <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal('signup')">Create a free account</button>
       </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
+        <p class="price-tagline">Add your journal and manifestation practice.</p>
         <div class="price-amount"><span class="price-figure" data-monthly="$5.55" data-annual="$55">$5.55</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
         <div class="limit">Sessions up to 2 hours</div>
-        <ul class="price-feats">
-          <li>Everything in Free, with sessions up to 2 hours</li>
-          <li>Save up to 10 subliminals to your library</li>
-          <li>Gratitude Journal</li>
-          <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
-          <li>Manifestation tracker</li>
-        </ul>
+        <details class="price-more">
+          <summary>What's included</summary>
+          <ul class="price-feats">
+            <li>Everything in Free, with sessions up to 2 hours</li>
+            <li>Save up to 10 subliminals to your library</li>
+            <li>Gratitude Journal</li>
+            <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
+            <li>Manifestation tracker</li>
+          </ul>
+        </details>
         <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'whisper')">Get Whisper</a>
       </div>
       <div class="price-card featured" id="priceCardRitual">
@@ -1579,13 +1638,16 @@
         <p class="price-tagline">Ritualize your mornings and your nights.</p>
         <div class="price-amount"><span class="price-figure" data-monthly="$11.11" data-annual="$111">$11.11</span><span class="price-period" data-monthly="/month" data-annual="/year">/month</span></div>
         <div class="limit">Sessions up to 8 hours</div>
-        <ul class="price-feats">
-          <li>Everything in Whisper, with all-night sessions up to 8 hours</li>
-          <li>Unlimited saved subliminals</li>
-          <li>Habit tracker — build your morning and night rituals</li>
-          <li>Subliminal + EFT Tapping</li>
-          <li>Visualization scripting</li>
-        </ul>
+        <details class="price-more">
+          <summary>What's included</summary>
+          <ul class="price-feats">
+            <li>Everything in Whisper, with all-night sessions up to 8 hours</li>
+            <li>Unlimited saved subliminals</li>
+            <li>Habit tracker — build your morning and night rituals</li>
+            <li>Subliminal + EFT Tapping</li>
+            <li>Visualization scripting</li>
+          </ul>
+        </details>
         <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'ritual')">Get Ritual</a>
       </div>
     </div>
@@ -1630,7 +1692,7 @@
       <div class="footer-motto">Be more Hopeful… Be more Romantic… Be more you.</div>
       <div class="footer-links">
         <button onclick="showReprogramPage()">The Science</button>
-        <button onclick="goTo('flow-section')">Build yours</button>
+        <button onclick="showBuildPage()">Build yours</button>
         <button onclick="goTo('pricing')">Pricing</button>
         <button onclick="goTo('waitlist')">Waitlist</button>
         <a href="/terms.html" style="color:var(--haze); text-decoration:none; font-size:13px;">Terms</a>
@@ -4171,7 +4233,7 @@ function renderNavLinks(){
         ['Library', 'showLibraryPage()'],
       ]
     : [
-        ['Build yours', "showMarketingHome(); goTo('flow-section')"],
+        ['Build yours', 'showBuildPage()'],
         ['Library', 'showLibraryPage()'],
         ['The Science', 'showReprogramPage()'],
         ['Pricing', "showMarketingHome(); goTo('pricing')"],
@@ -4285,6 +4347,15 @@ if (scienceBinauralGuideList){
 }
 /* The marketing page — hero, science, the builder, pricing. Anything that
    scrolls to a section down there (goTo) has to come through here first. */
+/* The builder is a room you walk into, not something you scroll past on the way
+   down the homepage. It used to live inside the marketing page, which meant a
+   first-time visitor met a grid of ten frequencies before deciding anything, and
+   "Start" on Today threw you out to the marketing page and scroll-jumped. */
+function showBuildPage(){
+  document.body.setAttribute('data-view', 'build');
+  window.scrollTo(0,0);
+  history.pushState({ page:'build' }, '', '#build');
+}
 function showMarketingHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
@@ -4390,14 +4461,14 @@ function renderTodaySession(lastSub){
       <p>${mins ? `${formatSessionLength(mins)} · ` : ''}the last one you saved. Put your headphones in and press play.</p>
       <button class="btn btn-primary" onclick="loadSavedIntoBuilder('${lastSub.id}')">Play it</button>
       <div class="today-links" style="justify-content:flex-start; margin-top:14px;">
-        <button onclick="showMarketingHome(); goTo('flow-section');">Build a new one</button>
+        <button onclick="showBuildPage()">Build a new one</button>
       </div>`;
   } else {
     card.innerHTML = `
       <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
       <h3>Build your first subliminal</h3>
       <p>Pick a frequency, say what you're working through, and record it in your own voice. It takes about five minutes.</p>
-      <button class="btn btn-primary" onclick="showMarketingHome(); goTo('flow-section');">Start</button>`;
+      <button class="btn btn-primary" onclick="showBuildPage()">Start</button>`;
   }
 }
 function renderTodayRitual(){
@@ -4504,6 +4575,7 @@ window.addEventListener('popstate', (e) => {
   else if (page === 'rituals'){ document.body.setAttribute('data-view','rituals'); renderRitualsState(); }
   else if (page === 'today'){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
+  else if (page === 'build') document.body.setAttribute('data-view','build');
   else document.body.removeAttribute('data-view');
 });
 
@@ -4756,10 +4828,9 @@ async function loadSavedIntoBuilder(id){
     }
   }
 
-  showMarketingHome();
+  showBuildPage();
   showStep(7);
   prepareFinal();
-  setTimeout(() => goTo('flow-section'), 50);
 }
 
 async function deleteMySubliminal(id){
