@@ -214,6 +214,14 @@
   @keyframes loadPulse{ 0%,100%{ opacity:.25; transform:scale(0.8);} 50%{ opacity:1; transform:scale(1);} }
 
   .voice-options{ display:grid; gap:10px; }
+  .voice-picker{ margin-top:16px; padding-top:16px; border-top:1px solid var(--dusk); }
+  .voice-picker-label{ font-size:12px; color:var(--haze); margin-bottom:10px; }
+  .voice-chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .voice-chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; transition:border-color .2s, background .2s; }
+  .voice-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .voice-chip .voice-chip-desc{ color:var(--haze); font-size:11px; }
+  .voice-chip.mine{ border-color:var(--candle); }
+  .voice-chip-play{ opacity:.6; }
   .voice-card{ text-align:left; cursor:pointer; padding:16px; border-radius:16px; background:var(--dusk); border:1px solid transparent; transition:all .2s; position:relative; }
   .voice-card.sel{ background:rgba(227,190,127,0.12); border-color:var(--candle); }
   .voice-card .badge{ position:absolute; top:12px; right:14px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--candle); background:rgba(227,190,127,0.14); padding:3px 9px; border-radius:999px; }
@@ -259,6 +267,17 @@
   .mini-btn:disabled{ opacity:.35; cursor:not-allowed; }
   .mini-btn.candlebtn{ background:var(--candle); color:#241C0E; }
   .mini-btn.ghostbtn{ background:transparent; color:var(--haze); border:1px solid var(--dusk); }
+  .mini-btn.micbtn{ background:var(--dusk); color:var(--moonlight); display:inline-flex; align-items:center; padding:9px 13px; }
+  .mini-btn.micbtn:hover{ color:var(--candle); }
+  /* The row that replaces the text field while a spoken entry is being recorded. */
+  .voice-rec{ display:flex; align-items:center; gap:10px; margin-bottom:20px; padding:11px 14px; background:var(--dusk); border-radius:14px; flex-wrap:wrap; }
+  .voice-rec-dot{ width:9px; height:9px; border-radius:50%; background:#E06C6C; flex-shrink:0; animation:voicePulse 1.6s ease-in-out infinite; }
+  @keyframes voicePulse{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+  .voice-rec-label{ font-size:13px; color:var(--moonlight); flex:1; min-width:140px; }
+  .voice-rec-time{ font-size:13px; color:var(--haze); font-variant-numeric:tabular-nums; }
+  /* Playback of a spoken entry, inside its card in the list. */
+  .journal-entry audio{ width:100%; margin:4px 0 10px; height:36px; }
+  .journal-entry-spoken{ font-size:11.5px; color:var(--haze); display:flex; align-items:center; gap:6px; margin-bottom:6px; }
 
   .final-panel{ display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:6px 0; width:100%; max-width:460px; margin:0 auto; }
   .final-orb{ width:110px; height:110px; }
@@ -406,6 +425,11 @@
   .profile-item .meta{ font-size:12px; color:var(--haze); margin-top:3px; }
   .profile-item button{ background:none; border:none; color:var(--haze); font-size:12px; cursor:pointer; text-decoration:underline; flex-shrink:0; }
   .profile-item button:hover{ color:#E39A9A; }
+  .voice-clone-card{ background:var(--dusk); border-radius:16px; padding:20px; margin-bottom:8px; }
+  .voice-clone-intro{ font-size:13px; color:var(--haze); line-height:1.6; margin:0 0 14px; }
+  .voice-clone-sample{ background:rgba(0,0,0,0.18); border-radius:12px; padding:14px 16px; font-size:13.5px; line-height:1.7; color:var(--moonlight); margin-bottom:14px; }
+  .voice-clone-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .voice-clone-have{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:13.5px; color:var(--moonlight); }
   .profile-settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:640px){ .profile-settings-grid{ grid-template-columns:1fr; } }
   .profile-field-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:18px; }
@@ -475,6 +499,9 @@
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
+  /* Members lead with their own library; signed-out visitors lead with the
+     ready-made one, since "Mine" would only ever be an empty locked panel. */
+  body[data-signed-in="yes"] [data-libtab="mine"]{ order:-1; }
   .journal-tabs button{ flex:1; background:none; border:none; color:var(--haze); font-size:13.5px; font-weight:500; padding:11px 14px; border-radius:999px; cursor:pointer; transition:all .2s; }
   .journal-tabs button.active{ background:rgba(185,167,232,0.16); color:var(--lilac); }
   .journal-prompt{ max-width:520px; margin:0 auto 20px; text-align:center; font-family:var(--serif); font-style:italic; font-size:13px; color:var(--lilac); }
@@ -565,8 +592,29 @@
   .habit-block-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
   .habit-block-head h3{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin-top:4px; }
   .habit-block-count{ font-size:12px; color:var(--haze); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  /* On a phone the count is longer than the row it shares, so the head stacks
+     and the count is allowed to wrap rather than run off the card. */
+  @media (max-width:640px){
+    .habit-block-head{ flex-direction:column; align-items:flex-start; gap:4px; }
+    .habit-block-count{ white-space:normal; line-height:1.5; }
+  }
   .habit-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
-  .habit-row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-row{ display:grid; grid-template-columns:auto auto 1fr auto auto auto; align-items:center; gap:10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05); border-radius:14px; padding:10px 12px; }
+  .habit-row:has(.habit-core-toggle.on){ border-color:rgba(224,196,138,0.22); }
+  /* Lifted off the list while it follows your finger. */
+  .habit-row.dragging{ position:relative; z-index:5; border-color:var(--lilac); box-shadow:0 10px 28px rgba(0,0,0,0.45); cursor:grabbing; }
+  body.habit-dragging{ user-select:none; }
+  .habit-grip{ background:none; border:none; padding:4px 2px; color:rgba(156,147,184,0.5); cursor:grab; touch-action:none; display:flex; align-items:center; }
+  .habit-grip:hover{ color:var(--lilac); }
+  .habit-grip:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; border-radius:6px; }
+  .habit-actions{ display:flex; align-items:center; gap:2px; }
+  .habit-move{ background:none; border:none; color:rgba(156,147,184,0.55); font-size:14px; line-height:1; padding:5px 6px; cursor:pointer; border-radius:6px; transition:color .2s, background .2s; }
+  .habit-move:hover:not(:disabled){ color:var(--moonlight); background:rgba(255,255,255,0.06); }
+  .habit-move:disabled{ opacity:.25; cursor:default; }
+  .habit-move:focus-visible{ outline:2px solid var(--lilac); outline-offset:1px; }
+  .habit-undo-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
+  .habit-undo-label{ font-size:12.5px; color:var(--haze); margin-right:2px; }
+  .habit-undo-bar .mini-btn{ font-size:12px; padding:7px 14px; }
   .habit-check{ width:26px; height:26px; border-radius:50%; border:1.5px solid var(--haze); background:none; cursor:pointer; display:flex; align-items:center; justify-content:center; color:transparent; transition:all .2s; padding:0; }
   .habit-check.done{ background:var(--lilac); border-color:var(--lilac); color:#1B1630; }
   .habit-check:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
@@ -577,11 +625,26 @@
   .habit-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.08); }
   .habit-dot.on{ background:var(--lilac); }
   .habit-dot.today{ box-shadow:0 0 0 1.5px rgba(227,190,127,0.6); }
+  .habit-core-toggle{ background:none; border:none; cursor:pointer; font-size:14px; line-height:1; padding:4px; color:rgba(156,147,184,0.35); transition:color .2s, transform .15s; }
+  .habit-core-toggle:hover{ color:var(--candle); transform:scale(1.15); }
+  .habit-core-toggle.on{ color:var(--candle); }
+  .habit-core-toggle:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; border-radius:6px; }
+  .habit-core-hint{ font-size:12px; color:var(--haze); line-height:1.6; margin:0 0 10px; }
+  /* A non-negotiable reads as the load-bearing one, without shouting. */
+  .day-habit.core{ border-color:rgba(224,196,138,0.28); }
+  .day-habit-core{ margin-left:auto; color:var(--candle); font-size:11px; flex-shrink:0; }
+  .today-ritual-group{ font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--haze); margin:14px 0 6px; }
+  .today-ritual-group:first-of-type{ margin-top:10px; }
+  .today-ritual-note{ font-size:12.5px; color:var(--haze); line-height:1.6; margin:12px 0 0; }
   .habit-streak{ font-size:11.5px; color:var(--lilac); white-space:nowrap; font-variant-numeric:tabular-nums; }
   .habit-streak.zero{ color:var(--haze); }
   .habit-delete{ display:flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:none; border:1px solid transparent; color:var(--haze); cursor:pointer; padding:0; opacity:.55; transition:all .2s; }
   .habit-delete:hover{ opacity:1; color:#E39A9A; border-color:rgba(227,154,154,0.4); }
-  @media (max-width:520px){ .habit-row{ grid-template-columns:auto 1fr auto; } .habit-week{ grid-column:2; } .habit-streak{ display:none; } }
+  @media (max-width:640px){
+    .habit-row{ grid-template-columns:auto auto 1fr auto; }
+    .habit-week{ grid-column:3; }
+    .habit-streak{ display:none; }
+  }
   .habit-empty{ font-size:13px; color:var(--haze); padding:6px 2px 4px; font-family:var(--serif); font-style:italic; }
   .habit-row-blank{ background:none; border:1px dashed rgba(255,255,255,0.08); grid-template-columns:auto 1fr; }
   .habit-slot-num{ font-size:11px; color:var(--haze); width:20px; text-align:center; font-variant-numeric:tabular-nums; opacity:.6; }
@@ -666,16 +729,12 @@
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
   <div class="modal-card">
     <button class="modal-close" onclick="closeAuthModal()">✕</button>
-    <div class="modal-title" id="authTitle">Create your account</div>
+    <div class="modal-title" id="authTitle">Welcome back</div>
     <div class="modal-sub" id="authSub">Save your sessions, keep a journal, and build your library.</div>
     <div id="googleAuthRow">
       <button type="button" class="btn-google" onclick="signInWithGoogle()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#fff; color:#1f1f1f; border:1px solid var(--dusk); border-radius:999px; padding:11px 20px; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:18px;">
         <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.98v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.98A9 9 0 0 0 0 9c0 1.45.35 2.83.98 4.03l2.97-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .98 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
         Continue with Google
-      </button>
-      <button type="button" class="btn-apple" onclick="signInWithApple()" style="width:100%; display:flex; align-items:center; justify-content:center; gap:10px; background:#000; color:#fff; border:1px solid #000; border-radius:999px; padding:11px 20px; font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; margin-bottom:18px;">
-        <svg width="16" height="18" viewBox="0 0 814 1000" fill="#fff"><path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127C46.7 790.7 0 663 0 541.8c0-194.4 126.4-297.5 250.8-297.5 66.1 0 121.2 43.4 162.7 43.4 39.5 0 101.1-46 176.3-46 28.5 0 130.9 2.6 198.3 99.2zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/></svg>
-        Continue with Apple
       </button>
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <div style="flex:1; height:1px; background:var(--dusk);"></div>
@@ -693,22 +752,22 @@
         <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPassword', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
-      <div id="forgotPwRow" style="display:none; text-align:right; margin-top:6px;">
+      <div id="forgotPwRow" style="text-align:right; margin-top:6px;">
         <button type="button" onclick="enterResetMode()" style="background:none; border:none; color:var(--lilac); font-size:12px; cursor:pointer; padding:0;">Forgot password?</button>
       </div>
     </div>
-    <div class="auth-field" id="confirmPwField">
+    <div class="auth-field" id="confirmPwField" style="display:none;">
       <label>Confirm password</label>
       <div class="pw-wrap">
         <input type="password" id="authPasswordConfirm" placeholder="••••••••" autocomplete="new-password">
         <button type="button" class="pw-toggle" onclick="togglePwVisibility('authPasswordConfirm', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </div>
-    <div class="auth-field" id="signupUsernameField">
+    <div class="auth-field" id="signupUsernameField" style="display:none;">
       <label>Username</label>
       <input type="text" id="signupUsername" placeholder="how others will know you" autocomplete="off">
     </div>
-    <div class="auth-field" id="signupAvatarField">
+    <div class="auth-field" id="signupAvatarField" style="display:none;">
       <label>Choose your avatar</label>
       <div class="avatar-grid" id="signupAvatarGrid"></div>
       <label class="avatar-upload-label" for="signupAvatarFile">or upload a photo</label>
@@ -716,8 +775,8 @@
       <div id="signupAvatarPreviewWrap"></div>
     </div>
     <div class="auth-msg" id="authMsg"></div>
-    <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Create a free account</button>
-    <div class="auth-toggle" id="authToggle">Already have an account? <button onclick="toggleAuthMode()">Log in</button></div>
+    <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Log in</button>
+    <div class="auth-toggle" id="authToggle">New here? <button onclick="toggleAuthMode()">Create a free account</button></div>
   </div>
 </div>
 
@@ -922,7 +981,7 @@
       <p>Browse generalized subliminals, or everything you've personally built and saved.</p>
     </div>
     <div class="journal-tabs" style="max-width:340px;">
-      <button class="active" data-libtab="premade" onclick="setLibraryTab('premade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>Premade</button>
+      <button data-libtab="premade" onclick="setLibraryTab('premade')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>Premade</button>
       <button data-libtab="mine" onclick="setLibraryTab('mine')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Mine</button>
     </div>
 
@@ -1080,9 +1139,15 @@
               <p>Hold to record each line yourself. Nothing is uploaded — it stays in this tab.</p>
             </button>
             <button class="voice-card" id="voiceAI" onclick="chooseVoice('ai')">
-              <h4>AI voice</h4>
-              <p>A natural browser voice reads each line aloud instead of recording.</p>
+              <h4>A studio voice</h4>
+              <p>Pick a voice to read each line aloud instead of recording it yourself.</p>
             </button>
+          </div>
+          <div class="voice-picker" id="voicePicker" style="display:none;">
+            <div class="voice-picker-label">Which voice?</div>
+            <div class="voice-chips" id="voiceChips"></div>
+            <audio id="voicePreview" style="display:none;"></audio>
+            <div class="save-msg" id="voicePickerMsg"></div>
           </div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="toStep5" disabled onclick="nextStep()">Continue</button></div>
@@ -1266,7 +1331,17 @@
     <div id="journalPanel" class="journal-panel" style="display:none;">
       <div class="journal-add">
         <input type="text" id="journalInput" placeholder="I am so grateful for…" onkeydown="if(event.key==='Enter') addJournalEntry()">
+        <button class="mini-btn micbtn" id="journalMicBtn" onclick="startVoiceEntry()" title="Say it out loud instead" aria-label="Record this entry instead of typing it">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 19v3"/></svg>
+        </button>
         <button class="mini-btn candlebtn" onclick="addJournalEntry()">Add</button>
+      </div>
+      <div class="voice-rec" id="journalVoiceRec" style="display:none;">
+        <span class="voice-rec-dot"></span>
+        <span class="voice-rec-label">Listening… say it out loud.</span>
+        <span class="voice-rec-time" id="journalVoiceTime">0:00</span>
+        <button class="mini-btn candlebtn" onclick="finishVoiceEntry()">Save it</button>
+        <button class="mini-btn ghostbtn" onclick="cancelVoiceEntry()">Cancel</button>
       </div>
       <div class="save-msg" id="journalAddMsg"></div>
       <div class="journal-stat" id="journalStat" style="display:none;"></div>
@@ -1328,6 +1403,11 @@
     <!-- Habit tracker: morning and night rituals -->
     <div id="habitsPanel" class="journal-panel" style="display:none;">
       <div class="journal-stat" id="habitsStat" style="display:none;"></div>
+      <div class="habit-undo-bar" id="habitUndoBar" style="display:none;">
+        <span class="habit-undo-label">Changed something?</span>
+        <button class="mini-btn ghostbtn" id="habitUndoBtn" onclick="undoHabits()">↩ Undo</button>
+        <button class="mini-btn ghostbtn" id="habitRedoBtn" onclick="redoHabits()">↪ Redo</button>
+      </div>
       <div class="habit-block" data-time="morning">
         <div class="habit-block-head">
           <div><div class="eyebrow">Morning ritual</div><h3>How you start the day</h3></div>
@@ -1374,6 +1454,13 @@
       </div>
 
       <button class="mini-btn ghostbtn" onclick="showLibraryPage(); setLibraryTab('mine');"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>View my saved subliminals →</button>
+
+      <h3 class="profile-subhead">Your voice</h3>
+      <div class="voice-clone-card" id="voiceCloneCard">
+        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Read the passage below once and your voice becomes one of the voices you can choose when you build a subliminal.</p>
+        <div class="voice-clone-body" id="voiceCloneBody"></div>
+        <div class="save-msg" id="voiceCloneMsg"></div>
+      </div>
 
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
@@ -1471,7 +1558,7 @@
           <li>Save 2 subliminals to your library (an account is required to save)</li>
           <li>Library of general subliminals on YouTube</li>
         </ul>
-        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal()">Create a free account</button>
+        <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal('signup')">Create a free account</button>
       </div>
       <div class="price-card" id="priceCardWhisper">
         <h3>Whisper</h3>
@@ -1632,7 +1719,7 @@ function eftRepeatsForIndex(i){
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -1677,7 +1764,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -1775,7 +1862,7 @@ async function pickRitualMode(btn){
   msg.textContent = '';
   if (mode === 'eft' || mode === 'visualization'){
     if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -1870,7 +1957,7 @@ async function generateAffirmations(){
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier !== 'none'){
     if (!currentUser){
-      msg.innerHTML = `${formatSessionLength(minutes)} needs an account — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `${formatSessionLength(minutes)} needs an account — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2055,12 +2142,134 @@ function renderAffList(){
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
-/* ---------------- step 4: voice choice ---------------- */
+/* ---------------- step 4: voice choice ----------------
+   Two things are being chosen here: whether to record yourself or not, and — if
+   not — which voice reads the lines. The studio voices are generated by
+   /api/tts; when that isn't configured (or the person isn't on a paid plan) the
+   app falls back to the device's own speech synthesis, which is how it has
+   always worked, so nothing breaks. */
+const AI_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',     desc: 'warm, calm' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', desc: 'soft, low' },
+  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',     desc: 'clear, steady' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',      desc: 'bright' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',    desc: 'deep, grounding' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',    desc: 'measured' },
+];
+const DEVICE_VOICE = 'device';   // the browser's own speechSynthesis
+const MY_CLONED_VOICE = 'mine';  // resolved to the profile's cloned_voice_id at play time
+
 function chooseVoice(mode){
   state.voiceMode = mode;
   document.getElementById('voiceOwn').classList.toggle('sel', mode==='own');
   document.getElementById('voiceAI').classList.toggle('sel', mode==='ai');
+  document.getElementById('voicePicker').style.display = mode === 'ai' ? 'block' : 'none';
+  if (mode === 'ai') renderVoiceChips();
   document.getElementById('toStep5').disabled = false;
+}
+
+function pickAiVoice(id){
+  state.aiVoiceId = id;
+  renderVoiceChips();
+  previewVoice(id);
+}
+
+async function renderVoiceChips(){
+  const wrap = document.getElementById('voiceChips');
+  if (!state.aiVoiceId) state.aiVoiceId = AI_VOICES[0].id;
+  const cloned = await myClonedVoiceId();
+  const chips = AI_VOICES.map(v => ({ id: v.id, name: v.name, desc: v.desc, mine: false }));
+  if (cloned) chips.unshift({ id: MY_CLONED_VOICE, name: 'My voice', desc: 'cloned', mine: true });
+  chips.push({ id: DEVICE_VOICE, name: 'This device', desc: 'built-in', mine: false });
+  wrap.innerHTML = chips.map(c => `
+    <button type="button" class="voice-chip${state.aiVoiceId === c.id ? ' sel' : ''}${c.mine ? ' mine' : ''}" onclick="pickAiVoice('${c.id}')">
+      ${c.name} <span class="voice-chip-desc">${c.desc}</span>
+    </button>`).join('');
+}
+
+/* The cloned voice id lives on the profile; cached so the picker doesn't refetch
+   it every repaint. */
+let clonedVoiceCache;
+async function myClonedVoiceId(){
+  if (clonedVoiceCache !== undefined) return clonedVoiceCache;
+  if (!sb || !currentUser){ clonedVoiceCache = null; return null; }
+  const { data } = await sb.from('profiles').select('cloned_voice_id').eq('id', currentUser.id).maybeSingle();
+  clonedVoiceCache = (data && data.cloned_voice_id) || null;
+  return clonedVoiceCache;
+}
+
+/* Resolve what the picker stores into the id the API actually wants. Returns
+   null when the line should be spoken by the device instead. */
+async function resolveVoiceId(picked){
+  if (!picked || picked === DEVICE_VOICE) return null;
+  if (picked === MY_CLONED_VOICE) return await myClonedVoiceId();
+  return picked;
+}
+
+async function previewVoice(picked){
+  const msg = document.getElementById('voicePickerMsg');
+  msg.textContent = ''; msg.className = 'save-msg';
+  const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
+  const voiceId = await resolveVoiceId(picked);
+  if (!voiceId){ speakWithDeviceVoice(line); return; }
+  msg.textContent = 'Loading the voice…';
+  try {
+    const url = await synthesizeLine(line, voiceId);
+    msg.textContent = '';
+    const el = document.getElementById('voicePreview');
+    el.src = url; el.play().catch(()=>{});
+  } catch (e){
+    msg.textContent = ttsErrorText(e);
+    msg.className = 'save-msg';
+    speakWithDeviceVoice(line);
+  }
+}
+function speakWithDeviceVoice(line){
+  try { window.speechSynthesis.cancel(); } catch(e){}
+  const u = new SpeechSynthesisUtterance(line);
+  u.rate = 0.92; u.pitch = 1.0;
+  window.speechSynthesis.speak(u);
+}
+function ttsErrorText(e){
+  const m = (e && e.message) || '';
+  if (m === 'upgrade_required') return 'Studio voices come with Whisper — using this device\'s voice for now.';
+  if (m === 'not_configured') return 'Studio voices aren\'t switched on yet — using this device\'s voice.';
+  return 'That voice is unavailable right now — using this device\'s voice.';
+}
+
+/* Generate one spoken line and hand back an object URL. Each line is only ever
+   generated once per session: the same words in the same voice always sound the
+   same, and every repeat after that is free. */
+const ttsCache = new Map();
+/* loadClip caches its decoded audio on the object it's handed, so each generated
+   line needs one stable handle rather than a fresh literal per repeat. */
+const studioClipHandles = new Map();
+function studioClipHandle(url){
+  if (!studioClipHandles.has(url)) studioClipHandles.set(url, { url });
+  return studioClipHandles.get(url);
+}
+async function synthesizeLine(text, voiceId){
+  const key = voiceId + '|' + text;
+  if (ttsCache.has(key)) return ttsCache.get(key);
+  const promise = (async () => {
+    const token = sb && (await sb.auth.getSession()).data.session?.access_token;
+    if (!token) throw new Error('not_signed_in');
+    const res = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text, voiceId }),
+    });
+    if (!res.ok){
+      let body = {};
+      try { body = await res.json(); } catch(e){}
+      throw new Error(body.error || `tts_failed_${res.status}`);
+    }
+    return URL.createObjectURL(await res.blob());
+  })();
+  ttsCache.set(key, promise);
+  // A failed line shouldn't be cached as permanently broken.
+  promise.catch(() => ttsCache.delete(key));
+  return promise;
 }
 
 /* ---------------- step 5: background + mixer ---------------- */
@@ -2083,7 +2292,7 @@ async function toggleLayerVoice(checked){
   if (!checked){ layerVoiceEnabled = false; panel.classList.remove('open'); return; }
   if (!currentUser){
     toggle.checked = false;
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
     msg.className = 'length-msg err';
     return;
   }
@@ -2199,6 +2408,91 @@ function advanceLine(){
   prepareFinal(); showStep(7);
 }
 
+/* Recording format. Chrome and Android record WebM/Opus; Safari records MP4/AAC.
+   decodeAudioData on Safari cannot read WebM at all, so a library recorded on a
+   laptop used to play back as pure silence on an iPhone — the decode promise
+   rejected and nothing caught it. Record in whatever this browser supports, keep
+   the real content type with the file, and fall back to an <audio> element
+   (which understands far more than decodeAudioData) when decoding fails. */
+function pickRecordingMime(){
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+  const candidates = ['audio/webm;codecs=opus','audio/webm','audio/mp4;codecs=mp4a.40.2','audio/mp4','audio/ogg;codecs=opus'];
+  return candidates.find(t => MediaRecorder.isTypeSupported(t)) || '';
+}
+function extForMime(mime){
+  const m = (mime || '').toLowerCase();
+  if (m.indexOf('webm') !== -1) return 'webm';
+  if (m.indexOf('mp4') !== -1 || m.indexOf('m4a') !== -1 || m.indexOf('aac') !== -1) return 'm4a';
+  if (m.indexOf('ogg') !== -1) return 'ogg';
+  if (m.indexOf('wav') !== -1) return 'wav';
+  if (m.indexOf('mpeg') !== -1 || m.indexOf('mp3') !== -1) return 'mp3';
+  return 'webm';
+}
+/* Clips saved before the fix all claim to be audio/webm whether they are or not,
+   so trust the bytes rather than the label when handing one to an <audio> tag. */
+function sniffAudioMime(bytes){
+  if (bytes.length > 4 && bytes[0]===0x1A && bytes[1]===0x45 && bytes[2]===0xDF && bytes[3]===0xA3) return 'audio/webm';
+  if (bytes.length > 12 && bytes[4]===0x66 && bytes[5]===0x74 && bytes[6]===0x79 && bytes[7]===0x70) return 'audio/mp4';
+  if (bytes.length > 4 && bytes[0]===0x4F && bytes[1]===0x67 && bytes[2]===0x67 && bytes[3]===0x53) return 'audio/ogg';
+  if (bytes.length > 4 && bytes[0]===0x52 && bytes[1]===0x49 && bytes[2]===0x46 && bytes[3]===0x46) return 'audio/wav';
+  if (bytes.length > 3 && bytes[0]===0x49 && bytes[1]===0x44 && bytes[2]===0x33) return 'audio/mpeg';
+  return '';
+}
+
+/* Turn a recording into something playable on THIS device, once per session.
+   Returns {kind:'buffer'} where decodeAudioData works, {kind:'element'} where it
+   doesn't. Rejects — loudly — when neither can play it, so the session can say so
+   instead of running silently for twenty minutes. */
+async function loadClip(ctx, rec){
+  if (rec._clip && rec._clipCtx === ctx) return rec._clip;
+  const raw = rec.blob || await (await fetch(rec.url)).blob();
+  const bytes = new Uint8Array(await raw.slice(0, 16).arrayBuffer());
+  const trueMime = sniffAudioMime(bytes) || raw.type || 'audio/webm';
+  const blob = raw.type === trueMime ? raw : new Blob([raw], { type: trueMime });
+  let clip = null;
+  try {
+    const buf = await blob.arrayBuffer();
+    clip = { kind: 'buffer', buffer: await ctx.decodeAudioData(buf) };
+  } catch (e){
+    const el = new Audio();
+    el.src = URL.createObjectURL(blob);
+    el.preload = 'auto';
+    await new Promise((resolve, reject) => {
+      el.oncanplaythrough = resolve;
+      el.onerror = () => reject(new Error('unplayable recording (' + trueMime + ')'));
+      el.load();
+    });
+    clip = { kind: 'element', el };
+  }
+  rec._clip = clip; rec._clipCtx = ctx;
+  return clip;
+}
+
+/* Play one loaded clip through `gainValue`, calling onended when it finishes. */
+function playClip(ctx, clip, gainValue, extraDest, onended){
+  if (clip.kind === 'buffer'){
+    const g = ctx.createGain(); g.gain.value = gainValue;
+    g.connect(ctx.destination);
+    if (extraDest && extraDest !== ctx.destination) g.connect(extraDest);
+    const src = ctx.createBufferSource(); src.buffer = clip.buffer;
+    src.connect(g); src.onended = onended; src.start();
+    return;
+  }
+  // createMediaElementSource can only ever be called once per <audio> element,
+  // so the element's graph is built once and reused for every repeat.
+  if (!clip.gain){
+    clip.gain = ctx.createGain();
+    ctx.createMediaElementSource(clip.el).connect(clip.gain);
+    clip.gain.connect(ctx.destination);
+    if (extraDest && extraDest !== ctx.destination) clip.gain.connect(extraDest);
+  }
+  clip.gain.gain.value = gainValue;
+  clip.el.onended = onended;
+  try { clip.el.currentTime = 0; } catch(e){}
+  const p = clip.el.play();
+  if (p && p.catch) p.catch(() => { if (onended) onended(); });
+}
+
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
 const recBtn = document.getElementById('recBtn');
 async function startRec(e){
@@ -2207,10 +2501,11 @@ async function startRec(e){
   try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(err){ document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
   holdStart = Date.now(); audioChunks=[];
-  mediaRecorder = new MediaRecorder(micStream);
+  const recMime = pickRecordingMime();
+  mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
   mediaRecorder.ondataavailable = ev=>audioChunks.push(ev.data);
   mediaRecorder.onstop = ()=>{
-    const blob = new Blob(audioChunks, {type:'audio/webm'});
+    const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || recMime || 'audio/webm'});
     const url = URL.createObjectURL(blob);
     micStream.getTracks().forEach(t=>t.stop());
     const held = Date.now()-holdStart;
@@ -2446,7 +2741,7 @@ async function triggerCustomTrackUpload(){
   const msg = document.getElementById('customTrackMsg');
   msg.textContent = '';
   if (!currentUser){
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal(); return false;">create a free account</a>.`;
+    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
     msg.className = 'length-msg err';
     return;
   }
@@ -2493,7 +2788,7 @@ async function pickSoothingLayer(btn){
 
   if (variant !== 'none'){
     if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal(); return false;">create a free account</a> first.`;
+      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
       msg.className = 'length-msg err';
       return;
     }
@@ -2658,6 +2953,9 @@ function playFinal(){
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
   finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+  // Safari and the iOS app's web view hand back a suspended context. Resuming has
+  // to happen inside the tap that started the session, which is where we are.
+  if (finalCtx.state === 'suspended') finalCtx.resume().catch(()=>{});
   startCustomTrackPlayback();
   const toneGain = finalCtx.createGain();
   const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
@@ -2730,19 +3028,37 @@ function playFinal(){
         if (!recorded.length) return;
         if (idx >= recorded.length) idx = 0; // loops independently, doesn't need to match the main track's length
         const { r } = recorded[idx];
-        fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
+        loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
-          const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
-          src.connect(liveLayerVoiceGain);
-          src.start();
-          src.onended = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, ()=>{
+            idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
+          });
+        }).catch(e=>{
+          console.error('could not play layered line', e);
+          idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
         });
       } else {
         if (idx >= lines.length) idx = 0;
-        const utter = new SpeechSynthesisUtterance(lines[idx]);
-        utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
-        utter.onend = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
-        window.speechSynthesis.speak(utter);
+        const line = lines[idx];
+        const advance = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+        const deviceSpeak = ()=>{
+          if (!finalPlaying) return;
+          const utter = new SpeechSynthesisUtterance(line);
+          utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
+          utter.onend = advance;
+          window.speechSynthesis.speak(utter);
+        };
+        resolveVoiceId(state.layerAiVoiceId).catch(()=>null).then(voiceId => {
+          if (!finalPlaying) return;
+          if (!voiceId){ deviceSpeak(); return; }
+          return synthesizeLine(line, voiceId)
+            .then(url => loadClip(finalCtx, studioClipHandle(url)))
+            .then(clip => {
+              if (!finalPlaying) return;
+              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, advance);
+            })
+            .catch(deviceSpeak);
+        }).catch(deviceSpeak);
       }
     }
     // Starts a beat after the main voice so the two voices don't land on top of each other.
@@ -2760,17 +3076,12 @@ function playFinal(){
         const { r, i } = recorded[idx];
         document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
-        fetch(r.url).then(res=>res.arrayBuffer()).then(buf=>finalCtx.decodeAudioData(buf)).then(audioBuf=>{
+        loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
           let rep = 0;
           function playOnce(){
             if (!finalPlaying) return;
-            const src = finalCtx.createBufferSource(); src.buffer = audioBuf;
-            const g = finalCtx.createGain(); g.gain.value = document.getElementById('mixVoice').value/100;
-            src.connect(g).connect(finalCtx.destination);
-            if (destForRecording !== finalCtx.destination) g.connect(destForRecording);
-            src.start();
-            src.onended = ()=>{
+            playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, ()=>{
               rep++;
               if (rep < repeatsForThisLine){
                 // Short beat between repeats of the same line, timed to a single tap.
@@ -2778,34 +3089,59 @@ function playFinal(){
               } else {
                 idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
               }
-            };
+            });
           }
           playOnce();
+        }).catch(e=>{
+          // Never fail silently — a session that plays no voice should say why.
+          console.error('could not play recorded line', i, e);
+          document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
+          idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
         });
       }
       playNext();
     } else {
       const lines = state.affirmations;
       let idx = 0;
+      // Resolved once per session: a studio voice id, or null to use the voice
+      // built into this device. Anything that goes wrong with a studio voice
+      // falls back to the device rather than leaving the session silent.
+      const voicePromise = resolveVoiceId(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
         if (idx >= lines.length){ onDone(); return; }
         document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
-        function speakOnce(){
+        function advance(){
+          rep++;
+          if (rep < repeatsForThisLine){
+            const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
+          } else {
+            idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
+          }
+        }
+        function deviceSpeak(){
           if (!finalPlaying) return;
           const utter = new SpeechSynthesisUtterance(lines[idx]);
           utter.rate = 0.92; utter.pitch = 1.0;
-          utter.onend = ()=>{
-            rep++;
-            if (rep < repeatsForThisLine){
-              const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
-            } else {
-              idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
-            }
-          };
+          utter.onend = advance;
           window.speechSynthesis.speak(utter);
+        }
+        function speakOnce(){
+          if (!finalPlaying) return;
+          const line = lines[idx];
+          voicePromise.then(voiceId => {
+            if (!finalPlaying) return;
+            if (!voiceId){ deviceSpeak(); return; }
+            return synthesizeLine(line, voiceId)
+              .then(url => loadClip(finalCtx, studioClipHandle(url)))
+              .then(clip => {
+                if (!finalPlaying) return;
+                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
+              })
+              .catch(() => deviceSpeak());
+          }).catch(deviceSpeak);
         }
         speakOnce();
       }
@@ -3217,8 +3553,9 @@ async function saveSubliminal(){
     let anyUploaded = false;
     for (let i = 0; i < recordings.length; i++){
       if (!recordings[i] || !recordings[i].blob){ recordingUrls.push(null); continue; }
-      const path = `${folder}/${i}.webm`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: 'audio/webm' });
+      const mime = recordings[i].blob.type || 'audio/webm';
+      const path = `${folder}/${i}.${extForMime(mime)}`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: mime });
       if (upErr){ console.error('recording upload failed for line', i, upErr); recordingUrls.push(null); continue; }
       recordingUrls.push(path); // store the storage path; we generate a signed URL when loading it back
       anyUploaded = true;
@@ -3246,8 +3583,9 @@ async function saveSubliminal(){
     layerRecordingUrls = [];
     for (let i = 0; i < layerRecordings.length; i++){
       if (!layerRecordings[i] || !layerRecordings[i].blob){ layerRecordingUrls.push(null); continue; }
-      const path = `${layerFolder}/${i}.webm`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: 'audio/webm' });
+      const mime = layerRecordings[i].blob.type || 'audio/webm';
+      const path = `${layerFolder}/${i}.${extForMime(mime)}`;
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: mime });
       if (upErr){ console.error('layer recording upload failed for line', i, upErr); layerRecordingUrls.push(null); continue; }
       layerRecordingUrls.push(path);
     }
@@ -3269,7 +3607,10 @@ async function saveSubliminal(){
     eft_mode: state.eftMode || false,
     eft_repeat_count: state.eftMode ? state.eftRepeatCount : null,
     visualization_mode: state.visualizationMode || false,
-    binaural_band: state.binauralBand || null
+    binaural_band: state.binauralBand || null,
+    // Remember which voice built this one, so reopening it sounds the same.
+    ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
+    layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
   });
   if (error){
     console.error('saveSubliminal error:', error);
@@ -3382,7 +3723,7 @@ try {
 }
 
 let currentUser = null;
-let authMode = 'signup'; // 'signup' | 'login' | 'reset'
+let authMode = 'login'; // 'login' | 'signup' | 'reset'
 let journalTab = 'received';
 
 // Where Supabase sends people after they click a password-reset email link.
@@ -3392,8 +3733,11 @@ let journalTab = 'received';
 const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
 
 /* ---------- auth modal ---------- */
-function openAuthModal(){
-  if (authMode === 'reset') authMode = 'login';
+/* Opens on log in unless a caller explicitly wants the sign-up form — most
+   people reaching this modal already have an account, and the ones who don't
+   get "New here? Create a free account" right underneath. */
+function openAuthModal(mode){
+  authMode = mode === 'signup' ? 'signup' : 'login';
   document.getElementById('authOverlay').classList.add('open');
   renderSignupAvatarGrid();
   updateAuthModalUI();
@@ -3415,8 +3759,7 @@ const GOOGLE_OAUTH_NATIVE_CALLBACK = 'com.fthr.subliminally://login-callback';
 
 async function signInWithGoogle(){ return startOAuthSignIn('google'); }
 
-/* Browser-based OAuth round trip, shared by Google everywhere and by Apple on
-   web/Android. (Apple on iOS uses the native sheet instead — see below.) */
+/* Browser-based OAuth round trip used by Google on web and in the native apps. */
 async function startOAuthSignIn(provider){
   if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
   const msg = document.getElementById('authMsg');
@@ -3429,7 +3772,7 @@ async function startOAuthSignIn(provider){
     },
   });
   if (error){
-    msg.textContent = error.message || `Could not start ${provider === 'apple' ? 'Apple' : 'Google'} sign-in — try again.`;
+    msg.textContent = error.message || 'Could not start Google sign-in — try again.';
     msg.className = 'auth-msg err';
     return;
   }
@@ -3439,51 +3782,19 @@ async function startOAuthSignIn(provider){
   // On web, signInWithOAuth already redirected the page — nothing left to do here.
 }
 
-/* Sign in with Apple. Apple requires it in any iOS app that offers another
-   third-party login (Google). On iPhone it uses Apple's native sheet via the
-   apple-sign-in plugin and hands Supabase the identity token; everywhere else
-   it's the same browser OAuth flow as Google. Needs the Apple provider enabled
-   in Supabase with the bundle id (com.fthr.subliminally) listed as a client id. */
-async function signInWithApple(){
-  const native = isNativeApp();
-  const plugin = native && window.Capacitor.getPlatform() === 'ios' && window.Capacitor.Plugins.SignInWithApple;
-  if (!plugin) return startOAuthSignIn('apple');
-
-  const msg = document.getElementById('authMsg');
-  if (!sb){ msg.textContent = 'Accounts aren\'t connected yet — check back soon.'; msg.className='auth-msg err'; return; }
-  try {
-    // Apple gets the SHA-256 of the nonce; Supabase gets the raw nonce and
-    // checks that the token's nonce claim matches its hash.
-    const rawNonce = randomToken(); const hashedNonce = await sha256Hex(rawNonce);
-    const { response } = await plugin.authorize({
-      clientId: 'com.fthr.subliminally',
-      redirectURI: SITE_ORIGIN + '/',
-      scopes: 'email name',
-      state: randomToken(),
-      nonce: hashedNonce,
-    });
-    if (!response || !response.identityToken){ msg.textContent = 'Apple sign-in was cancelled.'; msg.className = 'auth-msg'; return; }
-    msg.textContent = 'Signing you in…'; msg.className = 'auth-msg';
-    const { error } = await sb.auth.signInWithIdToken({ provider: 'apple', token: response.identityToken, nonce: rawNonce });
-    if (error){ msg.textContent = error.message || 'Apple sign-in failed — try again.'; msg.className = 'auth-msg err'; return; }
-    closeAuthModal();
-  } catch (e){
-    if (e && /cancel/i.test(e.message || '')) { msg.textContent = ''; return; }
-    console.error('Apple sign-in error:', e);
-    msg.textContent = 'Apple sign-in failed — try again.'; msg.className = 'auth-msg err';
-  }
-}
-function randomToken(){
-  const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
-async function sha256Hex(str){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
-}
-
 // Native only: Google/Supabase redirect back into the app via the custom URL
 // scheme above; Capacitor's App plugin surfaces that as an appUrlOpen event.
+/* On a phone the app is almost never reloaded — it's backgrounded overnight and
+   reopened in the morning, which is exactly when the day needs to turn over.
+   visibilitychange covers most of this, but Capacitor's own resume event is the
+   reliable signal on native. */
+function setupNativeDayRollover(){
+  if (!isNativeApp() || !window.Capacitor.Plugins.App) return;
+  window.Capacitor.Plugins.App.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) rollOverDayIfNeeded();
+  });
+}
+
 function setupNativeOAuthCallback(){
   if (!isNativeApp() || !sb || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
@@ -3795,6 +4106,9 @@ async function submitOnboarding(){
 }
 async function logOut(){
   if (!sb) return;
+  // Don't carry one account's cloned voice or generated lines into the next.
+  clonedVoiceCache = undefined;
+  ttsCache.clear(); studioClipHandles.clear();
   await sb.auth.signOut();
 }
 /* Apple requires in-app account deletion for any app with sign-up. The heavy
@@ -3891,6 +4205,9 @@ function showLibraryPage(){
   document.body.setAttribute('data-view', 'library');
   window.scrollTo(0,0);
   history.pushState({ page:'library' }, '', '#library');
+  // Your own subliminals are the reason you opened this — the ready-made ones
+  // are a browse, not a destination. Signed out there's nothing of yours to show.
+  setLibraryTab(currentUser ? 'mine' : 'premade');
 }
 function setLibraryTab(tab){
   document.querySelectorAll('.journal-tabs [data-libtab]').forEach(b => b.classList.toggle('active', b.dataset.libtab === tab));
@@ -3899,6 +4216,7 @@ function setLibraryTab(tab){
   if (tab === 'mine') renderMyLibraryState();
 }
 function renderMyLibraryState(){
+  document.body.setAttribute('data-signed-in', currentUser ? 'yes' : 'no');
   document.getElementById('myLibraryLocked').style.display = currentUser ? 'none' : 'block';
   document.getElementById('myLibraryPanel').style.display = currentUser ? 'block' : 'none';
   if (currentUser) loadMyLibrary();
@@ -3988,7 +4306,8 @@ function showTodayPage(){
 /* ---------- Today ----------
    The one screen a member should be able to open, act on, and close. Three
    cards at most: the session, the ritual that fits the hour, today's page. */
-let todayRitualTime = null;   // 'morning' | 'night' — null means follow the clock
+let todayRitualTime = null;       // 'morning' | 'night' — null means follow the clock
+let todayEssentialsOnly = false;  // the short-routine view, for the nights you have nothing left
 function currentRitualTime(){
   return todayRitualTime || (new Date().getHours() < 16 ? 'morning' : 'night');
 }
@@ -3998,6 +4317,50 @@ function greetingForHour(){
   if (h < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+/* ---------- rolling over at midnight ----------
+   This is a bedtime app: you check your night ritual off in bed and open it
+   again the next morning, without ever reloading. The date used to be worked
+   out once when the page loaded and never again, so last night's ticks stayed
+   on screen all morning and the day only appeared to "reset" when the page
+   happened to refresh. Watch the real date instead — on a slow timer, and every
+   time the app comes back to the foreground, which is how a phone actually
+   returns to it — and turn the page over in place when it changes.
+
+   Nothing is erased by this. Each check-in is stored against its own date, so
+   yesterday keeps its ticks in the calendar and its place in the streak; today
+   simply starts empty. */
+let currentDayStr = localDateStr();
+async function rollOverDayIfNeeded(){
+  const now = localDateStr();
+  if (now === currentDayStr) return;
+  currentDayStr = now;
+  todayRitualTime = null;      // a new day follows the clock again, not last night's choice
+  todayEssentialsOnly = false; // and opens on the full list again
+
+  const dateEl = document.getElementById('todayDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+  if (!sb || !currentUser) return;
+  // Refetch rather than trusting what's in memory — the day may also have been
+  // logged on another device before this one woke up.
+  await loadHabits({ silent: true });
+  await loadJournalPhotos({ silent: true });
+  if (document.body.getAttribute('data-view') === 'today'){
+    const greetEl = document.getElementById('todayGreeting');
+    if (greetEl) greetEl.textContent = greetingForHour() + (greetEl.textContent.includes(',') ? ',' + greetEl.textContent.split(',').slice(1).join(',') : '');
+    renderTodayRitual();
+    renderTodayPage_Page();
+  }
+  if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
+  renderPhotoCalendar();
+  renderDailyLogReward();
+}
+// Half a minute is often enough to turn over within moments of midnight, and
+// cheap enough to leave running all night.
+setInterval(rollOverDayIfNeeded, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) rollOverDayIfNeeded(); });
+window.addEventListener('focus', rollOverDayIfNeeded);
 async function renderTodayPage(){
   if (!sb || !currentUser) return;
   document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
@@ -4054,18 +4417,59 @@ function renderTodayRitual(){
   const today = localDateStr();
   const done = habitDoneByDate[today] || new Set();
   const doneCount = rows.filter(h => done.has(h.id)).length;
+  const core = rows.filter(h => h.is_core);
+  const extras = rows.filter(h => !h.is_core);
+  const st = routineStatusFor(time, today);
+  const left = shortRoutinesLeft(time, today);
+  const streak = routineStreak(time);
+  // On a short night the rest of the list is out of the way by default, so the
+  // screen doesn't open on nine things you already know you aren't doing.
+  const shortMode = todayEssentialsOnly && core.length > 0;
+
+  const habitBtn = h => {
+    const isDone = done.has(h.id);
+    return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
+      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+    </button>`;
+  };
+
+  // The headline is the whole point: finishing your non-negotiables has to read
+  // as having kept the ritual, not as having fallen short of the long list.
+  let headline;
+  if (!rows.length) headline = 'Nothing on this list yet.';
+  else if (st.state === 'full') headline = 'All done — nicely held.';
+  else if (st.state === 'essentials') headline = 'Your non-negotiables are done. That counts.';
+  else if (core.length) headline = `${st.coreDone} of ${core.length} non-negotiables`;
+  else headline = `${doneCount} of ${rows.length} so far`;
+
+  let note = '';
+  if (st.state === 'essentials'){
+    note = left > 0
+      ? `A short ${time}, and your streak holds. ${left} more left this week.`
+      : `That's both short ${time}s this week — your streak still holds today.`;
+  } else if (core.length && st.state !== 'full'){
+    note = left > 0
+      ? `Short on time? The ${core.length} marked ✦ are enough to keep the ritual. ${left} left this week.`
+      : `You've used both short ${time}s this week — tonight it's the full list that keeps the streak.`;
+  }
+
   card.style.display = 'block';
   card.innerHTML = `
-    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}</div>
-    <h3>${doneCount === rows.length && rows.length ? 'All done — nicely held.' : `${doneCount} of ${rows.length} so far`}</h3>
-    ${rows.length ? `<div class="today-ritual-list">${rows.map(h => {
-      const isDone = done.has(h.id);
-      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
-      </button>`;
-    }).join('')}</div>
-    <div class="today-progress"><i style="width:${rows.length ? Math.round(doneCount / rows.length * 100) : 0}%"></i></div>` : '<p>Nothing on this list yet.</p>'}
-    <button class="today-ritual-more" onclick="todayRitualTime='${other}'; renderTodayRitual();">Show my ${other} ritual →</button>`;
+    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}${streak > 1 ? ` · ${streak}-day streak` : ''}</div>
+    <h3>${headline}</h3>
+    ${rows.length ? `
+      ${core.length ? `<div class="today-ritual-group">Non-negotiable</div>` : ''}
+      <div class="today-ritual-list">${(core.length ? core : rows).map(habitBtn).join('')}</div>
+      ${core.length && extras.length ? (shortMode
+        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=false; renderTodayRitual();">Show the rest of my ${time} (${extras.filter(h=>done.has(h.id)).length} of ${extras.length} done) →</button>`
+        : `<div class="today-ritual-group">The rest</div>
+           <div class="today-ritual-list">${extras.map(habitBtn).join('')}</div>`) : ''}
+      ${note ? `<p class="today-ritual-note">${note}</p>` : ''}
+      <div class="today-progress"><i style="width:${Math.round(doneCount / rows.length * 100)}%"></i></div>
+      ${core.length && extras.length && !shortMode && st.state !== 'full'
+        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=true; renderTodayRitual();">Tired tonight? Just the non-negotiables →</button>` : ''}
+    ` : '<p>Nothing on this list yet. <button class="today-ritual-more" onclick="showRitualsPage(\'habits\')">Set it up →</button></p>'}
+    <button class="today-ritual-more" onclick="todayRitualTime='${other}'; todayEssentialsOnly=false; renderTodayRitual();">Show my ${other} ritual →</button>`;
 }
 function renderTodayPage_Page(){
   const card = document.getElementById('todayPageCard');
@@ -4119,6 +4523,7 @@ function renderProfileState(){
 async function loadProfile(){
   if (!sb || !currentUser) return;
   document.getElementById('settingsEmail').value = currentUser.email || '';
+  renderVoiceClone();
 
   const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if (prof){
@@ -4306,9 +4711,10 @@ async function loadSavedIntoBuilder(id){
     }
     state.voiceMode = 'own';
   } else {
-    // No recorded audio was saved for this one (or it was AI voice originally) —
-    // reloading plays it back with the AI voice instead.
+    // No recorded audio was saved for this one (or it was a studio voice
+    // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
+    state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
   }
 
   customTrackBlob = null;
@@ -4328,6 +4734,7 @@ async function loadSavedIntoBuilder(id){
   // Ritual-only second voice layer, if this saved subliminal has one.
   state.layerAffirmations = Array.isArray(s.layer_affirmations) ? s.layer_affirmations.slice() : [];
   state.layerVoiceMode = s.layer_voice_mode || null;
+  state.layerAiVoiceId = s.layer_ai_voice_id || DEVICE_VOICE;
   layerVoiceEnabled = !!(state.layerAffirmations.length && state.layerVoiceMode);
   layerVoiceMode = state.layerVoiceMode || 'ai';
   document.getElementById('layerVoiceToggle').checked = layerVoiceEnabled;
@@ -4360,6 +4767,155 @@ async function deleteMySubliminal(id){
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
   loadMyLibrary();
 }
+/* ---------- cloning your voice ----------
+   One sample, read once, and the studio can generate any line in that voice.
+   The recording is sent straight to /api/voice-clone and never stored here —
+   only the resulting voice id ends up on the profile. */
+const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not someday, and not once everything lines up — now, in the ordinary middle of things. I speak to myself the way I would speak to someone I love. I keep what I promised myself I would keep, on the days it is easy and on the days it is not.";
+let voiceCloneRecorder = null, voiceCloneChunks = [], voiceCloneStream = null,
+    voiceCloneTimer = null, voiceCloneStart = 0;
+
+async function renderVoiceClone(){
+  const body = document.getElementById('voiceCloneBody');
+  if (!body) return;
+  const cloned = await myClonedVoiceId();
+  if (voiceCloneRecorder){
+    const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
+    body.innerHTML = `
+      <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+      <div class="voice-clone-actions">
+        <span class="voice-rec-dot"></span>
+        <span class="voice-rec-label">Reading… take your time.</span>
+        <span class="voice-rec-time" id="voiceCloneTime">${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}</span>
+        <button class="mini-btn candlebtn" onclick="finishVoiceClone()">Done reading</button>
+        <button class="mini-btn ghostbtn" onclick="cancelVoiceClone()">Cancel</button>
+      </div>`;
+    return;
+  }
+  if (cloned){
+    body.innerHTML = `
+      <div class="voice-clone-have">
+        <span>✦ Your voice is ready — pick <b>My voice</b> when you choose a voice.</span>
+        <button class="mini-btn ghostbtn" onclick="startVoiceClone()">Record it again</button>
+        <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
+      </div>`;
+    return;
+  }
+  body.innerHTML = `
+    <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+    <div class="voice-clone-actions">
+      <button class="mini-btn candlebtn" onclick="startVoiceClone()">Read this to clone my voice</button>
+      <span class="voice-chip-desc">Somewhere quiet, normal speaking voice, about 30 seconds.</span>
+    </div>`;
+}
+
+async function startVoiceClone(){
+  const msg = document.getElementById('voiceCloneMsg');
+  msg.textContent = ''; msg.className = 'save-msg';
+  if (!sb || !currentUser) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder){
+    msg.textContent = "This browser can't record audio."; msg.className = 'save-msg err'; return;
+  }
+  try { voiceCloneStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(e){ msg.textContent = 'Microphone access is needed to record the sample.'; msg.className = 'save-msg err'; return; }
+  const mime = pickRecordingMime();
+  voiceCloneChunks = [];
+  voiceCloneRecorder = mime ? new MediaRecorder(voiceCloneStream, { mimeType: mime }) : new MediaRecorder(voiceCloneStream);
+  voiceCloneRecorder.ondataavailable = ev => voiceCloneChunks.push(ev.data);
+  voiceCloneRecorder.start();
+  voiceCloneStart = Date.now();
+  renderVoiceClone();
+  voiceCloneTimer = setInterval(() => {
+    const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
+    const el = document.getElementById('voiceCloneTime');
+    if (el) el.textContent = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+    if (secs >= 120) finishVoiceClone();  // well past what cloning needs
+  }, 250);
+}
+function stopVoiceCloneStream(){
+  clearInterval(voiceCloneTimer); voiceCloneTimer = null;
+  if (voiceCloneStream){ voiceCloneStream.getTracks().forEach(t => t.stop()); voiceCloneStream = null; }
+}
+function cancelVoiceClone(){
+  if (!voiceCloneRecorder) return;
+  voiceCloneRecorder.onstop = null;
+  try { voiceCloneRecorder.stop(); } catch(e){}
+  voiceCloneRecorder = null; voiceCloneChunks = [];
+  stopVoiceCloneStream();
+  renderVoiceClone();
+}
+function finishVoiceClone(){
+  if (!voiceCloneRecorder) return;
+  const seconds = Math.round((Date.now() - voiceCloneStart) / 1000);
+  const rec = voiceCloneRecorder;
+  voiceCloneRecorder = null;
+  rec.onstop = () => {
+    const blob = new Blob(voiceCloneChunks, { type: rec.mimeType || 'audio/webm' });
+    voiceCloneChunks = [];
+    stopVoiceCloneStream();
+    const msg = document.getElementById('voiceCloneMsg');
+    if (seconds < 8){
+      msg.textContent = 'That was very short — read the whole passage so the voice has enough to work from.';
+      msg.className = 'save-msg err';
+      renderVoiceClone();
+      return;
+    }
+    uploadVoiceClone(blob);
+  };
+  try { rec.stop(); } catch(e){ stopVoiceCloneStream(); renderVoiceClone(); }
+}
+async function uploadVoiceClone(blob){
+  const msg = document.getElementById('voiceCloneMsg');
+  const body = document.getElementById('voiceCloneBody');
+  body.innerHTML = '<div class="voice-clone-actions"><span class="voice-rec-label">Learning your voice — this takes a moment…</span></div>';
+  msg.textContent = ''; msg.className = 'save-msg';
+  try {
+    const token = (await sb.auth.getSession()).data.session?.access_token;
+    const res = await fetch(`${API_BASE}/api/voice-clone`, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'audio/webm', Authorization: `Bearer ${token}` },
+      body: blob,
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok){
+      msg.textContent = out.error === 'upgrade_required'
+        ? 'Cloning your voice comes with Ritual — $11.11 a month, or $111 a year.'
+        : out.error === 'not_configured'
+          ? "Voice cloning isn't switched on yet."
+          : (out.error || "Couldn't clone your voice — try again in a moment.");
+      msg.className = 'save-msg err';
+      renderVoiceClone();
+      return;
+    }
+    clonedVoiceCache = out.voiceId;   // the picker reads this straight away
+    msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok';
+    renderVoiceClone();
+  } catch (e){
+    console.error('voice clone failed:', e);
+    msg.textContent = "Couldn't reach the voice service — try again in a moment.";
+    msg.className = 'save-msg err';
+    renderVoiceClone();
+  }
+}
+async function removeClonedVoice(){
+  const msg = document.getElementById('voiceCloneMsg');
+  msg.textContent = 'Removing…'; msg.className = 'save-msg';
+  try {
+    const token = (await sb.auth.getSession()).data.session?.access_token;
+    const res = await fetch(`${API_BASE}/api/voice-clone`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error('remove failed');
+    clonedVoiceCache = null;
+    // Any subliminal set to "My voice" now falls back to the device voice.
+    if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
+    msg.textContent = 'Removed.'; msg.className = 'save-msg ok';
+    renderVoiceClone();
+  } catch (e){
+    msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err';
+  }
+}
+
 async function updateEmail(){
   const msg = document.getElementById('emailSettingsMsg');
   const newEmail = document.getElementById('settingsEmail').value.trim();
@@ -4423,7 +4979,7 @@ async function submitFeedback(){
    Journal tabs need Whisper; habits need Ritual. */
 const JOURNAL_TAB_COPY = {
   received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
-  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it as if it already has." },
+  manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it, or say it out loud, as if it already has." },
 };
 function setJournalTab(cat){
   journalTab = cat;
@@ -4542,6 +5098,16 @@ async function loadJournalEntries(){
   }
 
   if (!data.length){ list.innerHTML = '<div class="journal-empty">Nothing here yet — add your first entry above.</div>'; return; }
+
+  // Spoken entries live in a private bucket, so sign them all in one round trip
+  // rather than one request per card.
+  const audioUrlByPath = {};
+  const audioPaths = data.filter(e => e.audio_path).map(e => e.audio_path);
+  if (audioPaths.length){
+    const { data: signed } = await sb.storage.from('voice-notes').createSignedUrls(audioPaths, 3600);
+    (signed || []).forEach(x => { if (x.signedUrl) audioUrlByPath[x.path] = x.signedUrl; });
+  }
+
   list.innerHTML = data.map(e => {
     // Only entries that originally started in "On its way" can ever move — once
     // something's written straight into "Already mine," it stays put for good.
@@ -4552,7 +5118,16 @@ async function loadJournalEntries(){
     return `
     <div class="journal-entry">
       ${showBadge ? `<div class="journal-entry-badge" title="Made it from On its way to Already mine">✦ 2D → 3D</div>` : ''}
-      <p>"${e.content.replace(/</g,'&lt;')}"</p>
+      ${e.audio_path ? `
+        <div class="journal-entry-spoken">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 19v3"/></svg>
+          Spoken${e.audio_seconds ? ` · ${Math.floor(e.audio_seconds/60)}:${String(e.audio_seconds%60).padStart(2,'0')}` : ''}
+        </div>
+        ${audioUrlByPath[e.audio_path]
+          ? `<audio controls preload="none" src="${audioUrlByPath[e.audio_path]}"></audio>`
+          : `<p style="color:var(--haze); font-size:13px;">This recording couldn't be loaded right now.</p>`}
+      ` : ''}
+      ${e.content ? `<p>"${e.content.replace(/</g,'&lt;')}"</p>` : ''}
       <div class="date">${new Date(e.created_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}${showBadge ? ' · in my 3D now' : ''}</div>
       <div class="journal-entry-actions">
         ${canMove ? `<button class="journal-entry-move" onclick="toggleMoveConfirm('${e.id}')" aria-label="Move" title="Move">
@@ -4595,13 +5170,116 @@ async function moveJournalEntry(id, targetCategory){
 }
 async function deleteJournalEntry(id){
   if (!sb || !currentUser) return;
+  // Look up the audio first — once the row is gone there's nothing pointing at
+  // the file, and it would sit in storage forever.
+  const { data: entry } = await sb.from('journal_entries')
+    .select('audio_path').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
   const { error } = await sb.from('journal_entries')
     .delete()
     .eq('id', id)
     .eq('user_id', currentUser.id);
   if (error){ console.error('deleteJournalEntry error:', error); return; }
+  if (entry && entry.audio_path) await sb.storage.from('voice-notes').remove([entry.audio_path]);
   loadJournalEntries();
 }
+/* ---------- spoken gratitude & manifesting entries ----------
+   Some things are easier said than written, and saying an affirmation out loud
+   is the practice anyway. A spoken entry is stored as audio in the voice-notes
+   bucket with no text; everything else about it behaves like a written one. */
+let voiceEntryRecorder = null, voiceEntryChunks = [], voiceEntryStream = null,
+    voiceEntryTimer = null, voiceEntryStart = 0;
+const VOICE_ENTRY_MAX_SECONDS = 180;
+
+function voiceEntryUI(recording){
+  document.getElementById('journalVoiceRec').style.display = recording ? 'flex' : 'none';
+  document.querySelector('.journal-add').style.display = recording ? 'none' : 'flex';
+}
+async function startVoiceEntry(){
+  const msg = document.getElementById('journalAddMsg');
+  if (!sb || !currentUser) return;
+  if (voiceEntryRecorder) return;
+  if (!navigator.mediaDevices || !window.MediaRecorder){
+    msg.textContent = "This browser can't record audio — you can still type your entry.";
+    msg.className = 'save-msg err'; return;
+  }
+  try { voiceEntryStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(e){
+    msg.textContent = 'Microphone access is needed to speak your entry — check your browser permissions.';
+    msg.className = 'save-msg err'; return;
+  }
+  msg.textContent = ''; msg.className = 'save-msg';
+  const mime = pickRecordingMime();
+  voiceEntryChunks = [];
+  voiceEntryRecorder = mime ? new MediaRecorder(voiceEntryStream, { mimeType: mime }) : new MediaRecorder(voiceEntryStream);
+  voiceEntryRecorder.ondataavailable = ev => voiceEntryChunks.push(ev.data);
+  voiceEntryRecorder.start();
+  voiceEntryStart = Date.now();
+  voiceEntryUI(true);
+  voiceEntryTimer = setInterval(() => {
+    const secs = Math.floor((Date.now() - voiceEntryStart) / 1000);
+    document.getElementById('journalVoiceTime').textContent = `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+    // Long enough for anything worth saying, short enough to stay a quick habit.
+    if (secs >= VOICE_ENTRY_MAX_SECONDS) finishVoiceEntry();
+  }, 250);
+}
+function stopVoiceEntryStream(){
+  clearInterval(voiceEntryTimer); voiceEntryTimer = null;
+  if (voiceEntryStream){ voiceEntryStream.getTracks().forEach(t => t.stop()); voiceEntryStream = null; }
+  document.getElementById('journalVoiceTime').textContent = '0:00';
+  voiceEntryUI(false);
+}
+function cancelVoiceEntry(){
+  if (!voiceEntryRecorder) return;
+  voiceEntryRecorder.onstop = null;
+  try { voiceEntryRecorder.stop(); } catch(e){}
+  voiceEntryRecorder = null; voiceEntryChunks = [];
+  stopVoiceEntryStream();
+  document.getElementById('journalAddMsg').textContent = '';
+}
+function finishVoiceEntry(){
+  if (!voiceEntryRecorder) return;
+  const seconds = Math.max(1, Math.round((Date.now() - voiceEntryStart) / 1000));
+  const rec = voiceEntryRecorder;
+  voiceEntryRecorder = null;
+  rec.onstop = () => {
+    const blob = new Blob(voiceEntryChunks, { type: rec.mimeType || 'audio/webm' });
+    voiceEntryChunks = [];
+    stopVoiceEntryStream();
+    if (seconds < 1 || !blob.size){
+      document.getElementById('journalAddMsg').textContent = 'That was too short to save — try again.';
+      document.getElementById('journalAddMsg').className = 'save-msg err';
+      return;
+    }
+    saveVoiceEntry(blob, seconds);
+  };
+  try { rec.stop(); } catch(e){ stopVoiceEntryStream(); }
+}
+async function saveVoiceEntry(blob, seconds){
+  const msg = document.getElementById('journalAddMsg');
+  msg.textContent = 'Saving your recording…'; msg.className = 'save-msg';
+  const mime = blob.type || 'audio/webm';
+  const path = `${currentUser.id}/${Date.now()}.${extForMime(mime)}`;
+  const { error: upErr } = await sb.storage.from('voice-notes').upload(path, blob, { contentType: mime });
+  if (upErr){
+    console.error('voice entry upload failed:', upErr);
+    msg.textContent = "Couldn't upload that recording — try again in a moment.";
+    msg.className = 'save-msg err'; return;
+  }
+  const { error } = await sb.from('journal_entries').insert({
+    user_id: currentUser.id, category: journalTab, original_category: journalTab,
+    content: null, audio_path: path, audio_seconds: seconds,
+  });
+  if (error){
+    console.error('voice entry insert error:', error);
+    // Don't leave the orphaned file sitting in storage if the row didn't land.
+    await sb.storage.from('voice-notes').remove([path]);
+    msg.textContent = "Couldn't save that entry — try again in a moment.";
+    msg.className = 'save-msg err'; return;
+  }
+  msg.textContent = '';
+  loadJournalEntries();
+}
+
 async function addJournalEntry(){
   const msg = document.getElementById('journalAddMsg');
   if (!sb || !currentUser) return;
@@ -4751,10 +5429,14 @@ function dayHabitsHtml(dateStr){
   const block = (time, label) => {
     const rows = habitsCache.filter(h => h.time_of_day === time);
     if (!rows.length) return '';
-    return `<div class="day-habit-time">${label}</div><div class="day-habit-list">` + rows.map(h => {
+    const st = routineStatusFor(time, dateStr);
+    const verdict = st.state === 'full' ? ' · full routine'
+      : st.state === 'essentials' ? ' · non-negotiables kept'
+      : st.state === 'partial' ? ' · partly done' : '';
+    return `<div class="day-habit-time">${label}${verdict}</div><div class="day-habit-list">` + rows.map(h => {
       const isDone = done.has(h.id);
-      return `<button type="button" class="day-habit${isDone ? ' done' : ''}" onclick="toggleHabitOnDate('${h.id}','${dateStr}')" aria-pressed="${isDone}">
-        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}
+      return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${dateStr}')" aria-pressed="${isDone}">
+        <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
       </button>`;
     }).join('') + `</div>`;
   };
@@ -4817,10 +5499,31 @@ const HABIT_SLOTS = 15;
 const HABIT_BLANKS_VISIBLE = 3;   // empty slots shown before "+ more slots"
 let habitSlotsExpanded = { morning: false, night: false };
 let habitIdeasOpen = { morning: false, night: false };
+function renderHabitUndoBar(){
+  const bar = document.getElementById('habitUndoBar');
+  if (!bar) return;
+  const u = document.getElementById('habitUndoBtn');
+  const r = document.getElementById('habitRedoBtn');
+  u.disabled = !habitUndoStack.length;
+  r.disabled = !habitRedoStack.length;
+  bar.style.display = (habitUndoStack.length || habitRedoStack.length) ? 'flex' : 'none';
+}
 function expandHabitSlots(time){ habitSlotsExpanded[time] = true; renderHabits(); }
 function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; renderHabits(); }
 const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read scripture','Pray','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
+
+/* Habits show in the order you do them, not the order you typed them. Sorting
+   client-side keeps working if sort_order hasn't been added yet, where every
+   row reads as 0 and the list falls back to oldest-first. */
+function sortHabitsCache(){
+  habitsCache.sort((a, b) => {
+    if (a.time_of_day !== b.time_of_day) return a.time_of_day === 'morning' ? -1 : 1;
+    const d = (a.sort_order || 0) - (b.sort_order || 0);
+    if (d) return d;
+    return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
+  });
+}
 
 let habitsCache = [];        // rows from `habits`
 let habitCheckins = {};      // habit_id -> Set of YYYY-MM-DD
@@ -4836,6 +5539,7 @@ async function loadHabits(options){
   const msg = document.getElementById('habitsMsg');
   if (hErr || cErr){ if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
   habitsCache = habits || [];
+  sortHabitsCache();
   habitCheckins = {};
   habitDoneByDate = {};
   (checkins || []).forEach(c => {
@@ -4844,6 +5548,112 @@ async function loadHabits(options){
   });
   if (!silent) renderHabits();
 }
+/* ---------- non-negotiables, and the short routine ----------
+   Most people don't fall out of a ritual because it was too hard. They fall out
+   because they built a nine-item evening, missed three items once, decided they
+   had blown it, and stopped. So each routine gets a handful of non-negotiables:
+   the ones you do even on the night you have nothing left. Doing just those
+   still counts as keeping the ritual — twice a week, which is enough to cover a
+   bad week without quietly becoming the whole routine.
+
+   None of this needs storing. Whether a day was a full routine, a short one, or
+   a miss is worked out from the check-ins already on record, so there is no
+   second source of truth to fall out of step. */
+const CORE_HABIT_MAX = 5;
+const SHORT_ROUTINE_ALLOWANCE = 2;   // short routines per week, per routine
+
+/* Weeks run Monday to Sunday, so a rough Sunday night doesn't spend an
+   allowance that a fresh week is about to hand back anyway. */
+function weekStartStr(dateStr){
+  const [y,m,d] = dateStr.split('-').map(Number);
+  const dow = (new Date(y, m-1, d).getDay() + 6) % 7;   // Monday = 0
+  return shiftDateStr(dateStr, -dow);
+}
+
+/* How one routine went on one day:
+     full       - everything on the list
+     essentials - every non-negotiable, but not the whole list
+     partial    - something, but not all the non-negotiables
+     missed     - nothing                                        */
+function routineStatusFor(time, dateStr){
+  const rows = habitsCache.filter(h => h.time_of_day === time);
+  const done = habitDoneByDate[dateStr] || new Set();
+  const core = rows.filter(h => h.is_core);
+  const coreDone = core.filter(h => done.has(h.id)).length;
+  const allDone = rows.filter(h => done.has(h.id)).length;
+  let state = 'missed';
+  if (!rows.length) state = 'none';
+  else if (allDone === rows.length) state = 'full';
+  else if (core.length && coreDone === core.length) state = 'essentials';
+  else if (allDone > 0) state = 'partial';
+  return { state, done: allDone, total: rows.length, coreDone, coreTotal: core.length };
+}
+
+/* Short routines already spent in the week containing dateStr, counting up to
+   and including that day. */
+function shortRoutinesUsedBy(time, dateStr){
+  const start = weekStartStr(dateStr);
+  let used = 0;
+  for (let i = 0; i < 7; i++){
+    const d = shiftDateStr(start, i);
+    if (d > dateStr) break;
+    if (routineStatusFor(time, d).state === 'essentials') used++;
+  }
+  return used;
+}
+function shortRoutinesLeft(time, dateStr){
+  return Math.max(0, SHORT_ROUTINE_ALLOWANCE - shortRoutinesUsedBy(time, dateStr || localDateStr()));
+}
+
+/* Did this day keep the ritual? A full routine always does. A short one does
+   too, as long as there was still an allowance left that week. */
+function routineKept(time, dateStr){
+  const { state } = routineStatusFor(time, dateStr);
+  if (state === 'full') return true;
+  if (state !== 'essentials') return false;
+  return shortRoutinesUsedBy(time, dateStr) <= SHORT_ROUTINE_ALLOWANCE;
+}
+
+/* Consecutive days the ritual was kept — short nights included. This is the
+   number that should be hard to break, because it's the one people are
+   protecting when they push through a night they should have shortened. */
+function routineStreak(time){
+  let cursor = localDateStr();
+  // Today not being done yet shouldn't read as the streak already being over.
+  if (!routineKept(time, cursor)) cursor = shiftDateStr(cursor, -1);
+  let n = 0;
+  while (routineKept(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  return n;
+}
+
+/* Mark a habit as one of the non-negotiables, or take the mark off again. */
+async function toggleCoreHabit(habitId){
+  if (!sb || !currentUser) return;
+  const habit = habitsCache.find(h => h.id === habitId);
+  if (!habit) return;
+  const msg = document.getElementById('habitsMsg');
+  const turningOn = !habit.is_core;
+  if (turningOn){
+    const already = habitsCache.filter(h => h.time_of_day === habit.time_of_day && h.is_core).length;
+    if (already >= CORE_HABIT_MAX){
+      msg.textContent = `${CORE_HABIT_MAX} non-negotiables is the most for one routine — that's the point of them. Take one off first.`;
+      msg.className = 'save-msg';
+      return;
+    }
+  }
+  msg.textContent = '';
+  pushHabitUndo();
+  habit.is_core = turningOn;
+  renderHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+  const { error } = await sb.from('habits').update({ is_core: turningOn }).eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){
+    console.error('toggleCoreHabit error:', error);
+    msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err';
+    loadHabits();
+  }
+}
+
 /* Share of that day's habits that got checked off, 0–1. Measured against the
    habits you keep now, so the calendar reads as "how much of my ritual did I
    keep" rather than a moving target. */
@@ -4863,26 +5673,42 @@ function renderHabits(){
     const suggestWrap = document.getElementById(time === 'morning' ? 'habitSuggestMorning' : 'habitSuggestNight');
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
-    count.textContent = rows.length ? `${done} of ${rows.length} today · ${rows.length}/${HABIT_SLOTS} added` : `0/${HABIT_SLOTS} added`;
+    const coreCount = rows.filter(h => h.is_core).length;
+    const shortLeft = shortRoutinesLeft(time, today);
+    count.textContent = rows.length
+      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable · ${shortLeft} short ${time}${shortLeft === 1 ? '' : 's'} left this week`
+      : `0/${HABIT_SLOTS} added`;
 
-    const realRowsHtml = rows.map(h => {
+    const realRowsHtml = rows.map((h, i) => {
       const days = habitCheckins[h.id] || new Set();
       const isDone = days.has(today);
       const streak = streakFromDays(days);
       const dots = week.map(d => `<span class="habit-dot${days.has(d) ? ' on' : ''}${d === today ? ' today' : ''}" title="${d}"></span>`).join('');
+      const safeName = h.name.replace(/"/g,'&quot;');
       return `
-      <div class="habit-row${isDone ? ' done-today' : ''}">
-        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${h.name.replace(/"/g,'&quot;')}" aria-pressed="${isDone}">
+      <div class="habit-row${isDone ? ' done-today' : ''}" data-habit-id="${h.id}" data-time="${time}">
+        <button class="habit-grip" aria-label="Drag ${safeName} to reorder" title="Drag to reorder">
+          <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><circle cx="3" cy="2" r="1.4" fill="currentColor"/><circle cx="9" cy="2" r="1.4" fill="currentColor"/><circle cx="3" cy="7" r="1.4" fill="currentColor"/><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="3" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/></svg>
+        </button>
+        <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
-        <input type="text" class="habit-name" value="${h.name.replace(/"/g,'&quot;')}" maxlength="80" aria-label="Habit name"
+        <input type="text" class="habit-name" value="${safeName}" maxlength="80" aria-label="Habit name"
           onkeydown="if(event.key==='Enter') this.blur();"
           onblur="renameHabit('${h.id}', this.value)">
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
-        <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove habit" title="Remove">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="habit-actions">
+          <button class="habit-move" onclick="moveHabit('${h.id}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move ${safeName} up" title="Move up">↑</button>
+          <button class="habit-move" onclick="moveHabit('${h.id}',1)" ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Move ${safeName} down" title="Move down">↓</button>
+          <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
+            aria-pressed="${h.is_core ? 'true' : 'false'}"
+            title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
+            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>
+          <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove ${safeName}" title="Remove">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       </div>`;
     }).join('');
 
@@ -4907,7 +5733,11 @@ function renderHabits(){
       ? `<button type="button" class="habit-more-slots" onclick="expandHabitSlots('${time}')">+ ${hiddenSlots} more slot${hiddenSlots === 1 ? '' : 's'}</button>`
       : '';
 
-    list.innerHTML = realRowsHtml + blankRowsHtml + moreSlotsHtml;
+    // Said once, where the decision is actually made.
+    const coreHint = rows.length && !rows.some(h => h.is_core)
+      ? `<p class="habit-core-hint">Tap ✦ on the few you'd still do on your worst day. Doing just those counts as keeping the ritual — twice a week.</p>`
+      : '';
+    list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
       suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
@@ -4918,15 +5748,25 @@ function renderHabits(){
           : '';
     }
   });
+  renderHabitUndoBar();
   const stat = document.getElementById('habitsStat');
   if (!habitsCache.length){ stat.style.display = 'none'; return; }
   const allDays = new Set();
   habitsCache.forEach(h => (habitCheckins[h.id] || new Set()).forEach(d => allDays.add(d)));
   const practiceStreak = streakFromDays(allDays);
+  // If non-negotiables are set, the streak worth showing is the one they protect
+  // — kept on the short nights as well as the full ones.
+  const kept = ['morning','night']
+    .filter(t => habitsCache.some(h => h.time_of_day === t && h.is_core))
+    .map(t => ({ t, n: routineStreak(t) }))
+    .filter(x => x.n > 1)
+    .map(x => `${x.n}-day ${x.t} streak`);
+  const streakText = kept.length ? ` · ${kept.join(' · ')}`
+    : practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : '';
   stat.style.display = 'block';
   stat.textContent = doneToday === habitsCache.length
-    ? `✦ Every ritual done today${practiceStreak > 1 ? ` · ${practiceStreak} days in a row showing up` : ''}`
-    : `${doneToday} of ${habitsCache.length} done today${practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : ''}`;
+    ? `✦ Every ritual done today${streakText}`
+    : `${doneToday} of ${habitsCache.length} done today${streakText}`;
 }
 async function addHabit(time, name){
   if (!sb || !currentUser) return;
@@ -4934,7 +5774,9 @@ async function addHabit(time, name){
   if (!name) return;
   if (habitsCache.filter(h => h.time_of_day === time).length >= HABIT_SLOTS) return;
   const msg = document.getElementById('habitsMsg');
-  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time });
+  pushHabitUndo();
+  const sortOrder = habitsCache.filter(h => h.time_of_day === time).length;
+  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time, sort_order: sortOrder });
   if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
   msg.textContent = '';
   loadHabits();
@@ -4952,13 +5794,184 @@ async function toggleHabitOnDate(habitId, dateStr){
   else { days.add(dateStr); dayDone.add(habitId); }
   if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
   if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
+  // Habits are checked off straight from Today as well as from the Rituals page,
+  // so that card has to repaint too — otherwise the tick never appears and the
+  // tap reads as broken even though it saved.
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
   renderPhotoCalendar();
   renderDailyLogReward();
   const { error } = wasDone
     ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', dateStr)
     : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: dateStr });
-  if (error){ console.error('toggleHabitOnDate error:', error); loadHabits(); }
+  if (error){
+    // The tick was flipped locally a moment ago; if the save didn't land, put it
+    // back and say so, rather than letting it silently disappear on the next load.
+    console.error('toggleHabitOnDate error:', error);
+    const msg = document.getElementById('habitsMsg');
+    if (msg){ msg.textContent = "Couldn't save that check-in — check your connection and tap it again."; msg.className = 'save-msg err'; }
+    loadHabits();
+  }
 }
+/* ---------- undo and redo ----------
+   Reordering, renaming, archiving and marking non-negotiables are all easy to
+   do by accident and tedious to put back by hand. Rather than tracking an
+   inverse for each kind of change, every change records what the list looked
+   like beforehand; undo simply puts one of those back. Check-offs aren't part
+   of this — a tick is one tap to undo on its own, and mixing the two would make
+   the button mean two different things.
+
+   Deleting archives the row rather than removing it, so undoing a delete brings
+   back the habit *and* every check-in ever made against it. */
+let habitUndoStack = [], habitRedoStack = [];
+const HABIT_UNDO_LIMIT = 40;
+
+function habitSnapshot(){
+  return habitsCache.map(h => ({
+    id: h.id, name: h.name, time_of_day: h.time_of_day,
+    is_core: !!h.is_core, sort_order: h.sort_order || 0,
+  }));
+}
+function pushHabitUndo(){
+  habitUndoStack.push(habitSnapshot());
+  if (habitUndoStack.length > HABIT_UNDO_LIMIT) habitUndoStack.shift();
+  habitRedoStack = [];   // a fresh change forks the history; the old redos are gone
+}
+
+/* Put the list back exactly as a snapshot had it. Only rows that actually
+   differ are written, so undoing a single rename is a single update. */
+async function applyHabitSnapshot(snap){
+  if (!sb || !currentUser) return;
+  const inSnap = new Set(snap.map(h => h.id));
+  const updates = [];
+  // Anything added after the snapshot goes away again.
+  habitsCache.forEach(h => { if (!inSnap.has(h.id)) updates.push({ id: h.id, fields: { archived: true } }); });
+  snap.forEach(sv => {
+    const cur = habitsCache.find(h => h.id === sv.id);
+    if (cur && cur.name === sv.name && !!cur.is_core === sv.is_core && (cur.sort_order || 0) === sv.sort_order) return;
+    updates.push({ id: sv.id, fields: { name: sv.name, is_core: sv.is_core, sort_order: sv.sort_order, archived: false } });
+  });
+  for (const u of updates){
+    const { error } = await sb.from('habits').update(u.fields).eq('id', u.id).eq('user_id', currentUser.id);
+    if (error) console.error('undo/redo failed for habit', u.id, error);
+  }
+  await loadHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+}
+
+async function undoHabits(){
+  if (!habitUndoStack.length) return;
+  const before = habitUndoStack.pop();
+  habitRedoStack.push(habitSnapshot());
+  await applyHabitSnapshot(before);
+}
+async function redoHabits(){
+  if (!habitRedoStack.length) return;
+  const after = habitRedoStack.pop();
+  habitUndoStack.push(habitSnapshot());
+  await applyHabitSnapshot(after);
+}
+
+/* ---------- dragging a habit into place ----------
+   Pointer events rather than HTML5 drag-and-drop, because drag-and-drop does
+   nothing at all on a touchscreen and this is a phone app first. The row
+   follows your finger, its neighbours slide out of the way as you pass their
+   midpoints, and the new order is saved once on release. The up and down
+   buttons do the same job for anyone using a keyboard or a screen reader. */
+let habitDrag = null;
+
+function startHabitDrag(e){
+  const grip = e.target.closest('.habit-grip');
+  if (!grip || e.button > 0) return;
+  const row = grip.closest('.habit-row');
+  const list = row && row.parentElement;
+  if (!row || !list) return;
+  e.preventDefault();
+
+  const rows = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')];
+  habitDrag = {
+    row, list, rows,
+    time: row.dataset.time,
+    startY: e.clientY,
+    height: row.getBoundingClientRect().height,
+  };
+  row.classList.add('dragging');
+  grip.setPointerCapture(e.pointerId);
+  document.body.classList.add('habit-dragging');
+}
+
+function moveHabitDrag(e){
+  if (!habitDrag) return;
+  e.preventDefault();
+  const { row, startY } = habitDrag;
+  const dy = e.clientY - startY;
+  row.style.transform = `translateY(${dy}px)`;
+
+  // Swap with whichever neighbour the pointer has moved past the middle of.
+  const mid = row.getBoundingClientRect().top + habitDrag.height / 2;
+  const siblings = [...habitDrag.list.querySelectorAll('.habit-row:not(.habit-row-blank)')].filter(r => r !== row);
+  for (const other of siblings){
+    const box = other.getBoundingClientRect();
+    const otherMid = box.top + box.height / 2;
+    const before = other.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (before && mid < otherMid){ habitDrag.list.insertBefore(row, other); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
+    if (!before && mid > otherMid){ habitDrag.list.insertBefore(row, other.nextSibling); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
+  }
+}
+
+async function endHabitDrag(){
+  if (!habitDrag) return;
+  const { row, list, time } = habitDrag;
+  habitDrag = null;
+  row.classList.remove('dragging');
+  row.style.transform = '';
+  document.body.classList.remove('habit-dragging');
+
+  const orderedIds = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')].map(r => r.dataset.habitId);
+  const current = habitsCache.filter(h => h.time_of_day === time);
+  const ordered = orderedIds.map(id => current.find(h => h.id === id)).filter(Boolean);
+  if (ordered.length !== current.length){ renderHabits(); return; }   // something's out of step; repaint from truth
+  if (ordered.every((h, i) => h === current[i])){ renderHabits(); return; }  // nothing actually moved
+  pushHabitUndo();
+  await persistHabitOrder(time, ordered);
+}
+
+document.addEventListener('pointerdown', startHabitDrag);
+document.addEventListener('pointermove', moveHabitDrag, { passive: false });
+document.addEventListener('pointerup', endHabitDrag);
+document.addEventListener('pointercancel', endHabitDrag);
+
+/* ---------- putting habits in order ---------- */
+async function persistHabitOrder(time, ordered){
+  ordered.forEach((h, i) => { h.sort_order = i; });
+  sortHabitsCache();
+  renderHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+  for (const h of ordered){
+    const { error } = await sb.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id).eq('user_id', currentUser.id);
+    if (error){
+      console.error('persistHabitOrder error:', error);
+      const msg = document.getElementById('habitsMsg');
+      if (msg){ msg.textContent = "Couldn't save the new order — check your connection."; msg.className = 'save-msg err'; }
+      loadHabits();
+      return;
+    }
+  }
+}
+
+/* Nudge one habit up or down its own routine. */
+async function moveHabit(habitId, dir){
+  if (!sb || !currentUser) return;
+  const habit = habitsCache.find(h => h.id === habitId);
+  if (!habit) return;
+  const siblings = habitsCache.filter(h => h.time_of_day === habit.time_of_day);
+  const from = siblings.indexOf(habit);
+  const to = from + dir;
+  if (to < 0 || to >= siblings.length) return;
+  pushHabitUndo();
+  siblings.splice(to, 0, siblings.splice(from, 1)[0]);
+  await persistHabitOrder(habit.time_of_day, siblings);
+}
+
 /* Rename in place — edit the habit's text and it saves on blur or Enter,
    keeping every check-in attached to it. */
 async function renameHabit(habitId, name){
@@ -4966,16 +5979,21 @@ async function renameHabit(habitId, name){
   name = (name || '').trim();
   const habit = habitsCache.find(h => h.id === habitId);
   if (!habit || !name || name === habit.name){ renderHabits(); return; }
+  pushHabitUndo();
   habit.name = name;
   renderHabits();
   const { error } = await sb.from('habits').update({ name }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){ console.error('renameHabit error:', error); loadHabits(); }
 }
+/* Archived, not deleted: the row and its check-ins stay put, so Undo can bring
+   the whole history back rather than an empty habit with the same name. */
 async function deleteHabit(habitId){
   if (!sb || !currentUser) return;
-  const { error } = await sb.from('habits').delete().eq('id', habitId).eq('user_id', currentUser.id);
+  pushHabitUndo();
+  const { error } = await sb.from('habits').update({ archived: true }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){ console.error('deleteHabit error:', error); return; }
-  loadHabits();
+  await loadHabits();
+  if (document.body.getAttribute('data-view') === 'today') renderTodayRitual();
 }
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
@@ -4990,6 +6008,7 @@ if (sb){
 
 if (sb){
   setupNativeOAuthCallback();
+  setupNativeDayRollover();
   setupPushNotifications();
   initRevenueCat();
   updateManageSubscriptionLinks();

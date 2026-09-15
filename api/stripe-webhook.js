@@ -20,13 +20,30 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Map each Stripe Price ID to your plan names.
-// Find these in Stripe -> Product catalog -> click each product -> copy the Price ID (starts with "price_").
-const PRICE_TO_TIER = {
-  'price_1U00xTBiVHYI4vcXIDdi9kuF': 'whisper',
-  'price_1U00y5BiVHYI4vcXrtlN930K': 'reverie',
-  'price_1U00yoBiVHYI4vcXirZnmnwI': 'ritual',
+// Which plan a payment buys, keyed by what it charges in cents. Going by the
+// amount rather than the Price ID means new Payment Links at the same prices
+// keep working without a code change, and there's no ID to copy across by hand
+// and get wrong.
+//
+// Legacy amounts are from before the plan restructure. Reverie was retired;
+// anyone still paying for it keeps everything they had, which now lives on Ritual.
+const AMOUNT_TO_TIER = {
+  555: 'whisper',    // Whisper monthly, $5.55
+  5500: 'whisper',   // Whisper yearly, $55
+  1111: 'ritual',    // Ritual monthly, $11.11
+  11100: 'ritual',   // Ritual yearly, $111
+  1000: 'whisper',   // legacy Whisper, $10/mo
+  2200: 'ritual',    // legacy Reverie, $22/mo
+  3500: 'ritual',    // legacy Ritual, $35/mo
 };
+
+function tierForSubscription(sub) {
+  const price = sub.items?.data?.[0]?.price;
+  if (!price) return null;
+  const tier = AMOUNT_TO_TIER[price.unit_amount] || null;
+  if (!tier) console.error('No tier mapped for amount', price.unit_amount, 'price', price.id);
+  return tier;
+}
 
 function getRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -154,8 +171,7 @@ export default async function handler(req, res) {
       const userId = session.client_reference_id;
       if (userId && session.subscription) {
         const sub = await fetchStripeSubscription(session.subscription);
-        const priceId = sub.items?.data?.[0]?.price?.id;
-        const tier = PRICE_TO_TIER[priceId] || null;
+        const tier = tierForSubscription(sub);
         await upsertByUserId(userId, {
           stripe_customer_id: session.customer,
           tier,
@@ -170,8 +186,7 @@ export default async function handler(req, res) {
 
     if (event.type === 'customer.subscription.updated') {
       const sub = event.data.object;
-      const priceId = sub.items?.data?.[0]?.price?.id;
-      const tier = PRICE_TO_TIER[priceId] || null;
+      const tier = tierForSubscription(sub);
       const patch = {
         tier,
         status: sub.status,

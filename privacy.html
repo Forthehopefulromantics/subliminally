@@ -35,20 +35,22 @@
   <a href="/" class="back">← Back to Subliminally</a>
   <div class="brand">Subliminally <span style="color:var(--haze); font-weight:300;">by FTHR</span></div>
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: August 4, 2026</div>
+  <div class="updated">Last updated: September 12, 2026</div>
 
   <div class="notice">We built Subliminally to hold some genuinely personal things — your voice, your journal, what you're working through. This policy tries to be honest and specific about what we actually do with that, not vague boilerplate.</div>
 
   <h2>1. What we collect</h2>
   <table>
     <tr><th>Data</th><th>Why we collect it</th></tr>
-    <tr><td>Email &amp; password</td><td>To create and secure your account (password is hashed by our auth provider, Supabase — we never see it in plain text)</td></tr>
+    <tr><td>Email &amp; password</td><td>To create and secure your account (password is hashed by our auth provider, Supabase — we never see it in plain text). If you sign in with Google or Apple instead, we receive your email and name from them and never a password.</td></tr>
     <tr><td>Username &amp; avatar (photo or icon)</td><td>To personalize your account and, in future, for social features you opt into</td></tr>
     <tr><td>Phone (optional)</td><td>Only if you choose to provide it during onboarding</td></tr>
     <tr><td>Voice recordings</td><td>If you record affirmations in your own voice and save a session, the audio is stored so you can replay it later</td></tr>
-    <tr><td>Text you write</td><td>Affirmation prompts, journal entries, and support/feedback messages you submit</td></tr>
+    <tr><td>Text you write</td><td>Affirmation prompts, journal entries, habit names, and support/feedback messages you submit</td></tr>
+    <tr><td>Photos of your journal pages</td><td>If you use the Daily log, the photos you take or choose of your handwritten entries, plus any caption and the date you give them</td></tr>
+    <tr><td>Habit check-ins</td><td>Which morning and night habits you marked done, and on which days, so we can show your streaks</td></tr>
     <tr><td>Uploaded audio tracks</td><td>If you use the custom track feature (Ritual tier), the file you upload</td></tr>
-    <tr><td>Payment info</td><td>Handled entirely by Stripe — we receive your subscription status and tier, never your full card number</td></tr>
+    <tr><td>Payment info</td><td>On the website, handled entirely by Stripe; in the iOS and Android apps, by Apple's App Store or Google Play through RevenueCat. We receive your subscription status and tier, never your card number</td></tr>
     <tr><td>Basic usage data</td><td>Things like when you signed up, how you found us (if you tell us), and general account activity</td></tr>
   </table>
 
@@ -66,18 +68,24 @@
   <p>We use a small number of service providers to run Subliminally, each with access limited to what they need to do their job:</p>
   <ul>
     <li><strong>Supabase</strong> — database, authentication, and file storage (including voice recordings and uploaded tracks, stored privately per-account)</li>
-    <li><strong>Stripe</strong> — payment processing and subscription billing</li>
+    <li><strong>Stripe</strong> — payment processing and subscription billing on the website</li>
+    <li><strong>Apple App Store and Google Play</strong> — payment processing for subscriptions bought inside the iOS or Android app, under their own privacy policies</li>
+    <li><strong>RevenueCat</strong> — keeps track of in-app subscription status across your devices; receives an anonymous account identifier and purchase records, never your name or email from us</li>
+    <li><strong>Your voice recordings</strong> — affirmations you record, spoken gratitude and manifesting entries, and a voice sample if you choose to clone your voice. Recordings are stored privately and only you can play them back.</li>
+    <li><strong>A speech provider (ElevenLabs)</strong> — if you use a studio voice or clone your own, the text of that affirmation, and the voice sample you record, are sent to ElevenLabs to generate the audio. Deleting your account deletes your cloned voice there too.</li>
+    <li><strong>Google sign-in</strong> — only if you choose to log in with it; Google tells us your email and name, and we don't get access to anything else in your account</li>
     <li><strong>Resend</strong> — sending account and confirmation emails</li>
     <li><strong>Anthropic</strong> — generating affirmation text from your prompts</li>
-    <li><strong>Vercel</strong> — hosting the website itself</li>
+    <li><strong>Vercel</strong> — hosting the website and the small server functions the app talks to</li>
   </ul>
   <p>We don't share your data with advertisers or data brokers. We may disclose information if legally required to (such as in response to a valid subpoena) or to protect the safety of our users.</p>
 
-  <h2>4. Your voice recordings and journal entries specifically</h2>
-  <p>Voice recordings and uploaded custom tracks are stored in private storage accessible only to your account — they are not public by default and we don't listen to or review them unless you explicitly report an issue that requires us to investigate. Journal entries are similarly private to your account. Neither is used for any purpose beyond providing the Service back to you.</p>
+  <h2>4. Your voice, your journal, and your camera</h2>
+  <p>Voice recordings, uploaded custom tracks, and photos of your journal pages are stored in private storage accessible only to your account — they are not public, and we don't listen to, view, or review them unless you explicitly report an issue that requires us to investigate. Written journal entries and habit check-ins are similarly private to your account. None of it is used for any purpose beyond providing the Service back to you.</p>
+  <p>The app asks for microphone access only when you choose to record affirmations in your own voice, and for camera or photo-library access only when you choose to add a photo of a journal page or an avatar. You can decline either and still use the rest of the app.</p>
 
-  <h2>5. How long we keep your data</h2>
-  <p>We keep your account data for as long as your account is active. If you delete your account, we'll delete your personal data, saved sessions, recordings, and journal entries within 30 days, except where we're required to retain certain records (like billing history) for legal or tax purposes.</p>
+  <h2>5. How long we keep your data, and deleting your account</h2>
+  <p>We keep your account data for as long as your account is active. You can delete your account yourself at any time from Profile → Your account → Delete my account, on the website or in the app. That immediately and permanently removes your account, saved sessions, recordings, journal entries, photos, habits, and profile. Records we're required to keep for legal or tax purposes (like billing history held by Stripe, Apple, or Google) are retained by those providers under their own policies. Deleting your account does not cancel an active subscription — cancel that first through Stripe, the App Store, or Google Play.</p>
 
   <h2>6. Your rights</h2>
   <p>Depending on where you live, you may have rights to access, correct, export, or delete your personal data, and to object to certain uses of it. To exercise any of these, email us at <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a> and we'll respond within a reasonable timeframe. If you're in the EU/UK, you have rights under GDPR; if you're in California, you have rights under the CCPA — we honor these regardless of where you're located.</p>
