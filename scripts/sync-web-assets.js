@@ -21,6 +21,11 @@ const FILES_TO_COPY = [
   'sitemap.xml',
 ];
 
+// Whole folders the site references. Without these the native apps bundle the
+// markup but none of the pictures, and every <img> is a blank space in the app
+// while looking fine on the website.
+const DIRS_TO_COPY = ['img'];
+
 fs.mkdirSync(WWW, { recursive: true });
 
 for (const file of FILES_TO_COPY) {
@@ -28,6 +33,15 @@ for (const file of FILES_TO_COPY) {
   if (!fs.existsSync(src)) continue;
   fs.copyFileSync(src, path.join(WWW, file));
   console.log(`copied ${file} -> www/${file}`);
+}
+
+for (const dir of DIRS_TO_COPY) {
+  const src = path.join(ROOT, dir);
+  if (!fs.existsSync(src)) continue;
+  fs.rmSync(path.join(WWW, dir), { recursive: true, force: true });
+  fs.cpSync(src, path.join(WWW, dir), { recursive: true });
+  const count = fs.readdirSync(src).length;
+  console.log(`copied ${dir}/ -> www/${dir}/ (${count} files)`);
 }
 
 console.log('web assets synced into www/');
