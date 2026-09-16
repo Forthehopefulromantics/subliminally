@@ -54,6 +54,7 @@ let light = { lifetime: 0, today: 0, loaded: false };
    of these — a subliminal played leaves no other trace — so the Journey reads
    its state from here rather than keeping a second copy that could disagree. */
 let lightToday = new Set();
+let lightByDate = {};          // 'YYYY-MM-DD' -> Set of sources earned that day
 
 async function loadLight(){
   if (!sb || !currentUser) return;
@@ -61,9 +62,17 @@ async function loadLight(){
   if (error){ console.warn('light:', error.message); return; }   // migration not run yet
   const row = Array.isArray(data) ? data[0] : data;
   light = { lifetime: Number(row && row.lifetime || 0), today: Number(row && row.today || 0), loaded: true };
+  // The last three months by day, not just today: the calendar has to be able
+  // to say a session was played on a Tuesday in August, and nothing else
+  // remembers that.
   const { data: rows } = await sb.from('light_ledger')
-    .select('source').eq('user_id', currentUser.id).eq('earned_on', localDateStr());
-  lightToday = new Set((rows || []).map(r => r.source));
+    .select('source, earned_on').eq('user_id', currentUser.id)
+    .gte('earned_on', shiftDateStr(localDateStr(), -92));
+  lightByDate = {};
+  for (const r of rows || []){
+    (lightByDate[r.earned_on] = lightByDate[r.earned_on] || new Set()).add(r.source);
+  }
+  lightToday = lightByDate[localDateStr()] || new Set();
 }
 
 /* Ask for Light and show it only if it was actually granted. `near` is the
@@ -77,7 +86,10 @@ async function awardLight(source, ref, near){
   if (error){ console.warn('light:', error.message); return 0; }
   const amount = Number(data || 0);
   if (!amount) return 0;                    // already paid for today
-  light.lifetime += amount; light.today += amount; lightToday.add(source);
+  light.lifetime += amount; light.today += amount;
+  lightToday.add(source);
+  const d = localDateStr();
+  (lightByDate[d] = lightByDate[d] || new Set()).add(source);
   showLightMark(amount, near);
   renderLightStrip();
   return amount;

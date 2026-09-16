@@ -58,6 +58,7 @@ async function rollOverDayIfNeeded(){
   }
   if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();
   renderPhotoCalendar();
+  renderWeekReport();
   renderDailyLogReward();
 }
 // Half a minute is often enough to turn over within moments of midnight, and

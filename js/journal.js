@@ -351,13 +351,122 @@ async function loadJournalPhotos(options){
   rows.forEach(p => { journalPhotosByDate[p.entry_date] = { ...p, url: urlByPath[p.storage_path] || '' }; });
   if (silent) return;
   renderPhotoCalendar();
+  renderWeekReport();
   renderDailyLogReward();
 }
 
 function shiftPhotoMonth(delta){
   photoCalendarViewDate = new Date(photoCalendarViewDate.getFullYear(), photoCalendarViewDate.getMonth() + delta, 1);
   renderPhotoCalendar();
+  renderWeekReport();
 }
+/* ---------- what a day was ----------
+   One record, read by the calendar square, the day you open, and the weekly
+   report. Three readings of the same day that disagreed with each other would
+   be worse than not showing it at all. */
+function dayRecord(dateStr){
+  const done = habitDoneByDate[dateStr] || new Set();
+  const sources = (typeof lightByDate !== 'undefined' && lightByDate[dateStr]) || new Set();
+  const ritual = t => {
+    const rows = habitsCache.filter(h => h.time_of_day === t);
+    if (!rows.length) return null;
+    const st = routineStatusFor(t, dateStr);
+    return { kept: st.state === 'full' || st.state === 'essentials', done: st.done, total: st.total };
+  };
+  const rec = {
+    date: dateStr,
+    morning: ritual('morning'),
+    night: ritual('night'),
+    journal: !!journalPhotosByDate[dateStr],
+    subliminal: sources.has(typeof LIGHT_SOURCES !== 'undefined' ? LIGHT_SOURCES.subliminal : 'subliminal'),
+    habitsDone: done.size,
+    habitsTotal: habitsCache.length,
+  };
+  // Aligned is the average of whatever that day actually had to offer. A ritual
+  // scores how much of it you kept; journal and a session are yes or no. Days
+  // with no rituals set up aren't marked down for not having them.
+  const parts = [];
+  if (rec.morning) parts.push(rec.morning.total ? rec.morning.done / rec.morning.total : 0);
+  if (rec.night) parts.push(rec.night.total ? rec.night.done / rec.night.total : 0);
+  parts.push(rec.journal ? 1 : 0);
+  parts.push(rec.subliminal ? 1 : 0);
+  rec.aligned = parts.length ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length * 100) : 0;
+  rec.marks = [
+    rec.morning && rec.morning.kept ? 'morning' : null,
+    rec.night && rec.night.kept ? 'night' : null,
+    rec.journal ? 'journal' : null,
+    rec.subliminal ? 'subliminal' : null,
+  ].filter(Boolean);
+  return rec;
+}
+
+/* A day, in a few words. Never a grade — "you showed up" is the whole point,
+   and a quiet day is still a day you came back. */
+function dayVerdict(rec){
+  if (rec.aligned >= 90) return 'A day you gave everything to.';
+  if (rec.aligned >= 70) return 'A day you showed up.';
+  if (rec.aligned >= 40) return 'A day you kept some of it.';
+  if (rec.aligned > 0) return 'A day you came back.';
+  return 'A quiet day.';
+}
+
+/* ---------- the week behind you ----------
+   Her brief asked for a report, not a verdict. It counts what happened, names
+   the practice that held best and the one that slipped, and says so without
+   grading anyone. Everything here is read off dayRecord, so it can't tell a
+   different story from the calendar above it. */
+function weekRecords(){
+  const out = [];
+  for (let i = 6; i >= 0; i--) out.push(dayRecord(shiftDateStr(localDateStr(), -i)));
+  return out;
+}
+
+function renderWeekReport(){
+  const card = document.getElementById('weekReport');
+  if (!card) return;
+  const days = weekRecords();
+  const practised = days.filter(d => d.habitsDone > 0 || d.journal || d.subliminal).length;
+  if (!practised){ card.style.display = 'none'; return; }
+
+  const aligned = Math.round(days.reduce((a, d) => a + d.aligned, 0) / days.length);
+  const count = k => days.filter(k).length;
+  const mornings = count(d => d.morning && d.morning.kept);
+  const nights   = count(d => d.night && d.night.kept);
+  const pages    = count(d => d.journal);
+  const sessions = count(d => d.subliminal);
+  // Best and worst of the four, so the note has something true to point at.
+  const practices = [
+    days.some(d => d.morning) ? { name:'your morning ritual', n:mornings } : null,
+    days.some(d => d.night)   ? { name:'your night ritual',   n:nights }   : null,
+    { name:'journalling', n:pages },
+    { name:'your sessions', n:sessions },
+  ].filter(Boolean).sort((a, b) => b.n - a.n);
+  const best = practices[0], slipped = practices[practices.length - 1];
+
+  const name = (typeof higherSelf !== 'undefined' && (higherSelf.name || '').trim()) || 'Your higher self';
+  const cap = t => t[0].toUpperCase() + t.slice(1);
+  let note;
+  if (aligned >= 85) note = `A week you held onto. ${name} noticed.`;
+  else if (best && slipped && best.n > slipped.n)
+    note = `<b>${cap(best.name)}</b> held best this week. <b>${cap(slipped.name)}</b> had less of you — that's information, not a failing.`;
+  else note = `Seven days, and you came back to ${practised} of them.`;
+
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="week-head">
+      <h3>Your week</h3>
+      <div class="week-aligned">${aligned}%<span style="font-size:12px; color:var(--haze); font-family:var(--sans); margin-left:5px;">aligned</span></div>
+    </div>
+    <div class="week-grid">
+      <div class="week-stat"><b>${practised}/7</b><span>days you practised</span></div>
+      ${days.some(d => d.morning) ? `<div class="week-stat"><b>${mornings}</b><span>morning ritual${mornings === 1 ? '' : 's'}</span></div>` : ''}
+      ${days.some(d => d.night) ? `<div class="week-stat"><b>${nights}</b><span>night ritual${nights === 1 ? '' : 's'}</span></div>` : ''}
+      <div class="week-stat"><b>${pages}</b><span>page${pages === 1 ? '' : 's'} logged</span></div>
+      <div class="week-stat"><b>${sessions}</b><span>session${sessions === 1 ? '' : 's'} played</span></div>
+    </div>
+    <p class="week-note">${note}</p>`;
+}
+
 function renderPhotoCalendar(){
   const year = photoCalendarViewDate.getFullYear(), month = photoCalendarViewDate.getMonth();
   document.getElementById('photoCalendarTitle').textContent = photoCalendarViewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -377,15 +486,21 @@ function renderPhotoCalendar(){
     if (isFuture) classes.push('is-future');
     if (dateStr === today) classes.push('is-today');
     const style = entry && entry.url ? ` style="background-image:url('${entry.url}')"` : '';
-    const pct = isFuture ? null : habitCompletionFor(dateStr);
-    const bar = pct !== null && pct > 0
-      ? `<span class="cal-day-bar"><i style="width:${Math.round(pct * 100)}%"></i></span>`
+    const rec = isFuture ? null : dayRecord(dateStr);
+    // Four small marks: the two rituals, a page, a session. Enough to read a
+    // month at a glance without turning the square into a chart.
+    const marks = rec && rec.marks.length
+      ? `<span class="cal-day-marks" aria-hidden="true">${rec.marks.map(m => `<i class="cm cm-${m}"></i>`).join('')}</span>`
       : '';
-    const title = isFuture ? '' : ` title="${dayNum}${pct !== null ? ` — ${Math.round(pct * 100)}% of habits kept` : ''}"`;
+    const bar = rec && rec.aligned > 0
+      ? `<span class="cal-day-bar"><i style="width:${rec.aligned}%"></i></span>`
+      : '';
+    const title = isFuture ? ''
+      : ` title="${dayNum} — ${rec.aligned}% aligned${rec.marks.length ? ', ' + rec.marks.join(', ') : ''}"`;
     html += `<button type="button" class="${classes.join(' ')}"${style}${title} ${isFuture ? 'disabled' : `onclick="openDayDetail('${dateStr}')"`}>
       <span class="cal-day-num">${dayNum}</span>
       ${!entry && !isFuture ? '<span class="cal-day-plus">+</span>' : ''}
-      ${bar}
+      ${marks}${bar}
     </button>`;
   }
   document.getElementById('photoCalendarGrid').innerHTML = html;
@@ -426,7 +541,21 @@ function dayModalContent(dateStr){
   const body = document.getElementById('dayModalBody');
   const entry = journalPhotosByDate[dateStr];
   if (dateStr > localDateStr()){ body.innerHTML = `<p class="journal-empty">This day hasn't happened yet.</p>`; return; }
-  const pageHtml = entry
+  const rec = dayRecord(dateStr);
+  const practice = [
+    rec.morning ? { label:'Morning ritual', on:rec.morning.kept, detail:`${rec.morning.done} of ${rec.morning.total}` } : null,
+    { label:'Journal', on:rec.journal, detail: rec.journal ? 'Logged' : '—' },
+    { label:'Subliminal', on:rec.subliminal, detail: rec.subliminal ? 'Played' : '—' },
+    rec.night ? { label:'Night ritual', on:rec.night.kept, detail:`${rec.night.done} of ${rec.night.total}` } : null,
+  ].filter(Boolean);
+  const memory = `
+    <p class="day-verdict">${dayVerdict(rec)}</p>
+    <p class="day-aligned"><b>${rec.aligned}%</b> aligned</p>
+    <ul class="day-practice">${practice.map(p => `
+      <li class="${p.on ? 'on' : ''}"><span class="dp-tick" aria-hidden="true">${p.on ? '✓' : ''}</span>
+        <span class="dp-label">${p.label}</span><span class="dp-detail">${p.detail}</span></li>`).join('')}</ul>`;
+
+  const pageHtml = memory + (entry
     ? `<img class="day-modal-photo" src="${entry.url}" alt="Journal page from ${dayLabel(dateStr)}">
       <label class="day-modal-label">Summary of the page</label>
       <textarea id="dayModalCaption" rows="3" maxlength="200" placeholder="What this page was about…">${(entry.caption || '').replace(/</g,'&lt;')}</textarea>
@@ -436,7 +565,7 @@ function dayModalContent(dateStr){
         <button class="habit-delete" onclick="deleteDayEntry('${dateStr}')" aria-label="Delete this day's page" title="Delete">${trashIconSvg()}</button>
       </div>`
     : `<p class="journal-empty">No page logged for this day yet.</p>
-      <button class="mini-btn candlebtn" onclick="triggerCheckIn('${dateStr}')">Check in — add a photo</button>`;
+      <button class="mini-btn candlebtn" onclick="triggerCheckIn('${dateStr}')">Check in — add a photo</button>`);
 
   body.innerHTML = pageHtml + dayHabitsHtml(dateStr) + `<div class="save-msg" id="dayModalMsg"></div>`;
 }
