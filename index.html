@@ -169,14 +169,15 @@
 
   /* Imagery. Every photograph sits under a scrim so type stays readable whatever
      image replaces it — swap the file, the layout holds. See img/README.md. */
-  .page-hero{ position:relative; margin-bottom:34px; }
-  .page-hero img{ width:100%; height:clamp(200px,34vw,320px); object-fit:cover; display:block; }
-  .page-hero::after{ content:''; position:absolute; inset:0;
-    background:linear-gradient(180deg, rgba(13,11,24,0.30) 0%, rgba(13,11,24,0.74) 60%, var(--midnight) 100%); }
-  .page-hero-text{ position:absolute; inset:auto 0 0 0; z-index:1; padding:0 22px 24px; max-width:720px; margin:0 auto; left:0; right:0; }
-  .page-hero-text h2{ font-family:var(--serif); font-size:clamp(24px,5vw,32px); font-weight:500; margin-top:6px; text-wrap:balance; }
-  .page-hero-text p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:46ch; }
-  .page-hero-text .profile-page-back{ color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:14px; display:inline-flex; align-items:center; gap:6px; }
+  /* Every page opens the same way: a way back, then a centred title, both
+     sitting on the sky. Build and Rituals used to put theirs on a photograph
+     under a heavy gradient, which ended in a hard band of the old background
+     colour and read as a slab laid across the top of the page. */
+  .page-head{ padding-top:104px; }
+  section:has(> .page-head){ padding-top:0; }
+  .profile-page-back{ color:var(--haze); text-decoration:none; font-size:13px;
+    margin-bottom:22px; display:inline-flex; align-items:center; gap:6px; }
+  .profile-page-back:hover{ color:var(--moonlight); }
 
   /* A full-width photograph between sections — somewhere for the eye to rest. */
   .breath{ position:relative; margin:0; }
@@ -535,7 +536,7 @@
 
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
-  .journal-section:has(> .page-hero){ padding-top:0; border-top:none; }
+  .journal-section:has(> .page-head){ border-top:none; }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
   /* Members lead with their own library; signed-out visitors lead with the
      ready-made one, since "Mine" would only ever be an empty locked panel. */
@@ -735,12 +736,25 @@
   .higher-self[data-sky="day"] .hs-edit{ background:rgba(255,255,255,0.5); border-color:rgba(36,30,68,0.18); color:#241E44; }
   .higher-self[data-sky="day"] .hs-edit:hover{ background:rgba(255,255,255,0.78); }
 
-  /* Choosing which one she is. */
-  .hs-picker{ display:grid; grid-template-columns:repeat(auto-fill, minmax(88px,1fr)); gap:10px; margin:10px 0 4px; }
-  .hs-opt{ padding:0; line-height:0; cursor:pointer; border:2px solid transparent; border-radius:18px;
-    overflow:hidden; background:linear-gradient(178deg,#211A45,#45376A); }
-  .hs-opt img{ display:block; width:100%; height:auto; }
-  .hs-opt.sel{ border-color:var(--candle); }
+  /* ---- her, in layers ----
+     One mask per part, tinted with a colour, and the line art laid over the
+     top. The line art is the only thing carrying real pixels; everything under
+     it is a flat fill the size of its own mask. */
+  .av{ display:block; width:100%; height:auto; }
+  .hs-art{ position:relative; width:62%; max-width:230px; margin:0 auto -2px;
+    filter:drop-shadow(0 10px 18px rgba(13,11,24,.45)); }
+  body[data-sky="day"] .hs-art{ filter:drop-shadow(0 8px 14px rgba(60,52,104,.22)); }
+
+  /* ---- the maker ---- */
+  .hs-preview{ width:150px; margin:12px auto 4px; }
+  .av-maker{ margin-top:10px; }
+  .av-roster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:9px; }
+  .av-opt{ padding:3px; line-height:0; cursor:pointer; border:2px solid transparent;
+    border-radius:16px; background:var(--sunk); transition:border-color .2s, transform .15s; }
+  .av-opt:hover{ transform:translateY(-2px); }
+  .av-opt.sel{ border-color:var(--candle); }
+  .av-opt:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  .av-opt .av{ border-radius:12px; }
   .hs-soon{ font-size:11.5px; color:var(--haze); margin-top:8px; }
 
   /* ---- the sky ----
@@ -806,8 +820,12 @@
   body{ background:transparent; }
 
   /* Cards float on the sky rather than sitting flat on it. */
-  .today-card, .library-card, .journal-locked, .profile-field-card, .library-embed-wrap{
-    background:var(--veil); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+  /* Glass, not paint: enough blur to keep the text readable and enough
+     transparency that the clouds still drift behind it. */
+  .today-card, .library-card, .journal-locked, .profile-field-card, .library-embed-wrap,
+  .price-card, .quote-card, .flow-card, .voice-clone-card, .science-stat{
+    background:var(--veil); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+  .flow-card{ background:var(--veil) !important; }
   body[data-sky="day"] .today-card, body[data-sky="day"] .library-card,
   body[data-sky="day"] .journal-locked, body[data-sky="day"] .profile-field-card{
     box-shadow:0 10px 26px rgba(23,18,51,.10); }
@@ -968,13 +986,6 @@
       <label>Username</label>
       <input type="text" id="signupUsername" placeholder="how others will know you" autocomplete="off">
     </div>
-    <div class="auth-field" id="signupAvatarField" style="display:none;">
-      <label>Choose your avatar</label>
-      <div class="avatar-grid" id="signupAvatarGrid"></div>
-      <label class="avatar-upload-label" for="signupAvatarFile">or upload a photo</label>
-      <input type="file" id="signupAvatarFile" accept="image/*" style="display:none;">
-      <div id="signupAvatarPreviewWrap"></div>
-    </div>
     <div class="auth-msg" id="authMsg"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Log in</button>
     <div class="auth-toggle" id="authToggle">New here? <button onclick="toggleAuthMode()">Create a free account</button></div>
@@ -993,12 +1004,6 @@
     <div class="auth-field">
       <label>Username</label>
       <input type="text" id="obUsername" placeholder="how others will find you" autocomplete="off">
-    </div>
-    <div class="auth-field">
-      <label>Pick an avatar <span style="color:var(--haze); font-weight:400;">(or upload your own below)</span></label>
-      <div class="avatar-grid" id="avatarGrid"></div>
-      <input type="file" id="obAvatarFile" accept="image/*" style="margin-top:10px; font-size:12.5px; color:var(--haze);">
-      <div id="avatarPreviewWrap"></div>
     </div>
     <div class="auth-field">
       <label>Phone <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
@@ -1031,7 +1036,7 @@
   <div class="wrap today-wrap">
     <div class="higher-self" id="higherSelfCard" data-sky="night" style="display:none;">
       <button type="button" class="hs-edit" onclick="editHigherSelf()">Customise</button>
-      <img id="higherSelfImg" src="img/higher-self-1.webp" alt="Your higher self" width="720" height="720">
+      <div id="higherSelfArt" class="hs-art"></div>
       <div class="hs-name" id="higherSelfName">Your higher self</div>
       <div class="hs-sub" id="higherSelfSub"></div>
     </div>
@@ -1065,8 +1070,8 @@
 </section>
 
 <section class="science reprogram-page" id="reprogram">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">The Science</div>
       <h2>How repetition actually reprograms your mind</h2>
@@ -1181,8 +1186,8 @@
 </section>
 
 <section class="library-section" id="library">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Library</div>
       <h2>Ready-made, or made by you</h2>
@@ -1224,10 +1229,9 @@
 
 <!-- ============ GUIDED FLOW ============ -->
 <section class="flow-section" id="flow-section">
-  <div class="page-hero">
-    <img src="img/build.jpg" alt="" aria-hidden="true">
-    <div class="page-hero-text">
-      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+    <div class="section-head">
       <div class="eyebrow">Build yours</div>
       <h2>Your subliminal, start to finish</h2>
       <p>Five minutes: a frequency, what you're working through, and your own voice saying it.</p>
@@ -1505,8 +1509,8 @@
 </section>
 
 <section class="journal-section" id="journal">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your journal</div>
       <h2>Gratitude &amp; manifesting</h2>
@@ -1564,10 +1568,9 @@
 
 <!-- ============ RITUALS: daily log calendar + morning/night habits ============ -->
 <section class="journal-section" id="rituals">
-  <div class="page-hero">
-    <img src="img/journal.jpg" alt="" aria-hidden="true">
-    <div class="page-hero-text">
-      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+    <div class="section-head">
       <div class="eyebrow">Your rituals</div>
       <h2>Morning and night, one day at a time</h2>
       <p>Photograph the page you wrote by hand, check off the habits you kept, and watch the calendar fill in.</p>
@@ -1645,8 +1648,8 @@
 </section>
 
 <section class="profile-section" id="profile">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your account</div>
       <h2>Profile</h2>
@@ -1677,8 +1680,8 @@
         <input type="text" id="higherSelfNameInput" placeholder="e.g. Aurelia" maxlength="24">
         <button class="mini-btn ghostbtn" onclick="updateHigherSelfName()">Save name</button>
         <label style="display:block; margin-top:18px;">How they look</label>
-        <div class="hs-picker" id="higherSelfPicker"></div>
-        <p class="hs-soon" id="higherSelfSoon" style="display:none;">More of them are being drawn — they'll show up here.</p>
+        <div class="hs-preview" id="higherSelfPreview"></div>
+        <div class="av-maker" id="higherSelfMaker"></div>
         <div class="save-msg" id="higherSelfMsg"></div>
       </div>
 
@@ -1696,14 +1699,6 @@
           <input type="text" id="settingsUsername" placeholder="your username">
           <button class="mini-btn ghostbtn" onclick="updateUsername()">Update username</button>
           <div class="save-msg" id="usernameSettingsMsg"></div>
-        </div>
-        <div class="profile-field-card">
-          <label>Avatar</label>
-          <div class="avatar-grid" id="settingsAvatarGrid" style="margin-bottom:10px;"></div>
-          <label class="avatar-upload-label" for="settingsAvatarFile">or upload a photo</label>
-          <input type="file" id="settingsAvatarFile" accept="image/*" style="display:none;">
-          <div id="settingsAvatarPreviewWrap"></div>
-          <div class="save-msg" id="avatarSettingsMsg"></div>
         </div>
         <div class="profile-field-card">
           <label>Email</label>
@@ -3982,7 +3977,6 @@ const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-pa
 function openAuthModal(mode){
   authMode = mode === 'signup' ? 'signup' : 'login';
   document.getElementById('authOverlay').classList.add('open');
-  renderSignupAvatarGrid();
   updateAuthModalUI();
 }
 function closeAuthModal(){
@@ -4109,7 +4103,6 @@ function updateAuthModalUI(){
     document.querySelector('#authPassword').closest('.auth-field').style.display = 'none';
     document.getElementById('confirmPwField').style.display = 'none';
     document.getElementById('signupUsernameField').style.display = 'none';
-    document.getElementById('signupAvatarField').style.display = 'none';
     document.getElementById('authToggle').innerHTML = `<button onclick="toggleAuthModeFromReset()">Back to log in</button>`;
     document.getElementById('googleAuthRow').style.display = 'none';
     return;
@@ -4123,7 +4116,6 @@ function updateAuthModalUI(){
   const signupOnly = authMode === 'signup' ? 'block' : 'none';
   document.getElementById('confirmPwField').style.display = signupOnly;
   document.getElementById('signupUsernameField').style.display = signupOnly;
-  document.getElementById('signupAvatarField').style.display = signupOnly;
   document.getElementById('forgotPwRow').style.display = authMode === 'login' ? 'block' : 'none';
   document.getElementById('authToggle').innerHTML = authMode === 'signup'
     ? `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`
@@ -4168,7 +4160,6 @@ async function submitAuth(){
     signupUsername = document.getElementById('signupUsername').value.trim();
     if (!signupUsername){ msg.textContent = 'Pick a username.'; msg.className = 'auth-msg err'; return; }
     if (!/^[a-zA-Z0-9_\.]{3,24}$/.test(signupUsername)){ msg.textContent = 'Usernames are 3–24 characters — letters, numbers, dots, and underscores.'; msg.className = 'auth-msg err'; return; }
-    if (!signupSelectedAvatar && !signupAvatarFileBlob){ msg.textContent = 'Pick an avatar, or upload a photo.'; msg.className = 'auth-msg err'; return; }
   }
   msg.textContent = 'Working on it…'; msg.className = 'auth-msg';
   const wasSignup = authMode === 'signup';
@@ -4193,7 +4184,7 @@ async function submitAuth(){
   if (wasSignup){
     // Stash the chosen username/avatar so we can apply it once there's a real session
     // (which may be now, or after they click the email confirmation link and log in).
-    pendingSignupProfile = { username: signupUsername, avatar: signupSelectedAvatar, fileBlob: signupAvatarFileBlob };
+    pendingSignupProfile = { username: signupUsername };
   }
 
   // Signed up, but Supabase requires clicking an email link before there's a real session.
@@ -4211,116 +4202,28 @@ async function submitAuth(){
   }, 600);
 }
 
-const PRESET_AVATARS = ['🌙','✨','🕊️','🌊','🔮','🌸','⭐','🦋'];
-
-/* ---------------- SIGNUP: username + avatar (required) ---------------- */
-let signupSelectedAvatar = null;
-let signupAvatarFileBlob = null;
+/* ---------------- SIGNUP: username ----------------
+   There's no avatar to choose here any more: your higher self is the picture
+   of you in this app, and she's made on the profile page where there's room
+   for it. */
 let pendingSignupProfile = null;
-
-function renderSignupAvatarGrid(){
-  const grid = document.getElementById('signupAvatarGrid');
-  if (!grid || grid.children.length) return;
-  grid.innerHTML = PRESET_AVATARS.map((emoji) =>
-    `<div class="avatar-opt" data-emoji="${emoji}" onclick="pickSignupAvatar(this)">${emoji}</div>`
-  ).join('');
-}
-function pickSignupAvatar(el){
-  document.querySelectorAll('#signupAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
-  el.classList.add('sel');
-  signupSelectedAvatar = el.dataset.emoji;
-  signupAvatarFileBlob = null;
-  document.getElementById('signupAvatarPreviewWrap').innerHTML = '';
-  document.getElementById('signupAvatarFile').value = '';
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const f = document.getElementById('signupAvatarFile');
-  if (f){
-    f.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      signupAvatarFileBlob = file;
-      signupSelectedAvatar = null;
-      document.querySelectorAll('#signupAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
-      const url = URL.createObjectURL(file);
-      document.getElementById('signupAvatarPreviewWrap').innerHTML = `<img src="${url}" alt="Your avatar" style="width:48px;height:48px;border-radius:50%;object-fit:cover;margin-top:8px;border:2px solid var(--candle);">`;
-    });
-  }
-});
 
 // Applies the username/avatar chosen during signup, once a real session exists.
 async function applyPendingSignupProfile(){
   if (!pendingSignupProfile || !sb || !currentUser) return;
   const pending = pendingSignupProfile;
   pendingSignupProfile = null;
-  let avatarUrl = null;
-  if (pending.fileBlob){
-    const path = `${currentUser.id}/avatar-${Date.now()}.${(pending.fileBlob.name||'jpg').split('.').pop()}`;
-    const { error: upErr } = await sb.storage.from('avatars').upload(path, pending.fileBlob, { upsert: true });
-    if (!upErr){
-      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      avatarUrl = pub.publicUrl;
-    }
-  }
-  const error = await saveProfile({
-    username: pending.username,
-    avatar: avatarUrl ? null : pending.avatar,
-    avatar_url: avatarUrl
-  });
+  const error = await saveProfile({ username: pending.username });
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){
     // Username collided — let them fix it in the questionnaire/profile rather than blocking login.
     console.warn('Username taken; user can set another in onboarding.');
   }
 }
 
-/* ---------------- ONBOARDING: avatar + username ---------------- */
-let selectedAvatar = null;
-let uploadedAvatarUrl = null;
-
-function renderAvatarGrid(){
-  const grid = document.getElementById('avatarGrid');
-  if (!grid || grid.children.length) return; // only build once
-  grid.innerHTML = PRESET_AVATARS.map((emoji, i) =>
-    `<div class="avatar-opt${i===0?' sel':''}" data-emoji="${emoji}" onclick="pickAvatar(this)">${emoji}</div>`
-  ).join('');
-  selectedAvatar = PRESET_AVATARS[0];
-}
-function pickAvatar(el){
-  document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('sel'));
-  el.classList.add('sel');
-  selectedAvatar = el.dataset.emoji;
-  uploadedAvatarUrl = null; // picking a preset overrides any uploaded photo
-  document.getElementById('avatarPreviewWrap').innerHTML = '';
-}
-
-function openOnboardingModal(){
-  renderAvatarGrid();
-  document.getElementById('onboardOverlay').classList.add('open');
-}
-function closeOnboardingModal(){
-  document.getElementById('onboardOverlay').classList.remove('open');
-}
+/* ---------------- ONBOARDING: username ---------------- */
+function openOnboardingModal(){ document.getElementById('onboardOverlay').classList.add('open'); }
+function closeOnboardingModal(){ document.getElementById('onboardOverlay').classList.remove('open'); }
 function skipOnboarding(){ closeOnboardingModal(); }
-
-document.addEventListener('DOMContentLoaded', () => {
-  const fileInput = document.getElementById('obAvatarFile');
-  if (fileInput){
-    fileInput.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file || !sb || !currentUser) return;
-      const msg = document.getElementById('onboardMsg');
-      msg.textContent = 'Uploading photo…'; msg.className = 'auth-msg';
-      const path = `${currentUser.id}/avatar-${Date.now()}.${file.name.split('.').pop()}`;
-      const { error } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
-      if (error){ msg.textContent = "Couldn't upload that photo — try a different one, or pick an avatar above."; msg.className = 'auth-msg err'; return; }
-      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      uploadedAvatarUrl = pub.publicUrl;
-      document.getElementById('avatarPreviewWrap').innerHTML = `<img src="${uploadedAvatarUrl}" alt="Your avatar">`;
-      document.querySelectorAll('.avatar-opt').forEach(a => a.classList.remove('sel'));
-      msg.textContent = ''; msg.className = 'auth-msg';
-    });
-  }
-});
 
 async function submitOnboarding(){
   const msg = document.getElementById('onboardMsg');
@@ -4329,8 +4232,6 @@ async function submitOnboarding(){
   const patch = {
     full_name: document.getElementById('obName').value.trim() || null,
     username: username || null,
-    avatar: uploadedAvatarUrl ? null : selectedAvatar,
-    avatar_url: uploadedAvatarUrl,
     phone: document.getElementById('obPhone').value.trim() || null,
     referral_source: document.getElementById('obSource').value || null,
     signup_reason: document.getElementById('obReason').value.trim() || null,
@@ -4425,15 +4326,14 @@ function renderNavLinks(){
 }
 async function loadNavIdentity(){
   if (!sb || !currentUser) return;
-  const { data: prof } = await sb.from('profiles').select('username, full_name, avatar, avatar_url').eq('id', currentUser.id).maybeSingle();
+  const { data: prof } = await sb.from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
   const nameEl = document.getElementById('navChipName');
   const avatarEl = document.getElementById('navAvatar');
   if (!nameEl || !avatarEl) return; // nav may have re-rendered already
-  if (prof){
-    nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
-    if (prof.avatar_url){ avatarEl.innerHTML = `<img src="${prof.avatar_url}" alt="">`; }
-    else if (prof.avatar){ avatarEl.textContent = prof.avatar; }
-  }
+  if (prof) nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
+  // She's the picture of you in this app now, so the chip shows her rather
+  // than an emoji you picked once and forgot.
+  avatarEl.innerHTML = avatarMarkup(higherSelf);
 }
 
 /* ---------- profile ---------- */
@@ -4726,21 +4626,40 @@ function toggleSky(){
    One drawing for now; the others drop into this list as they're drawn and
    every screen picks them up from here. `id` is what's stored on the profile,
    so never renumber an entry once it has shipped. */
-const HIGHER_SELVES = [
-  { id: 'hs1', img: 'img/higher-self-1.webp', label: 'Braids, gold hoops' },
+/* ---------- your higher self ----------
+   The artwork is flat colour under black line art, so it ships as one mask per
+   part plus the line art on top. Tinting a mask is just a background colour,
+   which means skin, hair, eyes and lips are yours to choose rather than baked
+   into a drawing. A hairstyle is a folder of those layers; adding one is a line
+   here and a set of files. `id` is what's stored, so never rename one. */
+/* Twenty-two drawn avatars. Each one ships with its own skin tone, hair
+   texture and colour, so choosing between them is the customisation — tinting
+   flat colour over this artwork measured as a visible loss (mean 16/255
+   against the original), and the roster already covers the range that tinting
+   was standing in for. `id` is what's stored, so never rename one. */
+const AVATARS = [
+  'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10',
+  'm1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12',
 ];
-let higherSelf = { avatar: null, name: '' };
-function higherSelfById(id){ return HIGHER_SELVES.find(h => h.id === id) || HIGHER_SELVES[0]; }
+const HIGHER_SELF_DEFAULTS = { avatar:'f1' };
 
-/* The two profile columns arrive with 20260919_higher_self.sql. Until that
-   migration is run the select errors, and the rest of Today shouldn't fail
-   with it — so this asks on its own and shrugs off a refusal. */
+let higherSelf = { name:'', ...HIGHER_SELF_DEFAULTS };
+function avatarId(id){ return AVATARS.includes(id) ? id : HIGHER_SELF_DEFAULTS.avatar; }
+function avatarSrc(id, thumb){ return `img/avatar/${avatarId(id)}${thumb ? '-t' : ''}.webp`; }
+function avatarMarkup(look, thumb){
+  return `<img class="av" src="${avatarSrc(look && look.avatar, thumb)}" alt="" width="512" height="512" loading="lazy">`;
+}
+
+/* The columns arrive with 20260919 and 20260920. Until those are run this
+   select errors, and the rest of Today shouldn't fail with it — so it asks on
+   its own and shrugs off a refusal. */
 async function loadHigherSelf(){
   if (!sb || !currentUser) return;
   const { data, error } = await sb.from('profiles')
-    .select('higher_self_avatar, higher_self_name').eq('id', currentUser.id).maybeSingle();
+    .select('higher_self_name, higher_self_avatar').eq('id', currentUser.id).maybeSingle();
   if (error){ console.warn('higher self:', error.message); return; }
-  higherSelf = { avatar: (data && data.higher_self_avatar) || null, name: (data && data.higher_self_name) || '' };
+  const d = data || {};
+  higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
 }
 
 /* What she's doing while you're reading this. She's meant to be a step ahead
@@ -4759,11 +4678,9 @@ function higherSelfLine(name){
 function renderHigherSelfCard(){
   const card = document.getElementById('higherSelfCard');
   if (!card) return;
-  const who = higherSelfById(higherSelf.avatar);
   const name = (higherSelf.name || '').trim() || 'Your higher self';
-  const img = document.getElementById('higherSelfImg');
-  img.src = who.img;
-  img.alt = name === 'Your higher self' ? 'Your higher self' : `${name}, your higher self`;
+  const art = document.getElementById('higherSelfArt');
+  if (art) art.innerHTML = avatarMarkup(higherSelf);
   card.dataset.sky = currentSky();
   document.getElementById('higherSelfName').textContent = name;
   document.getElementById('higherSelfSub').textContent = higherSelfLine(name);
@@ -4780,25 +4697,29 @@ function editHigherSelf(){
   }, 60);
 }
 
-function renderHigherSelfPicker(){
-  const grid = document.getElementById('higherSelfPicker');
-  if (!grid) return;
-  const current = higherSelfById(higherSelf.avatar).id;
-  grid.innerHTML = HIGHER_SELVES.map(h =>
-    `<button type="button" class="hs-opt${h.id === current ? ' sel' : ''}" onclick="pickHigherSelf('${h.id}')" title="${h.label}" aria-pressed="${h.id === current}"><img src="${h.img}" alt="${h.label}" width="720" height="720" loading="lazy"></button>`
-  ).join('');
-  const soon = document.getElementById('higherSelfSoon');
-  if (soon) soon.style.display = HIGHER_SELVES.length < 2 ? 'block' : 'none';
+/* ---------- choosing her ---------- */
+function renderHigherSelfMaker(){
+  const wrap = document.getElementById('higherSelfMaker');
+  if (!wrap) return;
+  const preview = document.getElementById('higherSelfPreview');
+  if (preview) preview.innerHTML = avatarMarkup(higherSelf);
+  wrap.innerHTML = `<div class="av-roster">${AVATARS.map(id =>
+    `<button type="button" class="av-opt${id === higherSelf.avatar ? ' sel' : ''}" onclick="pickAvatar('${id}')"
+       aria-pressed="${id === higherSelf.avatar}" aria-label="Avatar ${id}">${avatarMarkup({ avatar:id }, true)}</button>`).join('')}</div>`;
 }
 
-async function pickHigherSelf(id){
+/* Paint first, save after: choosing should feel instant, and a slow round trip
+   to the database shouldn't sit between the tap and the change. */
+async function pickAvatar(id){
+  higherSelf.avatar = avatarId(id);
+  renderHigherSelfMaker();
+  renderHigherSelfCard();
+  loadNavIdentity();
   if (!sb || !currentUser) return;
   const msg = document.getElementById('higherSelfMsg');
-  higherSelf.avatar = id;
-  renderHigherSelfPicker();
-  renderHigherSelfCard();
-  msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const error = await saveProfile({ higher_self_avatar: id });
+  if (msg){ msg.textContent = 'Saving…'; msg.className = 'save-msg'; }
+  const error = await saveProfile({ higher_self_avatar: higherSelf.avatar });
+  if (!msg) return;
   if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
 }
@@ -4967,18 +4888,11 @@ async function loadProfile(){
   const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if (prof){
     document.getElementById('profileNameDisplay').textContent = prof.full_name || prof.username || currentUser.email.split('@')[0];
-    const avatarEl = document.getElementById('profileAvatarDisplay');
-    if (prof.avatar_url){ avatarEl.innerHTML = `<img src="${prof.avatar_url}" alt="avatar">`; }
-    else { avatarEl.textContent = prof.avatar || '🌙'; }
-
     document.getElementById('settingsUsername').value = prof.username || '';
-    renderSettingsAvatarGrid(prof.avatar);
-    higherSelf = { avatar: prof.higher_self_avatar || null, name: prof.higher_self_name || '' };
+    higherSelf = { name: prof.higher_self_name || '', avatar: avatarId(prof.higher_self_avatar) };
     document.getElementById('higherSelfNameInput').value = higherSelf.name;
-    renderHigherSelfPicker();
-    if (prof.avatar_url){
-      document.getElementById('settingsAvatarPreviewWrap').innerHTML = `<img src="${prof.avatar_url}" alt="Current avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin-top:8px;border:2px solid var(--candle);">`;
-    }
+    renderHigherSelfMaker();
+    document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf);
   }
 
   const myTier = await getMyTier();
@@ -4988,80 +4902,7 @@ async function loadProfile(){
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
 }
 
-/* ---------- change username / avatar anytime ---------- */
-function renderSettingsAvatarGrid(currentAvatar){
-  const grid = document.getElementById('settingsAvatarGrid');
-  grid.innerHTML = PRESET_AVATARS.map((emoji) =>
-    `<div class="avatar-opt${emoji===currentAvatar ? ' sel' : ''}" data-emoji="${emoji}" onclick="pickSettingsAvatar(this)">${emoji}</div>`
-  ).join('');
-}
-async function pickSettingsAvatar(el){
-  const msg = document.getElementById('avatarSettingsMsg');
-  if (!sb || !currentUser) return;
-  document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
-  el.classList.add('sel');
-  document.getElementById('settingsAvatarPreviewWrap').innerHTML = '';
-  msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const error = await saveProfile({ avatar: el.dataset.emoji, avatar_url: null });
-  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
-  msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
-  loadNavIdentity();
-  loadProfile();
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const f = document.getElementById('settingsAvatarFile');
-  if (f){
-    f.addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      const msg = document.getElementById('avatarSettingsMsg');
-      if (!file || !sb || !currentUser) return;
-      msg.textContent = 'Uploading…'; msg.className = 'save-msg';
-      const path = `${currentUser.id}/avatar-${Date.now()}.${(file.name||'jpg').split('.').pop()}`;
-      const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
-      if (upErr){ msg.textContent = "Couldn't upload — try a different photo."; msg.className = 'save-msg err'; return; }
-      const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      const error = await saveProfile({ avatar_url: pub.publicUrl, avatar: null });
-      if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
-      document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
-      msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
-      loadNavIdentity();
-      loadProfile();
-    });
-  }
-});
-/* Every write to a profile used to be an .update(), which quietly does nothing
-   when the row isn't there — the save reports success and the value never
-   lands. An upsert writes the row if it's missing and patches it if it isn't. */
-async function saveProfile(patch){
-  // Update first. A plain update needs only an update policy, which every
-  // setup has; an upsert would demand an insert policy even when the row is
-  // already there, and would break saving for anyone without one.
-  const { data, error } = await sb.from('profiles')
-    .update(patch).eq('id', currentUser.id).select('id');
-  if (error){ console.warn('profile save failed:', error); return error; }
-  if (data && data.length) return null;
-  // Nothing was updated, so this account never got a row. Make it rather than
-  // reporting a save that didn't happen.
-  const { error: insErr } = await sb.from('profiles').insert({ id: currentUser.id, ...patch });
-  if (insErr) console.warn('profile row create failed:', insErr);
-  return insErr || null;
-}
-
-/* "Couldn't save." tells you nothing and tells me less. These are the three
-   things that actually go wrong, in words, with the database's own reason
-   kept on the end so it can be read off the screen. */
-function describeSaveError(error){
-  const m = (error && (error.message || '')).toLowerCase();
-  if (m.includes('duplicate') || m.includes('unique')) return 'That username is taken — try another.';
-  if (m.includes('row-level security') || m.includes('permission') || error.code === '42501')
-    return "Your account doesn't have permission to write this. (Database policy.)";
-  if (m.includes('does not exist') || error.code === '42703' || error.code === 'PGRST204')
-    return 'This needs a database update that hasn\'t been run yet.';
-  if (m.includes('jwt') || m.includes('token') || error.code === 'PGRST301')
-    return 'Your session expired — log out and back in.';
-  return "Couldn't save: " + ((error && error.message) || 'unknown error');
-}
-
+/* ---------- change your username ---------- */
 async function updateUsername(){
   const msg = document.getElementById('usernameSettingsMsg');
   if (!sb || !currentUser) return;
