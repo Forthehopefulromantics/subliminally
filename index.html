@@ -875,6 +875,34 @@
     background:var(--veil); border:1px solid var(--dusk); transition:transform .2s; }
   .skybtn:hover{ transform:scale(1.08) rotate(-8deg); }
 
+  /* ---- Light ----
+     A quiet line of state above the day: how long you have kept going, what
+     you have earned, and where that puts you. It reports, it does not cheer. */
+  .light-strip{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-bottom:8px; font-size:12.5px; color:var(--haze); }
+  .ls-item{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .ls-item b{ color:var(--moonlight); font-weight:500; font-variant-numeric:tabular-nums; }
+  .ls-light b{ color:var(--candle); }
+  .ls-level{ font-family:var(--serif); font-size:13px; color:var(--moonlight);
+    letter-spacing:.01em; }
+  .ls-bar{ flex:1 1 90px; min-width:70px; height:3px; border-radius:2px;
+    background:var(--sunk); overflow:hidden; }
+  .ls-bar i{ display:block; height:100%; border-radius:2px; background:var(--candle);
+    transition:width .5s ease; }
+  .light-note{ font-size:11.5px; color:var(--haze); margin-bottom:22px; }
+
+  /* The credit lifts off the thing you just did and fades. Deliberately small:
+     this fires for remembering to drink water. */
+  .light-mark{ position:fixed; z-index:400; pointer-events:none; transform:translate(-50%,-50%);
+    font-size:13px; font-weight:600; color:var(--candle); text-shadow:0 1px 8px rgba(0,0,0,.35);
+    animation:light-rise 1.1s cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes light-rise{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.82); }
+    22%{ opacity:1; transform:translate(-50%,-64%) scale(1); }
+    100%{ opacity:0; transform:translate(-50%,-152%) scale(1); }
+  }
+  @media (prefers-reduced-motion:reduce){ .light-mark{ display:none; } }
+
   .today-section{ padding:0; }
   .today-wrap{ max-width:520px; padding-top:104px; padding-bottom:90px; }
   .today-head{ margin-bottom:34px; }
@@ -1040,6 +1068,8 @@
       <div class="hs-name" id="higherSelfName">Your higher self</div>
       <div class="hs-sub" id="higherSelfSub"></div>
     </div>
+    <div class="light-strip" id="lightStrip" style="display:none;"></div>
+    <div class="light-note" id="lightNote"></div>
     <div class="today-head">
       <div class="today-greeting" id="todayGreeting">Welcome back</div>
       <div class="today-date" id="todayDate"></div>
@@ -4557,13 +4587,116 @@ async function renderTodayPage(){
   document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');
 
   renderTodaySession(subs && subs[0]);
-  // Habits first: what she has to say about your day is read off them.
+  // Habits first: both the strip's streak and what she has to say read off them.
   if (tierAtLeast(myTier, 'ritual')){ await loadHabits({ silent: true }); renderTodayRitual(); }
   else document.getElementById('todayRitualCard').style.display = 'none';
   renderHigherSelfCard();
+  renderLightStrip();
   if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
   else document.getElementById('todayPageCard').style.display = 'none';
 }
+/* ---------- Light ----------
+   Light is earned by doing the practice. The amounts and the once-a-day rule
+   both live in the database (award_light), not here — this side asks for a
+   payment and is told what it got, which is 0 when it had already been paid.
+   These names are the contract with light_value(); don't rename one without
+   the migration. */
+const LIGHT_SOURCES = {
+  habit:           'habit',
+  morningRitual:   'ritual_morning',
+  nightRitual:     'ritual_night',
+  journal:         'journal',
+  subliminal:      'subliminal',
+  nonNegotiables:  'non_negotiables',
+  perfectDay:      'perfect_day',
+  weekStreak:      'week_streak',
+};
+
+/* Ten levels, by lifetime Light. Derived rather than stored, so the curve can
+   be rebalanced without touching anyone's record. */
+const LEVELS = [
+  { name:'Seed',         at:0    },
+  { name:'Bloom',        at:200  },
+  { name:'Becoming I',   at:500  },
+  { name:'Becoming II',  at:800  },
+  { name:'Becoming III', at:1200 },
+  { name:'Aligned I',    at:1500 },
+  { name:'Aligned II',   at:2100 },
+  { name:'Aligned III',  at:2900 },
+  { name:'Radiant',      at:5000 },
+  { name:'Higher Self',  at:8000 },
+];
+function levelFor(lifetime){
+  let i = 0;
+  for (let n = 0; n < LEVELS.length; n++) if (lifetime >= LEVELS[n].at) i = n;
+  const next = LEVELS[i + 1] || null;
+  return {
+    index: i, name: LEVELS[i].name, at: LEVELS[i].at,
+    next: next && next.name, nextAt: next && next.at,
+    toNext: next ? next.at - lifetime : 0,
+    // Progress through this level, not through the whole ladder.
+    pct: next ? Math.max(0, Math.min(1, (lifetime - LEVELS[i].at) / (next.at - LEVELS[i].at))) : 1,
+  };
+}
+
+let light = { lifetime: 0, today: 0, loaded: false };
+
+async function loadLight(){
+  if (!sb || !currentUser) return;
+  const { data, error } = await sb.rpc('my_light', { p_on: localDateStr() });
+  if (error){ console.warn('light:', error.message); return; }   // migration not run yet
+  const row = Array.isArray(data) ? data[0] : data;
+  light = { lifetime: Number(row && row.lifetime || 0), today: Number(row && row.today || 0), loaded: true };
+}
+
+/* Ask for Light and show it only if it was actually granted. `near` is the
+   element the mark drifts away from, so the credit appears where the thing you
+   just did is, rather than somewhere you aren't looking. */
+async function awardLight(source, ref, near){
+  if (!sb || !currentUser) return 0;
+  const { data, error } = await sb.rpc('award_light', {
+    p_source: source, p_ref: ref || '', p_on: localDateStr(),
+  });
+  if (error){ console.warn('light:', error.message); return 0; }
+  const amount = Number(data || 0);
+  if (!amount) return 0;                    // already paid for today
+  light.lifetime += amount; light.today += amount;
+  showLightMark(amount, near);
+  renderLightStrip();
+  return amount;
+}
+
+/* A small mark that lifts and fades. Not a celebration — you get one of these
+   for remembering to drink water. */
+function showLightMark(amount, near){
+  const host = near && near.getBoundingClientRect ? near : document.getElementById('lightStrip');
+  if (!host || !host.getBoundingClientRect) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = host.getBoundingClientRect();
+  const mark = document.createElement('span');
+  mark.className = 'light-mark';
+  mark.textContent = `+${amount} ✦`;
+  mark.style.left = (r.left + r.width / 2) + 'px';
+  mark.style.top = (r.top + r.height / 2) + 'px';
+  document.body.appendChild(mark);
+  mark.addEventListener('animationend', () => mark.remove());
+}
+
+function renderLightStrip(){
+  const el = document.getElementById('lightStrip');
+  if (!el) return;
+  const lv = levelFor(light.lifetime);
+  const streak = routineStreak(currentRitualTime());
+  el.innerHTML = `
+    ${streak > 1 ? `<span class="ls-item" title="${streak} days of practice"><b>${streak}</b> day${streak === 1 ? '' : 's'}</span>` : ''}
+    <span class="ls-item ls-light" title="${light.lifetime.toLocaleString()} Light earned in total">✦ <b>${light.lifetime.toLocaleString()}</b></span>
+    <span class="ls-item ls-level">${lv.name}</span>
+    <span class="ls-bar" role="img" aria-label="${lv.next ? `${lv.toNext} Light until ${lv.next}` : 'Higher Self reached'}"><i style="width:${Math.round(lv.pct * 100)}%"></i></span>`;
+  el.style.display = 'flex';
+  const note = document.getElementById('lightNote');
+  if (note) note.textContent = lv.next ? `${lv.toNext.toLocaleString()} Light until ${lv.next}` : 'You have reached Higher Self.';
+}
+
 /* ---------- day and night ----------
    The sky follows the clock on its own. Tapping the switch overrides it, but
    only until tomorrow — otherwise one tap at lunchtime leaves you on a blue
@@ -5979,7 +6112,7 @@ async function toggleCoreHabit(habitId){
   habit.is_core = turningOn;
   renderHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
   const { error } = await sb.from('habits').update({ is_core: turningOn }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){
     console.error('toggleCoreHabit error:', error);
@@ -6130,7 +6263,7 @@ async function toggleHabitOnDate(habitId, dateStr){
   // so that card has to repaint too — otherwise the tick never appears and the
   // tap reads as broken even though it saved.
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
   renderPhotoCalendar();
   renderDailyLogReward();
   const { error } = wasDone
@@ -6189,7 +6322,7 @@ async function applyHabitSnapshot(snap){
   }
   await loadHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
 }
 
 async function undoHabits(){
@@ -6287,7 +6420,7 @@ async function persistHabitOrder(time, ordered){
   sortHabitsCache();
   renderHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
   for (const h of ordered){
     const { error } = await sb.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id).eq('user_id', currentUser.id);
     if (error){
@@ -6348,7 +6481,7 @@ async function deleteHabit(habitId){
   if (error){ console.error('deleteHabit error:', error); return; }
   await loadHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
 }
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
