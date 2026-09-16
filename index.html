@@ -169,16 +169,15 @@
 
   /* Imagery. Every photograph sits under a scrim so type stays readable whatever
      image replaces it — swap the file, the layout holds. See img/README.md. */
-  /* These page headers used to be a photograph under a heavy gradient that
-     ended in a hard band of the old background colour. Against the sky that
-     band read as a slab laid across the top of the page, so the photograph
-     goes and the title sits on the sky with the clouds behind it. */
-  .page-hero{ position:relative; margin-bottom:30px; }
-  .page-hero img, .page-hero::after{ display:none; }
-  .page-hero-text{ position:static; padding:112px 22px 0; max-width:720px; margin:0 auto; }
-  .page-hero-text h2{ font-family:var(--serif); font-size:clamp(24px,5vw,32px); font-weight:500; margin-top:6px; text-wrap:balance; }
-  .page-hero-text p{ color:var(--haze); font-size:14px; margin-top:8px; max-width:46ch; }
-  .page-hero-text .profile-page-back{ color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:14px; display:inline-flex; align-items:center; gap:6px; }
+  /* Every page opens the same way: a way back, then a centred title, both
+     sitting on the sky. Build and Rituals used to put theirs on a photograph
+     under a heavy gradient, which ended in a hard band of the old background
+     colour and read as a slab laid across the top of the page. */
+  .page-head{ padding-top:104px; }
+  section:has(> .page-head){ padding-top:0; }
+  .profile-page-back{ color:var(--haze); text-decoration:none; font-size:13px;
+    margin-bottom:22px; display:inline-flex; align-items:center; gap:6px; }
+  .profile-page-back:hover{ color:var(--moonlight); }
 
   /* A full-width photograph between sections — somewhere for the eye to rest. */
   .breath{ position:relative; margin:0; }
@@ -537,7 +536,7 @@
 
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
-  .journal-section:has(> .page-hero){ padding-top:0; border-top:none; }
+  .journal-section:has(> .page-head){ border-top:none; }
   .journal-tabs{ display:flex; gap:8px; background:var(--veil); border:1px solid var(--dusk); border-radius:999px; padding:5px; max-width:520px; margin:0 auto 28px; }
   /* Members lead with their own library; signed-out visitors lead with the
      ready-made one, since "Mine" would only ever be an empty locked panel. */
@@ -1071,8 +1070,8 @@
 </section>
 
 <section class="science reprogram-page" id="reprogram">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">The Science</div>
       <h2>How repetition actually reprograms your mind</h2>
@@ -1187,8 +1186,8 @@
 </section>
 
 <section class="library-section" id="library">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Library</div>
       <h2>Ready-made, or made by you</h2>
@@ -1230,10 +1229,9 @@
 
 <!-- ============ GUIDED FLOW ============ -->
 <section class="flow-section" id="flow-section">
-  <div class="page-hero">
-    <img src="img/build.jpg" alt="" aria-hidden="true">
-    <div class="page-hero-text">
-      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+    <div class="section-head">
       <div class="eyebrow">Build yours</div>
       <h2>Your subliminal, start to finish</h2>
       <p>Five minutes: a frequency, what you're working through, and your own voice saying it.</p>
@@ -1511,8 +1509,8 @@
 </section>
 
 <section class="journal-section" id="journal">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your journal</div>
       <h2>Gratitude &amp; manifesting</h2>
@@ -1570,10 +1568,9 @@
 
 <!-- ============ RITUALS: daily log calendar + morning/night habits ============ -->
 <section class="journal-section" id="rituals">
-  <div class="page-hero">
-    <img src="img/journal.jpg" alt="" aria-hidden="true">
-    <div class="page-hero-text">
-      <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+    <div class="section-head">
       <div class="eyebrow">Your rituals</div>
       <h2>Morning and night, one day at a time</h2>
       <p>Photograph the page you wrote by hand, check off the habits you kept, and watch the calendar fill in.</p>
@@ -1651,8 +1648,8 @@
 </section>
 
 <section class="profile-section" id="profile">
-  <div class="wrap">
-    <a href="#" class="profile-page-back" onclick="goHome(); return false;" style="color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:24px; display:inline-flex; align-items:center; gap:6px;">← Back to Subliminally</a>
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Your account</div>
       <h2>Profile</h2>
