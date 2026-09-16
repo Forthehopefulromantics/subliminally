@@ -29,8 +29,19 @@ Two things that will bite:
 
 ### RevenueCat webhook
 
-`REVENUECAT_WEBHOOK_AUTH` = `dhEdleK-okLF-HlqrfZLVGrU4O5S2szsBRYsxo7xFlo` in
-Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
+Set `REVENUECAT_WEBHOOK_AUTH` as a secret in Vercel and use the exact same
+Authorization value in RevenueCat. Never write the value in this repository.
+Point the webhook at `/api/revenuecat-webhook`.
+
+### Security environment variables
+
+- Set `FEEDBACK_WEBHOOK_AUTH` in Vercel and as the Authorization header on the
+  Supabase Database Webhook that calls `/api/notify-feedback`.
+- Set the four active Stripe `price_...` IDs in
+  `STRIPE_PRICE_WHISPER_MONTHLY`, `STRIPE_PRICE_WHISPER_ANNUAL`,
+  `STRIPE_PRICE_RITUAL_MONTHLY`, and `STRIPE_PRICE_RITUAL_ANNUAL`.
+- If old subscriptions are still active, put their comma-separated Price IDs in
+  `STRIPE_PRICE_WHISPER_LEGACY` and `STRIPE_PRICE_RITUAL_LEGACY`.
 
 ## Apple review
 
@@ -65,3 +76,4 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260919_higher_self.sql` | run |
 | `20260920_usernames_and_avatar.sql` | run |
 | `20260921_light.sql` | run |
+| `20260924_security_hardening.sql` | pending |

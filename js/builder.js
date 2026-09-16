@@ -314,8 +314,21 @@ function pickEftRepeatCount(btn){
 }
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
+async function aiRequestHeaders(){
+  if (!sb || !currentUser) return null;
+  const { data } = await sb.auth.getSession();
+  const token = data && data.session && data.session.access_token;
+  if (!token) return null;
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 async function generateAffirmations(){
   const msg = document.getElementById('lengthMsg');
+  if (!currentUser){
+    msg.innerHTML = `Sign in to generate personalized content — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
+    msg.className = 'length-msg err';
+    return;
+  }
   const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
   const requiredTier = requiredTierForMinutes(minutes);
   if (requiredTier !== 'none'){
@@ -370,9 +383,11 @@ async function generateAffirmations(){
 async function callClaudeForAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const headers = await aiRequestHeaders();
+  if (!headers) return null;
   const response = await fetch(API_BASE + "/api/generate-affirmations", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal })
   });
   if (!response.ok) return null;
@@ -387,9 +402,11 @@ async function callClaudeForAffirmations(){
 async function callClaudeForEftAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const headers = await aiRequestHeaders();
+  if (!headers) return null;
   const response = await fetch(API_BASE + "/api/generate-eft-affirmations", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
   });
   if (!response.ok) return null;
@@ -454,9 +471,11 @@ function buildEftFallbackList(){
 async function callClaudeForVisualizationScript(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const headers = await aiRequestHeaders();
+  if (!headers) return null;
   const response = await fetch(API_BASE + "/api/generate-visualization-script", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
   });
   if (!response.ok) return null;
@@ -1637,4 +1656,3 @@ function stopFinal(){
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
-

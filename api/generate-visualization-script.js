@@ -1,5 +1,6 @@
 // /api/generate-visualization-script.js
 import { applyCors } from '../lib/cors.js';
+import { authorizeAiRequest, cleanPromptValue, sendAuthorizationError } from '../lib/ai-security.js';
 //
 // Generates a draft visualization script for "Visualization Script" mode
 // (Reverie & Ritual). This is meant purely as a starting point — the review step
@@ -16,9 +17,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { goal, toneLabel, freqLabel } = req.body || {};
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'Server is not configured with an API key yet.' });
+  }
 
-  if (!goal || !goal.trim()) {
+  const authorization = await authorizeAiRequest(req, { action: 'visualization', requiredTier: 'ritual' });
+  if (authorization.error) return sendAuthorizationError(res, authorization);
+
+  const { goal, toneLabel, freqLabel } = req.body || {};
+  const safeGoal = cleanPromptValue(goal, 2000);
+  const safeTone = cleanPromptValue(toneLabel, 80) || 'grounded';
+  const safeFrequency = cleanPromptValue(freqLabel, 80) || 'none';
+
+  if (!safeGoal) {
     return res.status(400).json({ error: 'Missing goal' });
   }
 
@@ -32,11 +43,11 @@ Rules for "script":
 - Vivid and sensory — what they see, hear, and feel, not just what happens. Ground it in the specific details the person gave you; don't generalize it into something vague.
 - 4 to 7 short paragraphs, separated by a blank line (use \\n\\n between paragraphs in the JSON string).
 - Arc: settle into the moment -> move through it as it's actually unfolding -> land on the feeling of having done it, calm and certain.
-- Warm, ${toneLabel || 'grounded'} tone. No hype-speech clichés, no medical or performance-outcome guarantees, no second-guessing language ("maybe", "hopefully").
+- Warm, ${safeTone} tone. No hype-speech clichés, no medical or performance-outcome guarantees, no second-guessing language ("maybe", "hopefully").
 - Do not reference the healing frequency directly.`;
 
-  const userPrompt = `What they want to visualize, in their own words: ${goal}
-Healing frequency context (tone only, don't name it directly): ${freqLabel || 'none'}`;
+  const userPrompt = `What they want to visualize, in their own words: ${safeGoal}
+Healing frequency context (tone only, don't name it directly): ${safeFrequency}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {

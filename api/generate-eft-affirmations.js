@@ -1,5 +1,6 @@
 // /api/generate-eft-affirmations.js
 import { applyCors } from '../lib/cors.js';
+import { authorizeAiRequest, cleanPromptValue, sendAuthorizationError } from '../lib/ai-security.js';
 //
 // Generates the content for "Subliminal + EFT Tapping" mode (Ritual only).
 // Produces the pieces needed for an 11-line session:
@@ -26,7 +27,17 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'Server is not configured with an API key yet.' });
+  }
+
+  const authorization = await authorizeAiRequest(req, { action: 'eft', requiredTier: 'ritual' });
+  if (authorization.error) return sendAuthorizationError(res, authorization);
+
   const { goal, toneLabel, freqLabel } = req.body || {};
+  const safeGoal = cleanPromptValue(goal, 1500) || 'general stress and tension';
+  const safeTone = cleanPromptValue(toneLabel, 80) || 'warm';
+  const safeFrequency = cleanPromptValue(freqLabel, 80) || 'none';
 
   const pointLabels = [
     'Eyebrow',
@@ -50,12 +61,12 @@ Return ONLY raw JSON, no markdown code fences, no commentary, matching this exac
 Rules:
 - "setupFeeling" completes the sentence "Even though I have ___, I deeply and completely love and accept myself." Name the specific feeling or issue in a few words (e.g. "this anxiety about money", "this fear of not being enough"), based on what the person described. Return only that feeling clause — not the rest of the sentence.
 - "kcReminder" is a full, natural first-person sentence said at the Karate Chop point (e.g. "I trust myself more with every breath." or "I release the fear that there's never enough."). A complete sentence, not a fragment — it gets reused for both the opening and closing tap of the round, so keep it general enough to work as a bookend.
-- "pointReminders" is an array of exactly 8 full, natural first-person sentences (roughly 6-14 words each, ending in a period), one for each of these points in this exact order: ${pointLabels.join(', ')}. Write these the way real EFT scripts read — complete, flowing sentences like "It's okay to feel uncertain sometimes." or "I am safe to receive more than I've ever allowed." — never short clipped phrases or word fragments. Each should feel like a natural step in releasing/processing the named feeling, gently varied line to line (not repeats of each other), grounded in what the person described, in a ${toneLabel || 'warm'} tone. Move loosely from naming the feeling toward relief/acceptance by the last point.
+- "pointReminders" is an array of exactly 8 full, natural first-person sentences (roughly 6-14 words each, ending in a period), one for each of these points in this exact order: ${pointLabels.join(', ')}. Write these the way real EFT scripts read — complete, flowing sentences like "It's okay to feel uncertain sometimes." or "I am safe to receive more than I've ever allowed." — never short clipped phrases or word fragments. Each should feel like a natural step in releasing/processing the named feeling, gently varied line to line (not repeats of each other), grounded in what the person described, in a ${safeTone} tone. Move loosely from naming the feeling toward relief/acceptance by the last point.
 - Every sentence should be short enough to say out loud comfortably in one breath, roughly 3-5 seconds.
 - Do not diagnose, give medical advice, or reference the healing frequency directly.`;
 
-  const userPrompt = `What they're working through tonight: ${goal || 'general stress and tension'}
-Healing frequency context (tone only, don't name it directly): ${freqLabel || 'none'}`;
+  const userPrompt = `What they're working through tonight: ${safeGoal}
+Healing frequency context (tone only, don't name it directly): ${safeFrequency}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -104,4 +115,3 @@ Healing frequency context (tone only, don't name it directly): ${freqLabel || 'n
     return res.status(500).json({ error: 'Generation failed' });
   }
 }
-
