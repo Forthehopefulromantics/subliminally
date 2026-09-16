@@ -903,6 +903,32 @@
   }
   @media (prefers-reduced-motion:reduce){ .light-mark{ display:none; } }
 
+  /* ---- today's journey ----
+     Four things, the state of each, and one of them raised as the next thing
+     worth doing. A list, not a scoreboard. */
+  .journey-list{ list-style:none; margin:16px 0 0; padding:0;
+    display:flex; flex-direction:column; gap:2px; }
+  .journey-q button{ display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+    background:none; border:none; border-radius:12px; padding:11px 10px; cursor:pointer;
+    font-family:inherit; font-size:14px; color:var(--moonlight);
+    min-height:44px; transition:background .18s; }
+  .journey-q button:hover{ background:var(--sunk); }
+  .journey-q button:focus-visible{ outline:2px solid var(--lilac); outline-offset:-2px; }
+  .jq-tick{ width:20px; height:20px; border-radius:50%; flex-shrink:0;
+    border:1.5px solid var(--haze); display:grid; place-items:center;
+    font-size:11px; color:transparent; }
+  .journey-q.done .jq-tick{ background:var(--good); border-color:var(--good); color:#1F3A29; }
+  .journey-q.done .jq-label{ color:var(--haze); }
+  .jq-label{ flex:1; min-width:0; overflow-wrap:anywhere; }
+  .jq-detail{ font-size:12px; color:var(--haze); flex-shrink:0; }
+  .journey-q.next .jq-label{ color:var(--candle); }
+
+  /* Habit names wrap instead of ending in an ellipsis, and the whole row is
+     the tap target rather than just the words. */
+  .day-habit{ min-height:44px; align-items:flex-start; padding:11px 12px; }
+  .day-habit-n, .day-habit-check{ margin-top:1px; }
+  .day-habit{ overflow-wrap:anywhere; text-align:left; line-height:1.4; }
+
   .today-section{ padding:0; }
   .today-wrap{ max-width:520px; padding-top:104px; padding-bottom:90px; }
   .today-head{ margin-bottom:34px; }
@@ -1074,7 +1100,8 @@
       <div class="today-greeting" id="todayGreeting">Welcome back</div>
       <div class="today-date" id="todayDate"></div>
     </div>
-    <div class="today-card today-card-primary" id="todaySessionCard"></div>
+    <div class="today-card today-card-primary" id="todayJourneyCard" style="display:none;"></div>
+    <div class="today-card" id="todaySessionCard"></div>
     <div class="today-card" id="todayRitualCard" style="display:none;"></div>
     <div class="today-card" id="todayPageCard" style="display:none;"></div>
     <div class="today-links">
@@ -3496,6 +3523,11 @@ function updateSessionTimerLabel(){
 }
 
 function finishFinal(){
+  // A session only counts once it has actually run for a while; starting and
+  // stopping shouldn't pay, and the database won't pay twice in a day anyway.
+  if (finalPlaying && finalStartTime && Date.now() - finalStartTime > 60000){
+    awardLight(LIGHT_SOURCES.subliminal, '', document.getElementById('finalPlayBtn'));
+  }
   finalPlaying = false;
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
@@ -4594,6 +4626,7 @@ async function renderTodayPage(){
   renderLightStrip();
   if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
   else document.getElementById('todayPageCard').style.display = 'none';
+  renderTodayJourney();   // last, so the journal load has landed and its state is real
 }
 /* ---------- Light ----------
    Light is earned by doing the practice. The amounts and the once-a-day rule
@@ -4640,6 +4673,10 @@ function levelFor(lifetime){
 }
 
 let light = { lifetime: 0, today: 0, loaded: false };
+/* What has already been paid for today. The ledger is the only record of some
+   of these — a subliminal played leaves no other trace — so the Journey reads
+   its state from here rather than keeping a second copy that could disagree. */
+let lightToday = new Set();
 
 async function loadLight(){
   if (!sb || !currentUser) return;
@@ -4647,6 +4684,9 @@ async function loadLight(){
   if (error){ console.warn('light:', error.message); return; }   // migration not run yet
   const row = Array.isArray(data) ? data[0] : data;
   light = { lifetime: Number(row && row.lifetime || 0), today: Number(row && row.today || 0), loaded: true };
+  const { data: rows } = await sb.from('light_ledger')
+    .select('source').eq('user_id', currentUser.id).eq('earned_on', localDateStr());
+  lightToday = new Set((rows || []).map(r => r.source));
 }
 
 /* Ask for Light and show it only if it was actually granted. `near` is the
@@ -4660,7 +4700,7 @@ async function awardLight(source, ref, near){
   if (error){ console.warn('light:', error.message); return 0; }
   const amount = Number(data || 0);
   if (!amount) return 0;                    // already paid for today
-  light.lifetime += amount; light.today += amount;
+  light.lifetime += amount; light.today += amount; lightToday.add(source);
   showLightMark(amount, near);
   renderLightStrip();
   return amount;
@@ -4893,6 +4933,70 @@ async function updateHigherSelfName(){
   renderHigherSelfCard();
   msg.textContent = name ? `Saved — ${name} it is.` : 'Saved.';
   msg.className = 'save-msg ok';
+}
+
+/* ---------- Today's Journey ----------
+   The question this answers is "what should I do next", so it reads the day,
+   works out the one thing that is most worth doing now, and makes that the
+   button. Everything else is a quiet list underneath it. */
+function journeyQuests(){
+  const today = localDateStr();
+  const ritual = t => {
+    const rows = habitsCache.filter(h => h.time_of_day === t);
+    if (!rows.length) return null;
+    const st = routineStatusFor(t, today);
+    return { done: st.state === 'full' || st.state === 'essentials', st, rows };
+  };
+  const morning = ritual('morning'), night = ritual('night');
+  const list = [];
+  if (morning) list.push({ key:'morning', label:'Morning ritual', done:morning.done,
+    detail:`${morning.st.done} of ${morning.st.total}`, go:() => { todayRitualTime='morning'; renderTodayRitual(); renderTodayJourney(); } });
+  list.push({ key:'journal', label:'Journal', done: !!journalPhotosByDate[today],
+    detail: journalPhotosByDate[today] ? 'Logged' : 'Not yet', go:() => showRitualsPage('calendar') });
+  list.push({ key:'subliminal', label:'Subliminal', done: lightToday.has(LIGHT_SOURCES.subliminal),
+    detail: lightToday.has(LIGHT_SOURCES.subliminal) ? 'Played' : 'Not yet', go:() => showBuildPage() });
+  if (night) list.push({ key:'night', label:'Night ritual', done:night.done,
+    detail:`${night.st.done} of ${night.st.total}`, go:() => { todayRitualTime='night'; renderTodayRitual(); renderTodayJourney(); } });
+  return list;
+}
+
+/* The next thing worth doing. Morning before the afternoon, night after it, and
+   the practice you have actually left undone before either. */
+function nextQuest(quests){
+  const undone = quests.filter(q => !q.done);
+  if (!undone.length) return null;
+  const evening = currentRitualTime() === 'night';
+  const order = evening ? ['night','journal','subliminal','morning'] : ['morning','subliminal','journal','night'];
+  for (const key of order){ const q = undone.find(u => u.key === key); if (q) return q; }
+  return undone[0];
+}
+
+function renderTodayJourney(){
+  const card = document.getElementById('todayJourneyCard');
+  if (!card) return;
+  const quests = journeyQuests();
+  if (!quests.length){ card.style.display = 'none'; return; }
+  const done = quests.filter(q => q.done).length;
+  const next = nextQuest(quests);
+  const evening = currentRitualTime() === 'night';
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="today-card-label">${evening ? "Tonight's journey" : "Today's journey"}</div>
+    <h3>${done === quests.length ? 'Every part of today is done.' : `${done} of ${quests.length} complete`}</h3>
+    <div class="today-progress"><i style="width:${Math.round(done / quests.length * 100)}%"></i></div>
+    ${next ? `<button class="btn btn-primary" onclick="journeyGo('${next.key}')">${next.done ? 'Open' : (next.key.includes('ritual') || next.key === 'morning' || next.key === 'night') ? `Continue ${next.label.toLowerCase()}` : next.label}</button>` : ''}
+    <ul class="journey-list">${quests.map(q => `
+      <li class="journey-q${q.done ? ' done' : ''}${next && q.key === next.key ? ' next' : ''}">
+        <button type="button" onclick="journeyGo('${q.key}')">
+          <span class="jq-tick" aria-hidden="true">${q.done ? '✓' : ''}</span>
+          <span class="jq-label">${q.label}</span>
+          <span class="jq-detail">${q.detail}</span>
+        </button>
+      </li>`).join('')}</ul>`;
+}
+function journeyGo(key){
+  const q = journeyQuests().find(x => x.key === key);
+  if (q) q.go();
 }
 
 function renderTodaySession(lastSub){
@@ -5936,6 +6040,8 @@ async function uploadJournalPhoto(file, dateStr){
   const { error } = await sb.from('journal_photos').upsert({ user_id: currentUser.id, storage_path: path, entry_date: dateStr }, { onConflict: 'user_id,entry_date' });
   if (error){ console.error('journal_photos upsert error:', error); if (msg){ msg.textContent = "Uploaded, but couldn't save — try again."; msg.className = 'save-msg err'; } return; }
   await loadJournalPhotos();
+  if (dateStr === localDateStr()) await awardLight(LIGHT_SOURCES.journal, dateStr, null);
+  if (document.body.getAttribute('data-view') === 'today') renderTodayJourney();
   if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
 }
 async function saveDayCaption(dateStr){
@@ -6112,7 +6218,7 @@ async function toggleCoreHabit(habitId){
   habit.is_core = turningOn;
   renderHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
   const { error } = await sb.from('habits').update({ is_core: turningOn }).eq('id', habitId).eq('user_id', currentUser.id);
   if (error){
     console.error('toggleCoreHabit error:', error);
@@ -6263,7 +6369,7 @@ async function toggleHabitOnDate(habitId, dateStr){
   // so that card has to repaint too — otherwise the tick never appears and the
   // tap reads as broken even though it saved.
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
   renderPhotoCalendar();
   renderDailyLogReward();
   const { error } = wasDone
@@ -6322,7 +6428,7 @@ async function applyHabitSnapshot(snap){
   }
   await loadHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
 }
 
 async function undoHabits(){
@@ -6420,7 +6526,7 @@ async function persistHabitOrder(time, ordered){
   sortHabitsCache();
   renderHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
   for (const h of ordered){
     const { error } = await sb.from('habits').update({ sort_order: h.sort_order }).eq('id', h.id).eq('user_id', currentUser.id);
     if (error){
@@ -6481,7 +6587,7 @@ async function deleteHabit(habitId){
   if (error){ console.error('deleteHabit error:', error); return; }
   await loadHabits();
   // Checking something off is the moment she has something new to say.
-  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); }
+  if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
 }
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
