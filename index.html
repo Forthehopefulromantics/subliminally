@@ -675,8 +675,9 @@
   /* A non-negotiable reads as the load-bearing one, without shouting. */
   .day-habit.core{ border-color:rgba(224,196,138,0.28); }
   .day-habit-core{ margin-left:auto; color:var(--candle); font-size:11px; flex-shrink:0; }
-  .today-ritual-group{ font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--haze); margin:14px 0 6px; }
-  .today-ritual-group:first-of-type{ margin-top:10px; }
+  .day-habit-n{ flex-shrink:0; min-width:14px; text-align:right; font-size:11.5px;
+    font-variant-numeric:tabular-nums; color:var(--haze); }
+  .day-habit.done .day-habit-n{ opacity:.55; }
   .today-ritual-note{ font-size:12.5px; color:var(--haze); line-height:1.6; margin:12px 0 0; }
   .habit-streak{ font-size:11.5px; color:var(--lilac); white-space:nowrap; font-variant-numeric:tabular-nums; }
   .habit-streak.zero{ color:var(--haze); }
@@ -4862,10 +4863,14 @@ function renderTodayRitual(){
   // screen doesn't open on nine things you already know you aren't doing.
   const shortMode = todayEssentialsOnly && core.length > 0;
 
+  // Numbered by where the habit actually sits in the ritual, not by where it
+  // falls in what's on screen — so on a short night the gaps show you what
+  // you're skipping rather than quietly renumbering around it.
   const habitBtn = h => {
     const isDone = done.has(h.id);
+    const n = rows.indexOf(h) + 1;
     return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+      <span class="day-habit-n" aria-hidden="true">${n}</span><span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
     </button>`;
   };
 
@@ -4894,12 +4899,9 @@ function renderTodayRitual(){
     <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}${streak > 1 ? ` · ${streak}-day streak` : ''}</div>
     <h3>${headline}</h3>
     ${rows.length ? `
-      ${core.length ? `<div class="today-ritual-group">Non-negotiable</div>` : ''}
-      <div class="today-ritual-list">${(core.length ? core : rows).map(habitBtn).join('')}</div>
-      ${core.length && extras.length ? (shortMode
-        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=false; renderTodayRitual();">Show the rest of my ${time} (${extras.filter(h=>done.has(h.id)).length} of ${extras.length} done) →</button>`
-        : `<div class="today-ritual-group">The rest</div>
-           <div class="today-ritual-list">${extras.map(habitBtn).join('')}</div>`) : ''}
+      <div class="today-ritual-list">${(shortMode ? core : rows).map(habitBtn).join('')}</div>
+      ${core.length && extras.length && shortMode
+        ? `<button class="today-ritual-more" onclick="todayEssentialsOnly=false; renderTodayRitual();">Show the rest of my ${time} (${extras.filter(h=>done.has(h.id)).length} of ${extras.length} done) →</button>` : ''}
       ${note ? `<p class="today-ritual-note">${note}</p>` : ''}
       <div class="today-progress"><i style="width:${Math.round(doneCount / rows.length * 100)}%"></i></div>
       ${core.length && extras.length && !shortMode && st.state !== 'full'
