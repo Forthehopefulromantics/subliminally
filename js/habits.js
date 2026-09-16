@@ -131,13 +131,79 @@ function routineKept(time, dateStr){
 /* Consecutive days the ritual was kept — short nights included. This is the
    number that should be hard to break, because it's the one people are
    protecting when they push through a night they should have shortened. */
+/* ---------- grace days ----------
+   A streak a single hard day can wipe out is measuring luck, not practice. A
+   Grace Day bridges one missed day so the run behind it stays intact. Which
+   days have been bridged is loaded from the database, not decided here, so the
+   same day can't be bridged twice and the balance can't drain invisibly. */
+let graceDays = 0;                 // held and unspent
+let graceUsed = new Set();         // `${date}|${time}` for days already bridged
+
+async function loadGrace(){
+  if (!sb || !currentUser) return;
+  const [{ data: prof }, { data: used }] = await Promise.all([
+    sb.from('profiles').select('grace_days').eq('id', currentUser.id).maybeSingle(),
+    sb.from('grace_used').select('used_on, time_of_day').eq('user_id', currentUser.id),
+  ]);
+  graceDays = Number((prof && prof.grace_days) || 0);
+  graceUsed = new Set((used || []).map(r => `${r.used_on}|${r.time_of_day}`));
+}
+
+function graceBridged(time, dateStr){ return graceUsed.has(`${dateStr}|${time}`); }
+
+/* Spend one to bridge a day. Recorded before anything is shown, so what the
+   screen says and what the database holds can't disagree. */
+async function useGraceDay(time, dateStr){
+  if (!sb || !currentUser || graceDays < 1) return false;
+  const { data, error } = await sb.rpc('spend_grace_day', { p_on: dateStr, p_time: time });
+  if (error || !data){ console.warn('grace:', error && error.message); return false; }
+  graceUsed.add(`${dateStr}|${time}`);
+  graceDays = Math.max(0, graceDays - 1);
+  return true;
+}
+
+/* A day counts toward the streak if the routine was kept, or if a Grace Day
+   has already been spent on it. */
+function routineHeld(time, dateStr){
+  return routineKept(time, dateStr) || graceBridged(time, dateStr);
+}
+
 function routineStreak(time){
   let cursor = localDateStr();
   // Today not being done yet shouldn't read as the streak already being over.
-  if (!routineKept(time, cursor)) cursor = shiftDateStr(cursor, -1);
+  if (!routineHeld(time, cursor)) cursor = shiftDateStr(cursor, -1);
   let n = 0;
-  while (routineKept(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  while (routineHeld(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
   return n;
+}
+
+/* Whether yesterday is the one thing standing between you and your old streak.
+   Offered rather than taken: spending someone's Grace Day without telling them
+   is worse than letting the number reset. */
+function graceOffer(time){
+  if (graceDays < 1) return null;
+  const yesterday = shiftDateStr(localDateStr(), -1);
+  if (routineHeld(time, yesterday)) return null;          // nothing to bridge
+  const before = shiftDateStr(yesterday, -1);
+  if (!routineHeld(time, before)) return null;            // nothing behind it to save
+  let n = 0, cursor = before;
+  while (routineHeld(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  return { time, date: yesterday, saves: n };
+}
+
+/* ---------- consistency ----------
+   The streak answers "am I on a run". This answers "how have I been doing",
+   and a missed day never takes anything away from it. Any day you checked
+   something off or logged a page is a day you practised. */
+function practisedOn(dateStr){
+  if ((habitDoneByDate[dateStr] || new Set()).size) return true;
+  return !!(typeof journalPhotosByDate !== 'undefined' && journalPhotosByDate[dateStr]);
+}
+function consistency(days){
+  const span = days || 30;
+  let n = 0;
+  for (let i = 0; i < span; i++) if (practisedOn(shiftDateStr(localDateStr(), -i))) n++;
+  return { days: n, of: span, pct: Math.round(n / span * 100) };
 }
 
 /* Mark a habit as one of the non-negotiables, or take the mark off again. */
@@ -297,6 +363,36 @@ async function addHabit(time, name){
 function toggleHabitToday(habitId){ return toggleHabitOnDate(habitId, localDateStr()); }
 /* Check a habit off for any day — today from the habit list, or an earlier
    day from its calendar square. */
+/* Light for a day's practice, asked for after a check-in lands. Un-checking
+   never takes Light back: the database won't pay twice for the same day, so a
+   refund would let someone tick, untick and tick again forever. What you did
+   happened, even if you change your mind about the tick. */
+async function awardLightForDay(dateStr, near){
+  if (dateStr !== localDateStr()) return;              // only today pays
+  for (const time of ['morning','night']){
+    const rows = habitsCache.filter(h => h.time_of_day === time);
+    if (!rows.length) continue;
+    const st = routineStatusFor(time, dateStr);
+    if (st.state === 'full'){
+      await awardLight(time === 'morning' ? LIGHT_SOURCES.morningRitual : LIGHT_SOURCES.nightRitual, time, near);
+    }
+    if (st.coreTotal && st.coreDone === st.coreTotal){
+      await awardLight(LIGHT_SOURCES.nonNegotiables, time, null);
+    }
+  }
+  const bothFull = ['morning','night'].every(t => {
+    const rows = habitsCache.filter(h => h.time_of_day === t);
+    return rows.length && routineStatusFor(t, dateStr).state === 'full';
+  });
+  if (bothFull) await awardLight(LIGHT_SOURCES.perfectDay, '', null);
+  if (routineStreak(currentRitualTime()) >= 7) await awardLight(LIGHT_SOURCES.weekStreak, weekStartStr(dateStr), null);
+  // Earning is recalculated rather than incremented, so the balance can't drift.
+  if (sb && currentUser){
+    const { data } = await sb.rpc('refresh_grace_days');
+    if (typeof data === 'number') graceDays = data;
+  }
+}
+
 async function toggleHabitOnDate(habitId, dateStr){
   if (!sb || !currentUser || dateStr > localDateStr()) return;
   const days = habitCheckins[habitId] = habitCheckins[habitId] || new Set();
@@ -324,6 +420,14 @@ async function toggleHabitOnDate(habitId, dateStr){
     const msg = document.getElementById('habitsMsg');
     if (msg){ msg.textContent = "Couldn't save that check-in — check your connection and tap it again."; msg.className = 'save-msg err'; }
     loadHabits();
+    return;
+  }
+  // Only once the check-in is really saved, so Light can't be earned for a tick
+  // that didn't land.
+  if (!wasDone){
+    const near = document.querySelector(`.day-habit[onclick*="${habitId}"], .habit-row[data-habit-id="${habitId}"] .habit-check`);
+    await awardLight(LIGHT_SOURCES.habit, habitId, near);
+    await awardLightForDay(dateStr, near);
   }
 }
 /* ---------- undo and redo ----------
