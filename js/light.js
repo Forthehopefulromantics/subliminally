@@ -99,18 +99,41 @@ function showLightMark(amount, near){
   mark.addEventListener('animationend', () => mark.remove());
 }
 
+async function acceptGraceDay(time, dateStr){
+  const ok = await useGraceDay(time, dateStr);
+  if (!ok) return;
+  renderLightStrip();
+  if (typeof renderHigherSelfCard === 'function') renderHigherSelfCard();
+  if (typeof renderTodayRitual === 'function') renderTodayRitual();
+}
+
 function renderLightStrip(){
   const el = document.getElementById('lightStrip');
   if (!el) return;
   const lv = levelFor(light.lifetime);
-  const streak = routineStreak(currentRitualTime());
+  const time = currentRitualTime();
+  const streak = routineStreak(time);
+  // The streak says whether you're on a run; consistency says how you've been
+  // doing. Both, because a missed day should cost you the first and nothing of
+  // the second.
+  const con = (typeof consistency === 'function') ? consistency(30) : null;
   el.innerHTML = `
     ${streak > 1 ? `<span class="ls-item" title="${streak} days of practice"><b>${streak}</b> day${streak === 1 ? '' : 's'}</span>` : ''}
+    ${con && con.days ? `<span class="ls-item ls-con" title="${con.days} practice days in the last 30"><b>${con.days}</b>/30</span>` : ''}
     <span class="ls-item ls-light" title="${light.lifetime.toLocaleString()} Light earned in total">✦ <b>${light.lifetime.toLocaleString()}</b></span>
     <span class="ls-item ls-level">${lv.name}</span>
     <span class="ls-bar" role="img" aria-label="${lv.next ? `${lv.toNext} Light until ${lv.next}` : 'Higher Self reached'}"><i style="width:${Math.round(lv.pct * 100)}%"></i></span>`;
   el.style.display = 'flex';
+
   const note = document.getElementById('lightNote');
-  if (note) note.textContent = lv.next ? `${lv.toNext.toLocaleString()} Light until ${lv.next}` : 'You have reached Higher Self.';
+  if (!note) return;
+  // A grace day is offered, never taken quietly. Spending someone's without
+  // telling them is worse than letting the number reset.
+  const offer = (typeof graceOffer === 'function') ? graceOffer(time) : null;
+  if (offer){
+    note.innerHTML = `Yesterday was missed. <button type="button" class="grace-offer" onclick="acceptGraceDay('${offer.time}','${offer.date}')">Use a grace day</button> to hold the ${offer.saves} behind it — you have ${graceDays}.`;
+    return;
+  }
+  note.textContent = lv.next ? `${lv.toNext.toLocaleString()} Light until ${lv.next}` : 'You have reached Higher Self.';
 }
 

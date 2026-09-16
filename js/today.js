@@ -77,6 +77,8 @@ async function renderTodayPage(){
     sb.from('subliminals').select('id, title, duration_seconds').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(1),
     getMyTier(),
     loadHigherSelf(),
+    loadLight(),
+    loadGrace(),
   ]);
   const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
   document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');

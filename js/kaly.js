@@ -45,18 +45,88 @@ async function loadHigherSelf(){
   higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
 }
 
-/* What she's doing while you're reading this. She's meant to be a step ahead
-   of you, not a scoreboard — so a missed night reads as her waiting, never as
-   a telling-off. Written without pronouns so any name fits. */
-function higherSelfLine(name){
+/* ---------- what she says ----------
+   One service, not a scattering of strings, so the dialogue can get more
+   sophisticated later without hunting through the app for every line.
+
+   Rules are tried in order and the first that fits wins, so the more specific
+   ones sit at the top. Each gets the same picture of the day, which keeps them
+   honest with each other.
+
+   Three things none of these lines will ever do: blame you for a day you
+   missed, tell you that you failed, or imply you have let anyone down. A
+   missed day is a day; tomorrow is the practice.
+
+   She is written without pronouns throughout, so whatever name you give her
+   fits without rewriting anything. */
+function kalyState(){
+  const today = localDateStr();
   const time = currentRitualTime();
-  const st = routineStatusFor(time, localDateStr());
-  if (st.state === 'full') return `${name} couldn't be prouder — that was the whole list.`;
-  if (st.state === 'essentials') return `${name} counts that as kept. Rest now.`;
-  if (st.state === 'partial') return `${name} is doing it alongside you.`;
-  if (time === 'morning') return `${name} has already started the day. Come and join.`;
-  return `${name} is already winding down for the night.`;
+  const hour = new Date().getHours();
+  const st = routineStatusFor(time, today);
+  const done = (habitDoneByDate[today] || new Set()).size;
+  return {
+    time, hour, st, done,
+    part: hour < 12 ? 'morning' : hour < 17 ? 'midday' : 'evening',
+    streak: routineStreak(time),
+    consistency: (typeof consistency === 'function') ? consistency(30) : null,
+    journalled: !!(typeof journalPhotosByDate !== 'undefined' && journalPhotosByDate[today]),
+    listened: (typeof lightToday !== 'undefined') && lightToday.has(LIGHT_SOURCES.subliminal),
+    grace: (typeof graceOffer === 'function') ? graceOffer(time) : null,
+    yesterdayMissed: (typeof routineHeld === 'function')
+      && !routineHeld(time, shiftDateStr(today, -1)),
+  };
 }
+
+const KALY_RULES = [
+  // Everything kept. Said plainly — overdoing it here makes the small days feel small.
+  { when: s => s.st.state === 'full' && s.journalled && s.listened,
+    say: (n, s) => `You showed up for yourself today. Every part of it.` },
+  { when: s => s.st.state === 'full',
+    say: (n, s) => `${n} couldn't be prouder — that was the whole list.` },
+  { when: s => s.st.state === 'essentials',
+    say: (n, s) => `${n} counts that as kept. Rest now.` },
+
+  // A run worth naming.
+  { when: s => s.streak >= 7 && s.st.state === 'partial',
+    say: (n, s) => `${s.streak} days running. ${n} is keeping pace with you.` },
+
+  // A missed day. Never a reprimand, and never the first thing said.
+  { when: s => s.yesterdayMissed && s.grace,
+    say: (n, s) => `Yesterday got away from you. A grace day can hold the ${s.grace.saves} behind it.` },
+  { when: s => s.yesterdayMissed && s.done === 0 && s.part !== 'evening',
+    say: (n, s) => `Tomorrow is another chance to practice — and so is today.` },
+
+  // Mid-practice.
+  { when: s => s.done >= 4,
+    say: (n, s) => `You've kept ${s.done} promises to yourself today.` },
+  { when: s => s.st.state === 'partial',
+    say: (n, s) => `${n} is doing it alongside you.` },
+
+  // Nothing done yet, by hour.
+  { when: s => s.part === 'morning',
+    say: (n, s) => `Good morning. Let's decide what kind of day we're creating.` },
+  { when: s => s.part === 'midday' && s.done === 0,
+    say: (n, s) => `${n} is waiting whenever you're ready to start.` },
+  { when: s => s.part === 'evening',
+    say: (n, s) => `Let's close out the day.` },
+];
+
+/* The line for right now. `name` is what she's been called; everything else is
+   read off the day. */
+function kalyMessage(name){
+  const who = (name || '').trim() || 'Your higher self';
+  const state = kalyState();
+  for (const rule of KALY_RULES){
+    try { if (rule.when(state)) return rule.say(who, state); } catch(e){ /* a rule that can't decide doesn't get a turn */ }
+  }
+  return state.time === 'morning'
+    ? `${who} has already started the day. Come and join.`
+    : `${who} is already winding down for the night.`;
+}
+
+/* Kept because the Today card and the old tests both call it. */
+function higherSelfLine(name){ return kalyMessage(name); }
 
 function renderHigherSelfCard(){
   const card = document.getElementById('higherSelfCard');
