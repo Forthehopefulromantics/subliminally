@@ -642,14 +642,18 @@
   /* Lifted off the list while it follows your finger. */
   .habit-row.dragging{ position:relative; z-index:5; border-color:var(--lilac); box-shadow:0 10px 28px rgba(0,0,0,0.45); cursor:grabbing; }
   body.habit-dragging{ user-select:none; }
-  .habit-grip{ background:none; border:none; padding:4px 2px; color:rgba(156,147,184,0.5); cursor:grab; touch-action:none; display:flex; align-items:center; }
-  .habit-grip:hover{ color:var(--lilac); }
-  .habit-grip:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; border-radius:6px; }
+  /* The position is the handle: it says where the habit comes in the order and
+     it's the thing you drag to change it, so the row carries one control where
+     it used to carry three. */
+  .habit-order{ width:26px; height:26px; flex:0 0 auto; padding:0; border-radius:9px;
+    display:flex; align-items:center; justify-content:center; cursor:grab; touch-action:none;
+    font-family:inherit; font-size:12.5px; font-weight:500; font-variant-numeric:tabular-nums;
+    color:var(--haze); background:var(--sunk); border:1px solid transparent;
+    transition:color .2s, background .2s, border-color .2s; }
+  .habit-order:hover{ color:var(--moonlight); border-color:var(--dusk); }
+  .habit-order:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  .habit-row.dragging .habit-order{ cursor:grabbing; color:var(--lilac); border-color:var(--lilac); }
   .habit-actions{ display:flex; align-items:center; gap:2px; }
-  .habit-move{ background:none; border:none; color:rgba(156,147,184,0.55); font-size:14px; line-height:1; padding:5px 6px; cursor:pointer; border-radius:6px; transition:color .2s, background .2s; }
-  .habit-move:hover:not(:disabled){ color:var(--moonlight); background:rgba(255,255,255,0.06); }
-  .habit-move:disabled{ opacity:.25; cursor:default; }
-  .habit-move:focus-visible{ outline:2px solid var(--lilac); outline-offset:1px; }
   .habit-undo-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .habit-undo-label{ font-size:12.5px; color:var(--haze); margin-right:2px; }
   .habit-undo-bar .mini-btn{ font-size:12px; padding:7px 14px; }
@@ -6149,9 +6153,9 @@ function renderHabits(){
       const safeName = h.name.replace(/"/g,'&quot;');
       return `
       <div class="habit-row${isDone ? ' done-today' : ''}" data-habit-id="${h.id}" data-time="${time}">
-        <button class="habit-grip" aria-label="Drag ${safeName} to reorder" title="Drag to reorder">
-          <svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><circle cx="3" cy="2" r="1.4" fill="currentColor"/><circle cx="9" cy="2" r="1.4" fill="currentColor"/><circle cx="3" cy="7" r="1.4" fill="currentColor"/><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="3" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/></svg>
-        </button>
+        <button class="habit-order" data-habit-id="${h.id}" onkeydown="habitOrderKey(event,'${h.id}')"
+          aria-label="${safeName} is number ${i + 1}. Drag, or use the arrow keys, to move it."
+          title="Drag to reorder">${i + 1}</button>
         <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
@@ -6161,8 +6165,6 @@ function renderHabits(){
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
         <div class="habit-actions">
-          <button class="habit-move" onclick="moveHabit('${h.id}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move ${safeName} up" title="Move up">↑</button>
-          <button class="habit-move" onclick="moveHabit('${h.id}',1)" ${i === rows.length - 1 ? 'disabled' : ''} aria-label="Move ${safeName} down" title="Move down">↓</button>
           <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
             aria-pressed="${h.is_core ? 'true' : 'false'}"
             title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
@@ -6344,7 +6346,7 @@ async function redoHabits(){
 let habitDrag = null;
 
 function startHabitDrag(e){
-  const grip = e.target.closest('.habit-grip');
+  const grip = e.target.closest('.habit-order');
   if (!grip || e.button > 0) return;
   const row = grip.closest('.habit-row');
   const list = row && row.parentElement;
@@ -6363,6 +6365,13 @@ function startHabitDrag(e){
   document.body.classList.add('habit-dragging');
 }
 
+/* The rows are reordered in the DOM as you drag, so the numbers have to keep
+   up — otherwise you'd be dropping a row labelled 4 into position 2. */
+function renumberHabitList(list){
+  [...list.querySelectorAll('.habit-row:not(.habit-row-blank) .habit-order')]
+    .forEach((el, i) => { el.textContent = i + 1; });
+}
+
 function moveHabitDrag(e){
   if (!habitDrag) return;
   e.preventDefault();
@@ -6377,8 +6386,8 @@ function moveHabitDrag(e){
     const box = other.getBoundingClientRect();
     const otherMid = box.top + box.height / 2;
     const before = other.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING;
-    if (before && mid < otherMid){ habitDrag.list.insertBefore(row, other); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
-    if (!before && mid > otherMid){ habitDrag.list.insertBefore(row, other.nextSibling); habitDrag.startY = e.clientY; row.style.transform = ''; break; }
+    if (before && mid < otherMid){ habitDrag.list.insertBefore(row, other); habitDrag.startY = e.clientY; row.style.transform = ''; renumberHabitList(habitDrag.list); break; }
+    if (!before && mid > otherMid){ habitDrag.list.insertBefore(row, other.nextSibling); habitDrag.startY = e.clientY; row.style.transform = ''; renumberHabitList(habitDrag.list); break; }
   }
 }
 
@@ -6424,6 +6433,18 @@ async function persistHabitOrder(time, ordered){
 }
 
 /* Nudge one habit up or down its own routine. */
+/* Dragging is a pointer gesture, so the arrow keys keep the list reorderable
+   without putting the arrow buttons back on screen. */
+function habitOrderKey(e, habitId){
+  const dir = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+  if (!dir) return;
+  e.preventDefault();
+  moveHabit(habitId, dir).then(() => {
+    const el = document.querySelector(`.habit-order[data-habit-id="${habitId}"]`);
+    if (el) el.focus();
+  });
+}
+
 async function moveHabit(habitId, dir){
   if (!sb || !currentUser) return;
   const habit = habitsCache.find(h => h.id === habitId);
