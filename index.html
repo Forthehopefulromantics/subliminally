@@ -883,6 +883,56 @@
   .ls-item{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
   .ls-item b{ color:var(--moonlight); font-weight:500; font-variant-numeric:tabular-nums; }
   .ls-light b{ color:var(--candle); }
+  .ls-con b{ color:var(--good); }
+  .grace-offer{ background:none; border:none; padding:0; font-family:inherit; font-size:inherit;
+    color:var(--candle); text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+  .grace-offer:hover{ color:var(--moonlight); }
+
+  /* ---- a month at a glance ----
+     Four marks on a square: the two rituals, a page, a session. Enough to read
+     a month without turning each day into a chart. */
+  .cal-day-marks{ position:absolute; left:0; right:0; bottom:9px; display:flex;
+    justify-content:center; gap:3px; pointer-events:none; }
+  .cm{ width:4px; height:4px; border-radius:50%; display:block; }
+  .cm-morning{ background:var(--candle); }
+  .cm-night{ background:var(--lilac); }
+  .cm-journal{ background:var(--good); }
+  .cm-subliminal{ background:#7FB3D5; }
+  .cal-legend{ display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;
+    font-size:11px; color:var(--haze); }
+  .cal-legend span{ display:inline-flex; align-items:center; gap:5px; }
+
+  /* ---- the day you open ---- */
+  .day-verdict{ font-family:var(--serif); font-size:17px; color:var(--moonlight);
+    margin:0 0 3px; text-wrap:balance; }
+  .day-aligned{ font-size:13px; color:var(--haze); margin:0 0 14px; }
+  .day-aligned b{ color:var(--candle); font-weight:500; font-variant-numeric:tabular-nums; }
+  .day-practice{ list-style:none; margin:0 0 16px; padding:0;
+    display:flex; flex-direction:column; gap:1px; }
+  .day-practice li{ display:flex; align-items:center; gap:10px; padding:7px 0;
+    font-size:13.5px; color:var(--haze); }
+  .dp-tick{ width:17px; height:17px; border-radius:50%; flex-shrink:0;
+    border:1.5px solid var(--dusk); display:grid; place-items:center;
+    font-size:10px; color:transparent; }
+  .day-practice li.on .dp-tick{ background:var(--good); border-color:var(--good); color:#1F3A29; }
+  .day-practice li.on .dp-label{ color:var(--moonlight); }
+  .dp-label{ flex:1; min-width:0; overflow-wrap:anywhere; }
+  .dp-detail{ flex-shrink:0; font-size:12px; }
+
+  /* ---- the week behind you ---- */
+  .week-report{ margin-bottom:22px; }
+  .week-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; margin-bottom:12px; }
+  .week-head h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); font-weight:400; }
+  .week-aligned{ font-family:var(--serif); font-size:26px; color:var(--candle);
+    font-variant-numeric:tabular-nums; line-height:1; }
+  .week-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(118px,1fr)); gap:10px; }
+  .week-stat{ background:var(--sunk); border-radius:12px; padding:11px 13px; }
+  .week-stat b{ display:block; font-size:17px; color:var(--moonlight); font-weight:500;
+    font-variant-numeric:tabular-nums; }
+  .week-stat span{ font-size:11.5px; color:var(--haze); }
+  .week-note{ font-size:13px; color:var(--haze); margin-top:13px; line-height:1.6; }
+  .week-note b{ color:var(--moonlight); font-weight:500; }
   .ls-level{ font-family:var(--serif); font-size:13px; color:var(--moonlight);
     letter-spacing:.01em; }
   .ls-bar{ flex:1 1 90px; min-width:70px; height:3px; border-radius:2px;
@@ -1663,6 +1713,7 @@
           <div class="log-reward-msg" id="logRewardHabits" style="display:none;"></div>
         </div>
       </div>
+      <div class="today-card week-report" id="weekReport" style="display:none;"></div>
       <div class="calendar-card">
         <div class="calendar-head">
           <button type="button" class="cal-nav" onclick="shiftPhotoMonth(-1)" aria-label="Previous month">‹</button>
@@ -1671,6 +1722,12 @@
         </div>
         <div class="calendar-dow"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
         <div class="calendar-grid" id="photoCalendarGrid"></div>
+        <div class="cal-legend" aria-hidden="true">
+          <span><i class="cm cm-morning"></i>Morning</span>
+          <span><i class="cm cm-night"></i>Night</span>
+          <span><i class="cm cm-journal"></i>Page</span>
+          <span><i class="cm cm-subliminal"></i>Session</span>
+        </div>
       </div>
       <input type="file" id="photoFile" accept="image/*" capture="environment" style="display:none;">
     </div>

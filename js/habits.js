@@ -409,6 +409,7 @@ async function toggleHabitOnDate(habitId, dateStr){
   // Checking something off is the moment she has something new to say.
   if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
   renderPhotoCalendar();
+  renderWeekReport();
   renderDailyLogReward();
   const { error } = wasDone
     ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', dateStr)
