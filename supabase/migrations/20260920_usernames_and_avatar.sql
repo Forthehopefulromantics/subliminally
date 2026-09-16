@@ -4,8 +4,7 @@
 --   1. usernames. The app has always had a username field, but the column was
 --      never created, which is why saving one failed. This adds it and makes
 --      it unique regardless of case, so "Kyla" and "kyla" can't both exist.
---   2. how your higher self looks: the hairstyle, and the four colours the
---      artwork is tinted with.
+--   2. which of the drawn avatars is your higher self.
 
 alter table public.profiles add column if not exists username text;
 
