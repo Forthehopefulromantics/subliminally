@@ -24,7 +24,7 @@ const FILES_TO_COPY = [
 // Whole folders the site references. Without these the native apps bundle the
 // markup but none of the pictures, and every <img> is a blank space in the app
 // while looking fine on the website.
-const DIRS_TO_COPY = ['img'];
+const DIRS_TO_COPY = ['img', 'js'];
 
 fs.mkdirSync(WWW, { recursive: true });
 
