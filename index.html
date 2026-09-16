@@ -422,6 +422,7 @@
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="rituals"] > nav ~ section:not(#rituals),
   body[data-view="today"] > nav ~ section:not(#today),
+  body[data-view="sanctuary"] > nav ~ section:not(#sanctuary),
   /* The builder is its own page now, so it's not part of the scroll down the
      marketing home — that's where the "too busy" was coming from. */
   body:not([data-view]) #flow-section,
@@ -432,14 +433,87 @@
   body[data-view="journal"] > footer,
   body[data-view="rituals"] > footer,
   body[data-view="today"] > footer,
+  body[data-view="sanctuary"] > footer,
   body[data-view="build"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="today"]) #today{ display:none !important; }
+  body:not([data-view="sanctuary"]) #sanctuary{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
   body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
   body:not([data-view="rituals"]) #rituals{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
+
+  /* ---- the Sanctuary ----
+     The stage is exactly the ratio of the artwork and is never cropped, which
+     is the whole trick: object-fit:cover crops by an amount that changes with
+     the shape of the screen, so a hotspot at "38% across" would sit on the door
+     on one phone and on the wall beside it on another. Nothing here crops, so a
+     percentage means the same thing on every device. The only thing that does
+     crop is the backdrop, which is blurred and which nobody taps. */
+  .sanctuary-section{ padding:0 0 40px; }
+  .sanc-frame{ position:relative; overflow:hidden; }
+  .sanc-backdrop{ position:absolute; inset:-8%; background-size:cover; background-position:center;
+    filter:blur(44px) saturate(.8) brightness(.5); opacity:0; transition:opacity .6s ease; }
+  .sanc-backdrop.on{ opacity:1; }
+  .sanc-stage{ position:relative; margin:0 auto; aspect-ratio:9/16;
+    width:min(100%, calc((100dvh - 132px) * 9 / 16));
+    background:var(--dusk); overflow:hidden; }
+  @supports not (height: 100dvh){ .sanc-stage{ width:min(100%, calc((100vh - 132px) * 9 / 16)); } }
+  .sanc-stage > img.sanc-art{ width:100%; height:100%; display:block; object-fit:fill; }
+  /* Room entrances live near the edges, and a status bar sits over the top
+     eighth and a nav bar over the bottom one. Both are scrimmed rather than
+     avoided, so artwork can run edge to edge behind readable text. */
+  .sanc-top, .sanc-bottom{ position:absolute; left:0; right:0; pointer-events:none; }
+  /* The strong part of the scrim reaches past the second line, not just the
+     first. Measured against the artwork rather than eyeballed: the subtitle is
+     body-size text, so it needs 4.5:1 against the *lightest* pixel it can land
+     on, and the moon is directly behind it. */
+  .sanc-top{ top:0; padding:14px 18px 54px;
+    background:linear-gradient(180deg, rgba(10,8,22,.94) 0%, rgba(10,8,22,.90) 52%,
+                               rgba(10,8,22,.62) 74%, rgba(10,8,22,0) 100%); }
+  .sanc-bottom{ bottom:0; padding:40px 18px 20px;
+    background:linear-gradient(0deg, rgba(10,8,22,.88), rgba(10,8,22,0)); }
+  .sanc-top *, .sanc-bottom *{ pointer-events:auto; }
+  /* Fixed colours, not the theme's: this text sits on artwork, and --haze is
+     tuned for a dark panel. The scrim carries most of it; the shadow covers the
+     rest for a picture that is pale exactly where the title goes. */
+  .sanc-title{ font-family:var(--serif); font-size:20px; color:#FFF7EE;
+    text-shadow:0 1px 12px rgba(10,8,22,.9), 0 0 3px rgba(10,8,22,.7); }
+  .sanc-sub{ font-size:12.5px; color:#F4EFFB; margin-top:3px;
+    text-shadow:0 1px 10px rgba(10,8,22,.95), 0 0 3px rgba(10,8,22,.8); }
+  .sanc-empty{ display:grid; place-items:center; height:100%; padding:30px; text-align:center; }
+  .sanc-empty p{ color:var(--haze); font-size:13.5px; max-width:30ch; margin-top:8px; }
+
+
+  /* the room list, under the picture rather than over it */
+  .sanc-rooms{ list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:1px; }
+  .sanc-room{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; align-items:baseline;
+    padding:11px 2px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .sr-name{ font-family:var(--serif); font-size:15.5px; color:var(--moonlight); }
+  .sr-blurb{ grid-column:1; font-size:12.5px; color:var(--haze); }
+  .sr-state{ grid-row:1; grid-column:2; font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--haze); }
+  /* Status is never colour alone: each state carries its own word as well. */
+  .sanc-room.is-locked .sr-name, .sanc-room.is-locked .sr-blurb{ opacity:.45; }
+  .sanc-room.is-new .sr-state{ color:var(--candle); }
+  .sanc-room.is-coming .sr-state{ color:var(--lilac); }
+
+  /* the way in, on Today */
+  .sanc-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    background:var(--veil); border:1px solid rgba(255,255,255,.07); border-radius:16px;
+    padding:10px 14px 10px 10px; margin-bottom:12px; cursor:pointer; color:inherit;
+    font-family:inherit; transition:border-color .2s; }
+  .sanc-row:hover{ border-color:rgba(227,190,127,.4); }
+  .sanc-row-thumb{ width:46px; height:46px; border-radius:12px; overflow:hidden; flex-shrink:0;
+    background:var(--dusk); }
+  .sanc-row-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .sanc-row-txt{ flex:1; min-width:0; }
+  .sanc-row-txt b{ display:block; font-family:var(--serif); font-weight:400; font-size:15.5px;
+    color:var(--moonlight); }
+  .sanc-row-txt span{ font-size:12px; color:var(--haze); }
+  .sanc-row-go{ color:var(--candle); font-size:18px; flex-shrink:0; }
+
   .profile-page-back{ display:none; }
   body[data-view] .profile-page-back{ display:inline-flex; }
   .profile-icon-btn{ background:none; border:none; cursor:pointer; font-size:17px; color:var(--haze); padding:0; line-height:1; transition:color .2s; }
@@ -1150,6 +1224,7 @@
       <div class="today-greeting" id="todayGreeting">Welcome back</div>
       <div class="today-date" id="todayDate"></div>
     </div>
+    <div id="todaySanctuaryRow"></div>
     <div class="today-card today-card-primary" id="todayJourneyCard" style="display:none;"></div>
     <div class="today-card" id="todaySessionCard"></div>
     <div class="today-card" id="todayRitualCard" style="display:none;"></div>
@@ -1162,6 +1237,20 @@
       <button onclick="showProfilePage()">Profile</button>
     </div>
   </div>
+</section>
+
+<!-- The Sanctuary. One section for the whole thing: the overview and each room
+     take turns inside #sanctuaryStage, because every extra section here is
+     another hand-kept list of view names three rules further up. -->
+<section class="sanctuary-section" id="sanctuary">
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+  </div>
+  <div class="sanc-frame">
+    <div class="sanc-backdrop" id="sanctuaryBackdrop" aria-hidden="true"></div>
+    <div class="sanc-stage" id="sanctuaryStage"></div>
+  </div>
+  <div class="wrap"><div id="sanctuaryBelow"></div></div>
 </section>
 
 <section class="hero">

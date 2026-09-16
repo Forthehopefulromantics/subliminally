@@ -198,3 +198,85 @@ function sanctuaryProgress(){
   const open  = SANCTUARY_ROOMS.filter(r => roomState(r.key) !== 'locked').length;
   return { open, total, waiting: unplacedItems().length };
 }
+
+/* ---------- the overview ----------
+   One stage, reused. The overview and each room take turns inside it rather
+   than being separate pages, so there is one route to keep working instead of
+   nine, and moving between them is a swap rather than a navigation.
+
+   Hotspots arrive in the next step; this renders the house and what is in it. */
+let sanctuaryRoomOpen = null;       // null on the overview, otherwise a room key
+
+function renderSanctuaryHome(){
+  const stage = document.getElementById('sanctuaryStage');
+  const below = document.getElementById('sanctuaryBelow');
+  const back  = document.getElementById('sanctuaryBackdrop');
+  if (!stage) return;
+  sanctuaryRoomOpen = null;
+
+  const art = 'img/sanctuary-home/00-home-overview.webp';
+  const p = sanctuaryProgress();
+
+  /* The backdrop is the same picture, blurred, filling whatever the stage does
+     not on a wide screen. It is decorative and never tapped, so it is the one
+     thing here allowed to crop. */
+  if (back){ back.style.backgroundImage = `url("${art}")`; back.classList.add('on'); }
+
+  stage.innerHTML = `
+    <img class="sanc-art" src="${art}" alt="Your Sanctuary: a two-story home among floating islands and waterfalls">
+    <div class="sanc-top">
+      <div class="sanc-title">Your Sanctuary</div>
+      <div class="sanc-sub">${p.open} of ${p.total} spaces open${p.waiting ? ` · ${p.waiting} waiting to be placed` : ''}</div>
+    </div>`;
+
+  /* The room list sits under the picture rather than over it. Over it, every
+     name needs its own scrim to stay readable against artwork that changes; the
+     same list underneath is readable by default and reachable by tab. */
+  if (below){
+    below.innerHTML = `<ul class="sanc-rooms">${SANCTUARY_ROOMS.map(r => {
+      const st = roomState(r.key);
+      const note = st === 'locked' ? 'Not open yet'
+                 : st === 'coming' ? 'Earned — being drawn'
+                 : st === 'new'    ? 'New'
+                 : 'Open';
+      return `<li class="sanc-room is-${st}">
+        <span class="sr-name">${r.name}</span>
+        <span class="sr-blurb">${r.blurb}</span>
+        <span class="sr-state">${note}</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+}
+
+/* Entering is a swap of what is on the stage, so there is nothing to undo on
+   the way back out. Rooms themselves land in a later step; this exists now so
+   the route and the back path are built and tested together. */
+function showSanctuary(roomKey){
+  if (!currentUser){ openAuthModal(); return; }
+  document.body.setAttribute('data-view', 'sanctuary');
+  window.scrollTo(0, 0);
+  history.pushState({ page:'sanctuary' }, '', '#sanctuary');
+  renderSanctuaryHome();
+}
+
+/* The way in, on Today. A thumbnail of the house and the count, so most days
+   the answer arrives without going anywhere — opening it is for when you want
+   to stand in it.
+
+   Hidden rather than empty until the migration has run, because a row that
+   says nothing is worse than no row. */
+function renderTodaySanctuaryRow(){
+  const host = document.getElementById('todaySanctuaryRow');
+  if (!host) return;
+  if (!sanctuary.ready){ host.innerHTML = ''; return; }
+  const p = sanctuaryProgress();
+  host.innerHTML = `
+    <button type="button" class="sanc-row" onclick="showSanctuary()">
+      <span class="sanc-row-thumb"><img src="img/sanctuary-home/00-home-overview.webp" alt=""></span>
+      <span class="sanc-row-txt">
+        <b>My Sanctuary</b>
+        <span>${p.open} of ${p.total} spaces open${p.waiting ? ` · ${p.waiting} to place` : ''}</span>
+      </span>
+      <span class="sanc-row-go" aria-hidden="true">›</span>
+    </button>`;
+}

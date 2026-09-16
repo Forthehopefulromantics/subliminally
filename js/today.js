@@ -80,6 +80,7 @@ async function renderTodayPage(){
     loadHigherSelf(),
     loadLight(),
     loadGrace(),
+    loadSanctuary(),
   ]);
   const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
   document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');
@@ -90,6 +91,7 @@ async function renderTodayPage(){
   else document.getElementById('todayRitualCard').style.display = 'none';
   renderHigherSelfCard();
   renderLightStrip();
+  renderTodaySanctuaryRow();
   if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
   else document.getElementById('todayPageCard').style.display = 'none';
   renderTodayJourney();   // last, so the journal load has landed and its state is real
