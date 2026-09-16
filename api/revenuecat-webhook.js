@@ -137,6 +137,10 @@ export default async function handler(req, res) {
     res.status(200).json({ received: true, skipped: 'no app_user_id on event' });
     return;
   }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(event.app_user_id)) {
+    res.status(200).json({ received: true, skipped: 'app_user_id is not a Supabase user id' });
+    return;
+  }
 
   try {
     const userId = event.app_user_id;
@@ -146,6 +150,10 @@ export default async function handler(req, res) {
     if (event.type === 'EXPIRATION') {
       await upsertByUserId(userId, { status: 'canceled' });
     } else if (ACTIVE_EVENT_TYPES.has(event.type)) {
+      if (!tier) {
+        res.status(200).json({ received: true, skipped: 'unknown product_id' });
+        return;
+      }
       await upsertByUserId(userId, {
         tier,
         status: expirationMs && expirationMs > Date.now() ? 'active' : 'canceled',

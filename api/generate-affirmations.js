@@ -1,6 +1,7 @@
 export const config = { api: { bodyParser: true } };
 
 import { applyCors } from '../lib/cors.js';
+import { authorizeAiRequest, cleanPromptValue, sendAuthorizationError } from '../lib/ai-security.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -15,13 +16,19 @@ export default async function handler(req, res) {
     return;
   }
 
+  const authorization = await authorizeAiRequest(req, { action: 'affirmations' });
+  if (authorization.error) return sendAuthorizationError(res, authorization);
+
   const { count, freqLabel, toneLabel, goal } = req.body || {};
   const safeCount = Math.min(Math.max(parseInt(count, 10) || 14, 5), 20);
+  const safeFrequency = cleanPromptValue(freqLabel, 80) || 'none';
+  const safeTone = cleanPromptValue(toneLabel, 80) || 'warm';
+  const safeGoal = cleanPromptValue(goal, 1500) || 'not specified';
 
   const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
-Frequency association (mood only, not medical): ${freqLabel || 'none'}
-Desired voice/tone: ${toneLabel || 'warm'}
-What the person said they want help with: "${goal || 'not specified'}"
+Frequency association (mood only, not medical): ${safeFrequency}
+Desired voice/tone: ${safeTone}
+What the person said they want help with: "${safeGoal}"
 Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
 Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.`;
 

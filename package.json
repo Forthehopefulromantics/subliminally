@@ -4,6 +4,8 @@
   "private": true,
   "description": "Subliminally by FTHR — web site plus the Capacitor wrapper that builds the iOS and Android apps from it.",
   "scripts": {
+    "check:syntax": "for file in api/*.js lib/*.js js/*.js; do node --check \"$file\" || exit 1; done",
+    "test": "npm run check:syntax && node --test tests/*.test.cjs",
     "cap:sync": "node scripts/sync-web-assets.js && cap sync",
     "cap:ios": "npm run cap:sync && cap open ios",
     "cap:android": "npm run cap:sync && cap open android"

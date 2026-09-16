@@ -10,6 +10,11 @@
 // Required environment variables (set these in Vercel -> Project -> Settings -> Environment Variables):
 //   STRIPE_SECRET_KEY        - Stripe Dashboard -> Developers -> API keys -> Secret key
 //   STRIPE_WEBHOOK_SECRET    - shown when you create the webhook endpoint in Stripe (see setup notes)
+//   STRIPE_PRICE_WHISPER_MONTHLY / STRIPE_PRICE_WHISPER_ANNUAL
+//   STRIPE_PRICE_RITUAL_MONTHLY  / STRIPE_PRICE_RITUAL_ANNUAL
+//     - immutable price_... IDs from the four active Payment Links
+//   STRIPE_PRICE_WHISPER_LEGACY / STRIPE_PRICE_RITUAL_LEGACY
+//     - optional comma-separated old price_... IDs for existing subscribers
 //   SUPABASE_URL             - same Project URL used on the site
 //   SUPABASE_SERVICE_ROLE_KEY- Supabase -> Settings -> API -> service_role key (NOT the publishable one)
 
@@ -20,28 +25,28 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Which plan a payment buys, keyed by what it charges in cents. Going by the
-// amount rather than the Price ID means new Payment Links at the same prices
-// keep working without a code change, and there's no ID to copy across by hand
-// and get wrong.
-//
-// Legacy amounts are from before the plan restructure. Reverie was retired;
-// anyone still paying for it keeps everything they had, which now lives on Ritual.
-const AMOUNT_TO_TIER = {
-  555: 'whisper',    // Whisper monthly, $5.55
-  5500: 'whisper',   // Whisper yearly, $55
-  1111: 'ritual',    // Ritual monthly, $11.11
-  11100: 'ritual',   // Ritual yearly, $111
-  1000: 'whisper',   // legacy Whisper, $10/mo
-  2200: 'ritual',    // legacy Reverie, $22/mo
-  3500: 'ritual',    // legacy Ritual, $35/mo
-};
+// Immutable Stripe Price IDs are the subscription authority. Configure the
+// current IDs in Vercel; optional legacy IDs may be comma-separated so existing
+// subscribers keep their access during renewals.
+const PRICE_TO_TIER = new Map();
+function registerPrices(value, tier) {
+  String(value || '').split(',').map((id) => id.trim()).filter(Boolean)
+    .forEach((id) => PRICE_TO_TIER.set(id, tier));
+}
+registerPrices(process.env.STRIPE_PRICE_WHISPER_MONTHLY, 'whisper');
+registerPrices(process.env.STRIPE_PRICE_WHISPER_ANNUAL, 'whisper');
+registerPrices(process.env.STRIPE_PRICE_RITUAL_MONTHLY, 'ritual');
+registerPrices(process.env.STRIPE_PRICE_RITUAL_ANNUAL, 'ritual');
+registerPrices(process.env.STRIPE_PRICE_WHISPER_LEGACY, 'whisper');
+registerPrices(process.env.STRIPE_PRICE_RITUAL_LEGACY, 'ritual');
 
 function tierForSubscription(sub) {
   const price = sub.items?.data?.[0]?.price;
   if (!price) return null;
-  const tier = AMOUNT_TO_TIER[price.unit_amount] || null;
-  if (!tier) console.error('No tier mapped for amount', price.unit_amount, 'price', price.id);
+  const metadataTier = price.metadata && ['whisper', 'ritual'].includes(price.metadata.subliminally_tier)
+    ? price.metadata.subliminally_tier : null;
+  const tier = PRICE_TO_TIER.get(price.id) || metadataTier;
+  if (!tier) console.error('No tier mapped for Stripe Price ID', price.id);
   return tier;
 }
 
@@ -54,16 +59,25 @@ function getRawBody(req) {
   });
 }
 
-async function verifyStripeSignature(rawBody, sigHeader, secret) {
+export async function verifyStripeSignature(rawBody, sigHeader, secret, nowSeconds = Math.floor(Date.now() / 1000)) {
   const crypto = await import('crypto');
-  if (!sigHeader) return false;
-  const parts = Object.fromEntries(sigHeader.split(',').map((p) => p.split('=')));
-  const signedPayload = `${parts.t}.${rawBody}`;
+  if (!sigHeader || !secret) return false;
+  const values = {};
+  for (const part of sigHeader.split(',')) {
+    const splitAt = part.indexOf('=');
+    if (splitAt < 1) continue;
+    const key = part.slice(0, splitAt);
+    (values[key] = values[key] || []).push(part.slice(splitAt + 1));
+  }
+  const timestamp = Number(values.t && values.t[0]);
+  if (!Number.isFinite(timestamp) || Math.abs(nowSeconds - timestamp) > 300) return false;
+  const signedPayload = `${timestamp}.${rawBody}`;
   const expected = crypto.createHmac('sha256', secret).update(signedPayload, 'utf8').digest('hex');
   const a = Buffer.from(expected);
-  const b = Buffer.from(parts.v1 || '');
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  return (values.v1 || []).some((signature) => {
+    const b = Buffer.from(signature);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  });
 }
 
 async function supabaseRequest(path, options) {
@@ -172,6 +186,7 @@ export default async function handler(req, res) {
       if (userId && session.subscription) {
         const sub = await fetchStripeSubscription(session.subscription);
         const tier = tierForSubscription(sub);
+        if (!tier) throw new Error('Checkout used an unmapped Stripe Price ID');
         await upsertByUserId(userId, {
           stripe_customer_id: session.customer,
           tier,
@@ -188,12 +203,12 @@ export default async function handler(req, res) {
       const sub = event.data.object;
       const tier = tierForSubscription(sub);
       const patch = {
-        tier,
         status: sub.status,
         current_period_end: sub.current_period_end
           ? new Date(sub.current_period_end * 1000).toISOString()
           : null,
       };
+      if (tier) patch.tier = tier;
       // Reset the download count at the start of each new billing period
       const prevPeriodEnd = event.data.previous_attributes?.current_period_end;
       if (prevPeriodEnd && prevPeriodEnd !== sub.current_period_end) {
