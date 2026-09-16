@@ -4257,11 +4257,11 @@ async function applyPendingSignupProfile(){
       avatarUrl = pub.publicUrl;
     }
   }
-  const { error } = await sb.from('profiles').update({
+  const error = await saveProfile({
     username: pending.username,
     avatar: avatarUrl ? null : pending.avatar,
     avatar_url: avatarUrl
-  }).eq('id', currentUser.id);
+  });
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){
     // Username collided — let them fix it in the questionnaire/profile rather than blocking login.
     console.warn('Username taken; user can set another in onboarding.');
@@ -4331,7 +4331,7 @@ async function submitOnboarding(){
     signup_reason: document.getElementById('obReason').value.trim() || null,
   };
   msg.textContent = 'Saving…'; msg.className = 'auth-msg';
-  const { error } = await sb.from('profiles').update(patch).eq('id', currentUser.id);
+  const error = await saveProfile(patch);
   if (error){
     if (error.message && error.message.toLowerCase().includes('duplicate')){
       msg.textContent = 'That username is taken — try another.'; msg.className = 'auth-msg err';
@@ -4793,8 +4793,8 @@ async function pickHigherSelf(id){
   renderHigherSelfPicker();
   renderHigherSelfCard();
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { error } = await sb.from('profiles').update({ higher_self_avatar: id }).eq('id', currentUser.id);
-  if (error){ console.warn('higher self:', error.message); msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+  const error = await saveProfile({ higher_self_avatar: id });
+  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
 }
 
@@ -4803,8 +4803,8 @@ async function updateHigherSelfName(){
   const msg = document.getElementById('higherSelfMsg');
   const name = document.getElementById('higherSelfNameInput').value.trim().slice(0, 24);
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { error } = await sb.from('profiles').update({ higher_self_name: name || null }).eq('id', currentUser.id);
-  if (error){ console.warn('higher self:', error.message); msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+  const error = await saveProfile({ higher_self_name: name || null });
+  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   higherSelf.name = name;
   renderHigherSelfCard();
   msg.textContent = name ? `Saved — ${name} it is.` : 'Saved.';
@@ -4996,8 +4996,8 @@ async function pickSettingsAvatar(el){
   el.classList.add('sel');
   document.getElementById('settingsAvatarPreviewWrap').innerHTML = '';
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { error } = await sb.from('profiles').update({ avatar: el.dataset.emoji, avatar_url: null }).eq('id', currentUser.id);
-  if (error){ msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+  const error = await saveProfile({ avatar: el.dataset.emoji, avatar_url: null });
+  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
   loadNavIdentity();
   loadProfile();
@@ -5014,8 +5014,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const { error: upErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true });
       if (upErr){ msg.textContent = "Couldn't upload — try a different photo."; msg.className = 'save-msg err'; return; }
       const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
-      const { error } = await sb.from('profiles').update({ avatar_url: pub.publicUrl, avatar: null }).eq('id', currentUser.id);
-      if (error){ msg.textContent = "Couldn't save."; msg.className = 'save-msg err'; return; }
+      const error = await saveProfile({ avatar_url: pub.publicUrl, avatar: null });
+      if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
       document.querySelectorAll('#settingsAvatarGrid .avatar-opt').forEach(a => a.classList.remove('sel'));
       msg.textContent = 'Avatar updated.'; msg.className = 'save-msg ok';
       loadNavIdentity();
@@ -5023,6 +5023,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+/* Every write to a profile used to be an .update(), which quietly does nothing
+   when the row isn't there — the save reports success and the value never
+   lands. An upsert writes the row if it's missing and patches it if it isn't. */
+async function saveProfile(patch){
+  // Update first. A plain update needs only an update policy, which every
+  // setup has; an upsert would demand an insert policy even when the row is
+  // already there, and would break saving for anyone without one.
+  const { data, error } = await sb.from('profiles')
+    .update(patch).eq('id', currentUser.id).select('id');
+  if (error){ console.warn('profile save failed:', error); return error; }
+  if (data && data.length) return null;
+  // Nothing was updated, so this account never got a row. Make it rather than
+  // reporting a save that didn't happen.
+  const { error: insErr } = await sb.from('profiles').insert({ id: currentUser.id, ...patch });
+  if (insErr) console.warn('profile row create failed:', insErr);
+  return insErr || null;
+}
+
+/* "Couldn't save." tells you nothing and tells me less. These are the three
+   things that actually go wrong, in words, with the database's own reason
+   kept on the end so it can be read off the screen. */
+function describeSaveError(error){
+  const m = (error && (error.message || '')).toLowerCase();
+  if (m.includes('duplicate') || m.includes('unique')) return 'That username is taken — try another.';
+  if (m.includes('row-level security') || m.includes('permission') || error.code === '42501')
+    return "Your account doesn't have permission to write this. (Database policy.)";
+  if (m.includes('does not exist') || error.code === '42703' || error.code === 'PGRST204')
+    return 'This needs a database update that hasn\'t been run yet.';
+  if (m.includes('jwt') || m.includes('token') || error.code === 'PGRST301')
+    return 'Your session expired — log out and back in.';
+  return "Couldn't save: " + ((error && error.message) || 'unknown error');
+}
+
 async function updateUsername(){
   const msg = document.getElementById('usernameSettingsMsg');
   if (!sb || !currentUser) return;
@@ -5030,15 +5063,8 @@ async function updateUsername(){
   if (!username){ msg.textContent = 'Enter a username.'; msg.className = 'save-msg err'; return; }
   if (!/^[a-zA-Z0-9_.]{3,24}$/.test(username)){ msg.textContent = 'Usernames are 3–24 characters — letters, numbers, dots, and underscores.'; msg.className = 'save-msg err'; return; }
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
-  const { error } = await sb.from('profiles').update({ username }).eq('id', currentUser.id);
-  if (error){
-    if (error.message && error.message.toLowerCase().includes('duplicate')){
-      msg.textContent = 'That username is taken — try another.'; msg.className = 'save-msg err';
-    } else {
-      msg.textContent = "Couldn't save."; msg.className = 'save-msg err';
-    }
-    return;
-  }
+  const error = await saveProfile({ username });
+  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   msg.textContent = 'Username updated.'; msg.className = 'save-msg ok';
   loadNavIdentity();
 }
