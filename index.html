@@ -3085,13 +3085,23 @@ let affirmationGapMs = 100;
 
 /* Live volume readouts + real-time gain updates while a session is playing.
    Each row now has a slider AND a typeable percentage input, kept in sync both ways. */
+/* The healing tone fades in over 2.5 seconds, and an AudioParam with a ramp
+   still scheduled on it ignores a plain assignment to .value — so moving that
+   slider during the fade did nothing at all, and felt broken. Clearing the
+   schedule first makes the slider authoritative the moment you move it. */
+function setLiveGain(node, v){
+  if (!node || !finalCtx) return;
+  const t = finalCtx.currentTime;
+  try { node.gain.cancelScheduledValues(t); } catch(e){}
+  try { node.gain.setValueAtTime(v, t); } catch(e){ node.gain.value = v; }
+}
 function applyLiveMixGain(id, value){
   if (!finalPlaying) return;
-  if (id==='mixTone' && liveToneGain) liveToneGain.gain.value = value/100 * 0.10;
-  if (id==='mixBg' && liveBgGain) liveBgGain.gain.value = value/100;
-  if (id==='mixSoothing' && liveSoothingGain) liveSoothingGain.gain.value = value/100 * 0.4;
-  if (id==='mixCustom' && liveCustomGain) liveCustomGain.gain.value = value/100 * 0.6;
-  if (id==='mixLayerVoice' && liveLayerVoiceGain) liveLayerVoiceGain.gain.value = value/100;
+  if (id==='mixTone') setLiveGain(liveToneGain, value/100 * 0.10);
+  if (id==='mixBg') setLiveGain(liveBgGain, value/100);
+  if (id==='mixSoothing') setLiveGain(liveSoothingGain, value/100 * 0.4);
+  if (id==='mixCustom') setLiveGain(liveCustomGain, value/100 * 0.6);
+  if (id==='mixLayerVoice') setLiveGain(liveLayerVoiceGain, value/100);
   /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
 }
 ['mixTone','mixBg','mixVoice','mixSoothing','mixCustom','mixLayerVoice'].forEach(id=>{
@@ -3310,7 +3320,7 @@ function playFinal(){
       let idx = 0;
       function playNext(){
         if (!finalPlaying) return;
-        if (idx >= recorded.length){ onDone(); return; }
+        if (idx >= recorded.length){ onDone(recorded.length > 0); return; }
         const { r, i } = recorded[idx];
         document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
@@ -3347,7 +3357,7 @@ function playFinal(){
       const voicePromise = resolveVoiceId(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
-        if (idx >= lines.length){ onDone(); return; }
+        if (idx >= lines.length){ onDone(lines.length > 0); return; }
         document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
@@ -3394,13 +3404,28 @@ function playFinal(){
     finalRecorder.start();
   }
 
-  runSequence(function loopCheck(){
+  // A pass that plays nothing returns instantly, and looping straight back into
+  // another one used to recurse synchronously until the stack gave out — which
+  // killed every script on the page, so nothing on the screen responded any
+  // more. Two guards: a pass that played nothing stops rather than looping, and
+  // the loop always goes through the event loop even when it did play.
+  let passesWithNoAudio = 0;
+  runSequence(function loopCheck(playedSomething){
     const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
     const elapsed = Date.now() - finalStartTime;
     const stillBuildingTowardTarget = targetMs && elapsed < targetMs;
     const manualLoop = document.getElementById('loopToggle').checked;
+    if (playedSomething) passesWithNoAudio = 0; else passesWithNoAudio++;
+    if (passesWithNoAudio >= 1){
+      const why = state.voiceMode === 'own'
+        ? 'No recordings are saved for these affirmations yet. Record them in the previous step, then play.'
+        : 'There are no affirmations to play yet. Go back a step and add some.';
+      finishFinal();
+      document.getElementById('finalLine').textContent = why;  // after, or finishFinal overwrites it
+      return;
+    }
     if (finalPlaying && (stillBuildingTowardTarget || manualLoop)){
-      runSequence(loopCheck);
+      const t = setTimeout(() => runSequence(loopCheck), 0); finalTimeouts.push(t);
     } else {
       finishFinal();
     }
