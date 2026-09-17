@@ -866,8 +866,8 @@ async function loadClip(ctx, rec){
 function playClip(ctx, clip, gainValue, extraDest, onended){
   if (clip.kind === 'buffer'){
     const g = ctx.createGain(); g.gain.value = gainValue;
-    g.connect(ctx.destination);
-    if (extraDest && extraDest !== ctx.destination) g.connect(extraDest);
+    g.connect(audioOut(ctx));
+    if (extraDest && extraDest !== audioOut(ctx)) g.connect(extraDest);
     const src = ctx.createBufferSource(); src.buffer = clip.buffer;
     src.connect(g);
     liveVoiceGains.add(g);
@@ -880,8 +880,8 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   if (!clip.gain){
     clip.gain = ctx.createGain();
     ctx.createMediaElementSource(clip.el).connect(clip.gain);
-    clip.gain.connect(ctx.destination);
-    if (extraDest && extraDest !== ctx.destination) clip.gain.connect(extraDest);
+    clip.gain.connect(audioOut(ctx));
+    if (extraDest && extraDest !== audioOut(ctx)) clip.gain.connect(extraDest);
   }
   clip.gain.gain.value = gainValue;
   liveVoiceGains.add(clip.gain);
@@ -1221,9 +1221,9 @@ function restartSoothingLayer(){
   if (state.soothingLayer && state.soothingLayer !== 'none' && finalCtx){
     const g = finalCtx.createGain();
     g.gain.value = document.getElementById('mixSoothing').value/100 * 0.4;
-    g.connect(finalCtx.destination);
+    g.connect(audioOut(finalCtx));
     liveSoothingGain = g;
-    finalPremiumPad = addPremiumPadLayer(finalCtx, finalCtx.destination, state.soothingLayer, g);
+    finalPremiumPad = addPremiumPadLayer(finalCtx, audioOut(finalCtx), state.soothingLayer, g);
   }
 }
 
@@ -1351,7 +1351,7 @@ function startCustomTrackPlayback(){
   if (!customTrackBlob || !finalCtx) return;
   const g = finalCtx.createGain();
   g.gain.value = document.getElementById('mixCustom').value/100 * 0.6;
-  g.connect(finalCtx.destination);
+  g.connect(audioOut(finalCtx));
   liveCustomGain = g;
   customTrackBlob.arrayBuffer().then(buf => finalCtx.decodeAudioData(buf)).then(audioBuf => {
     if (!finalPlaying) return; // stopped before it finished decoding
@@ -1408,6 +1408,50 @@ function stopSilentKeeper(){
   try { silentKeeper.pause(); silentKeeper.currentTime = 0; } catch(e){}
 }
 
+/* ---------- the way out to the speaker ----------
+   The sound check settled it: she hears an <audio> element and not Web Audio.
+   On an iPhone, Web Audio plays in the "ambient" category, which the ringer
+   switch silences; a media element plays in "playback", which it does not.
+   Every layer in this app went straight to ctx.destination, so the whole
+   session was ambient and the switch turned all of it off.
+
+   A silent loop alongside it was not enough -- it is a separate element, and
+   iOS was still free to treat the Web Audio graph as ambient. So the graph
+   itself now leaves through a media element: one bus, into a
+   MediaStreamDestination, into an <audio> that is genuinely playing.
+
+   It also still connects to ctx.destination. On a desktop, on Android, and
+   anywhere MediaStream capture is not supported, that is the path that works,
+   and hearing it twice is not a risk -- the same stream cannot play louder for
+   being routed two ways, and where both work the element is the one iOS
+   honours. If createMediaStreamDestination throws, the bus is exactly what
+   ctx.destination was before, so nothing regresses. */
+function audioOut(ctx){
+  if (!ctx) return null;
+  if (ctx.__outBus) return ctx.__outBus;
+  const bus = ctx.createGain();
+  bus.gain.value = 1;
+  bus.connect(ctx.destination);
+  try {
+    const md = ctx.createMediaStreamDestination();
+    bus.connect(md);
+    const el = new Audio();
+    el.srcObject = md.stream;
+    el.setAttribute('playsinline', '');
+    el.autoplay = true;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+    ctx.__outEl = el;
+  } catch(e){ /* not supported here; the direct connection above still carries it */ }
+  ctx.__outBus = bus;
+  return bus;
+}
+function closeAudioOut(ctx){
+  if (!ctx || !ctx.__outEl) return;
+  try { ctx.__outEl.pause(); ctx.__outEl.srcObject = null; } catch(e){}
+  ctx.__outEl = null;
+}
+
 function primeAudio(){
   // Before the context, so the category is already right when it opens.
   startSilentKeeper();
@@ -1418,7 +1462,7 @@ function primeAudio(){
   try {
     const s = finalCtx.createBufferSource();
     s.buffer = finalCtx.createBuffer(1, 1, 22050);
-    s.connect(finalCtx.destination);
+    s.connect(audioOut(finalCtx));
     s.start(0);
   } catch(e){}
   return finalCtx;
@@ -1465,7 +1509,7 @@ function playFinal(){
   toneGain.gain.linearRampToValueAtTime(targetToneVol, finalCtx.currentTime + 2.5); // gentle fade-in, no hard onset
   const toneFilter = finalCtx.createBiquadFilter();
   toneFilter.type = 'lowpass'; toneFilter.frequency.value = 2600; toneFilter.Q.value = 0.4; // softens harsh upper harmonics
-  toneFilter.connect(toneGain).connect(finalCtx.destination);
+  toneFilter.connect(toneGain).connect(audioOut(finalCtx));
   const baseHz = state.freq ? state.freq.hz : 528;
   if (state.binauralBand && BINAURAL_BANDS[state.binauralBand]){
     // Binaural mode: left ear gets the base frequency, right ear gets base+delta.
@@ -1493,7 +1537,7 @@ function playFinal(){
   liveToneGain = toneGain;
 
   const bgGain = finalCtx.createGain(); bgGain.gain.value = document.getElementById('mixBg').value/100;
-  bgGain.connect(finalCtx.destination);
+  bgGain.connect(audioOut(finalCtx));
   finalAmbience = buildAmbience(finalCtx, state.bg, bgGain);
   liveBgGain = bgGain;
 
@@ -1501,7 +1545,7 @@ function playFinal(){
   // (and their tier allows it — see pickSoothingLayer). Not automatic.
   restartSoothingLayer();
 
-  let destForRecording = finalCtx.destination;
+  let destForRecording = audioOut(finalCtx);
   if (state.voiceMode === 'own' && window.MediaRecorder){
     const dest = finalCtx.createMediaStreamDestination();
     toneGain.connect(dest); bgGain.connect(dest);
@@ -1514,8 +1558,8 @@ function playFinal(){
   if (layerVoiceEnabled && state.layerAffirmations && state.layerAffirmations.length){
     const layerGain = finalCtx.createGain();
     layerGain.gain.value = document.getElementById('mixLayerVoice').value/100;
-    layerGain.connect(finalCtx.destination);
-    if (destForRecording !== finalCtx.destination) layerGain.connect(destForRecording);
+    layerGain.connect(audioOut(finalCtx));
+    if (destForRecording !== audioOut(finalCtx)) layerGain.connect(destForRecording);
     liveLayerVoiceGain = layerGain;
     runLayerSequence();
   }
@@ -1795,6 +1839,7 @@ function finishFinal(){
   }
   finalPlaying = false;
   stopSilentKeeper();
+  closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
@@ -1819,6 +1864,7 @@ function finishFinal(){
 function stopFinal(){
   finalPlaying = false;
   stopSilentKeeper();
+  closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
@@ -1883,7 +1929,7 @@ async function runSoundCheck(){
   let ctxState = 'none';
   try {
     const ctx = primeAudio();
-    const g = ctx.createGain(); g.gain.value = 0.25; g.connect(ctx.destination);
+    const g = ctx.createGain(); g.gain.value = 0.25; g.connect(audioOut(ctx));
     const o = ctx.createOscillator(); o.frequency.value = 330; o.connect(g); o.start();
     await wait(1600); o.stop(); ctxState = ctx.state;
   } catch(e){ ctxState = 'failed: ' + (e && e.message); }
