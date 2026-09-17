@@ -517,8 +517,7 @@ async function loadNavIdentity(){
   const avatarEl = document.getElementById('navAvatar');
   if (!nameEl || !avatarEl) return; // nav may have re-rendered already
   if (prof) nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
-  // She's the picture of you in this app now, so the chip shows her rather
-  // than an emoji you picked once and forgot.
-  avatarEl.innerHTML = avatarMarkup(higherSelf);
+  // The chip is you, not her: the everyday drawing rather than the robed one.
+  avatarEl.innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face', alt:false });
 }
 
