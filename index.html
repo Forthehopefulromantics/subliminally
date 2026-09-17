@@ -969,8 +969,12 @@
     background:var(--halo); transition:background .7s ease; }
   body[data-sky="day"]{ --halo:rgba(255,255,255,.55); }
   body[data-sky="night"]{ --halo:rgba(185,167,232,.30); }
-  .higher-self img{ position:relative; display:block; width:62%; max-width:230px; height:auto;
-    margin:0 auto -2px; filter:drop-shadow(0 10px 18px rgba(13,11,24,.45)); }
+  /* Drawn full length now, so she is sized by height and the width follows.
+     Sized by width, a 281x500 drawing at 230px across would stand 409px tall
+     and take the whole screen before you had read a word. */
+  .higher-self img{ position:relative; display:block; height:230px; width:auto; max-width:82%;
+    object-fit:contain; margin:0 auto -2px; filter:drop-shadow(0 10px 18px rgba(13,11,24,.45)); }
+  @media (max-width:360px){ .higher-self img{ height:200px; } }
   .hs-name{ position:relative; font-family:var(--serif); font-size:19px; color:var(--moonlight); }
   .hs-sub{ position:relative; font-size:12.5px; color:var(--haze); margin-top:2px; padding:0 20px; text-wrap:balance; }
   .hs-edit{ position:absolute; left:4px; top:8px; z-index:2; cursor:pointer;
@@ -989,16 +993,29 @@
      One mask per part, tinted with a colour, and the line art laid over the
      top. The line art is the only thing carrying real pixels; everything under
      it is a flat fill the size of its own mask. */
-  .av{ display:block; width:100%; height:auto; }
+  /* Fitted inside its box, never cropped to it -- no heads, hair, headphones,
+     hands or feet cut off at any size. */
+  .av{ display:block; width:100%; height:auto; object-fit:contain; }
+  .av-face{ aspect-ratio:1; object-fit:cover; }
   .hs-art{ position:relative; width:62%; max-width:230px; margin:0 auto -2px;
     filter:drop-shadow(0 10px 18px rgba(13,11,24,.45)); }
   body[data-sky="day"] .hs-art{ filter:drop-shadow(0 8px 14px rgba(60,52,104,.22)); }
 
-  /* ---- the maker ---- */
-  .hs-preview{ width:150px; margin:12px auto 4px; }
+  /* ---- the maker ----
+     Both drawings side by side, because the pair is the point: this is who you
+     are, and this is the same person further along. */
+  .hs-preview{ margin:12px auto 4px; }
+  .hs-pair{ display:flex; justify-content:center; align-items:flex-end; gap:18px; }
+  .hs-pair figure{ margin:0; text-align:center; flex:0 1 150px; min-width:0; }
+  .hs-pair-art{ display:block; height:188px; }
+  .hs-pair-art .av{ height:100%; width:auto; margin:0 auto;
+    filter:drop-shadow(0 8px 14px rgba(60,52,104,.20)); }
+  .hs-pair figcaption{ margin-top:8px; font-size:12px; color:var(--haze);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (max-width:360px){ .hs-pair{ gap:10px; } .hs-pair-art{ height:150px; } }
   .av-maker{ margin-top:10px; }
-  .av-roster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:9px; }
-  .av-opt{ padding:3px; line-height:0; cursor:pointer; border:2px solid transparent;
+  .av-roster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:9px; }
+  .av-opt{ padding:5px 3px; line-height:0; cursor:pointer; border:2px solid transparent;
     border-radius:16px; background:var(--sunk); transition:border-color .2s, transform .15s; }
   .av-opt:hover{ transform:translateY(-2px); }
   .av-opt.sel{ border-color:var(--candle); }

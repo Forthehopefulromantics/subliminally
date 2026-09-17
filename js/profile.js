@@ -30,7 +30,7 @@ async function loadProfile(){
     higherSelf = { name: prof.higher_self_name || '', avatar: avatarId(prof.higher_self_avatar) };
     document.getElementById('higherSelfNameInput').value = higherSelf.name;
     renderHigherSelfMaker();
-    document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf);
+    document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face' });
   }
 
   const myTier = await getMyTier();
