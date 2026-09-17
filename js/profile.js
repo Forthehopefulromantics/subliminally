@@ -68,10 +68,13 @@ async function loadMyLibrary(){
     const titleVal = (s.title || '').replace(/"/g,'&quot;');
     return `<div class="profile-item" id="libItem-${s.id}">
       <div class="profile-item-top">
-        <button class="lib-play" id="libPlay-${s.id}" onclick="playFromLibrary('${s.id}')"
-          aria-label="Play ${titleVal || 'this subliminal'}" title="Play">
-          <span class="lib-play-icon" aria-hidden="true">▶</span>
-        </button>
+        <span class="lib-cover" id="libCover-${s.id}">
+          <img alt="" id="libCoverImg-${s.id}" style="display:none;">
+          <button class="lib-play" id="libPlay-${s.id}" onclick="playFromLibrary('${s.id}')"
+            aria-label="Play ${titleVal || 'this subliminal'}" title="Play">
+            <span class="lib-play-icon" aria-hidden="true">▶</span>
+          </button>
+        </span>
         <div style="flex:1; min-width:0;">
           <div class="lib-title-view" id="libTitleView-${s.id}">
             <div class="lib-title-text">${titleText.replace(/</g,'&lt;')}</div>
@@ -91,11 +94,17 @@ async function loadMyLibrary(){
           <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations</div>
           <div class="lib-now" id="libNow-${s.id}"></div>
         </div>
+      </div>
+      <div class="lib-actions">
+        <button onclick="pickCoverFor('${s.id}')">Cover</button>
         <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
     </div>`;
   }).join('');
+  // After the markup, not during: each one is a signed-link round trip, and the
+  // list should be readable before the pictures arrive.
+  subs.forEach(s => { if (s.cover_path) showCover(s.id, s.cover_path); });
 }
 
 function startEditLibraryTitle(id){
@@ -553,3 +562,90 @@ function currentSubliminalTitle(){
 
 /* One beat, cheap, and it stops mattering the moment nothing is playing. */
 setInterval(renderNowBar, 1000);
+
+/* ---------- cover art ----------
+   A picture per subliminal, so the library is something you recognise rather
+   than something you read.
+
+   Resized here rather than uploaded whole. A photo off a phone is three to six
+   megabytes and is about to be shown at 46 pixels; sending the original would
+   cost the person their data and the library its loading time, for detail no
+   screen will ever draw. */
+const COVER_PX = 512;
+
+function pickCoverFor(id){
+  let input = document.getElementById('coverPicker');
+  if (!input){
+    input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.id = 'coverPicker';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+  }
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.value = '';                    // so choosing the same file twice still fires
+    if (file) uploadCover(id, file);
+  };
+  input.click();
+}
+
+/* Square, centre-cropped, WebP. Centre-cropped rather than squashed: a portrait
+   squeezed into a square makes a face look wrong in a way people notice without
+   being able to say why. */
+function squareCover(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const c = document.createElement('canvas');
+      c.width = c.height = COVER_PX;
+      c.getContext('2d').drawImage(img,
+        (img.width - side) / 2, (img.height - side) / 2, side, side,
+        0, 0, COVER_PX, COVER_PX);
+      URL.revokeObjectURL(img.src);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('could not read that image')),
+               'image/webp', 0.85);
+    };
+    img.onerror = () => reject(new Error('that file is not an image this browser can open'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function uploadCover(id, file){
+  if (!sb || !currentUser) return;
+  const msg = document.getElementById('libTitleMsg-' + id);
+  const say = t => { if (msg) msg.textContent = t; };
+  say('Adding the cover…');
+  try {
+    const blob = await squareCover(file);
+    // Named after the subliminal inside a folder named after the person, which
+    // is exactly what the storage policy checks, and means a new cover replaces
+    // the old one rather than piling up.
+    const path = `${currentUser.id}/${id}.webp`;
+    const { error: upErr } = await sb.storage.from('covers')
+      .upload(path, blob, { upsert: true, contentType: 'image/webp' });
+    if (upErr) throw upErr;
+    const { error: dbErr } = await sb.from('subliminals')
+      .update({ cover_path: path }).eq('id', id).eq('user_id', currentUser.id);
+    if (dbErr) throw dbErr;
+    say('');
+    await showCover(id, path, true);
+  } catch (e){
+    say((e && e.message) || 'That cover could not be saved.');
+  }
+}
+
+/* Signed links expire, so they are fetched when the library renders rather than
+   stored. `bust` forces the browser past a picture it is already holding, which
+   it otherwise keeps showing after a replacement. */
+async function showCover(id, path, bust){
+  if (!path || !sb) return;
+  const img = document.getElementById('libCoverImg-' + id);
+  if (!img) return;
+  const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
+  if (error || !data) return;
+  img.src = data.signedUrl + (bust ? '&t=' + Date.now() : '');
+  img.style.display = 'block';
+  const wrap = document.getElementById('libCover-' + id);
+  if (wrap) wrap.classList.add('has-art');
+}
