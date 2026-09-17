@@ -21,14 +21,17 @@ function journeyQuests(){
   /* Three things, in the order a day happens. Journal and the habit count came
      off: the habits are already the two rituals, so they were counted twice,
      and a list that is mostly bookkeeping stops being a list of what to do. */
+  /* Morning, night, then the subliminal — it is last because it is the thing
+     you fall asleep to, so it is the only one that does not end with you doing
+     something else. */
   const list = [];
   if (morning) list.push({ key:'morning', label:'Morning ritual', done:morning.done,
     detail:`${morning.st.done} of ${morning.st.total}`, go:() => { todayRitualTime='morning'; renderTodayRitual(); renderTodayJourney(); } });
+  if (night) list.push({ key:'night', label:'Night ritual', done:night.done,
+    detail:`${night.st.done} of ${night.st.total}`, go:() => { todayRitualTime='night'; renderTodayRitual(); renderTodayJourney(); } });
   list.push({ key:'subliminal', label:'Subliminal', done: lightToday.has(LIGHT_SOURCES.subliminal),
     detail: lightToday.has(LIGHT_SOURCES.subliminal) ? 'Played' : 'Not yet',
     play: true, go:() => playTodaySubliminal() });
-  if (night) list.push({ key:'night', label:'Night ritual', done:night.done,
-    detail:`${night.st.done} of ${night.st.total}`, go:() => { todayRitualTime='night'; renderTodayRitual(); renderTodayJourney(); } });
   return list;
 }
 
@@ -38,7 +41,7 @@ function nextQuest(quests){
   const undone = quests.filter(q => !q.done);
   if (!undone.length) return null;
   const evening = currentRitualTime() === 'night';
-  const order = evening ? ['night','journal','subliminal','morning'] : ['morning','subliminal','journal','night'];
+  const order = evening ? ['night','subliminal','morning'] : ['morning','night','subliminal'];
   for (const key of order){ const q = undone.find(u => u.key === key); if (q) return q; }
   return undone[0];
 }
@@ -305,12 +308,17 @@ function chooseTodaySub(id){
    light_ledger like every other quest — playing it is what checks it off, and
    awardLight already refuses to pay twice in a day. */
 function playTodaySubliminal(){
-  if (finalPlaying){ stopFinal(); renderTodayJourney(); return; }
+  if (finalPlaying){ stopFinal(); renderTodaySession(null); renderTodayJourney(); return; }
   if (typeof primeAudio === 'function') primeAudio();   // inside the tap
   const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
   if (!id){ showBuildPage(); return; }
+  /* Loading a saved subliminal takes a moment, and a button that looks
+     unchanged for that moment reads as a button that did nothing. */
+  const card = document.getElementById('todaySessionCard');
+  const btn = card && card.querySelector('.btn-primary');
+  if (btn){ btn.textContent = 'Starting…'; btn.disabled = true; }
   if (typeof playFromLibrary === 'function'){
     playFromLibrary(id);
-    setTimeout(() => { renderTodaySession(null); renderTodayJourney(); }, 400);
+    setTimeout(() => { renderTodaySession(null); renderTodayJourney(); }, 900);
   } else showBuildPage();
 }
