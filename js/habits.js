@@ -779,7 +779,7 @@ function confirmLogOut(){
    skip it" would be an interrogation; "what got in the way" is a question about
    the day rather than about the person. */
 const MISS_REASONS = [
-  'Too tired', 'No time', 'Wasn\u2019t home', 'Forgot to log it',
+  'Too tired', 'No time', 'Wasn\u2019t home', 'Forgot',
   'Didn\u2019t feel like it', 'Unwell', 'Something came up', 'Needed a break',
 ];
 const MISS_FEELINGS = [
@@ -820,8 +820,8 @@ function openReflection(time, dateStr){
     .toLocaleDateString(undefined, { weekday:'long' });
   openAsk(`${day}\u2019s ${when}`, `
     <div class="ask-text">It didn\u2019t happen, and that\u2019s allowed. If you want to say what got in the way, it helps to see the pattern later \u2014 and if you don\u2019t, skip it.</div>
-    <button type="button" class="ask-did" onclick="markRitualDone()">
-      I did do it — I just forgot to log it
+    <button type="button" class="ask-did" onclick="goLogRitual()">
+      I did do it — take me there to log it
     </button>
     <div class="ask-label">What got in the way</div>
     <div class="ask-chips">${MISS_REASONS.concat([ASK_OTHER]).map(r =>
@@ -885,24 +885,20 @@ async function writeReflection(fields){
   if (error) console.warn('reflection:', error.message);
 }
 
-/* "I did it, I just forgot" is the most likely true answer to a missing day,
-   and it deserves to fix the day rather than file a note about it. Every habit
-   in that ritual is checked off for that date, so the calendar, the streak and
-   the week all agree with what actually happened. */
-async function markRitualDone(){
+/* "I did it, I just forgot" opens that day so it can be logged, rather than
+   ticking everything off on the person's behalf. Nobody does every item every
+   time, and a day filled in automatically is a record of what the app assumed
+   rather than of what happened -- which is worse than a gap, because it looks
+   like the truth.
+
+   The question is marked answered either way, so it is not asked again whether
+   they log the whole thing, some of it, or close the day and walk off. */
+function goLogRitual(){
   const { on, time } = reflection;
   closeAsk();
   if (!on) return;
   rememberAnswered(`${on}|${time}`);
-  const rows = habitsCache.filter(h => h.time_of_day === time);
-  for (const h of rows){
-    const days = habitCheckins[h.id] || new Set();
-    if (days.has(on)) continue;                 // already logged; leave it alone
-    await toggleHabitOnDate(h.id, on);
-  }
-  if (document.body.getAttribute('data-view') === 'today'){
-    renderTodayRitual(); renderWeekStrip(); renderLightStrip(); renderTodayJourney();
-  }
+  if (typeof openDayDetail === 'function') openDayDetail(on);
 }
 
 let reflectionsSeen = {};
