@@ -119,12 +119,34 @@ function renderTodayRitual(){
   // Numbered by where the habit actually sits in the ritual, not by where it
   // falls in what's on screen — so on a short night the gaps show you what
   // you're skipping rather than quietly renumbering around it.
+  //
+  // The number is a grip, so the order can be changed here rather than only on
+  // the Rituals page: this is the list you actually look at every morning, and
+  // it is the one where you notice you are doing things in the wrong order. It
+  // shares the drag engine in habits.js rather than owning a second copy.
+  //
+  // It cannot be a button inside the tick button — that is invalid, and a
+  // screen reader would find two controls where there is one row — so the row
+  // is a wrapper holding a grip and a tick side by side.
+  //
+  // No grip in short mode. The numbers there are positions in the full ritual
+  // while only some rows are on screen, so a drag would be reordering a list
+  // nobody can see all of.
   const habitBtn = h => {
     const isDone = done.has(h.id);
     const n = rows.indexOf(h) + 1;
-    return `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-      <span class="day-habit-n" aria-hidden="true">${n}</span><span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+    const tick = `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
+      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
     </button>`;
+    if (shortMode || rows.length < 2){
+      return `<div class="day-habit-row"><span class="day-habit-n" aria-hidden="true">${n}</span>${tick}</div>`;
+    }
+    const safeName = h.name.replace(/"/g,'&quot;');
+    return `<div class="day-habit-row" data-habit-row data-habit-id="${h.id}" data-time="${time}">
+      <button type="button" class="day-habit-n day-habit-grip" data-habit-grip data-habit-id="${h.id}"
+        onkeydown="habitOrderKey(event,'${h.id}')"
+        aria-label="${safeName} is number ${n}. Drag, or use the arrow keys, to move it."
+        title="Drag to reorder">${n}</button>${tick}</div>`;
   };
 
   // The headline is the whole point: finishing your non-negotiables has to read
