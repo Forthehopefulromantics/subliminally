@@ -1338,6 +1338,31 @@ function startCustomTrackPlayback(){
   }).catch(e => console.error('custom track playback failed:', e));
 }
 
+/* ---------- unlocking the speaker ----------
+   A browser only lets audio start inside the tap that asked for it, and an
+   `await` ends that tap. Playing from the library loads the recordings first,
+   which means by the time the player started, the gesture was over: iOS handed
+   back a suspended context, refused to resume it, and every oscillator and
+   every clip played into nothing. The timer is a setInterval, so it counted up
+   happily over total silence — which is exactly what it looked like.
+
+   So the context is opened and unlocked in the tap itself, before anything is
+   awaited. A one-sample silent buffer is what actually unlocks iOS; resume()
+   alone is not enough there. */
+function primeAudio(){
+  if (!finalCtx || finalCtx.state === 'closed'){
+    finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+  }
+  if (finalCtx.state === 'suspended') finalCtx.resume().catch(()=>{});
+  try {
+    const s = finalCtx.createBufferSource();
+    s.buffer = finalCtx.createBuffer(1, 1, 22050);
+    s.connect(finalCtx.destination);
+    s.start(0);
+  } catch(e){}
+  return finalCtx;
+}
+
 function playFinal(){
   if (finalPlaying) return;
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
@@ -1360,10 +1385,9 @@ function playFinal(){
   updateSessionTimerLabel();
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
 
-  finalCtx = new (window.AudioContext||window.webkitAudioContext)();
-  // Safari and the iOS app's web view hand back a suspended context. Resuming has
-  // to happen inside the tap that started the session, which is where we are.
-  if (finalCtx.state === 'suspended') finalCtx.resume().catch(()=>{});
+  // Reuses the context opened by the tap when there is one, rather than making
+  // a fresh suspended one that will never be allowed to start.
+  primeAudio();
   startCustomTrackPlayback();
   const toneGain = finalCtx.createGain();
   const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
@@ -1605,6 +1629,18 @@ function playFinal(){
   // killed every script on the page, so nothing on the screen responded any
   // more. Two guards: a pass that played nothing stops rather than looping, and
   // the loop always goes through the event loop even when it did play.
+  /* A context that is still suspended a moment after starting was refused, and
+     nothing anyone does with the mixer will make it audible. Better to say so
+     than to run a timer over silence. */
+  const silenceCheck = setTimeout(() => {
+    if (finalPlaying && finalCtx && finalCtx.state !== 'running'){
+      stopFinal();
+      document.getElementById('finalLine').textContent =
+        'This browser blocked the sound. Tap play once more — it usually starts on the second try.';
+    }
+  }, 1200);
+  finalTimeouts.push(silenceCheck);
+
   let passesWithNoAudio = 0;
   runSequence(function loopCheck(playedSomething){
     const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
