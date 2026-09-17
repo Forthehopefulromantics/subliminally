@@ -612,6 +612,9 @@
   .lib-now{ font-size:12px; color:var(--candle); margin-top:3px; min-height:15px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .profile-item-top{ gap:13px; align-items:center; }
+  #soundCheckMsg{ font-size:12.5px; color:var(--haze); margin-top:9px; min-height:17px; }
+  #soundCheckMsg b{ color:var(--moonlight); font-weight:500; }
+  .sc-detail{ font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--faint); }
   /* The actions sit under the row rather than beside it. Three links squeezed
      in next to the title left about ten characters for the title, which wrapped
      "888 Personalized" onto two lines on a phone. */
@@ -1862,6 +1865,7 @@
               <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
             </div>
             <div class="final-line" id="finalLine">"…"</div>
+            <div id="soundCheckMsg"></div>
             <div class="final-point-tag" id="finalPointTag" style="display:none;"></div>
             <div class="mixer">
               <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="30"><input type="number" class="mix-val-input" id="mixToneVal" min="0" max="100" value="30"><span class="mix-pct-sign">%</span></div>
@@ -1879,6 +1883,7 @@
             </div>
             <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
+              <button type="button" class="mini-btn" id="soundCheckBtn" onclick="runSoundCheck()">Sound check</button>
               <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
               <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
               <button class="mini-btn ghostbtn" id="rerecordBtn" onclick="rerecordVoice()" style="display:none;">

@@ -522,6 +522,20 @@ const AI_VOICES = [
 const DEVICE_VOICE = 'device';   // the browser's own speechSynthesis
 const MY_CLONED_VOICE = 'mine';  // resolved to the profile's cloned_voice_id at play time
 
+/* Choosing is the answer to the question on the screen, so it moves on. It used
+   to only light the card up and enable a Continue button further down, which
+   reads as the tap not having worked -- something flashes and the page stays
+   where it was.
+
+   'own' moves straight on: there is nothing else to decide. 'ai' does not,
+   because it has just asked a second question -- which voice -- and answering
+   the first by skipping the second would be worse. */
+const STEP_ADVANCE_MS = 260;          // long enough to see what you picked
+
+function advanceAfterPick(){
+  setTimeout(() => { if (step === 4) nextStep(); }, STEP_ADVANCE_MS);
+}
+
 function chooseVoice(mode){
   state.voiceMode = mode;
   document.getElementById('voiceOwn').classList.toggle('sel', mode==='own');
@@ -529,12 +543,17 @@ function chooseVoice(mode){
   document.getElementById('voicePicker').style.display = mode === 'ai' ? 'block' : 'none';
   if (mode === 'ai') renderVoiceChips();
   document.getElementById('toStep5').disabled = false;
+  if (mode === 'own') advanceAfterPick();
 }
 
 function pickAiVoice(id){
+  const first = state.aiVoiceId !== id;
   state.aiVoiceId = id;
   renderVoiceChips();
   previewVoice(id);
+  // Moving on the first pick only: tapping through voices to hear them should
+  // not throw you off the screen you are comparing them on.
+  if (first && !pickAiVoice._moved){ pickAiVoice._moved = true; advanceAfterPick(); }
 }
 
 async function renderVoiceChips(){
@@ -640,7 +659,12 @@ const bgGrid = document.getElementById('bgGrid');
 BACKGROUNDS.forEach(b=>{
   const c = document.createElement('button'); c.className='bg-card'+(b.key==='none'?' sel':'');
   c.innerHTML = `<span class="ic">${b.ic}</span>${b.label}`;
-  c.onclick = ()=>{ document.querySelectorAll('.bg-card').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); state.bg=b.key; };
+  c.onclick = ()=>{
+    document.querySelectorAll('.bg-card').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel'); state.bg = b.key;
+    // Same as the voice cards: the pick is the answer, so it moves on.
+    setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
+  };
   bgGrid.appendChild(c);
 });
 
@@ -1776,3 +1800,79 @@ function stopFinal(){
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
 
+
+/* ---------- sound check ----------
+   Three attempts at playing a plain tone, so a phone that makes no sound can
+   say which layer is failing instead of everyone guessing:
+
+     1. Web Audio, the engine the whole session runs on.
+     2. An <audio> element. On an iPhone the ringer switch silences Web Audio
+        but not media playback, so hearing this and not the first names the
+        cause exactly.
+     3. The device's own speech, which is the other thing a subliminal can use.
+
+   Whatever comes back, it is evidence rather than another theory. */
+function toneWavDataUri(seconds, hz){
+  const rate = 8000, n = Math.floor(rate * seconds);
+  const bytes = 44 + n * 2, buf = new ArrayBuffer(bytes), v = new DataView(buf);
+  const ascii = (off, str) => { for (let i = 0; i < str.length; i++) v.setUint8(off + i, str.charCodeAt(i)); };
+  ascii(0, 'RIFF'); v.setUint32(4, bytes - 8, true); ascii(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  ascii(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++){
+    // Faded at both ends so it is a note rather than a click.
+    const fade = Math.min(1, i / (rate * 0.05), (n - i) / (rate * 0.05));
+    v.setInt16(44 + i * 2, Math.sin(2 * Math.PI * hz * (i / rate)) * 0.35 * fade * 32767, true);
+  }
+  let bin = ''; const u8 = new Uint8Array(buf);
+  for (let i = 0; i < u8.length; i++) bin += String.fromCharCode(u8[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+function soundCheckSay(html){
+  const el = document.getElementById('soundCheckMsg');
+  if (el) el.innerHTML = html;
+}
+
+async function runSoundCheck(){
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  soundCheckSay('<b>1 of 3 — Web Audio.</b> Listen for a low tone…');
+
+  // 1. Web Audio, unlocked inside this tap.
+  let ctxState = 'none';
+  try {
+    const ctx = primeAudio();
+    const g = ctx.createGain(); g.gain.value = 0.25; g.connect(ctx.destination);
+    const o = ctx.createOscillator(); o.frequency.value = 330; o.connect(g); o.start();
+    await wait(1600); o.stop(); ctxState = ctx.state;
+  } catch(e){ ctxState = 'failed: ' + (e && e.message); }
+  await wait(400);
+
+  // 2. An <audio> element.
+  soundCheckSay('<b>2 of 3 — media playback.</b> Listen for a higher tone…');
+  let elResult = 'no';
+  try {
+    const el = new Audio(toneWavDataUri(1.5, 520));
+    el.volume = 1;
+    await el.play();
+    elResult = 'started';
+    await wait(1700);
+  } catch(e){ elResult = 'blocked: ' + (e && e.name); }
+  await wait(400);
+
+  // 3. The device's own voice.
+  soundCheckSay('<b>3 of 3 — the device voice.</b> Listen for a word…');
+  let spoke = false;
+  try {
+    const u = new SpeechSynthesisUtterance('Testing');
+    u.onstart = () => { spoke = true; };
+    window.speechSynthesis.speak(u);
+    await wait(2200);
+    window.speechSynthesis.cancel();
+  } catch(e){}
+
+  soundCheckSay(`Done. Tell me which of the three you heard — that is the whole answer.
+    <br><span class="sc-detail">Engine: ${ctxState} · media: ${elResult} · device voice: ${spoke ? 'started' : 'never started'}</span>`);
+}
