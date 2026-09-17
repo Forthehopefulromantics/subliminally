@@ -737,3 +737,127 @@ function closeHabitIconPicker(){
   if (pop) pop.remove();
   document.removeEventListener('click', habitIconOutside);
 }
+
+/* ---------- a small ask ----------
+   One modal for a question that needs an answer before anything happens. Two
+   things use it: confirming a log out, and the reflection after a missed
+   ritual. */
+let askOnClose = null;
+
+function openAsk(title, bodyHtml, onClose){
+  const o = document.getElementById('askOverlay');
+  if (!o) return;
+  document.getElementById('askTitle').textContent = title;
+  document.getElementById('askBody').innerHTML = bodyHtml;
+  askOnClose = onClose || null;
+  o.classList.add('open');
+  const first = o.querySelector('button:not(.modal-close)');
+  if (first) first.focus();
+}
+function closeAsk(){
+  const o = document.getElementById('askOverlay');
+  if (o) o.classList.remove('open');
+  const fn = askOnClose; askOnClose = null;
+  if (fn) fn();
+}
+
+/* Logging out on a shared or borrowed device is one tap from losing your place,
+   and there is no undo for it. */
+function confirmLogOut(){
+  openAsk('Log out?', `
+    <div class="ask-text">You'll need to sign in again to get back to your rituals and your subliminals. Nothing is deleted.</div>
+    <div class="ask-row">
+      <button class="btn btn-ghost" onclick="closeAsk()">Stay signed in</button>
+      <button class="btn btn-primary" onclick="closeAsk(); logOut();">Log out</button>
+    </div>`);
+}
+
+/* ---------- the reflection ----------
+   Asked once, the day after a ritual was not kept, and never again for that
+   day. Every part of it is optional, and the wording is the whole design: a
+   missed day is a thing that happened, not a thing you failed. "Why did you
+   skip it" would be an interrogation; "what got in the way" is a question about
+   the day rather than about the person. */
+const MISS_REASONS = [
+  'Too tired', 'No time', 'Wasn\u2019t home', 'Forgot',
+  'Didn\u2019t feel like it', 'Unwell', 'Something came up', 'Needed a break',
+];
+const MISS_FEELINGS = [
+  'Fine about it', 'A bit disappointed', 'Relieved',
+  'Frustrated', 'Didn\u2019t notice', 'Ready to go again',
+];
+let reflection = { on:null, time:null, reason:null, feeling:null };
+
+function pickAskChip(kind, value, el){
+  reflection[kind] = reflection[kind] === value ? null : value;
+  const group = el.parentElement;
+  group.querySelectorAll('.ask-chip').forEach(c => c.classList.remove('sel'));
+  if (reflection[kind]) el.classList.add('sel');
+}
+
+function openReflection(time, dateStr){
+  reflection = { on: dateStr, time, reason: null, feeling: null };
+  const when = time === 'morning' ? 'morning ritual' : 'night ritual';
+  const day = new Date(dateStr + 'T00:00:00')
+    .toLocaleDateString(undefined, { weekday:'long' });
+  openAsk(`${day}\u2019s ${when}`, `
+    <div class="ask-text">It didn\u2019t happen, and that\u2019s allowed. If you want to say what got in the way, it helps to see the pattern later \u2014 and if you don\u2019t, skip it.</div>
+    <div class="ask-label">What got in the way</div>
+    <div class="ask-chips">${MISS_REASONS.map(r =>
+      `<button type="button" class="ask-chip" onclick="pickAskChip('reason','${r.replace(/'/g,"\\'")}',this)">${r}</button>`).join('')}</div>
+    <div class="ask-label">How you feel about it</div>
+    <div class="ask-chips">${MISS_FEELINGS.map(f =>
+      `<button type="button" class="ask-chip" onclick="pickAskChip('feeling','${f.replace(/'/g,"\\'")}',this)">${f}</button>`).join('')}</div>
+    <div class="ask-row">
+      <button class="btn btn-primary" onclick="saveReflection()">Save</button>
+    </div>
+    <div style="margin-top:12px; text-align:center;">
+      <button class="ask-skip" onclick="dismissReflection()">Skip this</button>
+    </div>`);
+}
+
+/* Skipping still writes the row. Otherwise the same day is asked about every
+   morning until it is answered, which turns a gentle question into nagging. */
+async function dismissReflection(){
+  await writeReflection({ reason:null, feeling:null });
+  closeAsk();
+}
+async function saveReflection(){
+  await writeReflection({ reason: reflection.reason, feeling: reflection.feeling });
+  closeAsk();
+}
+async function writeReflection(fields){
+  const { on, time } = reflection;
+  reflectionsSeen[`${on}|${time}`] = true;      // so it does not reappear this session
+  if (!sb || !currentUser || !on) return;
+  const { error } = await sb.from('ritual_reflections').upsert({
+    user_id: currentUser.id, missed_on: on, time_of_day: time,
+    reason: fields.reason, feeling: fields.feeling,
+  }, { onConflict: 'user_id,missed_on,time_of_day' });
+  if (error) console.warn('reflection:', error.message);
+}
+
+let reflectionsSeen = {};
+async function loadReflections(){
+  reflectionsSeen = {};
+  if (!sb || !currentUser) return;
+  const { data, error } = await sb.from('ritual_reflections')
+    .select('missed_on, time_of_day')
+    .gte('missed_on', shiftDateStr(localDateStr(), -14));
+  if (error){ console.warn('reflections:', error.message); return; }
+  for (const r of data || []) reflectionsSeen[`${r.missed_on}|${r.time_of_day}`] = true;
+}
+
+/* Yesterday only, and only a ritual that had habits in it to miss. Asking about
+   a week ago is asking someone to remember a Tuesday, and asking about an empty
+   list is asking about nothing. */
+function reflectionDue(){
+  const y = shiftDateStr(localDateStr(), -1);
+  for (const time of ['morning', 'night']){
+    if (!habitsCache.some(h => h.time_of_day === time)) continue;
+    if (reflectionsSeen[`${y}|${time}`]) continue;
+    if (routineHeld(time, y)) continue;          // kept, or bridged by a grace day
+    return { time, date: y };
+  }
+  return null;
+}

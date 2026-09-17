@@ -424,7 +424,7 @@ async function deleteMyAccount(){
 function renderAccountArea(){
   const area = document.getElementById('authArea');
   if (currentUser){
-    area.innerHTML = `<div class="account-chip"><button class="nav-identity" onclick="showProfilePage()" title="Your profile"><span class="nav-avatar" id="navAvatar">🌙</span><b id="navChipName">${currentUser.email.split('@')[0]}</b></button><button onclick="logOut()">Log out</button></div>`;
+    area.innerHTML = `<div class="account-chip"><button class="nav-identity" onclick="showProfilePage()" title="Your profile"><span class="nav-avatar" id="navAvatar">🌙</span><b id="navChipName">${currentUser.email.split('@')[0]}</b></button><button onclick="confirmLogOut()">Log out</button></div>`;
     loadNavIdentity();
   } else {
     area.innerHTML = `<button class="nav-cta" onclick="openAuthModal()">Log in</button>`;
