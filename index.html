@@ -488,8 +488,7 @@
 
   /* the room list, under the picture rather than over it */
   .sanc-rooms{ list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:1px; }
-  .sanc-room{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; align-items:baseline;
-    padding:11px 2px; border-bottom:1px solid rgba(255,255,255,.06); }
+  .sanc-room{ border-bottom:1px solid rgba(255,255,255,.06); }
   .sr-name{ font-family:var(--serif); font-size:15.5px; color:var(--moonlight); }
   .sr-blurb{ grid-column:1; font-size:12.5px; color:var(--haze); }
   .sr-state{ grid-row:1; grid-column:2; font-size:11px; letter-spacing:.08em;
@@ -498,6 +497,59 @@
   .sanc-room.is-locked .sr-name, .sanc-room.is-locked .sr-blurb{ opacity:.45; }
   .sanc-room.is-new .sr-state{ color:var(--candle); }
   .sanc-room.is-coming .sr-state{ color:var(--lilac); }
+
+
+  /* ---- hotspots ----
+     Percentages of the stage, which is exactly the shape of the artwork and
+     never crops, so 71% across is the same doorway on every screen. */
+  .sanc-hots{ position:absolute; inset:0; }
+  .sanc-hot{ position:absolute; transform:translate(-50%,-50%);
+    width:52px; height:52px; padding:0; border:0; background:none; cursor:pointer;
+    display:grid; place-items:center; }
+  .sanc-hot .sh-dot{ width:15px; height:15px; border-radius:50%;
+    background:rgba(255,247,238,.92); box-shadow:0 0 0 3px rgba(10,8,22,.35), 0 0 16px 4px rgba(247,192,112,.55);
+    transition:transform .2s ease; }
+  /* Room names ride under the dot, but only for rooms you can go to: a label on
+     a room you have not opened is a spoiler and clutter at once. */
+  .sanc-hot .sh-name{ position:absolute; top:100%; margin-top:-6px; white-space:nowrap;
+    font-size:10.5px; letter-spacing:.04em; color:#FFF7EE; opacity:0;
+    text-shadow:0 1px 6px rgba(10,8,22,1), 0 0 3px rgba(10,8,22,.95); transition:opacity .2s; }
+  .sanc-hot.is-new .sh-name, .sanc-hot.is-unlocked .sh-name,
+  .sanc-hot.is-coming .sh-name, .sanc-hot.is-picked .sh-name{ opacity:1; }
+
+  /* Noise. Weather, not damage: soft lavender fog that dims the light behind a
+     room you have not opened. Never a padlock, never a warning colour. */
+  .sanc-hot .sh-noise{ position:absolute; width:86px; height:86px; border-radius:50%;
+    background:radial-gradient(circle, rgba(186,167,232,.5) 0%, rgba(150,132,200,.34) 42%, rgba(150,132,200,0) 72%);
+    opacity:0; transition:opacity .3s; }
+  .sanc-hot.is-locked .sh-noise{ opacity:1; }
+  .sanc-hot.is-locked .sh-dot{ width:11px; height:11px;
+    background:rgba(226,216,246,.5); box-shadow:0 0 0 2px rgba(10,8,22,.25); }
+  .sanc-hot.is-coming .sh-dot{ background:var(--lilac); }
+  .sanc-hot.is-new .sh-dot{ background:var(--candle);
+    box-shadow:0 0 0 3px rgba(10,8,22,.35), 0 0 20px 7px rgba(247,192,112,.75); }
+  .sanc-hot:hover .sh-dot, .sanc-hot.is-picked .sh-dot{ transform:scale(1.35); }
+  .sanc-hot:focus-visible{ outline:none; }
+  .sanc-hot:focus-visible .sh-dot{ transform:scale(1.35);
+    box-shadow:0 0 0 3px var(--midnight), 0 0 0 6px var(--candle); }
+  .sanc-hot.is-picked .sh-dot{ box-shadow:0 0 0 3px rgba(10,8,22,.45), 0 0 0 5px rgba(247,192,112,.9); }
+
+  /* A new room breathes. Nothing else on this screen moves. */
+  @keyframes sanc-breathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.18); } }
+  .sanc-hot.is-new .sh-dot{ animation:sanc-breathe 2.8s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){
+    .sanc-hot.is-new .sh-dot{ animation:none; }
+    .sanc-hot .sh-dot, .sanc-hot .sh-name, .sanc-hot .sh-noise{ transition:none; }
+    .sanc-backdrop{ transition:none; }
+  }
+
+  /* the list is buttons now */
+  .sanc-room button{ display:grid; grid-template-columns:1fr auto; gap:2px 12px;
+    align-items:baseline; width:100%; text-align:left; background:none; border:0;
+    padding:11px 2px; cursor:pointer; font-family:inherit; color:inherit; }
+  .sanc-room button:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; border-radius:8px; }
+  .sanc-room.is-picked{ border-bottom-color:var(--candle); }
+  .sanc-room.is-picked .sr-name{ color:var(--candle); }
 
   /* the way in, on Today */
   .sanc-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:left;

@@ -19,35 +19,36 @@
    See the migration for why that is the mechanism rather than a shortcut. */
 const SANCTUARY_ROOMS = [
   { key:'living',   name:'Living Room',   art:null,   /* 01-living-room-hub — not drawn yet */
-    blurb:'Where you come in.',
+    blurb:'Where you come in.', at:{ x:20, y:53 }, need:'Open from the first day.',
     opens: () => true },
 
   { key:'garden',   name:'Practice Garden', art:'07-practice-garden',
-    blurb:'Habits, kept.',
+    blurb:'Habits, kept.', at:{ x:47, y:76 }, need:'Check off one habit.',
     opens: s => (s.habit || 0) > 0 },
 
   { key:'bedroom',  name:'Dreamscape',    art:'02-bedroom-dreamscape',
-    blurb:'Rest, and the subconscious.',
+    blurb:'Rest, and the subconscious.', at:{ x:52, y:30 },
+    need:'Play a subliminal, or finish a night ritual.',
     opens: s => (s.subliminal || 0) > 0 || (s.ritual_night || 0) > 0 },
 
   { key:'library',  name:'Library',       art:null,   /* 03-library-story-room — not drawn yet */
-    blurb:'Your story, written down.',
+    blurb:'Your story, written down.', at:{ x:16, y:27 }, need:'Write or photograph one page.',
     opens: s => (s.journal || 0) > 0 },
 
   { key:'mirror',   name:'The Mirror',    art:'04-mirror-identity-room',
-    blurb:'Who you are becoming.',
+    blurb:'Who you are becoming.', at:{ x:71, y:26 }, need:'400 Light.',
     opens: (s, lifetime) => lifetime >= 400 },
 
   { key:'waters',   name:'The Waters',    art:'05-waters-bathroom',
-    blurb:'Where feeling is let go of.',
+    blurb:'Where feeling is let go of.', at:{ x:72, y:46 }, need:'800 Light.',
     opens: (s, lifetime) => lifetime >= 800 },
 
   { key:'studio',   name:'Vision Studio', art:null,   /* 06-creative-vision-studio — not drawn yet */
-    blurb:'What you are making.',
+    blurb:'What you are making.', at:{ x:86, y:52 }, need:'1,400 Light.',
     opens: (s, lifetime) => lifetime >= 1400 },
 
   { key:'horizon',  name:'The Horizon',   art:null,   /* 08-horizon-balcony — not drawn yet */
-    blurb:'Where you are going.',
+    blurb:'Where you are going.', at:{ x:89, y:34 }, need:'2,200 Light.',
     opens: (s, lifetime) => lifetime >= 2200 },
 ];
 function sanctuaryRoom(key){ return SANCTUARY_ROOMS.find(r => r.key === key) || null; }
@@ -222,30 +223,78 @@ function renderSanctuaryHome(){
      thing here allowed to crop. */
   if (back){ back.style.backgroundImage = `url("${art}")`; back.classList.add('on'); }
 
+  /* Hotspots are buttons, not divs with click handlers. That is the whole of
+     the keyboard support, the focus ring and the screen-reader announcement —
+     a div would need all three written by hand and they would drift.
+
+     Coordinates are percentages of the artwork. The stage is exactly the shape
+     of the artwork and never crops, so they mean the same thing everywhere. */
+  const spots = SANCTUARY_ROOMS.map(r => {
+    /* A locked room is not a disabled button: tapping it says what opens it,
+       which is the one thing someone standing in front of it wants. So no
+       aria-disabled — that would promise a screen-reader user nothing happens,
+       and something does. The state rides in the label instead. */
+    const st = roomState(r.key);
+    const say = st === 'locked' ? `locked. ${r.need}`
+              : st === 'coming' ? 'open, still being drawn'
+              : st === 'new'    ? 'open, not visited yet'
+              : 'open';
+    return `<button type="button" class="sanc-hot is-${st}"
+        style="left:${r.at.x}%; top:${r.at.y}%"
+        onclick="selectSanctuaryRoom('${r.key}')"
+        aria-label="${r.name} — ${say}">
+        <span class="sh-noise" aria-hidden="true"></span>
+        <span class="sh-dot" aria-hidden="true"></span>
+        <span class="sh-name" aria-hidden="true">${r.name}</span>
+      </button>`;
+  }).join('');
+
   stage.innerHTML = `
     <img class="sanc-art" src="${art}" alt="Your Sanctuary: a two-story home among floating islands and waterfalls">
+    <div class="sanc-hots">${spots}</div>
     <div class="sanc-top">
       <div class="sanc-title">Your Sanctuary</div>
       <div class="sanc-sub">${p.open} of ${p.total} spaces open${p.waiting ? ` · ${p.waiting} waiting to be placed` : ''}</div>
     </div>`;
 
-  /* The room list sits under the picture rather than over it. Over it, every
-     name needs its own scrim to stay readable against artwork that changes; the
-     same list underneath is readable by default and reachable by tab. */
-  if (below){
-    below.innerHTML = `<ul class="sanc-rooms">${SANCTUARY_ROOMS.map(r => {
-      const st = roomState(r.key);
-      const note = st === 'locked' ? 'Not open yet'
-                 : st === 'coming' ? 'Earned — being drawn'
-                 : st === 'new'    ? 'New'
-                 : 'Open';
-      return `<li class="sanc-room is-${st}">
+  renderSanctuaryList();
+}
+
+/* The list under the picture is not a duplicate of the hotspots — it is the
+   readable version of them. Names over artwork need a scrim each to stay
+   legible against a picture that changes; the same names underneath are
+   readable by default, ordered, and reachable by tab without hunting. */
+function renderSanctuaryList(selected){
+  const below = document.getElementById('sanctuaryBelow');
+  if (!below) return;
+  below.innerHTML = `<ul class="sanc-rooms">${SANCTUARY_ROOMS.map(r => {
+    const st = roomState(r.key);
+    const note = st === 'locked' ? 'Not open yet'
+               : st === 'coming' ? 'Being drawn'
+               : st === 'new'    ? 'New'
+               : 'Open';
+    return `<li class="sanc-room is-${st}${selected === r.key ? ' is-picked' : ''}">
+      <button type="button" onclick="selectSanctuaryRoom('${r.key}')">
         <span class="sr-name">${r.name}</span>
-        <span class="sr-blurb">${r.blurb}</span>
+        <span class="sr-blurb">${st === 'locked' ? r.need : r.blurb}</span>
         <span class="sr-state">${note}</span>
-      </li>`;
-    }).join('')}</ul>`;
-  }
+      </button>
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+/* Choosing a room from either the picture or the list. Entering one arrives in
+   the next step; for now this is what tells you where you just tapped, which is
+   also what a locked room has to do forever — say what opens it, without ever
+   implying you did something wrong. */
+function selectSanctuaryRoom(key){
+  const stage = document.getElementById('sanctuaryStage');
+  if (stage) stage.querySelectorAll('.sanc-hot').forEach(b =>
+    b.classList.toggle('is-picked', b.getAttribute('aria-label').startsWith(sanctuaryRoom(key).name + ' ')));
+  renderSanctuaryList(key);
+  const li = document.querySelector('.sanc-room.is-picked');
+  if (li) li.scrollIntoView({ block:'nearest',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 /* Entering is a swap of what is on the stage, so there is nothing to undo on
