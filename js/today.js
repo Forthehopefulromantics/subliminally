@@ -83,6 +83,7 @@ async function renderTodayPage(){
     loadGrace(),
     loadSanctuary(),
     loadTodaySubs(),
+    loadReflections(),
   ]);
   const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
   document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');
@@ -98,6 +99,11 @@ async function renderTodayPage(){
   if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
   else document.getElementById('todayPageCard').style.display = 'none';
   renderTodayJourney();   // last, so the journal load has landed and its state is real
+
+  /* After the page is drawn, not during: a modal that arrives while Today is
+     still assembling itself feels like an error rather than a question. */
+  const due = (typeof reflectionDue === 'function') ? reflectionDue() : null;
+  if (due) setTimeout(() => openReflection(due.time, due.date), 900);
 }
 
 /* ---------- the week, at a glance ----------

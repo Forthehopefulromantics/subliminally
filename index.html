@@ -610,6 +610,23 @@
   .cover-pop-foot{ display:flex; justify-content:space-between; gap:12px; margin-top:11px; }
   .profile-item .cover-pop-foot button{ font-size:12.5px; }
 
+
+  /* the small ask: a confirm, or the reflection after a missed ritual */
+  .ask-text{ font-size:14px; color:var(--haze); margin-top:10px; line-height:1.55; }
+  .ask-row{ display:flex; gap:10px; margin-top:18px; }
+  .ask-row .btn{ flex:1; }
+  .ask-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+  .ask-chip{ font-size:12.5px; border:1px solid var(--dusk); background:var(--veil);
+    color:var(--moonlight); border-radius:999px; padding:8px 13px; cursor:pointer;
+    font-family:inherit; }
+  .ask-chip:hover{ border-color:var(--candle); }
+  .ask-chip.sel{ border-color:var(--candle); color:var(--candle); }
+  .ask-chip:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  .ask-label{ font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--haze); margin-top:20px; }
+  .ask-skip{ background:none; border:none; color:var(--haze); font-size:12.5px;
+    cursor:pointer; font-family:inherit; text-decoration:underline; padding:0; }
+
   /* ---- the library as a playlist ---- */
   /* the cover, with the play control over it */
   .lib-cover{ position:relative; width:46px; height:46px; flex:0 0 auto; border-radius:12px;
@@ -982,7 +999,10 @@
   .cloud{ position:absolute; opacity:var(--cloud-op); transition:opacity .7s ease; }
   .cloud svg{ display:block; width:100%; height:auto; }
   .cloud .a{ fill:var(--cloud); transition:fill .7s ease; }
-  .cloud .b{ fill:var(--cloud-2); transition:fill .7s ease; }
+  /* The cloud's second path is the shading along its underside. Hidden rather
+     than deleted from the SVG, because the shape is one string shared by every
+     layer and cutting it out would be a find-and-replace across all seven. */
+  .cloud .b{ display:none; }
   @keyframes drift{ from{ transform:translateX(-30vw); } to{ transform:translateX(130vw); } }
   .drift{ animation:drift linear infinite; }
 
@@ -1351,6 +1371,17 @@
 </div>
 
 <!-- ============ AUTH MODAL ============ -->
+
+<!-- One small modal for a question that needs a yes. The auth overlay's card is
+     the right size and already styled, so this borrows its classes. -->
+<div class="modal-overlay" id="askOverlay" onclick="if(event.target===this) closeAsk()">
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="askTitle">
+    <button class="modal-close" onclick="closeAsk()" aria-label="Close">✕</button>
+    <div class="modal-title" id="askTitle"></div>
+    <div id="askBody"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="authOverlay" onclick="if(event.target===this) closeAuthModal()">
   <div class="modal-card">
     <button class="modal-close" onclick="closeAuthModal()">✕</button>
