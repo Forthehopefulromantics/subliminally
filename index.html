@@ -422,6 +422,7 @@
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="rituals"] > nav ~ section:not(#rituals),
   body[data-view="today"] > nav ~ section:not(#today),
+  body[data-view="sanctuary"] > nav ~ section:not(#sanctuary),
   /* The builder is its own page now, so it's not part of the scroll down the
      marketing home — that's where the "too busy" was coming from. */
   body:not([data-view]) #flow-section,
@@ -432,14 +433,139 @@
   body[data-view="journal"] > footer,
   body[data-view="rituals"] > footer,
   body[data-view="today"] > footer,
+  body[data-view="sanctuary"] > footer,
   body[data-view="build"] > footer,
   body[data-view="reprogram"] > footer{ display:none !important; }
   body:not([data-view="today"]) #today{ display:none !important; }
+  body:not([data-view="sanctuary"]) #sanctuary{ display:none !important; }
   body:not([data-view="profile"]) #profile{ display:none !important; }
   body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
   body:not([data-view="rituals"]) #rituals{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
+
+  /* ---- the Sanctuary ----
+     The stage is exactly the ratio of the artwork and is never cropped, which
+     is the whole trick: object-fit:cover crops by an amount that changes with
+     the shape of the screen, so a hotspot at "38% across" would sit on the door
+     on one phone and on the wall beside it on another. Nothing here crops, so a
+     percentage means the same thing on every device. The only thing that does
+     crop is the backdrop, which is blurred and which nobody taps. */
+  .sanctuary-section{ padding:0 0 40px; }
+  .sanc-frame{ position:relative; overflow:hidden; }
+  .sanc-backdrop{ position:absolute; inset:-8%; background-size:cover; background-position:center;
+    filter:blur(44px) saturate(.8) brightness(.5); opacity:0; transition:opacity .6s ease; }
+  .sanc-backdrop.on{ opacity:1; }
+  .sanc-stage{ position:relative; margin:0 auto; aspect-ratio:9/16;
+    width:min(100%, calc((100dvh - 132px) * 9 / 16));
+    background:var(--dusk); overflow:hidden; }
+  @supports not (height: 100dvh){ .sanc-stage{ width:min(100%, calc((100vh - 132px) * 9 / 16)); } }
+  .sanc-stage > img.sanc-art{ width:100%; height:100%; display:block; object-fit:fill; }
+  /* Room entrances live near the edges, and a status bar sits over the top
+     eighth and a nav bar over the bottom one. Both are scrimmed rather than
+     avoided, so artwork can run edge to edge behind readable text. */
+  .sanc-top, .sanc-bottom{ position:absolute; left:0; right:0; pointer-events:none; }
+  /* The strong part of the scrim reaches past the second line, not just the
+     first. Measured against the artwork rather than eyeballed: the subtitle is
+     body-size text, so it needs 4.5:1 against the *lightest* pixel it can land
+     on, and the moon is directly behind it. */
+  .sanc-top{ top:0; padding:14px 18px 54px;
+    background:linear-gradient(180deg, rgba(10,8,22,.94) 0%, rgba(10,8,22,.90) 52%,
+                               rgba(10,8,22,.62) 74%, rgba(10,8,22,0) 100%); }
+  .sanc-bottom{ bottom:0; padding:40px 18px 20px;
+    background:linear-gradient(0deg, rgba(10,8,22,.88), rgba(10,8,22,0)); }
+  .sanc-top *, .sanc-bottom *{ pointer-events:auto; }
+  /* Fixed colours, not the theme's: this text sits on artwork, and --haze is
+     tuned for a dark panel. The scrim carries most of it; the shadow covers the
+     rest for a picture that is pale exactly where the title goes. */
+  .sanc-title{ font-family:var(--serif); font-size:20px; color:#FFF7EE;
+    text-shadow:0 1px 12px rgba(10,8,22,.9), 0 0 3px rgba(10,8,22,.7); }
+  .sanc-sub{ font-size:12.5px; color:#F4EFFB; margin-top:3px;
+    text-shadow:0 1px 10px rgba(10,8,22,.95), 0 0 3px rgba(10,8,22,.8); }
+  .sanc-empty{ display:grid; place-items:center; height:100%; padding:30px; text-align:center; }
+  .sanc-empty p{ color:var(--haze); font-size:13.5px; max-width:30ch; margin-top:8px; }
+
+
+  /* the room list, under the picture rather than over it */
+  .sanc-rooms{ list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:1px; }
+  .sanc-room{ border-bottom:1px solid rgba(255,255,255,.06); }
+  .sr-name{ font-family:var(--serif); font-size:15.5px; color:var(--moonlight); }
+  .sr-blurb{ grid-column:1; font-size:12.5px; color:var(--haze); }
+  .sr-state{ grid-row:1; grid-column:2; font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--haze); }
+  /* Status is never colour alone: each state carries its own word as well. */
+  .sanc-room.is-locked .sr-name, .sanc-room.is-locked .sr-blurb{ opacity:.45; }
+  .sanc-room.is-new .sr-state{ color:var(--candle); }
+  .sanc-room.is-coming .sr-state{ color:var(--lilac); }
+
+
+  /* ---- hotspots ----
+     Percentages of the stage, which is exactly the shape of the artwork and
+     never crops, so 71% across is the same doorway on every screen. */
+  .sanc-hots{ position:absolute; inset:0; }
+  .sanc-hot{ position:absolute; transform:translate(-50%,-50%);
+    width:52px; height:52px; padding:0; border:0; background:none; cursor:pointer;
+    display:grid; place-items:center; }
+  .sanc-hot .sh-dot{ width:15px; height:15px; border-radius:50%;
+    background:rgba(255,247,238,.92); box-shadow:0 0 0 3px rgba(10,8,22,.35), 0 0 16px 4px rgba(247,192,112,.55);
+    transition:transform .2s ease; }
+  /* Room names ride under the dot, but only for rooms you can go to: a label on
+     a room you have not opened is a spoiler and clutter at once. */
+  .sanc-hot .sh-name{ position:absolute; top:100%; margin-top:-6px; white-space:nowrap;
+    font-size:10.5px; letter-spacing:.04em; color:#FFF7EE; opacity:0;
+    text-shadow:0 1px 6px rgba(10,8,22,1), 0 0 3px rgba(10,8,22,.95); transition:opacity .2s; }
+  .sanc-hot.is-new .sh-name, .sanc-hot.is-unlocked .sh-name,
+  .sanc-hot.is-coming .sh-name, .sanc-hot.is-picked .sh-name{ opacity:1; }
+
+  /* Noise. Weather, not damage: soft lavender fog that dims the light behind a
+     room you have not opened. Never a padlock, never a warning colour. */
+  .sanc-hot .sh-noise{ position:absolute; width:86px; height:86px; border-radius:50%;
+    background:radial-gradient(circle, rgba(186,167,232,.5) 0%, rgba(150,132,200,.34) 42%, rgba(150,132,200,0) 72%);
+    opacity:0; transition:opacity .3s; }
+  .sanc-hot.is-locked .sh-noise{ opacity:1; }
+  .sanc-hot.is-locked .sh-dot{ width:11px; height:11px;
+    background:rgba(226,216,246,.5); box-shadow:0 0 0 2px rgba(10,8,22,.25); }
+  .sanc-hot.is-coming .sh-dot{ background:var(--lilac); }
+  .sanc-hot.is-new .sh-dot{ background:var(--candle);
+    box-shadow:0 0 0 3px rgba(10,8,22,.35), 0 0 20px 7px rgba(247,192,112,.75); }
+  .sanc-hot:hover .sh-dot, .sanc-hot.is-picked .sh-dot{ transform:scale(1.35); }
+  .sanc-hot:focus-visible{ outline:none; }
+  .sanc-hot:focus-visible .sh-dot{ transform:scale(1.35);
+    box-shadow:0 0 0 3px var(--midnight), 0 0 0 6px var(--candle); }
+  .sanc-hot.is-picked .sh-dot{ box-shadow:0 0 0 3px rgba(10,8,22,.45), 0 0 0 5px rgba(247,192,112,.9); }
+
+  /* A new room breathes. Nothing else on this screen moves. */
+  @keyframes sanc-breathe{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.18); } }
+  .sanc-hot.is-new .sh-dot{ animation:sanc-breathe 2.8s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce){
+    .sanc-hot.is-new .sh-dot{ animation:none; }
+    .sanc-hot .sh-dot, .sanc-hot .sh-name, .sanc-hot .sh-noise{ transition:none; }
+    .sanc-backdrop{ transition:none; }
+  }
+
+  /* the list is buttons now */
+  .sanc-room button{ display:grid; grid-template-columns:1fr auto; gap:2px 12px;
+    align-items:baseline; width:100%; text-align:left; background:none; border:0;
+    padding:11px 2px; cursor:pointer; font-family:inherit; color:inherit; }
+  .sanc-room button:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; border-radius:8px; }
+  .sanc-room.is-picked{ border-bottom-color:var(--candle); }
+  .sanc-room.is-picked .sr-name{ color:var(--candle); }
+
+  /* the way in, on Today */
+  .sanc-row{ display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    background:var(--veil); border:1px solid rgba(255,255,255,.07); border-radius:16px;
+    padding:10px 14px 10px 10px; margin-bottom:12px; cursor:pointer; color:inherit;
+    font-family:inherit; transition:border-color .2s; }
+  .sanc-row:hover{ border-color:rgba(227,190,127,.4); }
+  .sanc-row-thumb{ width:46px; height:46px; border-radius:12px; overflow:hidden; flex-shrink:0;
+    background:var(--dusk); }
+  .sanc-row-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .sanc-row-txt{ flex:1; min-width:0; }
+  .sanc-row-txt b{ display:block; font-family:var(--serif); font-weight:400; font-size:15.5px;
+    color:var(--moonlight); }
+  .sanc-row-txt span{ font-size:12px; color:var(--haze); }
+  .sanc-row-go{ color:var(--candle); font-size:18px; flex-shrink:0; }
+
   .profile-page-back{ display:none; }
   body[data-view] .profile-page-back{ display:inline-flex; }
   .profile-icon-btn{ background:none; border:none; cursor:pointer; font-size:17px; color:var(--haze); padding:0; line-height:1; transition:color .2s; }
@@ -676,6 +802,19 @@
   /* A non-negotiable reads as the load-bearing one, without shouting. */
   .day-habit.core{ border-color:rgba(224,196,138,0.28); }
   .day-habit-core{ margin-left:auto; color:var(--candle); font-size:11px; flex-shrink:0; }
+  /* The row is a wrapper so the grip and the tick are two controls side by
+     side; a button cannot live inside a button. */
+  .day-habit-row{ display:flex; align-items:stretch; gap:7px; }
+  .day-habit-row .day-habit{ flex:1; min-width:0; }
+  .day-habit-grip{ background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);
+    border-radius:10px; color:var(--haze); font-family:inherit; cursor:grab;
+    touch-action:none; user-select:none; min-width:30px; padding:0 4px;
+    display:flex; align-items:center; justify-content:center; }
+  .day-habit-grip:hover{ color:var(--moonlight); }
+  .day-habit-grip:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  .day-habit-row.dragging{ opacity:.9; position:relative; z-index:5; }
+  .day-habit-row.dragging .day-habit-grip{ cursor:grabbing; color:var(--lilac); border-color:var(--lilac); }
+  body[data-sky="day"] .day-habit-grip{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
   .day-habit-n{ flex-shrink:0; min-width:14px; text-align:right; font-size:11.5px;
     font-variant-numeric:tabular-nums; color:var(--haze); }
   .day-habit.done .day-habit-n{ opacity:.55; }
@@ -1150,6 +1289,7 @@
       <div class="today-greeting" id="todayGreeting">Welcome back</div>
       <div class="today-date" id="todayDate"></div>
     </div>
+    <div id="todaySanctuaryRow"></div>
     <div class="today-card today-card-primary" id="todayJourneyCard" style="display:none;"></div>
     <div class="today-card" id="todaySessionCard"></div>
     <div class="today-card" id="todayRitualCard" style="display:none;"></div>
@@ -1162,6 +1302,20 @@
       <button onclick="showProfilePage()">Profile</button>
     </div>
   </div>
+</section>
+
+<!-- The Sanctuary. One section for the whole thing: the overview and each room
+     take turns inside #sanctuaryStage, because every extra section here is
+     another hand-kept list of view names three rules further up. -->
+<section class="sanctuary-section" id="sanctuary">
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+  </div>
+  <div class="sanc-frame">
+    <div class="sanc-backdrop" id="sanctuaryBackdrop" aria-hidden="true"></div>
+    <div class="sanc-stage" id="sanctuaryStage"></div>
+  </div>
+  <div class="wrap"><div id="sanctuaryBelow"></div></div>
 </section>
 
 <section class="hero">
@@ -2009,6 +2163,7 @@
 <script src="js/profile.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
+<script src="js/sanctuary.js"></script>
 <script src="js/boot.js"></script>
 </script>
 </body>

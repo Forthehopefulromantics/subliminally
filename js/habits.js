@@ -267,8 +267,8 @@ function renderHabits(){
       const dots = week.map(d => `<span class="habit-dot${days.has(d) ? ' on' : ''}${d === today ? ' today' : ''}" title="${d}"></span>`).join('');
       const safeName = h.name.replace(/"/g,'&quot;');
       return `
-      <div class="habit-row${isDone ? ' done-today' : ''}" data-habit-id="${h.id}" data-time="${time}">
-        <button class="habit-order" data-habit-id="${h.id}" onkeydown="habitOrderKey(event,'${h.id}')"
+      <div class="habit-row${isDone ? ' done-today' : ''}" data-habit-row data-habit-id="${h.id}" data-time="${time}">
+        <button class="habit-order" data-habit-grip data-habit-id="${h.id}" onkeydown="habitOrderKey(event,'${h.id}')"
           aria-label="${safeName} is number ${i + 1}. Drag, or use the arrow keys, to move it."
           title="Drag to reorder">${i + 1}</button>
         <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
@@ -495,19 +495,26 @@ async function redoHabits(){
    Pointer events rather than HTML5 drag-and-drop, because drag-and-drop does
    nothing at all on a touchscreen and this is a phone app first. The row
    follows your finger, its neighbours slide out of the way as you pass their
-   midpoints, and the new order is saved once on release. The up and down
-   buttons do the same job for anyone using a keyboard or a screen reader. */
+   midpoints, and the new order is saved once on release. The arrow keys do the
+   same job for anyone using a keyboard or a screen reader.
+
+   This works off data attributes rather than the habits panel's own class
+   names, because two lists show the same habits — the panel on Rituals and the
+   ritual card on Today — and reordering has to mean the same thing in both. A
+   second copy of this for Today would drift from this one within a month.
+   Anything that marks itself [data-habit-row] with a [data-habit-grip] inside
+   is draggable, whatever it looks like. */
 let habitDrag = null;
 
 function startHabitDrag(e){
-  const grip = e.target.closest('.habit-order');
+  const grip = e.target.closest('[data-habit-grip]');
   if (!grip || e.button > 0) return;
-  const row = grip.closest('.habit-row');
+  const row = grip.closest('[data-habit-row]');
   const list = row && row.parentElement;
   if (!row || !list) return;
   e.preventDefault();
 
-  const rows = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')];
+  const rows = [...list.querySelectorAll('[data-habit-row]')];
   habitDrag = {
     row, list, rows,
     time: row.dataset.time,
@@ -522,7 +529,7 @@ function startHabitDrag(e){
 /* The rows are reordered in the DOM as you drag, so the numbers have to keep
    up — otherwise you'd be dropping a row labelled 4 into position 2. */
 function renumberHabitList(list){
-  [...list.querySelectorAll('.habit-row:not(.habit-row-blank) .habit-order')]
+  [...list.querySelectorAll('[data-habit-row] [data-habit-grip]')]
     .forEach((el, i) => { el.textContent = i + 1; });
 }
 
@@ -535,7 +542,7 @@ function moveHabitDrag(e){
 
   // Swap with whichever neighbour the pointer has moved past the middle of.
   const mid = row.getBoundingClientRect().top + habitDrag.height / 2;
-  const siblings = [...habitDrag.list.querySelectorAll('.habit-row:not(.habit-row-blank)')].filter(r => r !== row);
+  const siblings = [...habitDrag.list.querySelectorAll('[data-habit-row]')].filter(r => r !== row);
   for (const other of siblings){
     const box = other.getBoundingClientRect();
     const otherMid = box.top + box.height / 2;
@@ -553,11 +560,11 @@ async function endHabitDrag(){
   row.style.transform = '';
   document.body.classList.remove('habit-dragging');
 
-  const orderedIds = [...list.querySelectorAll('.habit-row:not(.habit-row-blank)')].map(r => r.dataset.habitId);
+  const orderedIds = [...list.querySelectorAll('[data-habit-row]')].map(r => r.dataset.habitId);
   const current = habitsCache.filter(h => h.time_of_day === time);
   const ordered = orderedIds.map(id => current.find(h => h.id === id)).filter(Boolean);
-  if (ordered.length !== current.length){ renderHabits(); return; }   // something's out of step; repaint from truth
-  if (ordered.every((h, i) => h === current[i])){ renderHabits(); return; }  // nothing actually moved
+  if (ordered.length !== current.length){ repaintHabitLists(); return; }   // something's out of step; repaint from truth
+  if (ordered.every((h, i) => h === current[i])){ repaintHabitLists(); return; }  // nothing actually moved
   pushHabitUndo();
   await persistHabitOrder(time, ordered);
 }
@@ -639,3 +646,12 @@ async function deleteHabit(habitId){
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
 
+
+/* Both places habits appear repaint together. Reordering on Today has to show
+   up on Rituals and the other way round, and the panel being closed is not a
+   reason to leave it stale behind you. */
+function repaintHabitLists(){
+  if (typeof renderHabits === 'function') renderHabits();
+  if (typeof renderTodayRitual === 'function' &&
+      document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+}
