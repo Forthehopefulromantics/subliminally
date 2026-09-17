@@ -497,3 +497,59 @@ function reflectLibraryPlaying(){
   if (now) now.textContent = document.getElementById('finalLine').textContent || 'Playing…';
 }
 setInterval(() => { if (libraryNowPlayingId) reflectLibraryPlaying(); }, 1000);
+
+/* ---------- the bar that follows you ----------
+   A session lasts up to eight hours. Before this, the only place that knew one
+   was playing was whichever screen started it — walk to Journal and there was
+   no title, no line, and no way to stop it short of finding your way back.
+
+   It is one bar, driven off finalPlaying, and it renders nothing when nothing
+   is playing. Not a second player: the stop button calls the same stopFinal()
+   every other control does. */
+function ensureNowBar(){
+  let bar = document.getElementById('nowBar');
+  if (bar) return bar;
+  bar = document.createElement('div');
+  bar.id = 'nowBar';
+  bar.className = 'now-bar';
+  bar.setAttribute('role', 'status');
+  bar.setAttribute('aria-live', 'polite');
+  document.body.appendChild(bar);
+  return bar;
+}
+
+function renderNowBar(){
+  const bar = ensureNowBar();
+  if (!finalPlaying){
+    bar.classList.remove('on');
+    bar.innerHTML = '';
+    document.body.classList.remove('has-now-bar');
+    return;
+  }
+  const title = (typeof state !== 'undefined' && state.title) || currentSubliminalTitle() || 'Your subliminal';
+  const line  = (document.getElementById('finalLine') || {}).textContent || '';
+  bar.innerHTML = `
+    <div class="now-bar-in">
+      <span class="nb-pulse" aria-hidden="true"></span>
+      <span class="nb-txt">
+        <b>${String(title).replace(/</g,'&lt;')}</b>
+        <span>${String(line).replace(/</g,'&lt;').slice(0, 90)}</span>
+      </span>
+      <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
+    </div>`;
+  bar.classList.add('on');
+  document.body.classList.add('has-now-bar');
+}
+
+/* The title of whatever is playing, wherever it was started from. */
+function currentSubliminalTitle(){
+  if (libraryNowPlayingId){
+    const el = document.querySelector(`#libItem-${libraryNowPlayingId} .lib-title-text`);
+    if (el) return el.textContent;
+  }
+  const t = document.getElementById('finalTitle');
+  return t ? t.textContent : '';
+}
+
+/* One beat, cheap, and it stops mattering the moment nothing is playing. */
+setInterval(renderNowBar, 1000);
