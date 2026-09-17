@@ -82,6 +82,7 @@ async function renderTodayPage(){
     loadLight(),
     loadGrace(),
     loadSanctuary(),
+    loadTodaySubs(),
   ]);
   const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
   document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');

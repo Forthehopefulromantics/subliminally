@@ -18,13 +18,15 @@ function journeyQuests(){
     return { done: st.state === 'full' || st.state === 'essentials', st, rows };
   };
   const morning = ritual('morning'), night = ritual('night');
+  /* Three things, in the order a day happens. Journal and the habit count came
+     off: the habits are already the two rituals, so they were counted twice,
+     and a list that is mostly bookkeeping stops being a list of what to do. */
   const list = [];
   if (morning) list.push({ key:'morning', label:'Morning ritual', done:morning.done,
     detail:`${morning.st.done} of ${morning.st.total}`, go:() => { todayRitualTime='morning'; renderTodayRitual(); renderTodayJourney(); } });
-  list.push({ key:'journal', label:'Journal', done: !!journalPhotosByDate[today],
-    detail: journalPhotosByDate[today] ? 'Logged' : 'Not yet', go:() => showRitualsPage('calendar') });
   list.push({ key:'subliminal', label:'Subliminal', done: lightToday.has(LIGHT_SOURCES.subliminal),
-    detail: lightToday.has(LIGHT_SOURCES.subliminal) ? 'Played' : 'Not yet', go:() => showBuildPage() });
+    detail: lightToday.has(LIGHT_SOURCES.subliminal) ? 'Played' : 'Not yet',
+    play: true, go:() => playTodaySubliminal() });
   if (night) list.push({ key:'night', label:'Night ritual', done:night.done,
     detail:`${night.st.done} of ${night.st.total}`, go:() => { todayRitualTime='night'; renderTodayRitual(); renderTodayJourney(); } });
   return list;
@@ -61,8 +63,11 @@ function renderTodayJourney(){
           <span class="jq-tick" aria-hidden="true">${q.done ? '✓' : ''}</span>
           <span class="jq-label">${q.label}</span>
           <span class="jq-detail">${q.detail}</span>
+          ${q.play ? `<span class="jq-play" aria-hidden="true">${finalPlaying ? '❚❚' : '▶'}</span>` : ''}
         </button>
-      </li>`).join('')}</ul>`;
+      </li>`).join('')}</ul>
+    <div id="todaySubPicker"></div>`;
+  renderTodaySubPicker();
 }
 function journeyGo(key){
   const q = journeyQuests().find(x => x.key === key);
@@ -135,11 +140,8 @@ function renderTodayRitual(){
   const habitBtn = h => {
     const isDone = done.has(h.id);
     const n = rows.indexOf(h) + 1;
-    /* The picture sits where the empty circle was and becomes the tick when the
-       habit is done, rather than adding a third thing to look at. */
-    const glyph = (typeof habitIcon === 'function') ? habitIcon(h) : '';
     const tick = `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-      <span class="day-habit-check"${glyph ? ' data-glyph="' + glyph + '"' : ''}>✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
     </button>`;
     if (shortMode || rows.length < 2){
       return `<div class="day-habit-row"><span class="day-habit-n" aria-hidden="true">${n}</span>${tick}</div>`;
@@ -224,3 +226,70 @@ window.addEventListener('popstate', (e) => {
   else document.body.removeAttribute('data-view');
 });
 
+
+/* ---------- the last three ----------
+   Under the Journey, so choosing what to play tonight is one tap from the
+   screen you already opened rather than a trip to another page.
+
+   Three, not all of them: this is "what am I listening to tonight", and the
+   full shelf is what the Subliminals tab is for. */
+let todaySubs = [];
+let todaySubChosen = null;
+
+async function loadTodaySubs(){
+  if (!sb || !currentUser){ todaySubs = []; return; }
+  const { data, error } = await sb.from('subliminals')
+    .select('id, title, duration_seconds, cover_path')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: false }).limit(3);
+  if (error){ todaySubs = []; return; }
+  todaySubs = data || [];
+  if (!todaySubChosen && todaySubs.length) todaySubChosen = todaySubs[0].id;
+}
+
+function renderTodaySubPicker(){
+  const host = document.getElementById('todaySubPicker');
+  if (!host) return;
+  if (!todaySubs.length){ host.innerHTML = ''; return; }
+  host.innerHTML = `
+    <div class="sub-pick-label">Tonight's session</div>
+    <div class="sub-pick" role="radiogroup" aria-label="Choose a subliminal to play">
+      ${todaySubs.map(s => {
+        const mins = Math.round((s.duration_seconds || 0) / 60);
+        const on = s.id === todaySubChosen;
+        return `<button type="button" class="sub-pick-item${on ? ' sel' : ''}"
+          role="radio" aria-checked="${on}" onclick="chooseTodaySub('${s.id}')">
+          <span class="spi-art" id="spiArt-${s.id}"></span>
+          <span class="spi-name">${(s.title || 'Untitled').replace(/</g,'&lt;')}</span>
+          <span class="spi-len">${mins ? formatSessionLength(mins) : ''}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+  todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
+}
+
+async function showTodaySubCover(id, path){
+  if (!sb) return;
+  const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
+  const host = document.getElementById('spiArt-' + id);
+  if (error || !data || !host) return;
+  host.style.backgroundImage = `url("${data.signedUrl}")`;
+  host.classList.add('has-art');
+}
+
+function chooseTodaySub(id){
+  todaySubChosen = id;
+  renderTodaySubPicker();
+}
+
+/* Play whichever is chosen, without leaving Today. The tick comes from
+   light_ledger like every other quest — playing it is what checks it off, and
+   awardLight already refuses to pay twice in a day. */
+function playTodaySubliminal(){
+  if (finalPlaying){ stopFinal(); renderTodayJourney(); return; }
+  if (typeof primeAudio === 'function') primeAudio();   // inside the tap
+  const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
+  if (!id){ showBuildPage(); return; }
+  if (typeof playFromLibrary === 'function') playFromLibrary(id);
+  else showBuildPage();
+}

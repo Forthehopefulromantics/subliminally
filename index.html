@@ -1058,35 +1058,6 @@
      you have earned, and where that puts you. It reports, it does not cheer. */
 
 
-  /* ---- a picture for each habit ---- */
-  .habit-icon{ width:30px; height:30px; flex:0 0 auto; border-radius:9px; padding:0;
-    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
-    font-size:15px; line-height:1; cursor:pointer; display:grid; place-items:center; }
-  .habit-icon:hover{ border-color:var(--candle); }
-  .habit-icon:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
-  body[data-sky="day"] .habit-icon{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
-  .icon-pop{ position:absolute; z-index:70; margin-top:6px; width:250px; padding:9px;
-    display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
-    background:var(--veil); border:1px solid rgba(255,255,255,.12); border-radius:14px;
-    box-shadow:0 14px 34px rgba(8,6,20,.5); }
-  .icon-pop button{ aspect-ratio:1; border:none; background:none; border-radius:8px;
-    font-size:16px; cursor:pointer; padding:0; }
-  .icon-pop button:hover{ background:rgba(255,255,255,.1); }
-  .icon-pop button:focus-visible{ outline:2px solid var(--candle); outline-offset:-2px; }
-  /* On Today the picture IS the circle, and becomes a tick once it is done. */
-  /* The tick's own colour is transparent so the ✓ is hidden until it is done,
-     and ::before inherits that — so the picture needs its colour set back, or
-     it is drawn in invisible ink. */
-  .day-habit-check[data-glyph]::before{ content:attr(data-glyph); font-size:15px;
-    color:initial; -webkit-text-fill-color:initial; }
-  .day-habit-check[data-glyph]{ color:transparent; border-color:transparent;
-    background:rgba(255,255,255,.06); }
-  body[data-sky="day"] .day-habit-check[data-glyph]{ background:rgba(62,42,72,.07); }
-  .day-habit.done .day-habit-check[data-glyph]::before{ content:none; }
-  .day-habit.done .day-habit-check[data-glyph]{ color:#1B1630; background:var(--lilac);
-    border-color:var(--lilac); }
-
-  /* ---- the week at a glance ---- */
 
   /* ---- the bar that follows you while a session plays ---- */
   .now-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:none;
@@ -1126,6 +1097,27 @@
   /* Nothing important should sit underneath it. */
   body.has-now-bar{ padding-bottom:74px; }
 
+  /* the play mark on the Journey's subliminal row */
+  .jq-play{ flex:0 0 auto; margin-left:9px; color:var(--candle); font-size:13px; }
+  .journey-q.done .jq-play{ color:var(--haze); }
+
+  /* the last three, under the Journey */
+  .sub-pick-label{ font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--haze); margin:16px 0 8px; }
+  .sub-pick{ display:flex; flex-direction:column; gap:6px; }
+  .sub-pick-item{ display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);
+    border-radius:12px; padding:8px 11px; cursor:pointer; color:var(--moonlight);
+    font-family:inherit; font-size:13px; }
+  body[data-sky="day"] .sub-pick-item{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
+  .sub-pick-item.sel{ border-color:var(--candle); }
+  .spi-art{ width:30px; height:30px; flex:0 0 auto; border-radius:8px; background:var(--dusk);
+    background-size:cover; background-position:center; }
+  .spi-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .spi-len{ flex:0 0 auto; font-size:11px; color:var(--haze); }
+  .sub-pick-item:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+
+  /* ---- the week at a glance ---- */
   .week-strip{ margin:2px 0 16px; }
   .week-days{ display:flex; justify-content:space-between; gap:4px; }
   .week-day{ display:flex; flex-direction:column; align-items:center; gap:6px; flex:1 1 0; min-width:0; }
@@ -1429,7 +1421,7 @@
     <div class="today-links">
       <button onclick="showJournalPage()">Journal</button>
       <button onclick="showRitualsPage()">Rituals</button>
-      <button onclick="showLibraryPage()">Library</button>
+      <button onclick="showLibraryPage()">Subliminals</button>
       <button onclick="showReprogramPage()">The Science</button>
       <button onclick="showProfilePage()">Profile</button>
     </div>
@@ -1582,7 +1574,7 @@
   <div class="wrap page-head">
     <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
-      <div class="eyebrow">Library</div>
+      <div class="eyebrow">Subliminals</div>
       <h2>Ready-made, or made by you</h2>
       <p>Browse generalized subliminals, or everything you've personally built and saved.</p>
     </div>
