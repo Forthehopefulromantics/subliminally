@@ -46,8 +46,8 @@ async function rollOverDayIfNeeded(){
   if (!sb || !currentUser) return;
   // Refetch rather than trusting what's in memory — the day may also have been
   // logged on another device before this one woke up.
-  await loadHabits({ silent: true });
-  await loadJournalPhotos({ silent: true });
+  await loadHabits({ silent: true, force: true });
+  await loadJournalPhotos({ silent: true, force: true });
   if (document.body.getAttribute('data-view') === 'today'){
     const greetEl = document.getElementById('todayGreeting');
     if (greetEl) greetEl.textContent = greetingForHour() + (greetEl.textContent.includes(',') ? ',' + greetEl.textContent.split(',').slice(1).join(',') : '');
@@ -70,13 +70,79 @@ setInterval(rollOverDayIfNeeded, 30000);
 setInterval(applySky, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) rollOverDayIfNeeded(); });
 window.addEventListener('focus', rollOverDayIfNeeded);
-async function renderTodayPage(){
-  if (!sb || !currentUser) return;
-  document.getElementById('todayDate').textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+/* ---------- opening Today ----------
+   This used to be one long await: fifteen questions to the database, five of
+   them waiting on the one before, and nothing drawn until the last answer came
+   back. At a desk that is a blink. On a phone, where a round trip can take a
+   second or more, it is ten or twenty seconds of a screen that looks like the
+   tap never landed -- so you tap again, and wait again.
 
-  const [{ data: prof }, { data: subs }, myTier] = await Promise.all([
-    sb.from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle(),
-    sb.from('subliminals').select('id, title, duration_seconds').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(1),
+   So it is in two halves now. `paintToday` draws the whole page from what is
+   already in memory and returns straight away; `refreshToday` goes and asks,
+   and paints again when the answers arrive. Coming back to Today, everything
+   is already there and the refresh only corrects it. The one time you see an
+   empty screen is the very first load, and that one is genuinely waiting on
+   the network no matter what we do.
+
+   `todayPainted` is what tells the two apart: before the first real data has
+   landed we show the quiet placeholder rather than a page full of zeroes. */
+let todayPainted = false;
+let todayProfile = null, todayNewestSub = null;
+/* Kept across launches so the very first paint puts the right cards up rather
+   than flashing a member's cards at someone on the free plan, or the other way
+   round. It only decides what is drawn for the second before the real answer
+   lands -- what you are actually allowed to do is checked at the point you do
+   it, and on the server. */
+let todayTier = (function(){ try { return localStorage.getItem('fthr_tier') || 'ritual'; } catch(e){ return 'ritual'; } })();
+let todayRefreshing = null;
+function renderTodayPage(){
+  if (!sb || !currentUser) return;
+  paintToday();
+  refreshToday();
+}
+/* Everything here reads memory only. No awaits, nothing that can fail on a bad
+   connection -- so it always finishes inside the same frame as the tap. */
+function paintToday(){
+  const dateEl = document.getElementById('todayDate');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+  const name = (todayProfile && (todayProfile.full_name || todayProfile.username) || '').split(' ')[0];
+  const greetEl = document.getElementById('todayGreeting');
+  if (greetEl) greetEl.textContent = greetingForHour() + (name ? `, ${name}` : '');
+
+  document.body.classList.toggle('today-loading', !todayPainted);
+  renderTodaySession(todayNewestSub);
+  const ritualCard = document.getElementById('todayRitualCard');
+  if (tierAtLeast(todayTier, 'ritual')) renderTodayRitual();
+  else if (ritualCard && todayPainted) ritualCard.style.display = 'none';
+  renderWeekStrip();
+  renderHigherSelfCard();
+  renderLightStrip();
+  renderTodaySanctuaryRow();
+  const pageCard = document.getElementById('todayPageCard');
+  if (tierAtLeast(todayTier, 'whisper')) renderTodayPage_Page();
+  else if (pageCard && todayPainted) pageCard.style.display = 'none';
+  renderTodayJourney();
+}
+function refreshToday(){
+  // One refresh at a time. Tapping Today twice used to start the whole set of
+  // questions over again on top of the set already in the air.
+  if (todayRefreshing) return todayRefreshing;
+  todayRefreshing = renderTodayPageFresh().finally(() => { todayRefreshing = null; });
+  return todayRefreshing;
+}
+async function renderTodayPageFresh(){
+  if (!sb || !currentUser) return;
+
+  /* `loadTodaySubs` already fetches the newest three, newest first, so the
+     newest one is the head of that list -- asking for it separately was a
+     second trip for a row we were about to have anyway. */
+  /* All of it at once. The habits and the photo log used to be a second round
+     of waiting after this one, on the grounds that the plan decides whether to
+     show them -- but the plan only decides what is *drawn*, not what is worth
+     asking for, and the answer was already on its way for anyone on a paid
+     plan, which is who is looking at this screen. One wait instead of two. */
+  const [prof, myTier] = await Promise.all([
+    myProfile(),
     getMyTier(),
     loadHigherSelf(),
     loadLight(),
@@ -84,21 +150,16 @@ async function renderTodayPage(){
     loadSanctuary(),
     loadTodaySubs(),
     loadReflections(),
+    loadHabits({ silent: true }),
+    loadJournalPhotos({ silent: true }),
   ]);
-  const name = (prof && (prof.full_name || prof.username) || '').split(' ')[0];
-  document.getElementById('todayGreeting').textContent = greetingForHour() + (name ? `, ${name}` : '');
+  todayProfile = prof || todayProfile;
+  todayNewestSub = todaySubs[0] || todayNewestSub;
+  todayTier = myTier;
+  try { localStorage.setItem('fthr_tier', myTier); } catch(e){}
 
-  renderTodaySession(subs && subs[0]);
-  // Habits first: both the strip's streak and what she has to say read off them.
-  if (tierAtLeast(myTier, 'ritual')){ await loadHabits({ silent: true }); renderTodayRitual(); }
-  else document.getElementById('todayRitualCard').style.display = 'none';
-  renderWeekStrip();
-  renderHigherSelfCard();
-  renderLightStrip();
-  renderTodaySanctuaryRow();
-  if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
-  else document.getElementById('todayPageCard').style.display = 'none';
-  renderTodayJourney();   // last, so the journal load has landed and its state is real
+  todayPainted = true;
+  paintToday();
 
   /* After the page is drawn, not during: a modal that arrives while Today is
      still assembling itself feels like an error rather than a question. */
@@ -139,14 +200,18 @@ function weekStripDays(){
 function renderWeekStrip(){
   const el = document.getElementById('weekStrip');
   if (!el) return;
-  const days = weekStripDays();
+  /* An empty circle means you did not practise that day, and while the week is
+     still loading we do not know that about any of it. Saying it anyway, for
+     the second before the answer lands, tells you that you missed Monday. So
+     until the answer is here the whole week is drawn as unknown. */
+  const days = weekStripDays().map(d => todayPainted ? d : { ...d, done:false, unknown:!d.future });
   const kept = days.filter(d => d.done).length;
   el.innerHTML = `
     <div class="week-days" role="group" aria-label="This week: ${kept} of 7 days practised">
       ${days.map(d => `
-        <div class="week-day${d.done ? ' is-done' : ''}${d.isToday ? ' is-today' : ''}${d.future ? ' is-future' : ''}">
+        <div class="week-day${d.done ? ' is-done' : ''}${d.isToday ? ' is-today' : ''}${d.future ? ' is-future' : ''}${d.unknown ? ' is-unknown' : ''}">
           <span class="wd-dot" role="img"
-            aria-label="${d.full}${d.isToday ? ', today' : ''} — ${d.future ? 'still to come' : d.done ? 'practised' : 'not yet'}">
+            aria-label="${d.full}${d.isToday ? ', today' : ''} — ${d.unknown ? 'loading' : d.future ? 'still to come' : d.done ? 'practised' : 'not yet'}">
             ${d.done ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
           </span>
           <span class="wd-letter" aria-hidden="true">${d.letter}</span>

@@ -107,6 +107,55 @@ let journalTab = 'received';
 // app — same pattern as the sign-up email-confirmation link.
 const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
 
+/* ---------- your profile row ----------
+   One row in `profiles` holds your username, your real name, what you call
+   your higher self and which picture she is, how many Grace Days you have
+   left, and the questionnaire answers from signing up. Six different places
+   were each asking the database for their own two columns of it, which is six
+   round trips for one row -- and on a phone that is most of a second each.
+   They all go through here now, and the answer is shared.
+
+   `select('*')` rather than naming columns on purpose: a column that a
+   migration hasn't added yet fails a named select outright and takes the whole
+   row down with it, which is how the subliminal covers broke the Today list.
+   Asking for everything returns whatever is actually there. */
+async function myProfile(opts){
+  if (!sb || !currentUser) return null;
+  if (opts && opts.force) forgetFetch('profileRow');
+  const { data, error } = await fetchOnce('profileRow', () =>
+    sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(), 300000);
+  if (error){ forgetFetch('profileRow'); console.warn('profile:', error.message); return null; }
+  return data;
+}
+
+/* Writing part of it. Every caller that changes a profile field goes through
+   this, so there is one place that knows the row is keyed by `id` and one
+   place that drops the remembered copy afterwards.
+
+   It returns the error rather than throwing, because that is what the five
+   callers were already written to expect: `const error = await saveProfile(…)`
+   and then a message on screen. */
+async function saveProfile(patch){
+  if (!sb || !currentUser) return { message: 'Not signed in.' };
+  const { error } = await sb.from('profiles')
+    .upsert({ id: currentUser.id, ...patch }, { onConflict: 'id' });
+  // Whether it saved or not, what is remembered is no longer trustworthy.
+  forgetFetch('profileRow');
+  return error || null;
+}
+
+/* What to put on screen when a save fails. Postgres speaks in constraint
+   names; this says the one thing the person can act on. */
+function describeSaveError(error){
+  if (!error) return '';
+  const text = String(error.message || error.details || error).toLowerCase();
+  if (text.includes('duplicate') || text.includes('unique')) return 'That username is already taken — try another.';
+  if (text.includes('row-level security') || text.includes('permission')) return "You're signed out — sign in again and retry.";
+  if (text.includes('failed to fetch') || text.includes('network')) return "Couldn't reach the server — check your connection and try again.";
+  if (text.includes('check constraint') || text.includes('violates')) return "That doesn't look right — check it and try again.";
+  return "Couldn't save that — try again.";
+}
+
 /* ---------- auth modal ---------- */
 /* Opens on log in unless a caller explicitly wants the sign-up form — most
    people reaching this modal already have an account, and the ones who don't
@@ -183,7 +232,7 @@ function setupNativeOAuthCallback(){
 // questionnaire, so send anyone who lands here without one through onboarding.
 async function promptOnboardingIfProfileIncomplete(){
   if (!sb || !currentUser) return;
-  const { data: prof } = await sb.from('profiles').select('username').eq('id', currentUser.id).maybeSingle();
+  const prof = await myProfile();
   if (prof && !prof.username) openOnboardingModal();
 }
 
@@ -463,7 +512,7 @@ function renderNavLinks(){
 }
 async function loadNavIdentity(){
   if (!sb || !currentUser) return;
-  const { data: prof } = await sb.from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
+  const prof = await myProfile();
   const nameEl = document.getElementById('navChipName');
   const avatarEl = document.getElementById('navAvatar');
   if (!nameEl || !avatarEl) return; // nav may have re-rendered already

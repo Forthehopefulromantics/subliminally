@@ -575,7 +575,7 @@ let clonedVoiceCache;
 async function myClonedVoiceId(){
   if (clonedVoiceCache !== undefined) return clonedVoiceCache;
   if (!sb || !currentUser){ clonedVoiceCache = null; return null; }
-  const { data } = await sb.from('profiles').select('cloned_voice_id').eq('id', currentUser.id).maybeSingle();
+  const data = await myProfile();
   clonedVoiceCache = (data && data.cloned_voice_id) || null;
   return clonedVoiceCache;
 }

@@ -107,6 +107,8 @@
     background:radial-gradient(ellipse at center, var(--hero-wash) 0%, transparent 70%);
     pointer-events:none; z-index:0; }
   body[data-sky="day"]{ --hero-wash:rgba(255,253,248,.82); }
+  :root{ --skel:rgba(156,147,184,.16); --skel-lit:rgba(156,147,184,.30); }
+  body[data-sky="day"]{ --skel:rgba(62,42,72,.09); --skel-lit:rgba(62,42,72,.17); }
   body[data-sky="night"]{ --hero-wash:rgba(20,16,44,.78); }
   .hero > *:not(.hero-bg){ position:relative; z-index:1; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
@@ -1215,6 +1217,9 @@
   /* Today is a ring, which reads as "you are here" whether or not it is filled. */
   .week-day.is-today .wd-dot{ border-color:var(--candle); }
   .week-day.is-future .wd-dot{ background:none; border:1.5px dashed rgba(156,147,184,.35); }
+  .week-day.is-unknown .wd-dot{ background:var(--skel); animation:cardShimmer 1.4s ease-in-out infinite;
+    background-image:linear-gradient(90deg, var(--skel) 25%, var(--skel-lit) 37%, var(--skel) 63%); background-size:400% 100%; }
+  @media (prefers-reduced-motion: reduce){ .week-day.is-unknown .wd-dot{ animation:none; } }
   .wd-letter{ font-size:11px; color:var(--haze); letter-spacing:.04em; }
   .week-day.is-today .wd-letter{ color:var(--candle); font-weight:500; }
   @media (max-width:360px){ .wd-dot{ width:30px; height:30px; } }
@@ -1327,6 +1332,26 @@
   .today-date{ font-size:12.5px; color:var(--haze); margin-top:8px; letter-spacing:.04em; }
   .today-card{ border:1px solid var(--dusk); border-radius:20px; padding:22px 22px 20px; margin-bottom:14px; }
   .today-card-label{ font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--haze); margin-bottom:10px; }
+  /* The shape of a card, before its contents have arrived. Three bars, no
+     numbers and no wording, so there is nothing on screen that could turn out
+     to have been wrong once the answer lands. */
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  /* Which card just answered a tap. */
+  .just-opened{ animation:cardAnswered 1.3s ease-out 1; }
+  @keyframes cardAnswered{
+    0%{ box-shadow:0 0 0 0 rgba(185,167,232,.55); }
+    35%{ box-shadow:0 0 0 5px rgba(185,167,232,.22); }
+    100%{ box-shadow:0 0 0 0 rgba(185,167,232,0); } }
+  @media (prefers-reduced-motion: reduce){ .just-opened{ animation:none; } }
+  .card-skeleton{ display:flex; flex-direction:column; gap:10px; padding:2px 0 4px; }
+  .card-skeleton i{ display:block; height:13px; border-radius:7px;
+    background:linear-gradient(90deg, var(--skel) 25%, var(--skel-lit) 37%, var(--skel) 63%);
+    background-size:400% 100%; animation:cardShimmer 1.4s ease-in-out infinite; }
+  .card-skeleton i:nth-child(1){ width:62%; height:18px; }
+  .card-skeleton i:nth-child(2){ width:88%; }
+  .card-skeleton i:nth-child(3){ width:44%; }
+  @keyframes cardShimmer{ 0%{ background-position:100% 0; } 100%{ background-position:0 0; } }
+  @media (prefers-reduced-motion: reduce){ .card-skeleton i{ animation:none; } }
   .today-card h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); font-weight:400; line-height:1.35; }
   .today-card p{ font-size:13.5px; color:var(--haze); margin-top:7px; line-height:1.6; }
   .today-card .btn{ margin-top:18px; }

@@ -68,16 +68,22 @@ let lightByDate = {};          // 'YYYY-MM-DD' -> Set of sources earned that day
 
 async function loadLight(){
   if (!sb || !currentUser) return;
-  const { data, error } = await sb.rpc('my_light', { p_on: localDateStr() });
-  if (error){ console.warn('light:', error.message); return; }   // migration not run yet
+  /* These two used to run one after the other, which made opening Today two
+     round trips deep before anything else could start. Nothing in the second
+     depends on the first, so they go together -- and the pair is remembered,
+     because every page that draws a streak asks for them. */
+  const [{ data, error }, { data: rows }] = await fetchOnce('light', () => Promise.all([
+    sb.rpc('my_light', { p_on: localDateStr() }),
+    sb.from('light_ledger')
+      .select('source, earned_on').eq('user_id', currentUser.id)
+      .gte('earned_on', shiftDateStr(localDateStr(), -92)),
+  ]));
+  if (error){ forgetFetch('light'); console.warn('light:', error.message); return; }   // migration not run yet
   const row = Array.isArray(data) ? data[0] : data;
   light = { lifetime: Number(row && row.lifetime || 0), today: Number(row && row.today || 0), loaded: true };
   // The last three months by day, not just today: the calendar has to be able
   // to say a session was played on a Tuesday in August, and nothing else
   // remembers that.
-  const { data: rows } = await sb.from('light_ledger')
-    .select('source, earned_on').eq('user_id', currentUser.id)
-    .gte('earned_on', shiftDateStr(localDateStr(), -92));
   lightByDate = {};
   for (const r of rows || []){
     (lightByDate[r.earned_on] = lightByDate[r.earned_on] || new Set()).add(r.source);
@@ -90,6 +96,7 @@ async function loadLight(){
    just did is, rather than somewhere you aren't looking. */
 async function awardLight(source, ref, near){
   if (!sb || !currentUser) return 0;
+  forgetFetch('light');   // the balance is about to change
   const { data, error } = await sb.rpc('award_light', {
     p_source: source, p_ref: ref || '', p_on: localDateStr(),
   });
