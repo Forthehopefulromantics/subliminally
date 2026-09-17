@@ -779,20 +779,38 @@ function confirmLogOut(){
    skip it" would be an interrogation; "what got in the way" is a question about
    the day rather than about the person. */
 const MISS_REASONS = [
-  'Too tired', 'No time', 'Wasn\u2019t home', 'Forgot',
+  'Too tired', 'No time', 'Wasn\u2019t home', 'Forgot to log it',
   'Didn\u2019t feel like it', 'Unwell', 'Something came up', 'Needed a break',
 ];
 const MISS_FEELINGS = [
   'Fine about it', 'A bit disappointed', 'Relieved',
   'Frustrated', 'Didn\u2019t notice', 'Ready to go again',
 ];
+/* Neither list can cover a real day, and a list that pretends to makes people
+   pick the nearest wrong answer. "Something else" opens a box. */
+const ASK_OTHER = 'Something else';
 let reflection = { on:null, time:null, reason:null, feeling:null };
 
 function pickAskChip(kind, value, el){
-  reflection[kind] = reflection[kind] === value ? null : value;
   const group = el.parentElement;
+  const off = reflection[kind] === value;
+  reflection[kind] = off ? null : value;
   group.querySelectorAll('.ask-chip').forEach(c => c.classList.remove('sel'));
-  if (reflection[kind]) el.classList.add('sel');
+  if (!off) el.classList.add('sel');
+  // The box appears under whichever list "Something else" was picked in, and
+  // takes the focus, because opening a field nobody is typing in is just a
+  // field in the way.
+  const box = document.getElementById('askOther-' + kind);
+  if (box){
+    const want = !off && value === ASK_OTHER;
+    box.style.display = want ? 'block' : 'none';
+    if (want){ box.value = ''; box.focus(); }
+  }
+}
+/* What is typed replaces the chip's own text, so the answer that is stored is
+   the answer that was given. */
+function askOtherInput(kind, value){
+  reflection[kind] = value.trim() || ASK_OTHER;
 }
 
 function openReflection(time, dateStr){
@@ -802,12 +820,23 @@ function openReflection(time, dateStr){
     .toLocaleDateString(undefined, { weekday:'long' });
   openAsk(`${day}\u2019s ${when}`, `
     <div class="ask-text">It didn\u2019t happen, and that\u2019s allowed. If you want to say what got in the way, it helps to see the pattern later \u2014 and if you don\u2019t, skip it.</div>
+    <button type="button" class="ask-did" onclick="markRitualDone()">
+      I did do it — I just forgot to log it
+    </button>
     <div class="ask-label">What got in the way</div>
-    <div class="ask-chips">${MISS_REASONS.map(r =>
-      `<button type="button" class="ask-chip" onclick="pickAskChip('reason','${r.replace(/'/g,"\\'")}',this)">${r}</button>`).join('')}</div>
+    <div class="ask-chips">${MISS_REASONS.concat([ASK_OTHER]).map(r =>
+      `<button type="button" class="ask-chip" onclick="pickAskChip('reason','${r.replace(/'/g,"\\'")}',this)">${r}</button>`).join('')}
+      <input type="text" class="ask-other" id="askOther-reason" style="display:none"
+        maxlength="120" placeholder="In your own words…"
+        oninput="askOtherInput('reason', this.value)" aria-label="What got in the way">
+    </div>
     <div class="ask-label">How you feel about it</div>
-    <div class="ask-chips">${MISS_FEELINGS.map(f =>
-      `<button type="button" class="ask-chip" onclick="pickAskChip('feeling','${f.replace(/'/g,"\\'")}',this)">${f}</button>`).join('')}</div>
+    <div class="ask-chips">${MISS_FEELINGS.concat([ASK_OTHER]).map(f =>
+      `<button type="button" class="ask-chip" onclick="pickAskChip('feeling','${f.replace(/'/g,"\\'")}',this)">${f}</button>`).join('')}
+      <input type="text" class="ask-other" id="askOther-feeling" style="display:none"
+        maxlength="120" placeholder="In your own words…"
+        oninput="askOtherInput('feeling', this.value)" aria-label="How you feel about it">
+    </div>
     <div class="ask-row">
       <button class="btn btn-primary" onclick="saveReflection()">Save</button>
     </div>
@@ -826,10 +855,29 @@ async function saveReflection(){
   await writeReflection({ reason: reflection.reason, feeling: reflection.feeling });
   closeAsk();
 }
+/* Answered days are remembered on the device as well as in the database.
+   Until 20260927 is run the table does not exist, so the write fails and the
+   only record was a variable that dies with the page -- which is why the same
+   question came back on every refresh. The device is not the source of truth,
+   it is the thing that stops it asking twice. */
+const ANSWERED_KEY = 'fthr_reflections';
+function rememberAnswered(key){
+  reflectionsSeen[key] = true;
+  try {
+    const all = JSON.parse(localStorage.getItem(ANSWERED_KEY) || '{}');
+    all[key] = Date.now();
+    // A month is longer than anything is ever asked about, and keeps this small.
+    const cutoff = Date.now() - 31 * 864e5;
+    for (const k of Object.keys(all)) if (all[k] < cutoff) delete all[k];
+    localStorage.setItem(ANSWERED_KEY, JSON.stringify(all));
+  } catch(e){}
+}
+
 async function writeReflection(fields){
   const { on, time } = reflection;
-  reflectionsSeen[`${on}|${time}`] = true;      // so it does not reappear this session
-  if (!sb || !currentUser || !on) return;
+  if (!on) return;
+  rememberAnswered(`${on}|${time}`);
+  if (!sb || !currentUser) return;
   const { error } = await sb.from('ritual_reflections').upsert({
     user_id: currentUser.id, missed_on: on, time_of_day: time,
     reason: fields.reason, feeling: fields.feeling,
@@ -837,14 +885,38 @@ async function writeReflection(fields){
   if (error) console.warn('reflection:', error.message);
 }
 
+/* "I did it, I just forgot" is the most likely true answer to a missing day,
+   and it deserves to fix the day rather than file a note about it. Every habit
+   in that ritual is checked off for that date, so the calendar, the streak and
+   the week all agree with what actually happened. */
+async function markRitualDone(){
+  const { on, time } = reflection;
+  closeAsk();
+  if (!on) return;
+  rememberAnswered(`${on}|${time}`);
+  const rows = habitsCache.filter(h => h.time_of_day === time);
+  for (const h of rows){
+    const days = habitCheckins[h.id] || new Set();
+    if (days.has(on)) continue;                 // already logged; leave it alone
+    await toggleHabitOnDate(h.id, on);
+  }
+  if (document.body.getAttribute('data-view') === 'today'){
+    renderTodayRitual(); renderWeekStrip(); renderLightStrip(); renderTodayJourney();
+  }
+}
+
 let reflectionsSeen = {};
 async function loadReflections(){
   reflectionsSeen = {};
+  try {
+    const all = JSON.parse(localStorage.getItem(ANSWERED_KEY) || '{}');
+    for (const k of Object.keys(all)) reflectionsSeen[k] = true;
+  } catch(e){}
   if (!sb || !currentUser) return;
   const { data, error } = await sb.from('ritual_reflections')
     .select('missed_on, time_of_day')
     .gte('missed_on', shiftDateStr(localDateStr(), -14));
-  if (error){ console.warn('reflections:', error.message); return; }
+  if (error){ console.warn('reflections:', error.message); return; }   // the device still remembers
   for (const r of data || []) reflectionsSeen[`${r.missed_on}|${r.time_of_day}`] = true;
 }
 
