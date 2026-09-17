@@ -728,6 +728,10 @@ function setRecordStepCopy(target){
 
 /* ---------------- step 6: recording (own voice) ---------------- */
 let recIndex = 0; let recordings = [];
+/* Why the recordings for a saved subliminal could not be fetched, if they
+   couldn't. Empty means nothing went wrong — which is not the same as there
+   being nothing to play. See loadSavedIntoBuilder. */
+let recordingLoadErrors = [];
 let recordTarget = 'primary'; // 'primary' | 'layer'
 let layerRecordings = [];
 const waveform = document.getElementById('waveform'); const bars = [];
@@ -838,7 +842,10 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
     g.connect(ctx.destination);
     if (extraDest && extraDest !== ctx.destination) g.connect(extraDest);
     const src = ctx.createBufferSource(); src.buffer = clip.buffer;
-    src.connect(g); src.onended = onended; src.start();
+    src.connect(g);
+    liveVoiceGains.add(g);
+    src.onended = () => { liveVoiceGains.delete(g); if (onended) onended(); };
+    src.start();
     return;
   }
   // createMediaElementSource can only ever be called once per <audio> element,
@@ -850,10 +857,12 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
     if (extraDest && extraDest !== ctx.destination) clip.gain.connect(extraDest);
   }
   clip.gain.gain.value = gainValue;
-  clip.el.onended = onended;
+  liveVoiceGains.add(clip.gain);
+  const done = () => { liveVoiceGains.delete(clip.gain); if (onended) onended(); };
+  clip.el.onended = done;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
-  if (p && p.catch) p.catch(() => { if (onended) onended(); });
+  if (p && p.catch) p.catch(done);
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
@@ -1096,6 +1105,17 @@ function changeFinalFrequency(hzStr){
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
 let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
+/* Every gain node a voice line is currently playing through. A line is its own
+   node that dies when the line ends, so unlike the tone and the background
+   there is no single handle to hold — the set is what is live right now, and
+   finished nodes are dropped as they end. Without this, dragging the voice
+   volume did nothing until the *next* line started, which on a long line with
+   gaps between repeats is indistinguishable from a broken slider. */
+let liveVoiceGains = new Set();
+function voiceMixValue(){
+  const el = document.getElementById('mixVoice');
+  return el ? el.value/100 : 1;
+}
 
 /* ---------- soothing layer picker ---------- */
 /* ---------- custom track upload (Ritual only) ---------- */
@@ -1227,7 +1247,9 @@ function applyLiveMixGain(id, value){
   if (id==='mixSoothing') setLiveGain(liveSoothingGain, value/100 * 0.4);
   if (id==='mixCustom') setLiveGain(liveCustomGain, value/100 * 0.6);
   if (id==='mixLayerVoice') setLiveGain(liveLayerVoiceGain, value/100);
-  /* affirmation volume (mixVoice) is applied per-line the moment it plays, see runSequence() */
+  /* The affirmation volume reaches whatever is sounding right now as well as
+     every line after it. It used to only be read when a line started. */
+  if (id==='mixVoice') liveVoiceGains.forEach(g => setLiveGain(g, value/100));
 }
 ['mixTone','mixBg','mixVoice','mixSoothing','mixCustom','mixLayerVoice'].forEach(id=>{
   const el = document.getElementById(id);
@@ -1316,7 +1338,16 @@ function startCustomTrackPlayback(){
 function playFinal(){
   if (finalPlaying) return;
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
-  if (!hasVoice){ document.getElementById('finalLine').textContent = "No lines were recorded — go back and hold the record button on at least one."; return; }
+  if (!hasVoice){
+    /* Tell the truth about which of the two this is. Telling someone to record
+       lines they already recorded sends them to do the one thing that cannot
+       help. */
+    document.getElementById('finalLine').textContent = recordingLoadErrors.length
+      ? 'Your recordings are saved, but this device could not download them — ' +
+        recordingLoadErrors[0] + '. Check your connection and open it again.'
+      : 'No lines were recorded — go back and hold the record button on at least one.';
+    return;
+  }
 
   finalPlaying = true;
   finalStartTime = Date.now();
@@ -1615,6 +1646,7 @@ function finishFinal(){
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
   liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceGains.clear();
 }
 
 function stopFinal(){
@@ -1634,6 +1666,7 @@ function stopFinal(){
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
   liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceGains.clear();
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }

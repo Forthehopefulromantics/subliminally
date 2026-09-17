@@ -21,10 +21,14 @@
    against the original), and the roster already covers the range that tinting
    was standing in for. `id` is what's stored, so never rename one. */
 const AVATARS = [
+  'kaly',                                    // Kyla's own character, and the default
   'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10',
   'm1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12',
 ];
-const HIGHER_SELF_DEFAULTS = { avatar:'f1' };
+/* Kaly is who a new member meets. The other twenty-two stay, because anyone who
+   already picked one has that id stored in profiles.higher_self_avatar and a
+   default is not a reason to change someone's choice underneath them. */
+const HIGHER_SELF_DEFAULTS = { avatar:'kaly' };
 
 let higherSelf = { name:'', ...HIGHER_SELF_DEFAULTS };
 function avatarId(id){ return AVATARS.includes(id) ? id : HIGHER_SELF_DEFAULTS.avatar; }

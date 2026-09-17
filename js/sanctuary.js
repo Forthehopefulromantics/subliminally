@@ -8,6 +8,14 @@
    This file must load after light.js (it reads `light`) and after kaly.js
    (it calls avatarMarkup), and before boot.js. */
 
+/* ---------- switched off ----------
+   Kyla asked for the landscape and the house to come off the app while she
+   keeps it simple: habits, and the higher self who helps you keep them. This
+   file still loads and still works; nothing calls into it while this is false.
+   Everything below, the migration and the artwork are untouched, so turning it
+   back on is this one line. */
+const SANCTUARY_ENABLED = false;
+
 /* ---------- the rooms ----------
    `key` is what the database stores and what the artwork is named after, so a
    rename is a migration and a re-export, not a tidy-up. `art` being null means
@@ -127,6 +135,7 @@ async function loadSanctuary(){
   catch (e){ console.warn('sanctuary:', e && e.message); sanctuary.ready = false; }
 }
 async function loadSanctuaryInner(){
+  if (!SANCTUARY_ENABLED) return;   // don't spend four requests on a hidden screen
   if (!sb || !currentUser) return;
   sanctuary.loaded = true;
 
@@ -301,6 +310,7 @@ function selectSanctuaryRoom(key){
    the way back out. Rooms themselves land in a later step; this exists now so
    the route and the back path are built and tested together. */
 function showSanctuary(roomKey){
+  if (!SANCTUARY_ENABLED){ goHome(); return; }
   if (!currentUser){ openAuthModal(); return; }
   document.body.setAttribute('data-view', 'sanctuary');
   window.scrollTo(0, 0);
@@ -317,7 +327,7 @@ function showSanctuary(roomKey){
 function renderTodaySanctuaryRow(){
   const host = document.getElementById('todaySanctuaryRow');
   if (!host) return;
-  if (!sanctuary.ready){ host.innerHTML = ''; return; }
+  if (!SANCTUARY_ENABLED || !sanctuary.ready){ host.innerHTML = ''; return; }
   const p = sanctuaryProgress();
   host.innerHTML = `
     <button type="button" class="sanc-row" onclick="showSanctuary()">

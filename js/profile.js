@@ -145,19 +145,40 @@ async function loadSavedIntoBuilder(id){
 
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
+    /* Every way this can fail used to end in `null`, which is the same value as
+       "this line was never recorded". So a subliminal whose audio could not be
+       fetched — an expired link, a storage rule, a phone that dropped off the
+       network — came back looking like one you had never recorded, and the
+       player said "go back and hold the record button", which was untrue and
+       unfixable by doing what it asked. Load failures are now counted and told
+       apart from lines that genuinely have no recording. */
     recordings = [];
+    recordingLoadErrors = [];
     for (const path of s.recording_urls){
-      if (!path){ recordings.push(null); continue; }
+      if (!path){ recordings.push(null); continue; }   // never recorded: not an error
       const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-      if (sErr || !signed){ recordings.push(null); continue; }
+      if (sErr || !signed){
+        recordings.push(null);
+        recordingLoadErrors.push((sErr && sErr.message) || 'could not get a link to the audio');
+        continue;
+      }
       try {
         const res = await fetch(signed.signedUrl);
+        if (!res.ok) throw new Error('the audio file came back ' + res.status);
         const blob = await res.blob();
+        if (!blob.size) throw new Error('the audio file is empty');
         recordings.push({ url: URL.createObjectURL(blob), blob });
-      } catch(e){ recordings.push(null); }
+      } catch(e){
+        recordings.push(null);
+        recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');
+      }
     }
     state.voiceMode = 'own';
+    if (recordingLoadErrors.length){
+      console.warn('subliminal audio did not load:', recordingLoadErrors);
+    }
   } else {
+    recordingLoadErrors = [];
     // No recorded audio was saved for this one (or it was a studio voice
     // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
