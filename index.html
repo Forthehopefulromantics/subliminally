@@ -1029,6 +1029,10 @@
   @media (max-width:360px){ .hs-pair{ gap:10px; } .hs-pair-art{ height:150px; } }
   .av-maker{ margin-top:10px; }
   .av-roster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:9px; }
+  /* Tighter in the welcome modal: it sits under four other questions and
+     should not be the tallest thing on the screen. */
+  .av-roster-onboard{ grid-template-columns:repeat(auto-fill, minmax(62px,1fr)); gap:7px;
+    max-height:230px; overflow-y:auto; padding:2px; }
   .av-opt{ padding:5px 3px; line-height:0; cursor:pointer; border:2px solid transparent;
     border-radius:16px; background:var(--sunk); transition:border-color .2s, transform .15s; }
   .av-opt:hover{ transform:translateY(-2px); }
@@ -1600,6 +1604,19 @@
       <label>What are you hoping this helps with? <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
       <input type="text" id="obReason" placeholder="Sleep, confidence, focus…">
     </div>
+    <!-- What you believe, so the app can use your words rather than someone
+         else's. Answering is optional and it never changes what you can do
+         here — only how things are named. -->
+    <div class="auth-field">
+      <label>Does your practice have a faith behind it? <span style="color:var(--haze); font-weight:400;">(optional — changes the words we use, nothing else)</span></label>
+      <div class="length-chip-grid" id="obFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
+      <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none; margin-top:9px;">
+    </div>
+    <!-- Choosing who you are, at the point you become someone here. -->
+    <div class="auth-field">
+      <label>Choose your avatar <span style="color:var(--haze); font-weight:400;">(you can change her any time)</span></label>
+      <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
+    </div>
     <div class="auth-msg" id="onboardMsg"></div>
     <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="submitOnboarding()">Finish setup</button>
     <div class="auth-toggle"><button onclick="skipOnboarding()">Skip for now</button></div>
@@ -1609,7 +1626,11 @@
 <!-- ============ TODAY: the signed-in home ============ -->
 <section class="today-section" id="today">
   <div class="wrap today-wrap">
-    <div class="higher-self" id="higherSelfCard" data-sky="night" style="display:none;">
+    <!-- She is not the wallpaper any more. Standing on Today all day, she was
+         a picture you stopped seeing by the third morning; she is worth more as
+         someone who turns up, asks how it went, and goes again. The card stays
+         in the markup, hidden, because that check-in is what it becomes. -->
+    <div class="higher-self" id="higherSelfCard" data-sky="night" style="display:none;" hidden>
       <button type="button" class="hs-edit" onclick="editHigherSelf()">Customise</button>
       <div id="higherSelfArt" class="hs-art"></div>
       <div class="hs-name" id="higherSelfName">Your higher self</div>
@@ -2491,6 +2512,7 @@
 <script src="js/today.js"></script>
 <script src="js/light.js"></script>
 <script src="js/kaly.js"></script>
+<script src="js/faith.js"></script>
 <script src="js/journey.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/journal.js"></script>

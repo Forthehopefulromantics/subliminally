@@ -407,7 +407,29 @@ async function applyPendingSignupProfile(){
 }
 
 /* ---------------- ONBOARDING: username ---------------- */
-function openOnboardingModal(){ document.getElementById('onboardOverlay').classList.add('open'); }
+function openOnboardingModal(){
+  document.getElementById('onboardOverlay').classList.add('open');
+  // Both of these are drawn from lists in JS, so they are empty until asked for.
+  if (typeof renderFaithChips === 'function') renderFaithChips();
+  renderOnboardAvatars();
+}
+/* The same roster as the profile page, at the moment it actually matters --
+   you are deciding who you are here, so it belongs with your name, not three
+   screens into settings. */
+function renderOnboardAvatars(){
+  const wrap = document.getElementById('obAvatarRoster');
+  if (!wrap || typeof AVATAR_PACK === 'undefined') return;
+  wrap.innerHTML = AVATAR_PACK.map(a =>
+    `<button type="button" class="av-opt${a.id === higherSelf.avatar ? ' sel' : ''}"
+       onclick="pickOnboardAvatar('${a.id}')" aria-pressed="${a.id === higherSelf.avatar}"
+       title="${a.label}" aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('');
+}
+/* Held until Finish setup, rather than written on every tap: there is no
+   account row worth writing to yet, and the whole modal saves at once. */
+function pickOnboardAvatar(id){
+  higherSelf.avatar = avatarId(id);
+  renderOnboardAvatars();
+}
 function closeOnboardingModal(){ document.getElementById('onboardOverlay').classList.remove('open'); }
 function skipOnboarding(){ closeOnboardingModal(); }
 
@@ -421,6 +443,8 @@ async function submitOnboarding(){
     phone: document.getElementById('obPhone').value.trim() || null,
     referral_source: document.getElementById('obSource').value || null,
     signup_reason: document.getElementById('obReason').value.trim() || null,
+    higher_self_avatar: higherSelf.avatar,
+    ...(typeof faithAnswerForSave === 'function' ? faithAnswerForSave() : {}),
   };
   msg.textContent = 'Saving…'; msg.className = 'auth-msg';
   const error = await saveProfile(patch);

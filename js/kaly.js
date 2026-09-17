@@ -169,9 +169,14 @@ function kalyMessage(name){
 /* Kept because the Today card and the old tests both call it. */
 function higherSelfLine(name){ return kalyMessage(name); }
 
+/* Off Today for now. What she says is still written and still tested -- it is
+   what the check-in will say when its screen arrives -- so this stops short of
+   drawing her rather than stops short of knowing what she would say. */
+const HIGHER_SELF_ON_TODAY = false;
 function renderHigherSelfCard(){
   const card = document.getElementById('higherSelfCard');
   if (!card) return;
+  if (!HIGHER_SELF_ON_TODAY){ card.style.display = 'none'; return; }
   const name = (higherSelf.name || '').trim() || 'Your higher self';
   const art = document.getElementById('higherSelfArt');
   if (art) art.innerHTML = avatarMarkup(higherSelf, { state:'keeper' });

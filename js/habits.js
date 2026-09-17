@@ -24,8 +24,26 @@ function renderHabitUndoBar(){
 }
 function expandHabitSlots(time){ habitSlotsExpanded[time] = true; renderHabits(); }
 function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; renderHabits(); }
-const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read scripture','Pray','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
+/* 'Read scripture' and 'Pray' used to sit in this list for everyone, which is
+   both too specific for someone who does not pray and too vague for someone who
+   does -- a Muslim reading this is not being offered Fajr, and an atheist is
+   being offered something they have no use for. They come out of the shared
+   list and arrive from the faith answer instead, in the words that faith uses.
+   Someone who did not answer gets the shared list alone. */
+const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
+/* Whatever the faith offers goes first: it is the most specific thing we know
+   about what this person's morning already looks like. */
+function habitSuggestionsFor(time){
+  const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS;
+  const faith = (typeof faithHabitIdeas === 'function') ? faithHabitIdeas(time) : [];
+  const seen = new Set();
+  return [...faith, ...base].filter(s => {
+    const k = s.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
 
 /* Habits show in the order you do them, not the order you typed them. Sorting
    client-side keeps working if sort_order hasn't been added yet, where every
@@ -77,7 +95,10 @@ async function loadHabits(options){
    a miss is worked out from the check-ins already on record, so there is no
    second source of truth to fall out of step. */
 const CORE_HABIT_MAX = 5;
-const SHORT_ROUTINE_ALLOWANCE = 2;   // short routines per week, per routine
+/* Kept because shortRoutinesUsedBy still counts them for the weekly report, but
+   it no longer decides whether a day counts: doing your non-negotiables does
+   that, every day of the week. See routineKept. */
+const SHORT_ROUTINE_ALLOWANCE = 2;
 
 /* Weeks run Monday to Sunday, so a rough Sunday night doesn't spend an
    allowance that a fresh week is about to hand back anyway. */
@@ -122,13 +143,48 @@ function shortRoutinesLeft(time, dateStr){
   return Math.max(0, SHORT_ROUTINE_ALLOWANCE - shortRoutinesUsedBy(time, dateStr || localDateStr()));
 }
 
-/* Did this day keep the ritual? A full routine always does. A short one does
-   too, as long as there was still an allowance left that week. */
+/* Did this day keep the ritual? Your non-negotiables did it.
+
+   This used to also require the short routine to be inside a weekly allowance,
+   so keeping your non-negotiables on a third bad night in one week counted for
+   nothing -- which is the opposite of what a non-negotiable is for. You named
+   the few you would do on your worst day; doing them is the bar, and it is the
+   bar every day of the week.
+
+   With no non-negotiables named, the whole list is the bar, because there is
+   nothing else it could be. */
 function routineKept(time, dateStr){
-  const { state } = routineStatusFor(time, dateStr);
-  if (state === 'full') return true;
-  if (state !== 'essentials') return false;
-  return shortRoutinesUsedBy(time, dateStr) <= SHORT_ROUTINE_ALLOWANCE;
+  const st = routineStatusFor(time, dateStr);
+  if (st.state === 'none') return false;
+  if (!st.coreTotal) return st.state === 'full';
+  return st.coreDone === st.coreTotal;
+}
+
+/* ---------- winning it back ----------
+   A missed day is forgiven if you do the *entire* ritual the next day. Not the
+   non-negotiables -- those are the everyday bar, and bridging a miss should
+   cost more than an ordinary day does. So the day after a miss, the full list
+   puts the run behind it back.
+
+   One day, one bridge: two misses in a row cannot both be covered by a single
+   full day, because only the day immediately after a miss is looked at. */
+function redeemedByFullRitual(time, dateStr){
+  const next = shiftDateStr(dateStr, 1);
+  if (next > localDateStr()) return false;              // tomorrow has not happened
+  return routineStatusFor(time, next).state === 'full';
+}
+/* What you would have to do today to get yesterday back, or null if there is
+   nothing to get back. */
+function comebackOffer(time){
+  const yesterday = shiftDateStr(localDateStr(), -1);
+  if (routineKept(time, yesterday) || graceBridged(time, yesterday)) return null;
+  const st = routineStatusFor(time, localDateStr());
+  if (st.state === 'none') return null;                 // no ritual to complete
+  let behind = 0, cursor = shiftDateStr(yesterday, -1);
+  while (routineHeld(time, cursor)){ behind++; cursor = shiftDateStr(cursor, -1); }
+  if (!behind) return null;                             // nothing behind it to save
+  return { time, date: yesterday, saves: behind, done: st.done, total: st.total,
+           alreadyBack: st.state === 'full' };
 }
 
 /* Consecutive days the ritual was kept — short nights included. This is the
@@ -169,7 +225,8 @@ async function useGraceDay(time, dateStr){
 /* A day counts toward the streak if the routine was kept, or if a Grace Day
    has already been spent on it. */
 function routineHeld(time, dateStr){
-  return routineKept(time, dateStr) || graceBridged(time, dateStr);
+  return routineKept(time, dateStr) || graceBridged(time, dateStr)
+      || redeemedByFullRitual(time, dateStr);
 }
 
 function routineStreak(time){
@@ -259,9 +316,10 @@ function renderHabits(){
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
     const coreCount = rows.filter(h => h.is_core).length;
-    const shortLeft = shortRoutinesLeft(time, today);
+    const streakHere = routineStreak(time);
     count.textContent = rows.length
-      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable · ${shortLeft} short ${time}${shortLeft === 1 ? '' : 's'} left this week`
+      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable`
+        + (streakHere > 1 ? ` · ${streakHere}-day streak` : '')
       : `0/${HABIT_SLOTS} added`;
 
     const realRowsHtml = rows.map((h, i) => {
@@ -296,7 +354,7 @@ function renderHabits(){
     }).join('');
 
     const already = new Set(rows.map(h => h.name.toLowerCase()));
-    const pool = (time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS).filter(s => !already.has(s.toLowerCase()));
+    const pool = habitSuggestionsFor(time).filter(s => !already.has(s.toLowerCase()));
     // All 15 slots are there, but showing 15 empty boxes at once reads as a
     // chore list. Offer a few at a time and let people ask for the rest.
     const remaining = Math.max(0, HABIT_SLOTS - rows.length);

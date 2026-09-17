@@ -145,6 +145,7 @@ async function renderTodayPageFresh(){
     myProfile(),
     getMyTier(),
     loadHigherSelf(),
+    loadFaith(),
     loadLight(),
     loadGrace(),
     loadSanctuary(),
