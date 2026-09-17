@@ -3,14 +3,18 @@ import { applyCors } from '../lib/cors.js';
 //
 // Generates the content for "Subliminal + EFT Tapping" mode (Ritual only).
 // Produces the pieces needed for an 11-line session:
-//   1. Setup Statement — built client-side from `setupFeeling`:
-//      "Even though I have {setupFeeling}, I deeply and completely love and accept myself."
-//      (repeated 3x during playback)
-//   2-11. The 10-tap round: Karate Chop -> Eyebrow -> Side of the Eye -> Under the Eye ->
-//      Under the Nose -> Chin -> Collarbone -> Under the Arm -> Top of the Head ->
-//      Karate Chop again. `kcReminder` is used for both Karate Chop taps (open + close);
-//      `pointReminders` covers the 8 points in between, in order. Each repeats 5-7x
-//      (the user's pick) during playback.
+//   1. "Take responsibility for your own well-being." — fixed, said before any
+//      tapping starts, so it isn't generated here.
+//   2-3. Two setup statements on the Karate Chop, built client-side from
+//      `feelingA` and `feelingB`: "Even though I feel {A}, I still completely
+//      love and accept myself." then "...{B}, I still completely love and honor
+//      myself." Two different feelings, not one repeated.
+//   4-12. The cycle, Forehead -> Eyebrow -> Side of the Eye -> Under the Eye ->
+//      Under the Nose -> Chin -> Collarbone -> Under the Arm -> Top of the Head.
+//      `pointReminders` covers those nine, in order.
+//   13. "In body, mind and spirit." — fixed, closes every round.
+//   Nothing repeats a set number of times: the line is said once and you tap it
+//   for as long as it takes.
 //
 // This is a separate endpoint from /api/generate-affirmations.js on purpose — the
 // regular subliminal flow keeps using that one, untouched.
@@ -28,7 +32,10 @@ export default async function handler(req, res) {
 
   const { goal, toneLabel, freqLabel } = req.body || {};
 
+  // Forehead first, crown last. The closing Karate Chop is gone: the round now
+  // ends on a fixed line ("In body, mind and spirit.") written by the app.
   const pointLabels = [
+    'Forehead',
     'Eyebrow',
     'Side of the Eye',
     'Under the Eye',
@@ -42,15 +49,15 @@ export default async function handler(req, res) {
   const systemPrompt = `You write short EFT (Emotional Freedom Technique / "tapping") scripts.
 Return ONLY raw JSON, no markdown code fences, no commentary, matching this exact shape:
 {
-  "setupFeeling": string,
-  "kcReminder": string,
-  "pointReminders": [string, string, string, string, string, string, string, string]
+  "feelingA": string,
+  "feelingB": string,
+  "pointReminders": [string, string, string, string, string, string, string, string, string]
 }
 
 Rules:
-- "setupFeeling" completes the sentence "Even though I have ___, I deeply and completely love and accept myself." Name the specific feeling or issue in a few words (e.g. "this anxiety about money", "this fear of not being enough"), based on what the person described. Return only that feeling clause — not the rest of the sentence.
-- "kcReminder" is a full, natural first-person sentence said at the Karate Chop point (e.g. "I trust myself more with every breath." or "I release the fear that there's never enough."). A complete sentence, not a fragment — it gets reused for both the opening and closing tap of the round, so keep it general enough to work as a bookend.
-- "pointReminders" is an array of exactly 8 full, natural first-person sentences (roughly 6-14 words each, ending in a period), one for each of these points in this exact order: ${pointLabels.join(', ')}. Write these the way real EFT scripts read — complete, flowing sentences like "It's okay to feel uncertain sometimes." or "I am safe to receive more than I've ever allowed." — never short clipped phrases or word fragments. Each should feel like a natural step in releasing/processing the named feeling, gently varied line to line (not repeats of each other), grounded in what the person described, in a ${toneLabel || 'warm'} tone. Move loosely from naming the feeling toward relief/acceptance by the last point.
+- "feelingA" completes "Even though I feel ___, I still completely love and accept myself." Name the specific feeling in a few words (e.g. "anxious about money", "like I'm not enough"), based on what the person described. Return only that feeling clause — not the rest of the sentence. It must read naturally straight after the word "feel", so no leading "this" or "that".
+- "feelingB" completes the second setup statement, "Even though I feel ___, I still completely love and honor myself." This must name a DIFFERENT feeling from feelingA — the one sitting underneath it. If feelingA is the surface worry, feelingB is the fear or the tiredness beneath it (e.g. feelingA "anxious about money", feelingB "ashamed that I'm still here after all this time"). Same grammar rule: it follows the word "feel".
+- "pointReminders" is an array of exactly 9 full, natural first-person sentences (roughly 6-14 words each, ending in a period), one for each of these points in this exact order: ${pointLabels.join(', ')}. Write these the way real EFT scripts read — complete, flowing sentences like "It's okay to feel uncertain sometimes." or "I am safe to receive more than I've ever allowed." — never short clipped phrases or word fragments. Each should feel like a natural step in releasing/processing the named feeling, gently varied line to line (not repeats of each other), grounded in what the person described, in a ${toneLabel || 'warm'} tone. Move loosely from naming the feeling toward relief/acceptance by the last point.
 - Every sentence should be short enough to say out loud comfortably in one breath, roughly 3-5 seconds.
 - Do not diagnose, give medical advice, or reference the healing frequency directly.`;
 

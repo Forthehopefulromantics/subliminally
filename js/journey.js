@@ -221,7 +221,7 @@ function renderTodayRitual(){
   const core = rows.filter(h => h.is_core);
   const extras = rows.filter(h => !h.is_core);
   const st = routineStatusFor(time, today);
-  const left = shortRoutinesLeft(time, today);
+
   const streak = routineStreak(time);
   // On a short night the rest of the list is out of the way by default, so the
   // screen doesn't open on nine things you already know you aren't doing.
@@ -269,20 +269,23 @@ function renderTodayRitual(){
   else if (core.length) headline = `${st.coreDone} of ${core.length} non-negotiables`;
   else headline = `${doneCount} of ${rows.length} so far`;
 
+  /* The note answers one question: where do I stand. A day you can still win
+     back is the most useful thing it can say, so that goes first. */
+  const comeback = (typeof comebackOffer === 'function') ? comebackOffer(time) : null;
   let note = '';
-  if (st.state === 'essentials'){
-    note = left > 0
-      ? `A short ${time}, and your streak holds. ${left} more left this week.`
-      : `That's both short ${time}s this week — your streak still holds today.`;
+  if (comeback && comeback.alreadyBack){
+    note = `That's the whole list — yesterday is back, and so is the ${comeback.saves}-day run behind it.`;
+  } else if (comeback){
+    note = `Yesterday got away from you. Finish the whole ${time} today and you get it back, along with the ${comeback.saves} days behind it — ${comeback.done} of ${comeback.total} so far.`;
+  } else if (st.state === 'essentials'){
+    note = `Your non-negotiables are done, so the day is kept. The rest is yours if you want it.`;
   } else if (core.length && st.state !== 'full'){
-    note = left > 0
-      ? `Short on time? The ${core.length} marked ✦ are enough to keep the ritual. ${left} left this week.`
-      : `You've used both short ${time}s this week — tonight it's the full list that keeps the streak.`;
+    note = `Short on time? The ${core.length} marked ✦ are enough to keep the day.`;
   }
 
   card.style.display = 'block';
   card.innerHTML = `
-    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}${streak > 1 ? ` · ${streak}-day streak` : ''}</div>
+    <div class="today-card-label">${time === 'morning' ? 'Morning ritual' : 'Night ritual'}${streak > 1 ? ` · ${streak} days of non-negotiables` : ''}</div>
     <h3>${headline}</h3>
     ${rows.length ? `
       <div class="today-ritual-list">${(shortMode ? core : rows).map(habitBtn).join('')}</div>

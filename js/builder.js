@@ -58,9 +58,20 @@ const BINAURAL_BANDS = {
    Karate Chop point, repeated 3x), and lines 1-10 are a 10-tap round that starts and
    ends on Karate Chop, covering all eight core points (including Top of Head) in
    between. */
+/* ---------- the round, as Kyla runs it ----------
+   It opens before any tapping: one line taking responsibility for your own
+   well-being, said still. Then the Karate Chop carries two setup statements
+   rather than one repeated three times -- love and accept, then honour -- each
+   naming a different feeling, because naming two is how you get underneath the
+   first one. The cycle then runs from the forehead down and finishes on the
+   crown, and every round closes the same way: in body, mind and spirit.
+
+   `isStill` means do not tap yet. `isSetup` means the Karate Chop. */
 const EFT_LINE_POINTS = [
-  { key:'setup', label:'Setup Statement', where:'the Karate Chop point — outer edge of either hand, below the pinky', isSetup:true },
-  { key:'kc1', label:'Karate Chop', where:'the outer edge of either hand, below the pinky' },
+  { key:'responsibility', label:'Before you tap', where:'sit still for this one — hands down', isStill:true },
+  { key:'kcA', label:'Karate Chop — accept', where:'the outer edge of either hand, below the pinky', isSetup:true },
+  { key:'kcB', label:'Karate Chop — honour', where:'the outer edge of either hand, below the pinky', isSetup:true },
+  { key:'forehead', label:'Forehead', where:'the centre of your forehead, above the brow' },
   { key:'eyebrow', label:'Eyebrow', where:'the inner edge of one eyebrow, near the bridge of your nose' },
   { key:'sideeye', label:'Side of the Eye', where:'the bone at the outer corner of your eye' },
   { key:'undereye', label:'Under the Eye', where:'the bone directly under your eye' },
@@ -68,21 +79,22 @@ const EFT_LINE_POINTS = [
   { key:'chin', label:'Chin', where:'the crease between your lower lip and chin' },
   { key:'collarbone', label:'Collarbone', where:'just below where your collarbones meet' },
   { key:'underarm', label:'Under the Arm', where:'your side, about four inches below your armpit' },
-  { key:'crown', label:'Top of the Head', where:'the crown, center top of your head' },
-  { key:'kc2', label:'Karate Chop (closing)', where:'the outer edge of either hand, below the pinky' },
+  { key:'crown', label:'Top of the Head', where:'the crown, centre top of your head' },
+  { key:'close', label:'Closing', where:'rest your hands — this is the close', isStill:true },
 ];
-/* How many times a given line plays back-to-back while tapping: the setup statement
-   is always said 3 times (standard EFT); every round point uses the person's 5-7 pick. */
-function eftRepeatsForIndex(i){
-  if (!state.eftMode) return 1;
-  if (i === 0) return 3;
-  return state.eftRepeatCount || 1;
-}
+const EFT_LINE_COUNT = EFT_LINE_POINTS.length;
+const EFT_OPENING_LINE = 'Take responsibility for your own well-being.';
+const EFT_CLOSING_LINE = 'In body, mind and spirit.';
+/* Once each. You used to be asked up front how many times every line should
+   repeat -- five, six or seven -- which is a decision about a session you have
+   not had yet. Tapping is done by feel: the line is said, you tap it as long as
+   it takes, and the round comes back round again for as long as you stay. */
+function eftRepeatsForIndex(i){ return 1; }
 
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -127,7 +139,7 @@ function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:100, eftMode:false, eftRepeatCount:null, visualizationMode:false, binauralBand:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
   document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
@@ -155,9 +167,9 @@ function resetFlow(){
   document.getElementById('layerVoiceMsg').textContent = '';
   document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
   document.getElementById('layerVoiceMixRow').style.display = 'none';
-  affirmationGapMs = 100; state.affirmationGapMs = 100;
-  document.getElementById('lineGap').value = 0.1;
-  document.getElementById('lineGapVal').value = 0.1;
+  affirmationPace = DEFAULT_PACE;
+  setAffirmationGap(DEFAULT_GAP_SECONDS);
+  renderPaceChips();
   document.getElementById('mixTone').value = 30; document.getElementById('mixToneVal').value = 30;
   document.getElementById('mixBg').value = 50; document.getElementById('mixBgVal').value = 50;
   document.getElementById('mixVoice').value = 65; document.getElementById('mixVoiceVal').value = 65;
@@ -169,9 +181,8 @@ function resetFlow(){
   document.getElementById('ritualModeMsg').textContent = '';
   document.getElementById('countRow').style.display = 'block';
   applyModeCopy('subliminal');
-  state.eftRepeatCount = null;
-  document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
-  document.getElementById('eftRepeatMsg').textContent = '';
+  const lengthQ = document.getElementById('sessionLengthRow');
+  if (lengthQ) lengthQ.style.display = '';
   editingExistingId = null;
   contentAlreadySaved = false;
   document.getElementById('finalTitleInput').value = '';
@@ -214,7 +225,7 @@ countRange.addEventListener('input', ()=>{ document.getElementById('countVal').t
 const eftPointsList = document.getElementById('eftPointsList');
 // Skip index 0 (the Setup Statement) here — it's described separately above the list.
 // This shows the 9-point round: Karate Chop -> ... -> Karate Chop again.
-EFT_LINE_POINTS.slice(1).forEach((p, i) => {
+EFT_LINE_POINTS.forEach((p, i) => {
   const li = document.createElement('li');
   li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
   eftPointsList.appendChild(li);
@@ -246,26 +257,25 @@ async function pickRitualMode(btn){
   applyModeCopy(mode);
 
   if (state.eftMode){
-    state.count = 11; // 1 setup statement + a 10-tap round bookended by Karate Chop
+    state.count = EFT_LINE_COUNT;
     // EFT works best with a real pause to repeat the line while tapping — default to 5s.
-    affirmationGapMs = 5000; state.affirmationGapMs = 5000;
-    document.getElementById('lineGap').value = 5;
-    document.getElementById('lineGapVal').value = 5;
+    setAffirmationGap(5);
+    /* No length is set for tapping. You are not deciding in advance how long a
+       round will take you; the round comes back round for as long as you stay,
+       and you stop when you are done. */
+    state.targetLengthMinutes = 0;
   } else if (state.visualizationMode){
     state.count = 1; // one continuous script, not discrete lines
-    affirmationGapMs = 1500; state.affirmationGapMs = 1500;
-    document.getElementById('lineGap').value = 1.5;
-    document.getElementById('lineGapVal').value = 1.5;
-    document.getElementById('eftRepeatMsg').textContent = '';
+    setAffirmationGap(1.5);
   } else {
     state.count = parseInt(countRange.value, 10);
-    affirmationGapMs = 100; state.affirmationGapMs = 100;
-    document.getElementById('lineGap').value = 0.1;
-    document.getElementById('lineGapVal').value = 0.1;
-    state.eftRepeatCount = null;
-    document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
-    document.getElementById('eftRepeatMsg').textContent = '';
+    setAffirmationGap(DEFAULT_GAP_SECONDS);
   }
+  // The length question is not asked for tapping, so it comes off the screen
+  // rather than sitting there greyed out.
+  const lengthQ = document.getElementById('sessionLengthRow');
+  if (lengthQ) lengthQ.style.display = state.eftMode ? 'none' : '';
+  answered(btn);
 }
 /* Swaps the quiz-step copy (prompt label, generate button, loading/review titles)
    to match whichever of the three modes is active. */
@@ -306,12 +316,7 @@ function applyModeCopy(mode){
     reviewSub.textContent = 'See every line before it\'s ever recorded or played. Edit or remove anything.';
   }
 }
-function pickEftRepeatCount(btn){
-  document.querySelectorAll('#eftRepeatChips .length-chip').forEach(c=>c.classList.remove('sel'));
-  btn.classList.add('sel');
-  state.eftRepeatCount = parseInt(btn.dataset.count, 10);
-  document.getElementById('eftRepeatMsg').textContent = '';
-}
+
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
 async function generateAffirmations(){
@@ -333,16 +338,8 @@ async function generateAffirmations(){
   }
   msg.textContent = '';
 
-  if (state.eftMode && !state.eftRepeatCount){
-    const repMsg = document.getElementById('eftRepeatMsg');
-    repMsg.textContent = "Pick how many times you'll tap each point (5–7) before continuing.";
-    repMsg.className = 'length-msg err';
-    document.getElementById('eftRepeatChips').scrollIntoView({ behavior:'smooth', block:'center' });
-    return;
-  }
-
   state.goal = document.getElementById('quizGoal').value.trim();
-  state.count = state.eftMode ? 11 : (state.visualizationMode ? 1 : parseInt(countRange.value));
+  state.count = state.eftMode ? EFT_LINE_COUNT : (state.visualizationMode ? 1 : parseInt(countRange.value));
   showStep(2);
 
   if (state.visualizationMode){
@@ -394,13 +391,21 @@ async function callClaudeForEftAffirmations(){
   });
   if (!response.ok) return null;
   const data = await response.json();
-  if (!data || !data.setupFeeling || !data.kcReminder || !Array.isArray(data.pointReminders) || data.pointReminders.length !== 8) return null;
-  return [
-    `Even though I have ${data.setupFeeling}, I deeply and completely love and accept myself.`,
-    data.kcReminder,
-    ...data.pointReminders,
-    data.kcReminder
-  ];
+  /* The endpoint used to return one feeling and one reused Karate Chop line.
+     It returns two feelings now, and nine reminders instead of eight, because
+     the cycle gained the forehead and lost the closing Karate Chop. An older
+     deployment that still answers the old shape is handled rather than
+     rejected -- a stale function should cost the second setup line, not the
+     whole session. */
+  if (!data) return null;
+  const nine = Array.isArray(data.pointReminders) ? data.pointReminders : null;
+  const feelingA = data.feelingA || data.setupFeeling;
+  if (!feelingA || !nine || nine.length < 8) return null;
+  return eftLinesFrom({
+    feelingA,
+    feelingB: data.feelingB || 'the weight of carrying it on my own',
+    pointReminders: nine,
+  });
 }
 function buildFallbackList(){
   const bank = FALLBACK_BANK[state.intention] || FALLBACK_BANK.sleep;
@@ -425,25 +430,38 @@ function buildFallbackList(){
    but usable, built entirely client-side. Every line is a full sentence, matching how
    real EFT scripts read (not clipped phrases). */
 function buildEftFallbackList(){
+  /* Whatever goes here follows the word "feel", so it has to read as a feeling
+     and not as a noun: "even though I feel this feeling" is not a sentence. */
   const feeling = state.goal
     ? (state.goal.length > 50 ? state.goal.slice(0,50)+'…' : state.goal)
-    : 'this feeling';
-  const kcReminder = "I trust myself to move through this.";
-  const pointReminders = [
-    "I am releasing this, one breath at a time.",
-    "I'm allowed to let this go.",
-    "It's safe for me to feel calm right now.",
-    "I choose to soften instead of holding on.",
-    "This doesn't have to stay with me.",
-    "I am capable of moving through this.",
-    "I am already easing, even now.",
-    "I am settling into this moment as it is."
-  ];
+    : 'this way about it';
+  return eftLinesFrom({
+    feelingA: feeling,
+    feelingB: 'the weight of carrying it on my own',
+    pointReminders: [
+      "I am releasing this, one breath at a time.",
+      "I'm allowed to let this go.",
+      "It's safe for me to feel calm right now.",
+      "I choose to soften instead of holding on.",
+      "This doesn't have to stay with me.",
+      "I am capable of moving through this.",
+      "I am already easing, even now.",
+      "I am settling into this moment as it is.",
+      "I am steady, and I am here.",
+    ],
+  });
+}
+/* One place that knows the shape of a round, so the written script and the
+   generated one can never drift apart. Nine reminders: forehead through crown. */
+function eftLinesFrom(parts){
+  const nine = (parts.pointReminders || []).slice(0, 9);
+  while (nine.length < 9) nine.push('I am steady, and I am here.');
   return [
-    `Even though I have ${feeling}, I deeply and completely love and accept myself.`,
-    kcReminder,
-    ...pointReminders,
-    kcReminder
+    EFT_OPENING_LINE,
+    `Even though I feel ${parts.feelingA}, I still completely love and accept myself.`,
+    `Even though I feel ${parts.feelingB}, I still completely love and honor myself.`,
+    ...nine,
+    EFT_CLOSING_LINE,
   ];
 }
 
@@ -534,6 +552,57 @@ const STEP_ADVANCE_MS = 260;          // long enough to see what you picked
 
 function advanceAfterPick(){
   setTimeout(() => { if (step === 4) nextStep(); }, STEP_ADVANCE_MS);
+}
+
+/* ---------- a pick is an answer, so it moves you on ----------
+   Every one of these buttons used to light up and then sit there. On a phone
+   the next question is below the fold, so the tap looked like it had failed --
+   and the obvious thing to do with a button that did nothing is press it
+   again. Three of them behaved this way and one (the voice cards) did not,
+   which made it read as broken rather than as a choice.
+
+   So answering moves you to whatever comes next: the next question on this
+   screen, or the next screen when this was the last one. Same rule everywhere,
+   whether that question is on step 0 or step 5. */
+/* A question is any block holding one label and its answers. They are not all
+   called .quiz-q -- step 5's are .soothing-picker, .own-track-picker and so on
+   -- so the rule is the shape, not one class name. */
+const QUESTION_BLOCKS = '.quiz-q, .soothing-picker';
+function nextQuestionAfter(el){
+  const here = el && el.closest(QUESTION_BLOCKS);
+  if (!here) return null;
+  let n = here.nextElementSibling;
+  while (n){
+    if (n.matches && n.matches(QUESTION_BLOCKS) && n.offsetParent !== null) return n;
+    n = n.nextElementSibling;
+  }
+  return null;
+}
+function answered(el){
+  setTimeout(() => {
+    const next = nextQuestionAfter(el);
+    if (next){
+      next.scrollIntoView({ behavior:'smooth', block:'center' });
+      // A moment of glow, so it is obvious where the tap took you.
+      next.classList.remove('q-next');
+      void next.offsetWidth;
+      next.classList.add('q-next');
+      setTimeout(() => next.classList.remove('q-next'), 1400);
+      return;
+    }
+    // Nothing else to answer here. The continue button is the honest next step
+    // on the quiz screen -- it is what gates generating -- so go to it rather
+    // than skipping a screen the person has not finished.
+    const card = el && el.closest('.flow-step');
+    const cta = card && card.querySelector('.flow-nav .mini-btn:not([disabled])');
+    if (cta){
+      cta.scrollIntoView({ behavior:'smooth', block:'center' });
+      cta.classList.remove('q-next'); void cta.offsetWidth; cta.classList.add('q-next');
+      setTimeout(() => cta.classList.remove('q-next'), 1400);
+      return;
+    }
+    if (step === 5) nextStep();
+  }, STEP_ADVANCE_MS);
 }
 
 function chooseVoice(mode){
@@ -631,7 +700,8 @@ function studioClipHandle(url){
   return studioClipHandles.get(url);
 }
 async function synthesizeLine(text, voiceId){
-  const key = voiceId + '|' + text;
+  // The speed is baked into the audio, so it is part of what identifies a clip.
+  const key = voiceId + '|' + paceNow().speed + '|' + text;
   if (ttsCache.has(key)) return ttsCache.get(key);
   const promise = (async () => {
     const token = sb && (await sb.auth.getSession()).data.session?.access_token;
@@ -639,7 +709,8 @@ async function synthesizeLine(text, voiceId){
     const res = await fetch(`${API_BASE}/api/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ text, voiceId }),
+      // The pace is part of the reading, not just the gap after it.
+      body: JSON.stringify({ text, voiceId, speed: paceNow().speed }),
     });
     if (!res.ok){
       let body = {};
@@ -697,6 +768,7 @@ function pickLayerVoiceMode(btn){
   document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.remove('sel'));
   btn.classList.add('sel');
   layerVoiceMode = btn.dataset.mode;
+  answered(btn);
 }
 
 function startNextPhase(){
@@ -1180,6 +1252,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function pickBinauralBand(btn){
   document.querySelectorAll('#binauralChips .length-chip').forEach(c => c.classList.remove('sel'));
   btn.classList.add('sel');
+  answered(btn);
   const band = btn.dataset.band;
   state.binauralBand = band === 'none' ? null : band;
   const guideEl = document.getElementById('binauralGuideText');
@@ -1212,6 +1285,7 @@ async function pickSoothingLayer(btn){
 
   document.querySelectorAll('#soothingChips .length-chip').forEach(c => c.classList.remove('sel'));
   btn.classList.add('sel');
+  answered(btn);
   state.soothingLayer = variant;
   document.getElementById('soothingMixRow').style.display = variant === 'none' ? 'none' : 'flex';
   if (finalPlaying) restartSoothingLayer();
@@ -1227,10 +1301,60 @@ function restartSoothingLayer(){
   }
 }
 
-/* Time between affirmations — 0.1 to 10 seconds, live-adjustable, applies to
-   the main voice and (if present) the second layered voice. Stored internally in
-   milliseconds (affirmationGapMs) since that's what setTimeout needs. */
-let affirmationGapMs = 100;
+/* ---------- pace ----------
+   This was a slider measured in seconds that started at 0.1, which meant every
+   session opened with the lines running straight into each other, read at one
+   unvarying speed, with no breath anywhere. That is the robotic sound: not the
+   voice, the metronome behind it.
+
+   So there is a pace to choose now, and it sets three things at once -- how long
+   the silence between lines is, how fast the voice reads, and how much that
+   silence is allowed to vary. The seconds control is still underneath for
+   anyone who wants to set it exactly; picking a pace moves it.
+
+   `jitter` is the part that matters most and costs least. A gap that is exactly
+   2.2 seconds every single time is a click track. The same gap wandering by a
+   fifth of itself is someone talking. */
+const AFFIRMATION_PACES = [
+  { key:'close',   label:'Close together', sub:'barely a breath', gap:0.8, speed:1.0,  jitter:0.10 },
+  { key:'steady',  label:'Steady',         sub:'room to land',    gap:2.4, speed:0.92, jitter:0.18 },
+  { key:'drifting',label:'Drifting',       sub:'for falling asleep', gap:4.5, speed:0.82, jitter:0.22 },
+];
+const DEFAULT_PACE = 'steady';
+const DEFAULT_GAP_SECONDS = AFFIRMATION_PACES.find(p => p.key === DEFAULT_PACE).gap;
+let affirmationPace = DEFAULT_PACE;
+let affirmationGapMs = Math.round(DEFAULT_GAP_SECONDS * 1000);
+function paceNow(){ return AFFIRMATION_PACES.find(p => p.key === affirmationPace) || AFFIRMATION_PACES[1]; }
+/* What the player actually waits. Same gap, slightly different every time. */
+function gapForNextLine(){
+  const j = paceNow().jitter;
+  return Math.round(affirmationGapMs * (1 + (Math.random() * 2 - 1) * j));
+}
+function setAffirmationGap(seconds){
+  const v = Math.max(0.1, Math.min(10, seconds));
+  affirmationGapMs = Math.round(v * 1000);
+  state.affirmationGapMs = affirmationGapMs;
+  const el = document.getElementById('lineGap');
+  const readout = document.getElementById('lineGapVal');
+  if (el) el.value = v;
+  if (readout) readout.value = v;
+}
+function pickPace(btn){
+  const p = AFFIRMATION_PACES.find(x => x.key === btn.dataset.pace);
+  if (!p) return;
+  affirmationPace = p.key;
+  state.pace = p.key;
+  document.querySelectorAll('#paceChips .length-chip').forEach(c => c.classList.remove('sel'));
+  btn.classList.add('sel');
+  setAffirmationGap(p.gap);
+}
+function renderPaceChips(){
+  const wrap = document.getElementById('paceChips');
+  if (!wrap) return;
+  wrap.innerHTML = AFFIRMATION_PACES.map(p =>
+    `<button type="button" class="length-chip${p.key === affirmationPace ? ' sel' : ''}"
+       data-pace="${p.key}" onclick="pickPace(this)">${p.label}<span>${p.sub}</span></button>`).join('');
+}
 (function wireLineGap(){
   const el = document.getElementById('lineGap');
   const readout = document.getElementById('lineGapVal');
@@ -1569,16 +1693,16 @@ function playFinal(){
         loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
           playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, ()=>{
-            idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
+            idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t);
           });
         }).catch(e=>{
           console.error('could not play layered line', e);
-          idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t);
+          idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t);
         });
       } else {
         if (idx >= lines.length) idx = 0;
         const line = lines[idx];
-        const advance = ()=>{ idx++; const t = setTimeout(playNextLayerLine, affirmationGapMs); finalTimeouts.push(t); };
+        const advance = ()=>{ idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t); };
         const deviceSpeak = ()=>{
           if (!finalPlaying) return;
           const utter = new SpeechSynthesisUtterance(line);
@@ -1625,7 +1749,7 @@ function playFinal(){
                 // Short beat between repeats of the same line, timed to a single tap.
                 const t = setTimeout(playOnce, 700); finalTimeouts.push(t);
               } else {
-                idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
+                idx++; const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
               }
             });
           }
@@ -1634,7 +1758,7 @@ function playFinal(){
           // Never fail silently — a session that plays no voice should say why.
           console.error('could not play recorded line', i, e);
           document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
-          idx++; const t = setTimeout(playNext, affirmationGapMs); finalTimeouts.push(t);
+          idx++; const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
         });
       }
       playNext();
@@ -1656,7 +1780,7 @@ function playFinal(){
           if (rep < repeatsForThisLine){
             const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
           } else {
-            idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
+            idx++; const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
           }
         }
         /* The device's own voice is the one thing here that can fail without
@@ -1758,7 +1882,9 @@ function playFinal(){
     const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
     const elapsed = Date.now() - finalStartTime;
     const stillBuildingTowardTarget = targetMs && elapsed < targetMs;
-    const manualLoop = document.getElementById('loopToggle').checked;
+    /* Tapping has no set length, so it keeps coming back round until you stop
+       it. That is the whole point of not asking how long first. */
+    const manualLoop = document.getElementById('loopToggle').checked || state.eftMode;
     if (playedSomething) passesWithNoAudio = 0; else passesWithNoAudio++;
     if (passesWithNoAudio >= 1){
       const why = state.voiceMode === 'own'
@@ -1967,3 +2093,8 @@ async function runSoundCheck(){
   soundCheckSay(`Done. Tell me which of the three you heard — that is the whole answer.
     <br><span class="sc-detail">Engine: ${ctxState} · media: ${elResult} · device voice: ${spoke ? 'started' : 'never started'}</span>`);
 }
+
+/* Last, deliberately: the pace constants are declared partway down this file,
+   and a `const` cannot be read before its declaration has run. Called from the
+   top, this threw on load and took every function below it with it. */
+renderPaceChips();

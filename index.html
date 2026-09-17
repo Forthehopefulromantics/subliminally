@@ -288,6 +288,20 @@
   .bg-card.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .bg-card .ic{ font-size:18px; display:block; margin-bottom:4px; }
   @media (max-width:560px){ .bg-grid{ grid-template-columns:repeat(2,1fr); } }
+  /* Where a tap just took you. Same idea as the card glow on Today. */
+  .q-next{ animation:qNext 1.3s ease-out 1; border-radius:14px; }
+  @keyframes qNext{
+    0%{ box-shadow:0 0 0 0 rgba(185,167,232,.5); }
+    35%{ box-shadow:0 0 0 6px rgba(185,167,232,.18); }
+    100%{ box-shadow:0 0 0 0 rgba(185,167,232,0); } }
+  body[data-sky="day"] .q-next{ animation-name:qNextDay; }
+  @keyframes qNextDay{
+    0%{ box-shadow:0 0 0 0 rgba(240,132,95,.45); }
+    35%{ box-shadow:0 0 0 6px rgba(240,132,95,.16); }
+    100%{ box-shadow:0 0 0 0 rgba(240,132,95,0); } }
+  @media (prefers-reduced-motion: reduce){ .q-next{ animation:none; } }
+  .mix-pace{ margin:4px 0 12px; }
+  .mix-pace > label{ display:block; font-size:12.5px; color:var(--haze); margin-bottom:8px; }
   .mix-row{ display:flex; align-items:center; gap:10px; margin-top:8px; }
   .mix-row label{ font-size:12px; color:var(--haze); min-width:100px; }
   .mix-row input[type=range]{ flex:1; accent-color:var(--lilac); }
@@ -1015,6 +1029,10 @@
   @media (max-width:360px){ .hs-pair{ gap:10px; } .hs-pair-art{ height:150px; } }
   .av-maker{ margin-top:10px; }
   .av-roster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:9px; }
+  /* Tighter in the welcome modal: it sits under four other questions and
+     should not be the tallest thing on the screen. */
+  .av-roster-onboard{ grid-template-columns:repeat(auto-fill, minmax(62px,1fr)); gap:7px;
+    max-height:230px; overflow-y:auto; padding:2px; }
   .av-opt{ padding:5px 3px; line-height:0; cursor:pointer; border:2px solid transparent;
     border-radius:16px; background:var(--sunk); transition:border-color .2s, transform .15s; }
   .av-opt:hover{ transform:translateY(-2px); }
@@ -1586,6 +1604,19 @@
       <label>What are you hoping this helps with? <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
       <input type="text" id="obReason" placeholder="Sleep, confidence, focus…">
     </div>
+    <!-- What you believe, so the app can use your words rather than someone
+         else's. Answering is optional and it never changes what you can do
+         here — only how things are named. -->
+    <div class="auth-field">
+      <label>Does your practice have a faith behind it? <span style="color:var(--haze); font-weight:400;">(optional — changes the words we use, nothing else)</span></label>
+      <div class="length-chip-grid" id="obFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
+      <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none; margin-top:9px;">
+    </div>
+    <!-- Choosing who you are, at the point you become someone here. -->
+    <div class="auth-field">
+      <label>Choose your avatar <span style="color:var(--haze); font-weight:400;">(you can change her any time)</span></label>
+      <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
+    </div>
     <div class="auth-msg" id="onboardMsg"></div>
     <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="submitOnboarding()">Finish setup</button>
     <div class="auth-toggle"><button onclick="skipOnboarding()">Skip for now</button></div>
@@ -1595,7 +1626,11 @@
 <!-- ============ TODAY: the signed-in home ============ -->
 <section class="today-section" id="today">
   <div class="wrap today-wrap">
-    <div class="higher-self" id="higherSelfCard" data-sky="night" style="display:none;">
+    <!-- She is not the wallpaper any more. Standing on Today all day, she was
+         a picture you stopped seeing by the third morning; she is worth more as
+         someone who turns up, asks how it went, and goes again. The card stays
+         in the markup, hidden, because that check-in is what it becomes. -->
+    <div class="higher-self" id="higherSelfCard" data-sky="night" style="display:none;" hidden>
       <button type="button" class="hs-edit" onclick="editHigherSelf()">Customise</button>
       <div id="higherSelfArt" class="hs-art"></div>
       <div class="hs-name" id="higherSelfName">Your higher self</div>
@@ -1856,21 +1891,14 @@
               <p>Use the prompt above as a starting point and hit continue — if you've written something, you'll get a full draft script built from it that you can rewrite, trim, or keep as-is. Leave it blank and you'll land on an empty page to write the whole thing yourself.</p>
             </div>
             <div class="eft-guide-panel" id="eftGuidePanel" style="display:none;">
-              <h4>How EFT tapping works</h4>
-              <p>Emotional Freedom Technique (EFT), or "tapping," starts with a setup statement said on the Karate Chop point, repeated 3 times: "Even though I have this [feeling], I deeply and completely love and accept myself." Then you move through a round of ten taps — starting and ending on Karate Chop — repeating a short reminder phrase 5 to 7 times at each point. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
-              <p>Tonight you'll get 11 lines total: the setup statement first, then one line for each tap in the round below. Each round line repeats back-to-back the number of times you pick — matching how many times you'll actually tap that point — with a pause before the next point so you have a moment to shift positions.</p>
-              <p style="font-size:12.5px; color:var(--candle);">1. Setup Statement — Karate Chop, repeated 3 times</p>
-              <ol class="eft-points-list" id="eftPointsList" start="2"></ol>
-              <label style="display:block; margin-top:14px; font-size:12.5px; color:var(--moonlight);">Are you ready to decide? How many times do you want each line repeated while you tap? <span style="color:var(--candle);">*</span></label>
-              <div class="length-chip-grid" id="eftRepeatChips" style="grid-template-columns:repeat(3,1fr); max-width:280px;">
-                <button class="length-chip" data-count="5" onclick="pickEftRepeatCount(this)">5 times</button>
-                <button class="length-chip" data-count="6" onclick="pickEftRepeatCount(this)">6 times</button>
-                <button class="length-chip" data-count="7" onclick="pickEftRepeatCount(this)">7 times</button>
-              </div>
-              <div class="length-msg" id="eftRepeatMsg"></div>
+              <h4>How the round runs</h4>
+              <p>It opens before you tap anything: <em>take responsibility for your own well-being</em>, said sitting still. Then both hands come to the Karate Chop for two setup statements — <em>even though I feel …, I still completely love and accept myself</em>, then a second feeling, the one underneath that one, and <em>I still completely love and honor myself</em>. <a href="#" onclick="showReprogramPage(); setScienceTab('eft'); return false;">Read the full guide →</a></p>
+              <p>From there the cycle runs from the forehead down to the crown, and every round closes the same way: <em>in body, mind and spirit</em>. Then it comes back round again.</p>
+              <p>There is nothing to set first — no number of repetitions and no session length. A line is said once and you tap it for as long as it takes. When you have had enough, you stop.</p>
+              <ol class="eft-points-list" id="eftPointsList"></ol>
             </div>
           </div>
-          <div class="quiz-q">
+          <div class="quiz-q" id="sessionLengthRow">
             <label>How long should tonight's session run? <span class="session-length-val" id="sessionLengthVal">5 min</span></label>
             <div class="session-length-row">
               <input type="range" id="sessionLengthSlider" min="5" max="480" step="1" value="5" oninput="onSessionLengthInput()">
@@ -2061,7 +2089,11 @@
               <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixSoothingVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixCustomVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="layerVoiceMixRow" style="display:none;"><label>Second voice</label><input type="range" id="mixLayerVoice" min="0" max="100" value="35"><input type="number" class="mix-val-input" id="mixLayerVoiceVal" min="0" max="100" value="35"><span class="mix-pct-sign">%</span></div>
-              <div class="mix-row"><label>Time between affirmations</label><input type="range" id="lineGap" min="0.1" max="10" step="0.1" value="0.1"><input type="number" class="mix-val-input" id="lineGapVal" min="0.1" max="10" step="0.1" value="0.1" style="width:56px;"><span class="mix-pct-sign">s</span></div>
+              <div class="mix-pace">
+                <label>Pace</label>
+                <div class="length-chip-grid" id="paceChips" style="grid-template-columns:repeat(3,1fr);"></div>
+              </div>
+              <div class="mix-row"><label>Exact gap between lines</label><input type="range" id="lineGap" min="0.1" max="10" step="0.1" value="2.4"><input type="number" class="mix-val-input" id="lineGapVal" min="0.1" max="10" step="0.1" value="2.4" style="width:56px;"><span class="mix-pct-sign">s</span></div>
             </div>
             <div class="session-target" id="sessionTarget"></div>
             <div class="session-progress" id="sessionProgress" style="display:none;">
@@ -2480,6 +2512,7 @@
 <script src="js/today.js"></script>
 <script src="js/light.js"></script>
 <script src="js/kaly.js"></script>
+<script src="js/faith.js"></script>
 <script src="js/journey.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/journal.js"></script>
