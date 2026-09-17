@@ -65,36 +65,63 @@ function renderTodayJourney(){
           <span class="jq-detail">${q.detail}</span>
           ${q.play ? `<span class="jq-play" aria-hidden="true">${finalPlaying ? '❚❚' : '▶'}</span>` : ''}
         </button>
-      </li>`).join('')}</ul>
-    <div id="todaySubPicker"></div>`;
-  renderTodaySubPicker();
+      </li>`).join('')}</ul>`;
 }
 function journeyGo(key){
   const q = journeyQuests().find(x => x.key === key);
   if (q) q.go();
 }
 
+/* ---------- tonight's session ----------
+   The last three, side by side, the way Calm puts its sessions on the home
+   screen. It used to be one card naming whichever you saved most recently,
+   which is a guess about tonight rather than a choice about it.
+
+   `lastSub` is still the argument renderTodayPage passes, and is still what is
+   chosen when nothing else has been -- the newest is a good default, it is just
+   not the only option any more. */
 function renderTodaySession(lastSub){
   const card = document.getElementById('todaySessionCard');
+  if (!card) return;
   const evening = new Date().getHours() >= 16;
-  if (lastSub){
-    const mins = Math.round((lastSub.duration_seconds || 0) / 60);
-    card.innerHTML = `
-      <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
-      <h3>${(lastSub.title || 'Your subliminal').replace(/</g,'&lt;')}</h3>
-      <p>${mins ? `${formatSessionLength(mins)} · ` : ''}the last one you saved. Put your headphones in and press play.</p>
-      <button class="btn btn-primary" onclick="loadSavedIntoBuilder('${lastSub.id}')">Play it</button>
-      <div class="today-links" style="justify-content:flex-start; margin-top:14px;">
-        <button onclick="showBuildPage()">Build a new one</button>
-      </div>`;
-  } else {
+
+  if (!todaySubs.length){
     card.innerHTML = `
       <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
       <h3>Build your first subliminal</h3>
       <p>Pick a frequency, say what you're working through, and record it in your own voice. It takes about five minutes.</p>
       <button class="btn btn-primary" onclick="showBuildPage()">Start</button>`;
+    return;
   }
+  if (!todaySubChosen) todaySubChosen = (lastSub && lastSub.id) || todaySubs[0].id;
+
+  card.innerHTML = `
+    <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
+    <h3>What are you listening to?</h3>
+    <div class="sess-row" role="radiogroup" aria-label="Choose tonight's subliminal">
+      ${todaySubs.map(s => {
+        const mins = Math.round((s.duration_seconds || 0) / 60);
+        const on = s.id === todaySubChosen;
+        const playing = finalPlaying && libraryNowPlayingId === s.id;
+        return `<button type="button" class="sess-card${on ? ' sel' : ''}" role="radio"
+            aria-checked="${on}" onclick="chooseTodaySub('${s.id}')">
+          <span class="sess-art" id="sessArt-${s.id}">
+            <span class="sess-play" aria-hidden="true">${playing ? '❚❚' : '▶'}</span>
+          </span>
+          <span class="sess-name">${(s.title || 'Untitled').replace(/</g,'&lt;')}</span>
+          <span class="sess-len">${mins ? formatSessionLength(mins) : ''}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    <button class="btn btn-primary" onclick="playTodaySubliminal()">${
+      finalPlaying ? 'Stop' : 'Play it'}</button>
+    <div class="today-links" style="justify-content:flex-start; margin-top:14px;">
+      <button onclick="showBuildPage()">Build a new one</button>
+      <button onclick="showLibraryPage(); setLibraryTab('mine');">All my subliminals</button>
+    </div>`;
+  todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
 }
+
 function renderTodayRitual(){
   const card = document.getElementById('todayRitualCard');
   if (!habitsCache.length){
@@ -238,40 +265,32 @@ let todaySubChosen = null;
 
 async function loadTodaySubs(){
   if (!sb || !currentUser){ todaySubs = []; return; }
+  /* Two queries rather than one. cover_path arrives with 20260925 and that
+     migration has not been run, so asking for it in the same select failed the
+     whole thing and the row came back empty -- with no error anywhere, because
+     I had written the empty case as the quiet fallback. A missing cover must
+     cost the cover, not the list. */
   const { data, error } = await sb.from('subliminals')
-    .select('id, title, duration_seconds, cover_path')
+    .select('id, title, duration_seconds')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false }).limit(3);
-  if (error){ todaySubs = []; return; }
+  if (error){ console.warn('subliminals:', error.message); todaySubs = []; return; }
   todaySubs = data || [];
+  if (todaySubs.length){
+    const { data: art } = await sb.from('subliminals')
+      .select('id, cover_path').in('id', todaySubs.map(s => s.id));
+    if (art) for (const a of art){
+      const row = todaySubs.find(s => s.id === a.id);
+      if (row) row.cover_path = a.cover_path;
+    }
+  }
   if (!todaySubChosen && todaySubs.length) todaySubChosen = todaySubs[0].id;
-}
-
-function renderTodaySubPicker(){
-  const host = document.getElementById('todaySubPicker');
-  if (!host) return;
-  if (!todaySubs.length){ host.innerHTML = ''; return; }
-  host.innerHTML = `
-    <div class="sub-pick-label">Tonight's session</div>
-    <div class="sub-pick" role="radiogroup" aria-label="Choose a subliminal to play">
-      ${todaySubs.map(s => {
-        const mins = Math.round((s.duration_seconds || 0) / 60);
-        const on = s.id === todaySubChosen;
-        return `<button type="button" class="sub-pick-item${on ? ' sel' : ''}"
-          role="radio" aria-checked="${on}" onclick="chooseTodaySub('${s.id}')">
-          <span class="spi-art" id="spiArt-${s.id}"></span>
-          <span class="spi-name">${(s.title || 'Untitled').replace(/</g,'&lt;')}</span>
-          <span class="spi-len">${mins ? formatSessionLength(mins) : ''}</span>
-        </button>`;
-      }).join('')}
-    </div>`;
-  todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
 }
 
 async function showTodaySubCover(id, path){
   if (!sb) return;
   const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
-  const host = document.getElementById('spiArt-' + id);
+  const host = document.getElementById('sessArt-' + id);
   if (error || !data || !host) return;
   host.style.backgroundImage = `url("${data.signedUrl}")`;
   host.classList.add('has-art');
@@ -279,7 +298,7 @@ async function showTodaySubCover(id, path){
 
 function chooseTodaySub(id){
   todaySubChosen = id;
-  renderTodaySubPicker();
+  renderTodaySession(null);
 }
 
 /* Play whichever is chosen, without leaving Today. The tick comes from
@@ -290,6 +309,8 @@ function playTodaySubliminal(){
   if (typeof primeAudio === 'function') primeAudio();   // inside the tap
   const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
   if (!id){ showBuildPage(); return; }
-  if (typeof playFromLibrary === 'function') playFromLibrary(id);
-  else showBuildPage();
+  if (typeof playFromLibrary === 'function'){
+    playFromLibrary(id);
+    setTimeout(() => { renderTodaySession(null); renderTodayJourney(); }, 400);
+  } else showBuildPage();
 }

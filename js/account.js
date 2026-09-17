@@ -449,11 +449,11 @@ function renderNavLinks(){
         ['Today', 'showTodayPage()'],
         ['Rituals', 'showRitualsPage()'],
         ['Journal', 'showJournalPage()'],
-        ['Library', 'showLibraryPage()'],
+        ['Subliminals', 'showLibraryPage()'],
       ]
     : [
         ['Build yours', 'showBuildPage()'],
-        ['Library', 'showLibraryPage()'],
+        ['Subliminals', 'showLibraryPage()'],
         ['The Science', 'showReprogramPage()'],
         ['Pricing', "showMarketingHome(); goTo('pricing')"],
       ];
