@@ -580,16 +580,87 @@ function currentSubliminalTitle(){
 setInterval(renderNowBar, 1000);
 
 /* ---------- cover art ----------
-   A picture per subliminal, so the library is something you recognise rather
-   than something you read.
+   Eight covers that ship with the app, cut from artwork Kyla already owns, and
+   an upload for anyone who wants their own picture.
 
-   Resized here rather than uploaded whole. A photo off a phone is three to six
-   megabytes and is about to be shown at 46 pixels; sending the original would
-   cost the person their data and the library its loading time, for detail no
-   screen will ever draw. */
+   The built-in ones are the main path on purpose. They need no storage bucket,
+   no signed link and no network — "Bucket not found" was the whole of the
+   upload experience until the migration is run, and a picture you choose from a
+   shelf is a better first experience than one you have to go and find anyway.
+
+   Both end up in the same column: a built-in is stored as `builtin:night`, an
+   upload as the path to the file. The prefix is what tells them apart, so
+   nothing else in the app has to care which kind it is. */
+const BUILTIN_COVERS = [
+  { key:'sunrise', name:'Sunrise' },
+  { key:'night',   name:'Night sky' },
+  { key:'clouds',  name:'Above the clouds' },
+  { key:'garden',  name:'The garden' },
+  { key:'bedroom', name:'The bedroom' },
+  { key:'waters',  name:'The waters' },
+  { key:'mirror',  name:'The mirror' },
+  { key:'home',    name:'The whole house' },
+];
 const COVER_PX = 512;
 
+function builtinCoverUrl(path){
+  const key = String(path || '').slice('builtin:'.length);
+  return BUILTIN_COVERS.some(c => c.key === key) ? `img/covers/${key}.webp` : null;
+}
+
 function pickCoverFor(id){
+  closeCoverPicker();
+  const pop = document.createElement('div');
+  pop.className = 'cover-pop'; pop.id = 'coverPop';
+  pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Choose a cover');
+  pop.innerHTML = `
+    <div class="cover-pop-grid">
+      ${BUILTIN_COVERS.map(c => `
+        <button type="button" onclick="setBuiltinCover('${id}','${c.key}')" title="${c.name}">
+          <img src="img/covers/${c.key}.webp" alt="${c.name}" loading="lazy">
+        </button>`).join('')}
+    </div>
+    <div class="cover-pop-foot">
+      <button type="button" onclick="pickCoverUpload('${id}')">Use my own picture…</button>
+      <button type="button" onclick="closeCoverPicker()">Cancel</button>
+    </div>`;
+  const item = document.getElementById('libItem-' + id);
+  (item || document.body).appendChild(pop);
+  const first = pop.querySelector('button'); if (first) first.focus();
+  setTimeout(() => document.addEventListener('click', coverPopOutside), 0);
+}
+function coverPopOutside(e){
+  const pop = document.getElementById('coverPop');
+  if (pop && !pop.contains(e.target)) closeCoverPicker();
+}
+function closeCoverPicker(){
+  const pop = document.getElementById('coverPop');
+  if (pop) pop.remove();
+  document.removeEventListener('click', coverPopOutside);
+}
+
+async function setBuiltinCover(id, key){
+  closeCoverPicker();
+  const msg = document.getElementById('libTitleMsg-' + id);
+  showCover(id, 'builtin:' + key, true);          // instantly, before the write
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('subliminals')
+    .update({ cover_path: 'builtin:' + key }).eq('id', id).eq('user_id', currentUser.id);
+  if (error && msg) msg.textContent = describeCoverError(error);
+}
+
+/* The one error anyone actually hits, said in words that name the fix. */
+function describeCoverError(e){
+  const m = (e && e.message) || '';
+  if (/column .*cover_path|cover_path .*does not exist/i.test(m))
+    return 'Covers need one more database update — run 20260925 and this will stick.';
+  if (/bucket not found/i.test(m))
+    return 'Uploads need the covers bucket, which comes with 20260925. The covers above work without it.';
+  return m || 'That cover could not be saved.';
+}
+
+function pickCoverUpload(id){
+  closeCoverPicker();
   let input = document.getElementById('coverPicker');
   if (!input){
     input = document.createElement('input');
@@ -599,15 +670,17 @@ function pickCoverFor(id){
   }
   input.onchange = () => {
     const file = input.files && input.files[0];
-    input.value = '';                    // so choosing the same file twice still fires
+    input.value = '';
     if (file) uploadCover(id, file);
   };
   input.click();
 }
 
-/* Square, centre-cropped, WebP. Centre-cropped rather than squashed: a portrait
-   squeezed into a square makes a face look wrong in a way people notice without
-   being able to say why. */
+/* Square, centre-cropped, WebP. Resized here rather than uploaded whole: a photo
+   off a phone is three to six megabytes and is about to be drawn at forty-six
+   pixels. Centre-cropped rather than squashed, because a portrait squeezed into
+   a square makes a face look wrong in a way people notice without being able to
+   say why. */
 function squareCover(file){
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -634,9 +707,6 @@ async function uploadCover(id, file){
   say('Adding the cover…');
   try {
     const blob = await squareCover(file);
-    // Named after the subliminal inside a folder named after the person, which
-    // is exactly what the storage policy checks, and means a new cover replaces
-    // the old one rather than piling up.
     const path = `${currentUser.id}/${id}.webp`;
     const { error: upErr } = await sb.storage.from('covers')
       .upload(path, blob, { upsert: true, contentType: 'image/webp' });
@@ -647,24 +717,99 @@ async function uploadCover(id, file){
     say('');
     await showCover(id, path, true);
   } catch (e){
-    say((e && e.message) || 'That cover could not be saved.');
+    say(describeCoverError(e));
   }
 }
 
-/* Signed links expire, so they are fetched when the library renders rather than
-   stored. `bust` forces the browser past a picture it is already holding, which
-   it otherwise keeps showing after a replacement. */
+/* A built-in is a file that ships with the app, so it needs no round trip. An
+   upload needs a signed link, which expires, so it is fetched at render time. */
 async function showCover(id, path, bust){
-  if (!path || !sb) return;
   const img = document.getElementById('libCoverImg-' + id);
-  if (!img) return;
+  if (!path || !img) return;
+  const builtin = builtinCoverUrl(path);
+  const wrap = document.getElementById('libCover-' + id);
+  if (builtin){
+    img.src = builtin; img.style.display = 'block';
+    if (wrap) wrap.classList.add('has-art');
+    return;
+  }
+  if (!sb) return;
   const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
   if (error || !data) return;
   img.src = data.signedUrl + (bust ? '&t=' + Date.now() : '');
   img.style.display = 'block';
-  const wrap = document.getElementById('libCover-' + id);
   if (wrap) wrap.classList.add('has-art');
 }
+
+/* ---------- the bar that follows you ----------
+   A session lasts up to eight hours. Before this, the only place that knew one
+   was playing was whichever screen started it — walk to Journal and there was
+   no title, no line, and no way to stop it short of finding your way back.
+
+   It is one bar, driven off finalPlaying, and it renders nothing when nothing
+   is playing. Not a second player: the stop button calls the same stopFinal()
+   every other control does. */
+function ensureNowBar(){
+  let bar = document.getElementById('nowBar');
+  if (bar) return bar;
+  bar = document.createElement('div');
+  bar.id = 'nowBar';
+  bar.className = 'now-bar';
+  bar.setAttribute('role', 'status');
+  bar.setAttribute('aria-live', 'polite');
+  document.body.appendChild(bar);
+  return bar;
+}
+
+function renderNowBar(){
+  const bar = ensureNowBar();
+  if (!finalPlaying){
+    bar.classList.remove('on');
+    bar.innerHTML = '';
+    document.body.classList.remove('has-now-bar');
+    return;
+  }
+  const title = (typeof state !== 'undefined' && state.title) || currentSubliminalTitle() || 'Your subliminal';
+  const line  = (document.getElementById('finalLine') || {}).textContent || '';
+  /* Rebuilt every second, so a slider mid-drag must not be torn out from under
+     the finger. Only the text changes on a tick; the controls are built once. */
+  if (!bar.dataset.built){
+    bar.innerHTML = `
+      <div class="now-bar-in">
+        <span class="nb-pulse" aria-hidden="true"></span>
+        <span class="nb-txt">
+          <b id="nbTitle"></b>
+          <span id="nbLine"></span>
+        </span>
+        <button type="button" class="nb-mix" onclick="toggleNowMixer()"
+          aria-expanded="false" aria-controls="nbMixer" aria-label="Sound levels">Levels</button>
+        <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
+      </div>
+      <div class="nb-mixer" id="nbMixer" hidden>${nowMixerRows()}</div>`;
+    bar.dataset.built = '1';
+  }
+  const tEl = document.getElementById('nbTitle');
+  const lEl = document.getElementById('nbLine');
+  if (tEl) tEl.textContent = title;
+  if (lEl) lEl.textContent = String(line).slice(0, 90);
+  syncNowMixer();
+  bar.classList.add('on');
+  document.body.classList.add('has-now-bar');
+}
+
+/* The title of whatever is playing, wherever it was started from. */
+function currentSubliminalTitle(){
+  if (libraryNowPlayingId){
+    const el = document.querySelector(`#libItem-${libraryNowPlayingId} .lib-title-text`);
+    if (el) return el.textContent;
+  }
+  const t = document.getElementById('finalTitle');
+  return t ? t.textContent : '';
+}
+
+/* One beat, cheap, and it stops mattering the moment nothing is playing. */
+setInterval(renderNowBar, 1000);
+
 
 /* ---------- the mixer, where you are ----------
    The sliders live on the build page. Playing from the library gave you a

@@ -291,10 +291,17 @@ async function loadTodaySubs(){
 }
 
 async function showTodaySubCover(id, path){
+  const host = document.getElementById('sessArt-' + id);
+  if (!host || !path) return;
+  const builtin = (typeof builtinCoverUrl === 'function') ? builtinCoverUrl(path) : null;
+  if (builtin){
+    host.style.backgroundImage = `url("${builtin}")`;
+    host.classList.add('has-art');
+    return;
+  }
   if (!sb) return;
   const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
-  const host = document.getElementById('sessArt-' + id);
-  if (error || !data || !host) return;
+  if (error || !data) return;
   host.style.backgroundImage = `url("${data.signedUrl}")`;
   host.classList.add('has-art');
 }
