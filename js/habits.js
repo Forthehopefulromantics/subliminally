@@ -274,9 +274,6 @@ function renderHabits(){
         <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
-        <button type="button" class="habit-icon" data-habit-id="${h.id}"
-          onclick="openHabitIconPicker('${h.id}')"
-          aria-label="Picture for ${safeName} — tap to change">${habitIcon(h)}</button>
         <input type="text" class="habit-name" value="${safeName}" maxlength="80" aria-label="Habit name"
           onkeydown="if(event.key==='Enter') this.blur();"
           onblur="renameHabit('${h.id}', this.value)">

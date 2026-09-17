@@ -1373,7 +1373,44 @@ function startCustomTrackPlayback(){
    So the context is opened and unlocked in the tap itself, before anything is
    awaited. A one-sample silent buffer is what actually unlocks iOS; resume()
    alone is not enough there. */
+/* ---------- the silent keeper ----------
+   Kyla's sound check came back: she heard the <audio> tone and not the Web
+   Audio one. That is the whole diagnosis. On an iPhone, Web Audio plays in the
+   "ambient" category, which the ringer switch silences; an <audio> element
+   plays in "playback", which it does not. Every oscillator, every recording and
+   every nature sound in this app went through the first one, so a phone on
+   silent ran an entire session making no sound at all — with the timer counting,
+   because nothing was broken, it was just muted.
+
+   A media element that is actually playing moves the whole app into the
+   playback category, and Web Audio comes with it. So a silent loop runs for as
+   long as the session does. It costs nothing audible and it is the difference
+   between the app working and not working for anyone whose phone is on silent —
+   which, for a thing you use at bedtime, is most people. */
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQQAAAAAAAAA';
+let silentKeeper = null;
+
+function startSilentKeeper(){
+  try {
+    if (!silentKeeper){
+      silentKeeper = new Audio(SILENT_WAV);
+      silentKeeper.loop = true;
+      silentKeeper.volume = 0.02;   // not 0: iOS treats a truly silent element as nothing playing
+      silentKeeper.setAttribute('playsinline', '');
+    }
+    const p = silentKeeper.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch(e){}
+}
+function stopSilentKeeper(){
+  if (!silentKeeper) return;
+  try { silentKeeper.pause(); silentKeeper.currentTime = 0; } catch(e){}
+}
+
 function primeAudio(){
+  // Before the context, so the category is already right when it opens.
+  startSilentKeeper();
   if (!finalCtx || finalCtx.state === 'closed'){
     finalCtx = new (window.AudioContext||window.webkitAudioContext)();
   }
@@ -1669,7 +1706,7 @@ function playFinal(){
     if (finalPlaying && finalCtx && finalCtx.state !== 'running'){
       stopFinal();
       document.getElementById('finalLine').textContent =
-        'This browser blocked the sound. Tap play once more — it usually starts on the second try.';
+        'This browser blocked the sound. Tap play once more — and check the silent switch on the side of your phone.';
     }
   }, 1200);
   finalTimeouts.push(silenceCheck);
@@ -1757,6 +1794,7 @@ function finishFinal(){
     awardLight(LIGHT_SOURCES.subliminal, '', document.getElementById('finalPlayBtn'));
   }
   finalPlaying = false;
+  stopSilentKeeper();
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
@@ -1780,6 +1818,7 @@ function finishFinal(){
 
 function stopFinal(){
   finalPlaying = false;
+  stopSilentKeeper();
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
