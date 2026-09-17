@@ -274,6 +274,9 @@ function renderHabits(){
         <button class="habit-check${isDone ? ' done' : ''}" onclick="toggleHabitToday('${h.id}')" aria-label="${isDone ? 'Undo' : 'Done'}: ${safeName}" aria-pressed="${isDone}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
+        <button type="button" class="habit-icon" data-habit-id="${h.id}"
+          onclick="openHabitIconPicker('${h.id}')"
+          aria-label="Picture for ${safeName} — tap to change">${habitIcon(h)}</button>
         <input type="text" class="habit-name" value="${safeName}" maxlength="80" aria-label="Habit name"
           onkeydown="if(event.key==='Enter') this.blur();"
           onblur="renameHabit('${h.id}', this.value)">
@@ -654,4 +657,86 @@ function repaintHabitLists(){
   if (typeof renderHabits === 'function') renderHabits();
   if (typeof renderTodayRitual === 'function' &&
       document.body.getAttribute('data-view') === 'today') renderTodayRitual();
+}
+
+/* ---------- a picture for each habit ----------
+   Stored in habits.icon when someone picks one, guessed from the name when they
+   have not. The guess matters more than the picker: every habit that already
+   exists gets a picture the moment the migration runs, rather than a list of
+   blanks waiting to be filled in one at a time.
+
+   Longest match wins, so "cold shower" is not claimed by "shower", and the
+   check runs over the whole name so "morning walk" still finds "walk". */
+const HABIT_ICON_GUESSES = [
+  ['cold shower','🚿'], ['shower','🚿'], ['bath','🛁'], ['brush','🪥'], ['floss','🦷'],
+  ['skincare','🧴'], ['skin','🧴'], ['moisturis','🧴'], ['moisturiz','🧴'], ['sunscreen','🧴'],
+  ['water','💧'], ['hydrat','💧'], ['tea','🍵'], ['coffee','☕'], ['smoothie','🥤'],
+  ['vitamin','💊'], ['supplement','💊'], ['medicat','💊'], ['protein','🥤'],
+  ['breakfast','🍳'], ['lunch','🥗'], ['dinner','🍽'], ['meal','🍽'], ['eat','🍽'],
+  ['gym','🏋'], ['workout','🏋'], ['lift','🏋'], ['train','🏋'], ['exercis','🏋'],
+  ['run','🏃'], ['walk','🚶'], ['steps','🚶'], ['yoga','🧘'], ['stretch','🤸'], ['pilates','🧘'],
+  ['meditat','🧘'], ['breath','🌬'], ['pray','🙏'], ['gratitude','🙏'], ['grateful','🙏'],
+  ['journal','📓'], ['write','✍'], ['read','📖'], ['book','📖'], ['study','📚'], ['learn','📚'],
+  ['affirm','✨'], ['mirror','🪞'], ['visuali','🌟'], ['manifest','🌙'], ['subliminal','🎧'],
+  ['sleep','😴'], ['bed','🛏'], ['nap','😴'], ['wake','🌅'], ['sunrise','🌅'], ['sunset','🌇'],
+  ['phone','📵'], ['screen','📵'], ['social','📵'], ['scroll','📵'],
+  ['clean','🧹'], ['tidy','🧹'], ['laundry','🧺'], ['dish','🧼'], ['make the bed','🛏'],
+  ['plan','🗓'], ['budget','💰'], ['money','💰'], ['save','💰'], ['work','💼'],
+  ['music','🎵'], ['sing','🎤'], ['dance','💃'], ['art','🎨'], ['draw','🎨'], ['create','🎨'],
+  ['sun','☀'], ['outside','🌿'], ['nature','🌿'], ['plant','🪴'], ['garden','🪴'],
+  ['call','📞'], ['text','💬'], ['friend','💛'], ['family','💛'], ['love','💛'],
+];
+function habitIcon(h){
+  if (h && h.icon) return h.icon;
+  const name = ((h && h.name) || '').toLowerCase();
+  let best = '', bestLen = 0;
+  for (const [needle, glyph] of HABIT_ICON_GUESSES){
+    if (name.includes(needle) && needle.length > bestLen){ best = glyph; bestLen = needle.length; }
+  }
+  return best || '○';
+}
+
+/* The set someone can choose from. Kept short: a grid of three hundred emoji is
+   a worse experience than a shelf of forty that were picked on purpose. */
+const HABIT_ICON_CHOICES = [
+  '💧','🍵','☕','🥤','💊','🍳','🥗','🍽','🏋','🏃','🚶','🧘','🤸','🌬','🙏',
+  '📓','✍','📖','📚','✨','🪞','🌟','🌙','🎧','😴','🛏','🌅','🌇','📵','🧹',
+  '🧺','🧼','🚿','🛁','🪥','🧴','🗓','💰','💼','🎵','🎤','💃','🎨','☀','🌿',
+  '🪴','📞','💬','💛','○',
+];
+
+async function setHabitIcon(habitId, glyph){
+  const h = habitsCache.find(x => x.id === habitId);
+  if (h) h.icon = glyph;
+  closeHabitIconPicker();
+  repaintHabitLists();
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('habits').update({ icon: glyph })
+    .eq('id', habitId).eq('user_id', currentUser.id);
+  // The column arrives with 20260926. Until then the picture is this session
+  // only, which is better than refusing to show one.
+  if (error) console.warn('habit icon:', error.message);
+}
+
+function openHabitIconPicker(habitId){
+  closeHabitIconPicker();
+  const anchor = document.querySelector(`[data-habit-row][data-habit-id="${habitId}"] .habit-icon`)
+              || document.querySelector(`.habit-icon[data-habit-id="${habitId}"]`);
+  const pop = document.createElement('div');
+  pop.className = 'icon-pop'; pop.id = 'habitIconPop'; pop.setAttribute('role','dialog');
+  pop.setAttribute('aria-label','Choose a picture for this habit');
+  pop.innerHTML = HABIT_ICON_CHOICES.map(g =>
+    `<button type="button" onclick="setHabitIcon('${habitId}','${g}')" aria-label="${g}">${g}</button>`).join('');
+  (anchor ? anchor.parentElement : document.body).appendChild(pop);
+  const first = pop.querySelector('button'); if (first) first.focus();
+  setTimeout(() => document.addEventListener('click', habitIconOutside), 0);
+}
+function habitIconOutside(e){
+  const pop = document.getElementById('habitIconPop');
+  if (pop && !pop.contains(e.target)) closeHabitIconPicker();
+}
+function closeHabitIconPicker(){
+  const pop = document.getElementById('habitIconPop');
+  if (pop) pop.remove();
+  document.removeEventListener('click', habitIconOutside);
 }

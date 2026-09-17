@@ -135,8 +135,11 @@ function renderTodayRitual(){
   const habitBtn = h => {
     const isDone = done.has(h.id);
     const n = rows.indexOf(h) + 1;
+    /* The picture sits where the empty circle was and becomes the tick when the
+       habit is done, rather than adding a third thing to look at. */
+    const glyph = (typeof habitIcon === 'function') ? habitIcon(h) : '';
     const tick = `<button type="button" class="day-habit${isDone ? ' done' : ''}${h.is_core ? ' core' : ''}" onclick="toggleHabitOnDate('${h.id}','${today}')" aria-pressed="${isDone}">
-      <span class="day-habit-check">✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
+      <span class="day-habit-check"${glyph ? ' data-glyph="' + glyph + '"' : ''}>✓</span>${h.name.replace(/</g,'&lt;')}${h.is_core ? '<span class="day-habit-core" title="Non-negotiable">✦</span>' : ''}
     </button>`;
     if (shortMode || rows.length < 2){
       return `<div class="day-habit-row"><span class="day-habit-n" aria-hidden="true">${n}</span>${tick}</div>`;

@@ -1365,6 +1365,15 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
+  /* Nothing here can produce a sound: no recordings, a device voice, and a
+     device that has already refused to use it. Saying so now is the whole of
+     the fix -- the timer used to start anyway. */
+  if (state.voiceMode !== 'own' && deviceVoiceKnownBroken()
+      && (!state.aiVoiceId || state.aiVoiceId === DEVICE_VOICE)){
+    document.getElementById('finalLine').textContent = DEVICE_VOICE_MESSAGE;
+    return;
+  }
+
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
   if (!hasVoice){
     /* Tell the truth about which of the two this is. Telling someone to record
@@ -1666,12 +1675,22 @@ function playFinal(){
 
 /* Every way out of this ends the session. A player that cannot make a sound
    should not keep a timer running as though it can. */
+/* Once this device has proved it will not speak, remember it. Otherwise every
+   subliminal built from typed text costs another thirteen seconds of hope
+   before the same sentence appears. */
+const NO_DEVICE_VOICE_KEY = 'fthr_no_device_voice';
+function deviceVoiceKnownBroken(){
+  try { return localStorage.getItem(NO_DEVICE_VOICE_KEY) === '1'; } catch(e){ return false; }
+}
+const DEVICE_VOICE_MESSAGE =
+  "This device won't let the built-in voice speak inside the app — it's a limit " +
+  "of the browser, not of your subliminal. Record the lines in your own voice, " +
+  "or pick a studio voice, and it will play.";
+
 function reportNoDeviceVoice(){
+  try { localStorage.setItem(NO_DEVICE_VOICE_KEY, '1'); } catch(e){}
   finishFinal();
-  document.getElementById('finalLine').textContent =
-    "This device won't let the built-in voice speak while a session is running — " +
-    "it's a limitation of the browser, not of your subliminal. Record the lines in " +
-    "your own voice, or pick a studio voice, and it will play.";
+  document.getElementById('finalLine').textContent = DEVICE_VOICE_MESSAGE;
 }
 
 function fmtClock(totalSec){
