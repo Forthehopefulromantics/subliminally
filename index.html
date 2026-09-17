@@ -1030,7 +1030,16 @@
      than deleted from the SVG, because the shape is one string shared by every
      layer and cutting it out would be a find-and-replace across all seven. */
   .cloud .b{ display:none; }
-  @keyframes drift{ from{ transform:translateX(-30vw); } to{ transform:translateX(130vw); } }
+  /* Every cloud used to run the same -30vw to 130vw, whatever its width. A
+     cloud as wide as the screen is already three-quarters of the way on at
+     -30vw, so at the end of its run it vanished off the right and then popped
+     back in mid-screen -- which is the disappearing and reappearing.
+
+     Measured in its own width instead: it starts with its right edge exactly on
+     the left of the screen and ends with its left edge exactly off the right.
+     Both ends are the same invisible position, so the loop has no seam,
+     whatever the cloud's size. */
+  @keyframes drift{ from{ transform:translateX(-100%); } to{ transform:translateX(100vw); } }
   .drift{ animation:drift linear infinite; }
 
   .stars{ position:absolute; inset:0; opacity:var(--star); transition:opacity .7s ease; }
@@ -1173,6 +1182,29 @@
     font-variant-numeric:tabular-nums; }
   body.has-now-mixer{ padding-bottom:210px; }
 
+  /* ---- the same bar, in daylight ----
+     It was written once, in night colours, and then the app defaulted to day.
+     So a dark slab sat across the bottom of a pale blue page. Every colour in
+     it is repainted here rather than dimmed, and the panel is translucent
+     enough that the sky keeps drifting behind it. */
+  body[data-sky="day"] .now-bar{
+    background:rgba(255,253,248,.88); backdrop-filter:blur(18px) saturate(1.1);
+    border-top:1px solid rgba(62,42,72,.10);
+    box-shadow:0 -10px 30px rgba(84,64,120,.10); }
+  body[data-sky="day"] .nb-txt b{ color:#241E44; }
+  body[data-sky="day"] .nb-txt span{ color:#6B6190; }
+  body[data-sky="day"] .nb-pulse{ background:#F0845F;
+    box-shadow:0 0 0 0 rgba(240,132,95,.6); animation-name:nb-beat-day; }
+  @keyframes nb-beat-day{ 0%{ box-shadow:0 0 0 0 rgba(240,132,95,.5); } 70%{ box-shadow:0 0 0 9px rgba(240,132,95,0); } 100%{ box-shadow:0 0 0 0 rgba(240,132,95,0); } }
+  body[data-sky="day"] .nb-stop, body[data-sky="day"] .nb-mix{
+    border-color:rgba(62,42,72,.20); color:#3A3260; background:rgba(255,255,255,.55); }
+  body[data-sky="day"] .nb-stop:hover, body[data-sky="day"] .nb-mix:hover{
+    border-color:#C0552B; color:#C0552B; }
+  body[data-sky="day"] .nb-stop:focus-visible, body[data-sky="day"] .nb-mix:focus-visible{ outline-color:#C0552B; }
+  body[data-sky="day"] .nb-row-name{ color:#6B6190; }
+  body[data-sky="day"] .nb-row-val{ color:#241E44; }
+  body[data-sky="day"] .nb-row input[type=range]{ accent-color:#C0552B; }
+
   /* Nothing important should sit underneath it. */
   body.has-now-bar{ padding-bottom:74px; }
 
@@ -1182,6 +1214,16 @@
 
   /* tonight's session: the last three, side by side, the way Calm does it */
   .sess-row{ display:flex; gap:9px; margin:13px 0 4px; }
+  /* Play it across the top, the other two sharing the line below it. Three
+     across does not fit a phone without each label breaking over two lines,
+     which is worse than a second row. */
+  .sess-actions{ display:flex; flex-wrap:wrap; gap:9px; margin-top:15px; }
+  .sess-actions .btn{ font-size:13.5px; padding:12px 14px; justify-content:center;
+    white-space:nowrap; gap:7px; min-height:46px; }
+  .sess-actions .btn-primary{ flex:1 1 100%; padding:14px; font-size:15px; }
+  .sess-actions .btn-ghost{ flex:1 1 0; min-width:0; }
+  .sess-btn-mark{ display:inline-flex; flex:0 0 auto; }
+  @media (max-width:340px){ .sess-actions .btn-ghost{ flex:1 1 100%; } }
   .sess-card{ flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:6px;
     background:none; border:none; padding:0; cursor:pointer; text-align:left;
     font-family:inherit; color:var(--moonlight); }
@@ -1191,6 +1233,16 @@
   .sess-card.sel .sess-art{ border-color:var(--candle); }
   .sess-play{ width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
     background:rgba(12,9,26,.55); color:#FFF7EE; font-size:11px; backdrop-filter:blur(2px); }
+  /* A cover you haven't chosen yet was a slab of night-blue grey in the middle
+     of a pale card, with a near-black disc on it. In daylight the empty square
+     is warm and the disc is the same orange as everything else you can press. */
+  body[data-sky="day"] .sess-art{
+    background-color:#F6EADC; box-shadow:inset 0 0 0 1px rgba(62,42,72,.07); }
+  body[data-sky="day"] .sess-card.sel .sess-art{ border-color:#C0552B; }
+  body[data-sky="day"] .sess-play{ background:rgba(255,253,248,.82); color:#C0552B;
+    box-shadow:0 2px 8px rgba(84,64,120,.18); }
+  body[data-sky="day"] .sess-len{ color:#6B6190; }
+  body[data-sky="day"] .sess-card.sel .sess-name{ color:#C0552B; }
   .sess-name{ font-size:12px; line-height:1.3; overflow:hidden; text-overflow:ellipsis;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .sess-card.sel .sess-name{ color:var(--candle); }
@@ -1304,10 +1356,21 @@
      worth doing. A list, not a scoreboard. */
   .journey-list{ list-style:none; margin:16px 0 0; padding:0;
     display:flex; flex-direction:column; gap:2px; }
-  .journey-q button{ display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  /* The row is a strip holding two controls, not one wide button: the faders
+     cannot be a button inside a button, and a screen reader would find one
+     control where there are two. */
+  .journey-q{ display:flex; align-items:center; gap:4px; }
+  .journey-q button{ display:flex; align-items:center; gap:11px; text-align:left;
     background:none; border:none; border-radius:12px; padding:11px 10px; cursor:pointer;
     font-family:inherit; font-size:14px; color:var(--moonlight);
     min-height:44px; transition:background .18s; }
+  .jq-main{ flex:1; min-width:0; }
+  .jq-edit{ flex:0 0 auto; width:40px; min-height:40px; justify-content:center;
+    color:var(--candle); border:1px solid rgba(227,190,127,.32) !important; padding:0 !important; }
+  .jq-edit:hover{ background:rgba(227,190,127,.12); }
+  body[data-sky="day"] .jq-edit{ color:#C0552B; border-color:rgba(192,85,43,.34) !important;
+    background:rgba(255,255,255,.5); }
+  body[data-sky="day"] .jq-edit:hover{ background:rgba(240,132,95,.14); }
   .journey-q button:hover{ background:var(--sunk); }
   .journey-q button:focus-visible{ outline:2px solid var(--lilac); outline-offset:-2px; }
   .jq-tick{ width:20px; height:20px; border-radius:50%; flex-shrink:0;

@@ -35,14 +35,17 @@ const CLOUD_SVG = `<svg viewBox="0 0 200 92" xmlns="http://www.w3.org/2000/svg">
 
 /* Clouds at different depths — small and pale high up, bigger and slower near
    the horizon, so the sky reads as having depth rather than as a pattern. */
+/* Opacities are lower than they were because there are now two clouds in each
+   band rather than one, and the sky should weigh the same as the one Kyla
+   drew -- twice the clouds at the old opacity is a different, heavier sky. */
 const CLOUD_LAYERS = [
-  { top:'3%',  w:'46%',  op:.55, dur:132, delay:-40 },
-  { top:'12%', w:'70%',  op:.92, dur:104, delay:-88 },
-  { top:'27%', w:'38%',  op:.48, dur:150, delay:-15 },
-  { top:'41%', w:'86%',  op:.85, dur:118, delay:-70 },
-  { top:'56%', w:'52%',  op:.60, dur:142, delay:-110 },
-  { top:'70%', w:'100%', op:.95, dur:96,  delay:-30 },
-  { top:'86%', w:'64%',  op:.70, dur:126, delay:-95 },
+  { top:'3%',  w:'46%',  op:.38, dur:132, delay:-40 },
+  { top:'12%', w:'70%',  op:.62, dur:104, delay:-88 },
+  { top:'27%', w:'38%',  op:.33, dur:150, delay:-15 },
+  { top:'41%', w:'86%',  op:.58, dur:118, delay:-70 },
+  { top:'56%', w:'52%',  op:.42, dur:142, delay:-110 },
+  { top:'70%', w:'100%', op:.64, dur:96,  delay:-30 },
+  { top:'86%', w:'64%',  op:.48, dur:126, delay:-95 },
 ];
 
 /* Dealt once at startup. Seeded rather than random so the stars land in the
@@ -51,8 +54,13 @@ function buildSky(){
   const clouds = document.getElementById('skyClouds');
   const stars = document.getElementById('skyStars');
   if (!clouds || !stars || clouds.childElementCount) return;
-  clouds.innerHTML = CLOUD_LAYERS.map(l =>
-    `<div class="cloud drift" style="top:${l.top};width:${l.w};opacity:${l.op};animation-duration:${l.dur}s;animation-delay:${l.delay}s">${CLOUD_SVG}</div>`).join('');
+  /* Two per band, half a lap apart. One cloud per band spends part of its run
+     entering or leaving, so there were moments with nothing much in that stripe
+     of sky; with a second one trailing it by half the cycle there is always one
+     well inside the frame. */
+  clouds.innerHTML = CLOUD_LAYERS.map(l => [0, -l.dur / 2].map(offset =>
+    `<div class="cloud drift" style="top:${l.top};width:${l.w};opacity:${l.op};animation-duration:${l.dur}s;animation-delay:${(l.delay + offset).toFixed(1)}s">${CLOUD_SVG}</div>`
+  ).join('')).join('');
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   stars.innerHTML = Array.from({ length: 42 }, () => {
