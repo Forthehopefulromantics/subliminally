@@ -584,6 +584,18 @@
   .mylibrary-section{ padding:80px 0; }
 
   /* ---- the library as a playlist ---- */
+  /* the cover, with the play control over it */
+  .lib-cover{ position:relative; width:46px; height:46px; flex:0 0 auto; border-radius:12px;
+    overflow:hidden; display:grid; place-items:center; }
+  .lib-cover img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  /* Over a photograph the button needs its own footing, so it goes dark and
+     translucent rather than staying a solid gold disc that hides the picture. */
+  .lib-cover.has-art .lib-play,
+  .profile-item .lib-cover.has-art button.lib-play{ position:relative; z-index:1;
+    background:rgba(12,9,26,.5); color:#FFF7EE; backdrop-filter:blur(2px); }
+  .lib-cover.has-art .lib-play:hover,
+  .profile-item .lib-cover.has-art button.lib-play:hover{ background:rgba(12,9,26,.72); color:#FFF7EE; }
+
   .profile-item button.lib-play{ width:46px; height:46px; flex:0 0 auto; border-radius:50%;
     cursor:pointer; background:var(--candle); border:none; color:#2B1E06; display:grid;
     place-items:center; font-size:15px; padding:0; text-decoration:none;
@@ -600,6 +612,11 @@
   .lib-now{ font-size:12px; color:var(--candle); margin-top:3px; min-height:15px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .profile-item-top{ gap:13px; align-items:center; }
+  /* The actions sit under the row rather than beside it. Three links squeezed
+     in next to the title left about ten characters for the title, which wrapped
+     "888 Personalized" onto two lines on a phone. */
+  .lib-actions{ display:flex; gap:16px; margin-top:9px; padding-top:9px;
+    border-top:1px solid rgba(255,255,255,.06); }
 
   .profile-item-affs{ margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; gap:5px; }
   .profile-item-affs p{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--haze); }
@@ -1036,6 +1053,46 @@
   /* ---- Light ----
      A quiet line of state above the day: how long you have kept going, what
      you have earned, and where that puts you. It reports, it does not cheer. */
+
+  /* ---- the week at a glance ---- */
+
+  /* ---- the bar that follows you while a session plays ---- */
+  .now-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:none;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));
+    background:rgba(20,16,40,.92); backdrop-filter:blur(14px);
+    border-top:1px solid rgba(255,255,255,.08); }
+  .now-bar.on{ display:block; }
+  .now-bar-in{ display:flex; align-items:center; gap:11px; max-width:640px; margin:0 auto; }
+  .nb-pulse{ width:9px; height:9px; border-radius:50%; background:var(--candle); flex:0 0 auto;
+    box-shadow:0 0 0 0 rgba(227,190,127,.6); animation:nb-beat 2.4s ease-out infinite; }
+  @keyframes nb-beat{ 0%{ box-shadow:0 0 0 0 rgba(227,190,127,.5); } 70%{ box-shadow:0 0 0 9px rgba(227,190,127,0); } 100%{ box-shadow:0 0 0 0 rgba(227,190,127,0); } }
+  @media (prefers-reduced-motion: reduce){ .nb-pulse{ animation:none; } }
+  .nb-txt{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .nb-txt b{ font-size:13.5px; color:var(--moonlight); font-weight:500;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nb-txt span{ font-size:11.5px; color:var(--haze);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nb-stop{ flex:0 0 auto; background:none; border:1px solid rgba(255,255,255,.18);
+    color:var(--moonlight); border-radius:999px; padding:7px 15px; font-size:12.5px;
+    font-family:inherit; cursor:pointer; }
+  .nb-stop:hover{ border-color:var(--candle); color:var(--candle); }
+  .nb-stop:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  /* Nothing important should sit underneath it. */
+  body.has-now-bar{ padding-bottom:74px; }
+
+  .week-strip{ margin:2px 0 16px; }
+  .week-days{ display:flex; justify-content:space-between; gap:4px; }
+  .week-day{ display:flex; flex-direction:column; align-items:center; gap:6px; flex:1 1 0; min-width:0; }
+  .wd-dot{ width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
+    background:var(--dusk); border:1.5px solid transparent; color:#1B1630; }
+  .week-day.is-done .wd-dot{ background:var(--lilac); }
+  /* Today is a ring, which reads as "you are here" whether or not it is filled. */
+  .week-day.is-today .wd-dot{ border-color:var(--candle); }
+  .week-day.is-future .wd-dot{ background:none; border:1.5px dashed rgba(156,147,184,.35); }
+  .wd-letter{ font-size:11px; color:var(--haze); letter-spacing:.04em; }
+  .week-day.is-today .wd-letter{ color:var(--candle); font-weight:500; }
+  @media (max-width:360px){ .wd-dot{ width:30px; height:30px; } }
+
   .light-strip{ display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     margin-bottom:8px; font-size:12.5px; color:var(--haze); }
   .ls-item{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
@@ -1302,6 +1359,7 @@
       <div class="hs-name" id="higherSelfName">Your higher self</div>
       <div class="hs-sub" id="higherSelfSub"></div>
     </div>
+    <div class="week-strip" id="weekStrip" style="display:none;"></div>
     <div class="light-strip" id="lightStrip" style="display:none;"></div>
     <div class="light-note" id="lightNote"></div>
     <div class="today-head">

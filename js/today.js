@@ -52,6 +52,7 @@ async function rollOverDayIfNeeded(){
     const greetEl = document.getElementById('todayGreeting');
     if (greetEl) greetEl.textContent = greetingForHour() + (greetEl.textContent.includes(',') ? ',' + greetEl.textContent.split(',').slice(1).join(',') : '');
     renderTodayRitual();
+    renderWeekStrip();
     renderTodayPage_Page();
     applySky();              // yesterday's choice of sky expires with yesterday
     renderHigherSelfCard();  // and what she says is read off the new day's list
@@ -89,10 +90,60 @@ async function renderTodayPage(){
   // Habits first: both the strip's streak and what she has to say read off them.
   if (tierAtLeast(myTier, 'ritual')){ await loadHabits({ silent: true }); renderTodayRitual(); }
   else document.getElementById('todayRitualCard').style.display = 'none';
+  renderWeekStrip();
   renderHigherSelfCard();
   renderLightStrip();
   renderTodaySanctuaryRow();
   if (tierAtLeast(myTier, 'whisper')){ await loadJournalPhotos({ silent: true }); renderTodayPage_Page(); }
   else document.getElementById('todayPageCard').style.display = 'none';
   renderTodayJourney();   // last, so the journal load has landed and its state is real
+}
+
+/* ---------- the week, at a glance ----------
+   Seven circles at the top of Today, the way Calm does it. It answers one
+   question before you have read anything else: have I been here this week.
+
+   Filled means you practised — a habit ticked or a page written, which is the
+   same test the calendar and the streak already use, so no screen can disagree
+   with another about whether a day counted.
+
+   Days ahead of today are drawn but empty. They are not failures yet, and a
+   week that shows four blanks the moment it starts on Monday reads as being
+   four behind rather than four to come. */
+function weekStripDays(){
+  const today = localDateStr();
+  const d = new Date(today + 'T00:00:00');
+  // Monday first. getDay() is 0 for Sunday, which would put Sunday at the front.
+  const back = (d.getDay() + 6) % 7;
+  const monday = shiftDateStr(today, -back);
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = shiftDateStr(monday, i);
+    return {
+      date,
+      letter: ['M','T','W','T','F','S','S'][i],
+      full: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][i],
+      isToday: date === today,
+      future: date > today,
+      done: date <= today && practisedOn(date),
+    };
+  });
+}
+
+function renderWeekStrip(){
+  const el = document.getElementById('weekStrip');
+  if (!el) return;
+  const days = weekStripDays();
+  const kept = days.filter(d => d.done).length;
+  el.innerHTML = `
+    <div class="week-days" role="group" aria-label="This week: ${kept} of 7 days practised">
+      ${days.map(d => `
+        <div class="week-day${d.done ? ' is-done' : ''}${d.isToday ? ' is-today' : ''}${d.future ? ' is-future' : ''}">
+          <span class="wd-dot" role="img"
+            aria-label="${d.full}${d.isToday ? ', today' : ''} — ${d.future ? 'still to come' : d.done ? 'practised' : 'not yet'}">
+            ${d.done ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+          </span>
+          <span class="wd-letter" aria-hidden="true">${d.letter}</span>
+        </div>`).join('')}
+    </div>`;
+  el.style.display = 'block';
 }
