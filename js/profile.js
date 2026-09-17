@@ -23,7 +23,7 @@ async function loadProfile(){
   document.getElementById('settingsEmail').value = currentUser.email || '';
   renderVoiceClone();
 
-  const { data: prof } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  const prof = await myProfile();
   if (prof){
     document.getElementById('profileNameDisplay').textContent = prof.full_name || prof.username || currentUser.email.split('@')[0];
     document.getElementById('settingsUsername').value = prof.username || '';
@@ -54,11 +54,17 @@ async function updateUsername(){
   loadNavIdentity();
 }
 
-async function loadMyLibrary(){
+async function loadMyLibrary(options){
   if (!sb || !currentUser) return;
   const list = document.getElementById('myLibraryList');
-  list.innerHTML = '<div class="library-empty">Loading…</div>';
-  const { data: subs, error } = await sb.from('subliminals').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  if (options && options.force) forgetFetch('myLibrary');
+  // Only say "Loading" when there is nothing already on screen. Wiping a list
+  // you were just looking at, to put the word Loading in its place, is how a
+  // page that is about to be identical still feels slow.
+  if (!list.querySelector('.profile-item')) list.innerHTML = '<div class="library-empty">Loading…</div>';
+  const { data: subs, error } = await fetchOnce('myLibrary',
+    () => sb.from('subliminals').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }));
+  if (error) forgetFetch('myLibrary');
   if (error || !subs || !subs.length){ list.innerHTML = '<div class="library-empty">Nothing saved yet — build one and hit "Save to my library."</div>'; return; }
   list.innerHTML = subs.map(s => {
     const mins = Math.round((s.duration_seconds||0)/60);
@@ -251,7 +257,8 @@ async function loadSavedIntoBuilder(id, opts){
 async function deleteMySubliminal(id){
   if (!sb || !currentUser) return;
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
-  loadMyLibrary();
+  forgetFetch('todaySubs'); forgetFetch('todaySubCovers');
+  loadMyLibrary({ force: true });
 }
 /* ---------- cloning your voice ----------
    One sample, read once, and the studio can generate any line in that voice.

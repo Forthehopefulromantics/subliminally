@@ -20,7 +20,11 @@ if (sb){
   initRevenueCat();
   updateManageSubscriptionLinks();
   sb.auth.onAuthStateChange((event, session) => {
+    const wasId = currentUser && currentUser.id;
     currentUser = session ? session.user : null;
+    // Whoever is signed in now, nothing remembered for the last person is
+    // allowed to survive into their screens.
+    if (wasId !== (currentUser && currentUser.id)) forgetFetch();
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
     if (currentUser && event === 'SIGNED_IN') promptOnboardingIfProfileIncomplete();

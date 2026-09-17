@@ -336,19 +336,51 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+/* Signed links are good for an hour, so signing every photo you have ever
+   taken each time a page opens is an hour's work thrown away every time. Keep
+   them until they are nearly up and only ask for the ones that are missing. */
+const SIGNED_PHOTO_URLS = {};   // storage_path -> { url, until }
+let signingPhotos = null;       // two callers at once must not both go and sign
+async function signPhotoPaths(paths){
+  const now = Date.now();
+  const need = paths.filter(p => !(SIGNED_PHOTO_URLS[p] && SIGNED_PHOTO_URLS[p].until > now + 60000));
+  if (need.length){
+    if (signingPhotos) await signingPhotos;   // one already in the air — take its answers
+    const still = need.filter(p => !(SIGNED_PHOTO_URLS[p] && SIGNED_PHOTO_URLS[p].until > Date.now() + 60000));
+    if (still.length){
+      signingPhotos = sb.storage.from('journal-photos').createSignedUrls(still, 3600)
+        .then(({ data: signed }) => {
+          (signed || []).forEach(s => { if (s.signedUrl) SIGNED_PHOTO_URLS[s.path] = { url: s.signedUrl, until: Date.now() + 3600000 }; });
+        })
+        .finally(() => { signingPhotos = null; });
+      await signingPhotos;
+    }
+  }
+  const out = {};
+  paths.forEach(p => { if (SIGNED_PHOTO_URLS[p]) out[p] = SIGNED_PHOTO_URLS[p].url; });
+  return out;
+}
 async function loadJournalPhotos(options){
   if (!sb || !currentUser) return;
   const silent = options && options.silent;   // Today loads the photos without drawing the calendar
-  const { data, error } = await sb.from('journal_photos').select('*').eq('user_id', currentUser.id);
-  if (error){ console.error('loadJournalPhotos error:', error); return; }
+  if (options && options.force) forgetFetch('journalPhotos');
+  const { data, error } = await fetchOnce('journalPhotos',
+    () => sb.from('journal_photos').select('*').eq('user_id', currentUser.id));
+  if (error){ forgetFetch('journalPhotos'); console.error('loadJournalPhotos error:', error); return; }
   const rows = data || [];
-  const urlByPath = {};
-  if (rows.length){
-    const { data: signed } = await sb.storage.from('journal-photos').createSignedUrls(rows.map(p => p.storage_path), 3600);
-    (signed || []).forEach(s => { if (s.signedUrl) urlByPath[s.path] = s.signedUrl; });
-  }
   journalPhotosByDate = {};
-  rows.forEach(p => { journalPhotosByDate[p.entry_date] = { ...p, url: urlByPath[p.storage_path] || '' }; });
+  rows.forEach(p => { journalPhotosByDate[p.entry_date] = { ...p, url: (SIGNED_PHOTO_URLS[p.storage_path] || {}).url || '' }; });
+  /* Signing the links is a second round trip, and which days have a photo --
+     which is all Today and the streak need to know -- is already answered by
+     the rows above. So the pictures are fetched after, not before. */
+  const unsigned = rows.filter(p => !journalPhotosByDate[p.entry_date].url);
+  if (unsigned.length) signPhotoPaths(unsigned.map(p => p.storage_path)).then(urls => {
+    let changed = false;
+    unsigned.forEach(p => { if (urls[p.storage_path]){ journalPhotosByDate[p.entry_date].url = urls[p.storage_path]; changed = true; } });
+    if (!changed) return;
+    if (document.body.getAttribute('data-view') === 'today') renderTodayPage_Page();
+    if (document.getElementById('photoCalendarTitle')) renderPhotoCalendar();
+  });
   if (silent) return;
   renderPhotoCalendar();
   renderWeekReport();
@@ -617,7 +649,7 @@ async function uploadJournalPhoto(file, dateStr){
   // photo never wipes out a summary already written for that day.
   const { error } = await sb.from('journal_photos').upsert({ user_id: currentUser.id, storage_path: path, entry_date: dateStr }, { onConflict: 'user_id,entry_date' });
   if (error){ console.error('journal_photos upsert error:', error); if (msg){ msg.textContent = "Uploaded, but couldn't save — try again."; msg.className = 'save-msg err'; } return; }
-  await loadJournalPhotos();
+  await loadJournalPhotos({ force: true });
   if (dateStr === localDateStr()) await awardLight(LIGHT_SOURCES.journal, dateStr, null);
   if (document.body.getAttribute('data-view') === 'today') renderTodayJourney();
   if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
@@ -626,6 +658,7 @@ async function saveDayCaption(dateStr){
   const msg = document.getElementById('dayModalMsg');
   const caption = document.getElementById('dayModalCaption').value.trim() || null;
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  forgetFetch('journalPhotos');
   const { error } = await sb.from('journal_photos').update({ caption }).eq('user_id', currentUser.id).eq('entry_date', dateStr);
   if (error){ console.error('saveDayCaption error:', error); msg.textContent = "Couldn't save — try again."; msg.className = 'save-msg err'; return; }
   if (journalPhotosByDate[dateStr]) journalPhotosByDate[dateStr].caption = caption;
@@ -638,6 +671,6 @@ async function deleteDayEntry(dateStr){
   if (error){ console.error('deleteDayEntry error:', error); return; }
   await sb.storage.from('journal-photos').remove([entry.storage_path]);
   closeDayDetail();
-  loadJournalPhotos();
+  loadJournalPhotos({ force: true });
 }
 

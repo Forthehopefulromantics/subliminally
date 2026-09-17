@@ -45,13 +45,16 @@ let habitDoneByDate = {};    // YYYY-MM-DD -> Set of habit_id (what the calendar
 async function loadHabits(options){
   if (!sb || !currentUser) return;
   const silent = options && options.silent;   // calendar loads habits quietly, in the background
+  /* Today, Rituals and the calendar all want this, and moving between them used
+     to ask for the whole list again each time. `force` is for after a write. */
+  if (options && options.force) forgetFetch('habits');
   const since = shiftDateStr(localDateStr(), -400);
-  const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await Promise.all([
+  const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await fetchOnce('habits', () => Promise.all([
     sb.from('habits').select('*').eq('user_id', currentUser.id).eq('archived', false).order('created_at', { ascending: true }),
     sb.from('habit_checkins').select('habit_id, done_on').eq('user_id', currentUser.id).gte('done_on', since),
-  ]);
+  ]));
   const msg = document.getElementById('habitsMsg');
-  if (hErr || cErr){ if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
+  if (hErr || cErr){ forgetFetch('habits'); if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
   habitsCache = habits || [];
   sortHabitsCache();
   habitCheckins = {};
@@ -141,9 +144,9 @@ let graceUsed = new Set();         // `${date}|${time}` for days already bridged
 
 async function loadGrace(){
   if (!sb || !currentUser) return;
-  const [{ data: prof }, { data: used }] = await Promise.all([
-    sb.from('profiles').select('grace_days').eq('id', currentUser.id).maybeSingle(),
-    sb.from('grace_used').select('used_on, time_of_day').eq('user_id', currentUser.id),
+  const [prof, { data: used }] = await Promise.all([
+    myProfile(),
+    fetchOnce('graceUsed', () => sb.from('grace_used').select('used_on, time_of_day').eq('user_id', currentUser.id)),
   ]);
   graceDays = Number((prof && prof.grace_days) || 0);
   graceUsed = new Set((used || []).map(r => `${r.used_on}|${r.time_of_day}`));
@@ -155,6 +158,7 @@ function graceBridged(time, dateStr){ return graceUsed.has(`${dateStr}|${time}`)
    screen says and what the database holds can't disagree. */
 async function useGraceDay(time, dateStr){
   if (!sb || !currentUser || graceDays < 1) return false;
+  forgetFetch('graceUsed'); forgetFetch('profileRow');
   const { data, error } = await sb.rpc('spend_grace_day', { p_on: dateStr, p_time: time });
   if (error || !data){ console.warn('grace:', error && error.message); return false; }
   graceUsed.add(`${dateStr}|${time}`);
@@ -231,7 +235,7 @@ async function toggleCoreHabit(habitId){
   if (error){
     console.error('toggleCoreHabit error:', error);
     msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err';
-    loadHabits();
+    loadHabits({ force: true });
   }
 }
 
@@ -355,10 +359,24 @@ async function addHabit(time, name){
   const msg = document.getElementById('habitsMsg');
   pushHabitUndo();
   const sortOrder = habitsCache.filter(h => h.time_of_day === time).length;
-  const { error } = await sb.from('habits').insert({ user_id: currentUser.id, name, time_of_day: time, sort_order: sortOrder });
+  /* Ask for the saved row back rather than adding it and then fetching the
+     whole list again to find out what its id is. Same one trip to the
+     database, and the habit is on screen the moment it lands instead of one
+     more wait later. */
+  const { data, error } = await sb.from('habits')
+    .insert({ user_id: currentUser.id, name, time_of_day: time, sort_order: sortOrder })
+    .select().single();
   if (error){ console.error('addHabit error:', error); msg.textContent = "Couldn't add that habit — try again."; msg.className = 'save-msg err'; return; }
   msg.textContent = '';
-  loadHabits();
+  forgetFetch('habits');
+  if (data){
+    habitsCache.push(data);
+    sortHabitsCache();
+    repaintHabitLists();
+    if (document.body.getAttribute('data-view') === 'today') renderTodayJourney();
+  } else {
+    loadHabits({ force: true });   // older Supabase, or the row came back empty
+  }
 }
 function toggleHabitToday(habitId){ return toggleHabitOnDate(habitId, localDateStr()); }
 /* Check a habit off for any day — today from the habit list, or an earlier
@@ -388,6 +406,7 @@ async function awardLightForDay(dateStr, near){
   if (routineStreak(currentRitualTime()) >= 7) await awardLight(LIGHT_SOURCES.weekStreak, weekStartStr(dateStr), null);
   // Earning is recalculated rather than incremented, so the balance can't drift.
   if (sb && currentUser){
+    forgetFetch('profileRow');
     const { data } = await sb.rpc('refresh_grace_days');
     if (typeof data === 'number') graceDays = data;
   }
@@ -414,21 +433,28 @@ async function toggleHabitOnDate(habitId, dateStr){
   const { error } = wasDone
     ? await sb.from('habit_checkins').delete().eq('habit_id', habitId).eq('user_id', currentUser.id).eq('done_on', dateStr)
     : await sb.from('habit_checkins').insert({ user_id: currentUser.id, habit_id: habitId, done_on: dateStr });
+  // The tick is already right in memory; drop the remembered copy so that a
+  // reload later in the session doesn't put the old answer back over it.
+  forgetFetch('habits');
   if (error){
     // The tick was flipped locally a moment ago; if the save didn't land, put it
     // back and say so, rather than letting it silently disappear on the next load.
     console.error('toggleHabitOnDate error:', error);
     const msg = document.getElementById('habitsMsg');
     if (msg){ msg.textContent = "Couldn't save that check-in — check your connection and tap it again."; msg.className = 'save-msg err'; }
-    loadHabits();
+    loadHabits({ force: true });
     return;
   }
   // Only once the check-in is really saved, so Light can't be earned for a tick
   // that didn't land.
   if (!wasDone){
     const near = document.querySelector(`.day-habit[onclick*="${habitId}"], .habit-row[data-habit-id="${habitId}"] .habit-check`);
-    await awardLight(LIGHT_SOURCES.habit, habitId, near);
-    await awardLightForDay(dateStr, near);
+    // Neither of these is on screen -- the tick was drawn the moment you tapped
+    // -- so they do not need to queue behind each other.
+    await Promise.all([
+      awardLight(LIGHT_SOURCES.habit, habitId, near),
+      awardLightForDay(dateStr, near),
+    ]);
   }
 }
 /* ---------- undo and redo ----------
@@ -473,7 +499,7 @@ async function applyHabitSnapshot(snap){
     const { error } = await sb.from('habits').update(u.fields).eq('id', u.id).eq('user_id', currentUser.id);
     if (error) console.error('undo/redo failed for habit', u.id, error);
   }
-  await loadHabits();
+  await loadHabits({ force: true });
   // Checking something off is the moment she has something new to say.
   if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
 }
@@ -587,7 +613,7 @@ async function persistHabitOrder(time, ordered){
       console.error('persistHabitOrder error:', error);
       const msg = document.getElementById('habitsMsg');
       if (msg){ msg.textContent = "Couldn't save the new order — check your connection."; msg.className = 'save-msg err'; }
-      loadHabits();
+      loadHabits({ force: true });
       return;
     }
   }
@@ -630,18 +656,27 @@ async function renameHabit(habitId, name){
   habit.name = name;
   renderHabits();
   const { error } = await sb.from('habits').update({ name }).eq('id', habitId).eq('user_id', currentUser.id);
-  if (error){ console.error('renameHabit error:', error); loadHabits(); }
+  if (error){ console.error('renameHabit error:', error); loadHabits({ force: true }); }
 }
 /* Archived, not deleted: the row and its check-ins stay put, so Undo can bring
    the whole history back rather than an empty habit with the same name. */
 async function deleteHabit(habitId){
   if (!sb || !currentUser) return;
   pushHabitUndo();
-  const { error } = await sb.from('habits').update({ archived: true }).eq('id', habitId).eq('user_id', currentUser.id);
-  if (error){ console.error('deleteHabit error:', error); return; }
-  await loadHabits();
-  // Checking something off is the moment she has something new to say.
+  // Off the screen first, the same way a tick goes on first. Undo puts it back
+  // whether or not the save landed, and a failed save reloads the truth.
+  const removed = habitsCache.find(h => h.id === habitId);
+  habitsCache = habitsCache.filter(h => h.id !== habitId);
+  repaintHabitLists();
   if (document.body.getAttribute('data-view') === 'today'){ renderTodayRitual(); renderHigherSelfCard(); renderLightStrip(); renderTodayJourney(); }
+  forgetFetch('habits');
+  const { error } = await sb.from('habits').update({ archived: true }).eq('id', habitId).eq('user_id', currentUser.id);
+  if (error){
+    console.error('deleteHabit error:', error);
+    if (removed) habitsCache.push(removed);
+    await loadHabits({ force: true });
+    repaintHabitLists();
+  }
 }
 /* Library is now a direct YouTube playlist embed — see #library in the HTML.
    No Supabase fetch needed for it anymore. */
@@ -878,6 +913,7 @@ async function writeReflection(fields){
   if (!on) return;
   rememberAnswered(`${on}|${time}`);
   if (!sb || !currentUser) return;
+  forgetFetch('reflections');
   const { error } = await sb.from('ritual_reflections').upsert({
     user_id: currentUser.id, missed_on: on, time_of_day: time,
     reason: fields.reason, feeling: fields.feeling,
@@ -909,10 +945,10 @@ async function loadReflections(){
     for (const k of Object.keys(all)) reflectionsSeen[k] = true;
   } catch(e){}
   if (!sb || !currentUser) return;
-  const { data, error } = await sb.from('ritual_reflections')
+  const { data, error } = await fetchOnce('reflections', () => sb.from('ritual_reflections')
     .select('missed_on, time_of_day')
-    .gte('missed_on', shiftDateStr(localDateStr(), -14));
-  if (error){ console.warn('reflections:', error.message); return; }   // the device still remembers
+    .gte('missed_on', shiftDateStr(localDateStr(), -14)));
+  if (error){ forgetFetch('reflections'); console.warn('reflections:', error.message); return; }   // the device still remembers
   for (const r of data || []) reflectionsSeen[`${r.missed_on}|${r.time_of_day}`] = true;
 }
 

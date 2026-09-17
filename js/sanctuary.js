@@ -143,7 +143,7 @@ async function loadSanctuaryInner(){
     sb.rpc('my_light_sources'),
     sb.from('sanctuary_grants').select('week_start, offered, chosen, seed').order('week_start', { ascending:false }),
     sb.from('sanctuary_placements').select('room_key, slot_key, item_key'),
-    sb.from('profiles').select('sanctuary_seen').eq('id', currentUser.id).maybeSingle(),
+    myProfile().then(d => ({ data: d })),
   ]);
 
   if (srcRes.error || grantRes.error || placeRes.error){

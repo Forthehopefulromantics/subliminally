@@ -256,8 +256,14 @@ function estimateSessionSeconds(){
 
 async function getMySubscriberRow(){
   if (!sb || !currentUser) return null;
-  const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
-  return data; // null if they've never subscribed
+  /* Which plan you are on is asked for constantly -- by the builder on every
+     step, by each page as it opens, by the pricing block. It changes when you
+     buy something and at almost no other time, so it is worth remembering for
+     longer than anything else here. `forgetFetch('tier')` after a purchase. */
+  return fetchOnce('tier', async () => {
+    const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
+    return data; // null if they've never subscribed
+  }, 300000);
 }
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, whisper: 10, ritual: Infinity };
@@ -352,6 +358,7 @@ async function saveSubliminal(){
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
+  forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
   const { error } = await sb.from('subliminals').insert({
     user_id: currentUser.id,
     title: title,

@@ -26,9 +26,9 @@ function journeyQuests(){
      something else. */
   const list = [];
   if (morning) list.push({ key:'morning', label:'Morning ritual', done:morning.done,
-    detail:`${morning.st.done} of ${morning.st.total}`, go:() => { todayRitualTime='morning'; renderTodayRitual(); renderTodayJourney(); } });
+    detail:`${morning.st.done} of ${morning.st.total}`, go:() => openRitualOnToday('morning') });
   if (night) list.push({ key:'night', label:'Night ritual', done:night.done,
-    detail:`${night.st.done} of ${night.st.total}`, go:() => { todayRitualTime='night'; renderTodayRitual(); renderTodayJourney(); } });
+    detail:`${night.st.done} of ${night.st.total}`, go:() => openRitualOnToday('night') });
   list.push({ key:'subliminal', label:'Subliminal', done: lightToday.has(LIGHT_SOURCES.subliminal),
     detail: lightToday.has(LIGHT_SOURCES.subliminal) ? 'Played' : 'Not yet',
     play: true, go:() => playTodaySubliminal() });
@@ -51,6 +51,11 @@ function renderTodayJourney(){
   if (!card) return;
   const quests = journeyQuests();
   if (!quests.length){ card.style.display = 'none'; return; }
+  if (!todayPainted && !habitsCache.length){
+    card.style.display = 'block';
+    card.innerHTML = todayPlaceholder("Today's journey");
+    return;
+  }
   const done = quests.filter(q => q.done).length;
   const next = nextQuest(quests);
   const evening = currentRitualTime() === 'night';
@@ -70,6 +75,24 @@ function renderTodayJourney(){
         </button>
       </li>`).join('')}</ul>`;
 }
+/* "Continue morning ritual" used to swap which ritual the card below was
+   showing and leave you where you were. The card is off the bottom of a phone
+   screen, so the tap looked like it had done nothing at all -- and the obvious
+   next move is to press it again. It does the same thing as before; it just
+   takes you to the list as well, which is what the word "continue" promised. */
+function openRitualOnToday(time){
+  todayRitualTime = time;
+  renderTodayRitual();
+  renderTodayJourney();
+  const card = document.getElementById('todayRitualCard');
+  if (!card) return;
+  card.scrollIntoView({ behavior:'smooth', block:'center' });
+  // A moment of glow, so it is obvious which card just answered you.
+  card.classList.remove('just-opened');
+  void card.offsetWidth;                  // restart the animation on a repeat tap
+  card.classList.add('just-opened');
+  setTimeout(() => card.classList.remove('just-opened'), 1400);
+}
 function journeyGo(key){
   const q = journeyQuests().find(x => x.key === key);
   if (q) q.go();
@@ -88,6 +111,10 @@ function renderTodaySession(lastSub){
   if (!card) return;
   const evening = new Date().getHours() >= 16;
 
+  if (!todaySubs.length && !todayPainted){
+    card.innerHTML = todayPlaceholder(evening ? 'Tonight' : 'Today');
+    return;
+  }
   if (!todaySubs.length){
     card.innerHTML = `
       <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
@@ -125,8 +152,23 @@ function renderTodaySession(lastSub){
   todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
 }
 
+/* Empty and not-loaded-yet look identical from in here, and they should not
+   read the same on screen. "Nothing set yet" is a true thing to say about a
+   new account and a wrong thing to flash at someone with a six-item morning
+   while their list is still on its way. Until the first real answer has
+   landed, say nothing instead. */
+function todayPlaceholder(label){
+  return `<div class="today-card-label">${label}</div>
+    <div class="card-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+    <span class="sr-only">Loading</span>`;
+}
 function renderTodayRitual(){
   const card = document.getElementById('todayRitualCard');
+  if (!habitsCache.length && !todayPainted){
+    card.style.display = 'block';
+    card.innerHTML = todayPlaceholder('Your ritual');
+    return;
+  }
   if (!habitsCache.length){
     card.style.display = 'block';
     card.innerHTML = `
@@ -273,21 +315,32 @@ async function loadTodaySubs(){
      whole thing and the row came back empty -- with no error anywhere, because
      I had written the empty case as the quiet fallback. A missing cover must
      cost the cover, not the list. */
-  const { data, error } = await sb.from('subliminals')
+  const { data, error } = await fetchOnce('todaySubs', () => sb.from('subliminals')
     .select('id, title, duration_seconds')
     .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false }).limit(3);
-  if (error){ console.warn('subliminals:', error.message); todaySubs = []; return; }
-  todaySubs = data || [];
-  if (todaySubs.length){
-    const { data: art } = await sb.from('subliminals')
-      .select('id, cover_path').in('id', todaySubs.map(s => s.id));
-    if (art) for (const a of art){
-      const row = todaySubs.find(s => s.id === a.id);
-      if (row) row.cover_path = a.cover_path;
-    }
-  }
+    .order('created_at', { ascending: false }).limit(3));
+  if (error){ forgetFetch('todaySubs'); console.warn('subliminals:', error.message); todaySubs = []; return; }
+  todaySubs = (data || []).map(s => ({ ...s }));
   if (!todaySubChosen && todaySubs.length) todaySubChosen = todaySubs[0].id;
+  /* The cover art is a second question, and the page does not need its answer
+     to be useful -- the titles, the lengths and the play button are all here
+     already. So it is not waited for: it goes and gets them, and paints them
+     over the cards when they arrive. This is what kept opening the app a whole
+     round trip slower than it needed to be. */
+  if (todaySubs.length) loadTodaySubCovers();
+}
+async function loadTodaySubCovers(){
+  const ids = todaySubs.map(s => s.id);
+  if (!ids.length) return;
+  const { data: art } = await fetchOnce('todaySubCovers', () => sb.from('subliminals')
+    .select('id, cover_path').in('id', ids));
+  if (!art) return;
+  let changed = false;
+  for (const a of art){
+    const row = todaySubs.find(s => s.id === a.id);
+    if (row && row.cover_path !== a.cover_path){ row.cover_path = a.cover_path; changed = true; }
+  }
+  if (changed && document.body.getAttribute('data-view') === 'today') renderTodaySession(todayNewestSub);
 }
 
 async function showTodaySubCover(id, path){

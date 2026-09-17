@@ -43,10 +43,7 @@ function avatarMarkup(look, thumb){
    its own and shrugs off a refusal. */
 async function loadHigherSelf(){
   if (!sb || !currentUser) return;
-  const { data, error } = await sb.from('profiles')
-    .select('higher_self_name, higher_self_avatar').eq('id', currentUser.id).maybeSingle();
-  if (error){ console.warn('higher self:', error.message); return; }
-  const d = data || {};
+  const d = (await myProfile()) || {};
   higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
 }
 
@@ -141,7 +138,12 @@ function renderHigherSelfCard(){
   if (art) art.innerHTML = avatarMarkup(higherSelf);
   card.dataset.sky = currentSky();
   document.getElementById('higherSelfName').textContent = name;
-  document.getElementById('higherSelfSub').textContent = higherSelfLine(name);
+  /* What she says is read off today's check-ins, so before those have landed
+     the only honest line is none. "Tomorrow is another chance" is a kind thing
+     to say to someone who hasn't started; it is the wrong thing to say to
+     someone who finished at seven this morning and is still waiting to see it. */
+  const painted = (typeof todayPainted === 'undefined') || todayPainted;
+  document.getElementById('higherSelfSub').textContent = painted ? higherSelfLine(name) : '';
   card.style.display = 'block';
 }
 

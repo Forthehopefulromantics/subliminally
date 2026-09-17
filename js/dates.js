@@ -25,3 +25,41 @@ function streakFromDays(daySet){
   while (daySet.has(cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
   return n;
 }
+
+/* ---------- asking the network once ----------
+   Every screen used to re-fetch everything it needed the moment it opened, so
+   moving between two pages that both want your habits asked for them twice, and
+   opening Today asked for your plan six times in one go. On a desk that reads
+   as fine. On a phone, where a round trip to the database can take a second or
+   more, thirty of them in a row is the difference between a tap that lands and
+   a tap that appears to have done nothing.
+
+   Two things fix most of it. `fetchOnce` remembers what an answer was for a
+   short while and hands the same one back rather than asking again, and it
+   hands a second caller the request already in flight instead of opening a new
+   one. Anything that changes the answer calls `forgetFetch` to drop it.
+
+   The window is deliberately short. This is a cache for the next few seconds of
+   tapping around, not a store — a check-in you make on another device still
+   shows up when you come back to the page a minute later. */
+const FETCH_TTL_MS = 45000;
+const _fetchAt = {}, _fetchVal = {}, _fetchIn = {};
+function fetchOnce(key, fn, ttlMs){
+  const ttl = ttlMs == null ? FETCH_TTL_MS : ttlMs;
+  if (_fetchIn[key]) return _fetchIn[key];                 // already on its way — wait for that one
+  if (_fetchAt[key] && Date.now() - _fetchAt[key] < ttl) return Promise.resolve(_fetchVal[key]);
+  const p = Promise.resolve().then(fn).then(
+    v => { _fetchAt[key] = Date.now(); _fetchVal[key] = v; delete _fetchIn[key]; return v; },
+    e => { delete _fetchIn[key]; throw e; }                 // a failure is not an answer; ask again next time
+  );
+  _fetchIn[key] = p;
+  return p;
+}
+function forgetFetch(key){
+  if (key == null){ Object.keys(_fetchAt).forEach(forgetFetch); return; }
+  delete _fetchAt[key]; delete _fetchVal[key]; delete _fetchIn[key];
+}
+function fetchIsFresh(key, ttlMs){
+  const ttl = ttlMs == null ? FETCH_TTL_MS : ttlMs;
+  return !!(_fetchAt[key] && Date.now() - _fetchAt[key] < ttl);
+}
