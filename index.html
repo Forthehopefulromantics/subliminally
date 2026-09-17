@@ -93,10 +93,21 @@
   }
 
   .hero{ position:relative; min-height:88vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:130px 28px 70px; gap:24px; overflow:hidden; }
-  .hero-bg{ position:absolute; inset:0; z-index:0; }
-  .hero-bg img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .hero-bg::after{ content:''; position:absolute; inset:0;
-    background:linear-gradient(180deg, rgba(13,11,24,0.52) 0%, rgba(13,11,24,0.40) 38%, var(--midnight) 100%); }
+  /* Nothing between the hero and the sky. The clouds drifting behind it are
+     the same ones on the sign-up screen, because it is the same layer -- it was
+     always there, with a photograph parked on top of it.
+
+     One thing does go between them: a soft wash under the words. The clouds
+     move, so without it a headline is readable for twenty seconds and then a
+     pale cloud drifts under it and it is not. It is wide and very diffuse, so
+     it reads as haze near the horizon rather than as a panel. */
+  .hero-bg{ display:none; }
+  .hero::before{ content:''; position:absolute; left:50%; top:46%;
+    width:min(1100px, 130%); height:78%; transform:translate(-50%,-50%);
+    background:radial-gradient(ellipse at center, var(--hero-wash) 0%, transparent 70%);
+    pointer-events:none; z-index:0; }
+  body[data-sky="day"]{ --hero-wash:rgba(255,253,248,.82); }
+  body[data-sky="night"]{ --hero-wash:rgba(20,16,44,.78); }
   .hero > *:not(.hero-bg){ position:relative; z-index:1; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
   .orb{ position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(185,167,232,0.55), transparent 60%), radial-gradient(circle at 68% 72%, rgba(227,190,127,0.42), transparent 55%), radial-gradient(circle, #2E2650, var(--midnight-2) 75%); box-shadow:0 0 90px rgba(185,167,232,0.25), inset 0 0 50px rgba(227,190,127,0.18); animation:breathe 6s ease-in-out infinite; }
@@ -1058,10 +1069,21 @@
   body[data-sky="day"] .journal-tabs button.active{ background:rgba(122,79,181,.14); }
   body[data-sky="day"] input::placeholder, body[data-sky="day"] textarea::placeholder{ color:#9C8FA8; }
 
-  /* The hero and the breath quote sit on their own darkened photographs, not
-     on the sky, so their text stays light whatever the hour. */
-  body[data-sky="day"] .hero, body[data-sky="day"] .breath{
+  /* The breath quote still sits on its own darkened photograph, so its text
+     stays light whatever the hour. The hero does not any more -- it is on the
+     sky, so it takes the sky's colours like every other screen. */
+  body[data-sky="day"] .breath{
     --moonlight:#FFF7EE; --haze:#E0D2E4; --lilac:#EBDBFF; --candle:#F7D267; }
+
+  /* The orb reads as a hole in a pale sky, so by day it becomes a soft sun
+     instead of a dark sphere. */
+  body[data-sky="day"] .orb{
+    background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.95), transparent 62%),
+               radial-gradient(circle at 66% 70%, rgba(247,210,103,.55), transparent 58%),
+               radial-gradient(circle, #FFF6E6, rgba(255,246,230,.35) 72%);
+    box-shadow:0 0 90px rgba(255,236,196,.55), inset 0 0 50px rgba(247,210,103,.25); }
+  body[data-sky="day"] .orb-inner{
+    background:radial-gradient(circle at 40% 35%, rgba(255,255,255,.7), transparent 65%); }
 
   /* The switch, in the bar, so it's reachable from any page. */
   .skybtn{ width:36px; height:36px; border-radius:50%; flex:0 0 auto; cursor:pointer;
