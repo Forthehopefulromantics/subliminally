@@ -66,8 +66,12 @@ async function loadMyLibrary(){
     const affs = Array.isArray(s.affirmations) ? s.affirmations : [];
     const titleText = s.title || 'Untitled subliminal';
     const titleVal = (s.title || '').replace(/"/g,'&quot;');
-    return `<div class="profile-item">
+    return `<div class="profile-item" id="libItem-${s.id}">
       <div class="profile-item-top">
+        <button class="lib-play" id="libPlay-${s.id}" onclick="playFromLibrary('${s.id}')"
+          aria-label="Play ${titleVal || 'this subliminal'}" title="Play">
+          <span class="lib-play-icon" aria-hidden="true">▶</span>
+        </button>
         <div style="flex:1; min-width:0;">
           <div class="lib-title-view" id="libTitleView-${s.id}">
             <div class="lib-title-text">${titleText.replace(/</g,'&lt;')}</div>
@@ -84,12 +88,12 @@ async function loadMyLibrary(){
             <button class="lib-title-cancel-btn" onclick="cancelEditLibraryTitle('${s.id}')" aria-label="Cancel">✕</button>
           </div>
           <div class="save-msg" id="libTitleMsg-${s.id}" style="margin-top:2px;"></div>
-          <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations · saved ${when}</div>
+          <div class="meta">${mins ? mins+' min · ' : ''}${affs.length} affirmations</div>
+          <div class="lib-now" id="libNow-${s.id}"></div>
         </div>
         <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
-      ${affs.length ? `<div class="profile-item-affs">${affs.map(a=>`<p>"${String(a).replace(/</g,'&lt;')}"</p>`).join('')}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -125,7 +129,11 @@ async function renameLibraryItem(id){
   document.getElementById(`libTitleView-${id}`).style.display = 'flex';
 }
 
-async function loadSavedIntoBuilder(id){
+/* `stayHere` is for playing from the library: the state is loaded exactly the
+   same way, but you are not thrown onto the builder page to find a second
+   button. Everything before this point is identical either way -- there is one
+   loader, not two. */
+async function loadSavedIntoBuilder(id, opts){
   if (!sb || !currentUser) return;
   const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
   if (error || !s) return;
@@ -224,9 +232,11 @@ async function loadSavedIntoBuilder(id){
     }
   }
 
-  showBuildPage();
-  showStep(7);
   prepareFinal();
+  if (!(opts && opts.stayHere)){
+    showBuildPage();
+    showStep(7);
+  }
 }
 
 async function deleteMySubliminal(id){
@@ -438,3 +448,52 @@ async function submitFeedback(){
   document.getElementById('feedbackMessage').value = '';
 }
 
+
+/* ---------- play it here ----------
+   "Play" used to mean "load this into the builder and go to that page", which
+   left you on a different screen looking for a second button before anything
+   made a sound. It plays where you pressed it now.
+
+   The engine is the one in builder.js: the same state, the same mixer, the same
+   session. Only the way in is different — nothing about playback is duplicated
+   here, because two players would drift and one of them would be the broken one. */
+async function playFromLibrary(id){
+  if (!sb || !currentUser){ openAuthModal(); return; }
+  const btn = document.getElementById('libPlay-' + id);
+  const now = document.getElementById('libNow-' + id);
+
+  // Pressing play on the one already playing stops it, the way a playlist does.
+  if (finalPlaying && libraryNowPlayingId === id){ stopFinal(); return; }
+  if (finalPlaying) stopFinal();
+
+  libraryNowPlayingId = id;
+  if (btn) btn.classList.add('is-loading');
+  if (now) now.textContent = 'Loading…';
+
+  try {
+    await loadSavedIntoBuilder(id, { stayHere: true });
+  } catch (e){
+    if (now) now.textContent = 'Could not load this one.';
+    if (btn) btn.classList.remove('is-loading');
+    libraryNowPlayingId = null;
+    return;
+  }
+  if (btn) btn.classList.remove('is-loading');
+  playFinal();
+  reflectLibraryPlaying();
+}
+
+let libraryNowPlayingId = null;
+
+/* The card shows what the player is doing, so you do not have to go and look.
+   Driven off finalPlaying rather than a second copy of the state. */
+function reflectLibraryPlaying(){
+  document.querySelectorAll('.lib-play').forEach(b => b.classList.remove('is-playing'));
+  document.querySelectorAll('.lib-now').forEach(n => { n.textContent = ''; });
+  if (!finalPlaying || !libraryNowPlayingId) return;
+  const btn = document.getElementById('libPlay-' + libraryNowPlayingId);
+  const now = document.getElementById('libNow-' + libraryNowPlayingId);
+  if (btn) btn.classList.add('is-playing');
+  if (now) now.textContent = document.getElementById('finalLine').textContent || 'Playing…';
+}
+setInterval(() => { if (libraryNowPlayingId) reflectLibraryPlaying(); }, 1000);
