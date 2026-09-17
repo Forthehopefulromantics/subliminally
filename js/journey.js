@@ -67,12 +67,14 @@ function renderTodayJourney(){
     ${next ? `<button class="btn btn-primary" onclick="journeyGo('${next.key}')">${next.done ? 'Open' : (next.key.includes('ritual') || next.key === 'morning' || next.key === 'night') ? `Continue ${next.label.toLowerCase()}` : next.label}</button>` : ''}
     <ul class="journey-list">${quests.map(q => `
       <li class="journey-q${q.done ? ' done' : ''}${next && q.key === next.key ? ' next' : ''}">
-        <button type="button" onclick="journeyGo('${q.key}')">
+        <button type="button" class="jq-main" onclick="journeyGo('${q.key}')">
           <span class="jq-tick" aria-hidden="true">${q.done ? '✓' : ''}</span>
           <span class="jq-label">${q.label}</span>
           <span class="jq-detail">${q.detail}</span>
           ${q.play ? `<span class="jq-play" aria-hidden="true">${finalPlaying ? '❚❚' : '▶'}</span>` : ''}
         </button>
+        ${q.play && finalPlaying ? `<button type="button" class="jq-edit" onclick="openSoundLevels()"
+            aria-label="Adjust the sound levels" title="Sound levels">${MIXER_ICON}</button>` : ''}
       </li>`).join('')}</ul>`;
 }
 /* "Continue morning ritual" used to swap which ritual the card below was
@@ -92,6 +94,35 @@ function openRitualOnToday(time){
   void card.offsetWidth;                  // restart the animation on a repeat tap
   card.classList.add('just-opened');
   setTimeout(() => card.classList.remove('just-opened'), 1400);
+}
+/* The three things you can do with a session, given the same weight and the
+   same shape. "Build a new one" and "All my subliminals" were grey text under
+   the button, which reads as small print rather than as the other two thirds of
+   the choice -- and on a phone a line of grey text is the hardest thing on the
+   card to hit. Each carries a mark cut to match the play triangle on the cover
+   art above it. */
+const PLAY_MARK  = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.87l10.4-6.4a1 1 0 0 0 0-1.74L9.5 4.73A1 1 0 0 0 8 5.6Z"/></svg>';
+// A square, because the button says Stop. Two bars would be promising a pause.
+const STOP_MARK  = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.6"/></svg>';
+const PLUS_MARK  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+const STACK_MARK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="13" height="13" rx="2.5"/><path d="M7 4h11a3 3 0 0 1 3 3v11"/></svg>';
+
+/* Faders. It is the one picture that reads as "change how this sounds" without
+   a word next to it, and it is the same mark the levels panel uses. */
+const MIXER_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+  <path d="M6 20v-7M6 9V4M12 20v-10M12 6V4M18 20v-4M18 12V4"/>
+  <circle cx="6" cy="11" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="18" cy="14" r="2"/></svg>`;
+
+/* Opens the levels from wherever you are, rather than only from the bar at the
+   bottom -- which is the one place you are not looking when you are halfway
+   down your morning list. Already open, it scrolls you to it instead of
+   closing it under you. */
+function openSoundLevels(){
+  const panel = document.getElementById('nbMixer');
+  if (!panel) return;
+  if (panel.hasAttribute('hidden')) toggleNowMixer();
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 function journeyGo(key){
   const q = journeyQuests().find(x => x.key === key);
@@ -143,11 +174,14 @@ function renderTodaySession(lastSub){
         </button>`;
       }).join('')}
     </div>
-    <button class="btn btn-primary" onclick="playTodaySubliminal()">${
-      finalPlaying ? 'Stop' : 'Play it'}</button>
-    <div class="today-links" style="justify-content:flex-start; margin-top:14px;">
-      <button onclick="showBuildPage()">Build a new one</button>
-      <button onclick="showLibraryPage(); setLibraryTab('mine');">All my subliminals</button>
+    <div class="sess-actions">
+      <button class="btn btn-primary" onclick="playTodaySubliminal()">
+        <span class="sess-btn-mark" aria-hidden="true">${finalPlaying ? STOP_MARK : PLAY_MARK}</span>
+        ${finalPlaying ? 'Stop' : 'Play it'}</button>
+      <button class="btn btn-ghost" onclick="showBuildPage()">
+        <span class="sess-btn-mark" aria-hidden="true">${PLUS_MARK}</span>Build a new one</button>
+      <button class="btn btn-ghost" onclick="showLibraryPage(); setLibraryTab('mine');">
+        <span class="sess-btn-mark" aria-hidden="true">${STACK_MARK}</span>All my subliminals</button>
     </div>`;
   todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
 }
