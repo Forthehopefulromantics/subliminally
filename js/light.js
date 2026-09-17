@@ -49,6 +49,16 @@ function levelFor(lifetime){
   };
 }
 
+/* The points are off. Kyla's reason is the right one: a number that goes up
+   makes a day you missed into a number that did not, and the app should not be
+   another place that keeps score of you.
+
+   Hidden, not deleted. award_light still records every session and every habit,
+   so the history is intact and turning this back on is one line -- nothing has
+   to be re-earned. The streak stays, because "you have been here eight days" is
+   a fact about your practice rather than a score. */
+const POINTS_VISIBLE = false;
+
 let light = { lifetime: 0, today: 0, loaded: false };
 /* What has already been paid for today. The ledger is the only record of some
    of these — a subliminal played leaves no other trace — so the Journey reads
@@ -98,6 +108,7 @@ async function awardLight(source, ref, near){
 /* A small mark that lifts and fades. Not a celebration — you get one of these
    for remembering to drink water. */
 function showLightMark(amount, near){
+  if (!POINTS_VISIBLE) return;
   const host = near && near.getBoundingClientRect ? near : document.getElementById('lightStrip');
   if (!host || !host.getBoundingClientRect) return;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -122,12 +133,28 @@ async function acceptGraceDay(time, dateStr){
 function renderLightStrip(){
   const el = document.getElementById('lightStrip');
   if (!el) return;
-  const lv = levelFor(light.lifetime);
   const time = currentRitualTime();
   const streak = routineStreak(time);
-  // The streak says whether you're on a run; consistency says how you've been
-  // doing. Both, because a missed day should cost you the first and nothing of
-  // the second.
+  const note = document.getElementById('lightNote');
+
+  if (!POINTS_VISIBLE){
+    // Only the streak, and only once it is a run rather than a single day.
+    el.innerHTML = streak > 1
+      ? `<span class="ls-item" title="${streak} days of practice"><b>${streak}</b> day${streak === 1 ? '' : 's'}</span>`
+      : '';
+    el.style.display = streak > 1 ? 'flex' : 'none';
+    if (note){
+      /* A grace day is still offered -- that is the opposite of scorekeeping:
+         it exists so one hard day does not undo a run. */
+      const offer = (typeof graceOffer === 'function') ? graceOffer(time) : null;
+      note.innerHTML = offer
+        ? `Yesterday was missed. <button type="button" class="grace-offer" onclick="acceptGraceDay('${offer.time}','${offer.date}')">Use a grace day</button> to hold the ${offer.saves} behind it — you have ${graceDays}.`
+        : '';
+    }
+    return;
+  }
+
+  const lv = levelFor(light.lifetime);
   const con = (typeof consistency === 'function') ? consistency(30) : null;
   el.innerHTML = `
     ${streak > 1 ? `<span class="ls-item" title="${streak} days of practice"><b>${streak}</b> day${streak === 1 ? '' : 's'}</span>` : ''}
@@ -136,11 +163,7 @@ function renderLightStrip(){
     <span class="ls-item ls-level">${lv.name}</span>
     <span class="ls-bar" role="img" aria-label="${lv.next ? `${lv.toNext} Light until ${lv.next}` : 'Higher Self reached'}"><i style="width:${Math.round(lv.pct * 100)}%"></i></span>`;
   el.style.display = 'flex';
-
-  const note = document.getElementById('lightNote');
   if (!note) return;
-  // A grace day is offered, never taken quietly. Spending someone's without
-  // telling them is worse than letting the number reset.
   const offer = (typeof graceOffer === 'function') ? graceOffer(time) : null;
   if (offer){
     note.innerHTML = `Yesterday was missed. <button type="button" class="grace-offer" onclick="acceptGraceDay('${offer.time}','${offer.date}')">Use a grace day</button> to hold the ${offer.saves} behind it — you have ${graceDays}.`;
@@ -148,4 +171,3 @@ function renderLightStrip(){
   }
   note.textContent = lv.next ? `${lv.toNext.toLocaleString()} Light until ${lv.next}` : 'You have reached Higher Self.';
 }
-

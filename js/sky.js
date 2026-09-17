@@ -19,7 +19,11 @@ function skyOverride(){
     return (o && o.date === localDateStr() && (o.mode === 'day' || o.mode === 'night')) ? o.mode : null;
   } catch(e){ return null; }
 }
-function currentSky(){ return skyOverride() || skyByClock(); }
+/* Light by default. It used to follow the clock, which meant the app was dark
+   for most of the hours anyone opens it, and dark was never the decision — it
+   was just what 6pm did. The switch still works, and still lasts until
+   tomorrow. */
+function currentSky(){ return skyOverride() || 'day'; }
 
 const SUN_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const MOON_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8z"/></svg>';
@@ -82,7 +86,7 @@ function toggleSky(){
   // Matching the clock again is the same as having no choice stored, so the
   // sky goes back to following it by itself.
   try {
-    if (next === skyByClock()) localStorage.removeItem(SKY_KEY);
+    if (next === 'day') localStorage.removeItem(SKY_KEY);   // 'day' is the default, so it needs nothing stored
     else localStorage.setItem(SKY_KEY, JSON.stringify({ mode: next, date: localDateStr() }));
   } catch(e){}
   applySky();

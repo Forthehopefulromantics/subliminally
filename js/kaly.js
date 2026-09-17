@@ -20,14 +20,15 @@
    flat colour over this artwork measured as a visible loss (mean 16/255
    against the original), and the roster already covers the range that tinting
    was standing in for. `id` is what's stored, so never rename one. */
-const AVATARS = [
-  'kaly',                                    // Kyla's own character, and the default
-  'f1','f2','f3','f4','f5','f6','f7','f8','f9','f10',
-  'm1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12',
-];
-/* Kaly is who a new member meets. The other twenty-two stay, because anyone who
-   already picked one has that id stored in profiles.higher_self_avatar and a
-   default is not a reason to change someone's choice underneath them. */
+/* Kaly, until Kyla's new set arrives. The twenty-two drawn ones are gone from
+   the picker.
+
+   Their files stay in img/avatar/ on purpose. profiles.higher_self_avatar still
+   holds 'f3' or 'm7' for anyone who picked one, and deleting the pictures would
+   turn their choice into a broken image. avatarId() sends an id that is no
+   longer offered back to the default, so they see Kaly rather than a gap, and
+   nothing had to be migrated to make that true. */
+const AVATARS = ['kaly'];
 const HIGHER_SELF_DEFAULTS = { avatar:'kaly' };
 
 let higherSelf = { name:'', ...HIGHER_SELF_DEFAULTS };

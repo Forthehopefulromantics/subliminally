@@ -1054,6 +1054,35 @@
      A quiet line of state above the day: how long you have kept going, what
      you have earned, and where that puts you. It reports, it does not cheer. */
 
+
+  /* ---- a picture for each habit ---- */
+  .habit-icon{ width:30px; height:30px; flex:0 0 auto; border-radius:9px; padding:0;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
+    font-size:15px; line-height:1; cursor:pointer; display:grid; place-items:center; }
+  .habit-icon:hover{ border-color:var(--candle); }
+  .habit-icon:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; }
+  body[data-sky="day"] .habit-icon{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
+  .icon-pop{ position:absolute; z-index:70; margin-top:6px; width:250px; padding:9px;
+    display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
+    background:var(--veil); border:1px solid rgba(255,255,255,.12); border-radius:14px;
+    box-shadow:0 14px 34px rgba(8,6,20,.5); }
+  .icon-pop button{ aspect-ratio:1; border:none; background:none; border-radius:8px;
+    font-size:16px; cursor:pointer; padding:0; }
+  .icon-pop button:hover{ background:rgba(255,255,255,.1); }
+  .icon-pop button:focus-visible{ outline:2px solid var(--candle); outline-offset:-2px; }
+  /* On Today the picture IS the circle, and becomes a tick once it is done. */
+  /* The tick's own colour is transparent so the ✓ is hidden until it is done,
+     and ::before inherits that — so the picture needs its colour set back, or
+     it is drawn in invisible ink. */
+  .day-habit-check[data-glyph]::before{ content:attr(data-glyph); font-size:15px;
+    color:initial; -webkit-text-fill-color:initial; }
+  .day-habit-check[data-glyph]{ color:transparent; border-color:transparent;
+    background:rgba(255,255,255,.06); }
+  body[data-sky="day"] .day-habit-check[data-glyph]{ background:rgba(62,42,72,.07); }
+  .day-habit.done .day-habit-check[data-glyph]::before{ content:none; }
+  .day-habit.done .day-habit-check[data-glyph]{ color:#1B1630; background:var(--lilac);
+    border-color:var(--lilac); }
+
   /* ---- the week at a glance ---- */
 
   /* ---- the bar that follows you while a session plays ---- */
@@ -1099,7 +1128,16 @@
   .week-day{ display:flex; flex-direction:column; align-items:center; gap:6px; flex:1 1 0; min-width:0; }
   .wd-dot{ width:34px; height:34px; border-radius:50%; display:grid; place-items:center;
     background:var(--dusk); border:1.5px solid transparent; color:#1B1630; }
-  .week-day.is-done .wd-dot{ background:var(--lilac); }
+  .week-day.is-done .wd-dot{ background:var(--lilac); color:#FFF7EE; }
+  /* In light mode --lilac is a deep purple, so the tick has to go pale or it
+     is a dark mark on a dark disc. Checked against both skies rather than
+     assumed from the dark one. */
+  body[data-sky="day"] .week-day.is-done .wd-dot{ background:#7A4FB5; color:#FFF7EE; }
+  body[data-sky="day"] .wd-dot{ background:rgba(62,42,72,.10); }
+  body[data-sky="day"] .week-day.is-future .wd-dot{ background:none; border-color:rgba(122,101,132,.4); }
+  body[data-sky="day"] .wd-letter{ color:#7A6584; }
+  body[data-sky="day"] .week-day.is-today .wd-letter{ color:#C0552B; }
+  body[data-sky="day"] .week-day.is-today .wd-dot{ border-color:#C0552B; }
   /* Today is a ring, which reads as "you are here" whether or not it is filled. */
   .week-day.is-today .wd-dot{ border-color:var(--candle); }
   .week-day.is-future .wd-dot{ background:none; border:1.5px dashed rgba(156,147,184,.35); }
