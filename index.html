@@ -582,6 +582,25 @@
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
   .mylibrary-section{ padding:80px 0; }
+
+  /* ---- the library as a playlist ---- */
+  .profile-item button.lib-play{ width:46px; height:46px; flex:0 0 auto; border-radius:50%;
+    cursor:pointer; background:var(--candle); border:none; color:#2B1E06; display:grid;
+    place-items:center; font-size:15px; padding:0; text-decoration:none;
+    transition:transform .15s, background .2s; }
+  .profile-item button.lib-play:hover{ transform:scale(1.06); color:#2B1E06; }
+  .lib-play:focus-visible{ outline:2px solid var(--lilac); outline-offset:3px; }
+  .profile-item button.lib-play.is-loading{ background:var(--dusk); color:var(--haze); }
+  .lib-play.is-loading .lib-play-icon::before{ content:'…'; }
+  .lib-play.is-loading .lib-play-icon{ font-size:0; }
+  /* Playing shows a pause mark, because pressing it again is how you stop. */
+  .profile-item button.lib-play.is-playing{ background:var(--lilac); color:#1B1630; }
+  .lib-play.is-playing .lib-play-icon{ font-size:0; }
+  .lib-play.is-playing .lib-play-icon::before{ content:'❚❚'; font-size:12px; letter-spacing:1px; }
+  .lib-now{ font-size:12px; color:var(--candle); margin-top:3px; min-height:15px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .profile-item-top{ gap:13px; align-items:center; }
+
   .profile-item-affs{ margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; gap:5px; }
   .profile-item-affs p{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--haze); }
   .profile-item-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }

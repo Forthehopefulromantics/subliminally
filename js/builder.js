@@ -728,6 +728,9 @@ function setRecordStepCopy(target){
 
 /* ---------------- step 6: recording (own voice) ---------------- */
 let recIndex = 0; let recordings = [];
+/* How many affirmations in a row the device voice failed to say. Reset by any
+   line that actually speaks. See deviceSpeak. */
+let deviceSpeechFailures = 0;
 /* Why the recordings for a saved subliminal could not be fetched, if they
    couldn't. Empty means nothing went wrong — which is not the same as there
    being nothing to play. See loadSavedIntoBuilder. */
@@ -1351,6 +1354,7 @@ function playFinal(){
 
   finalPlaying = true;
   finalStartTime = Date.now();
+  deviceSpeechFailures = 0;
   document.getElementById('finalPlayBtn').disabled = true;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
@@ -1525,12 +1529,48 @@ function playFinal(){
             idx++; const t = setTimeout(speakNext, affirmationGapMs); finalTimeouts.push(t);
           }
         }
+        /* The device's own voice is the one thing here that can fail without
+           saying anything. speak() resolves to nothing at all on an iPhone in a
+           saved-to-home-screen web app, and on any browser where an AudioContext
+           is already running it can be refused outright — and when that happens
+           `onend` never fires. The old code hung on that forever: no line, no
+           error, no next affirmation, just a session that looked like it was
+           playing and made no sound for however long it was set to run.
+
+           So: every utterance is watched. If it neither starts nor ends, it is
+           treated as failed rather than waited on, and enough failures in a row
+           stop the session and say so. Eight hours of silence is the worst
+           outcome this code can produce, and it was the likeliest one. */
         function deviceSpeak(){
           if (!finalPlaying) return;
           const utter = new SpeechSynthesisUtterance(lines[idx]);
           utter.rate = 0.92; utter.pitch = 1.0;
-          utter.onend = advance;
-          window.speechSynthesis.speak(utter);
+
+          let settled = false;
+          const settle = (spoke) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(watchdog);
+            if (spoke) deviceSpeechFailures = 0;
+            else deviceSpeechFailures++;
+            if (deviceSpeechFailures >= 3){ reportNoDeviceVoice(); return; }
+            advance();
+          };
+
+          utter.onstart = () => { deviceSpeechFailures = 0; };
+          utter.onend   = () => settle(true);
+          utter.onerror = () => settle(false);
+
+          // Generous: a long affirmation at 0.92 rate still starts within a
+          // second or two. This only fires when nothing happened at all.
+          const watchdog = setTimeout(() => {
+            try { window.speechSynthesis.cancel(); } catch(e){}
+            settle(false);
+          }, 4000 + lines[idx].length * 90);
+          finalTimeouts.push(watchdog);
+
+          try { window.speechSynthesis.speak(utter); }
+          catch(e){ settle(false); }
         }
         function speakOnce(){
           if (!finalPlaying) return;
@@ -1586,6 +1626,16 @@ function playFinal(){
       finishFinal();
     }
   });
+}
+
+/* Every way out of this ends the session. A player that cannot make a sound
+   should not keep a timer running as though it can. */
+function reportNoDeviceVoice(){
+  finishFinal();
+  document.getElementById('finalLine').textContent =
+    "This device won't let the built-in voice speak while a session is running — " +
+    "it's a limitation of the browser, not of your subliminal. Record the lines in " +
+    "your own voice, or pick a studio voice, and it will play.";
 }
 
 function fmtClock(totalSec){
