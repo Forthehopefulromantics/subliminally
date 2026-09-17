@@ -1470,15 +1470,6 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
-  /* Nothing here can produce a sound: no recordings, a device voice, and a
-     device that has already refused to use it. Saying so now is the whole of
-     the fix -- the timer used to start anyway. */
-  if (state.voiceMode !== 'own' && deviceVoiceKnownBroken()
-      && (!state.aiVoiceId || state.aiVoiceId === DEVICE_VOICE)){
-    document.getElementById('finalLine').textContent = DEVICE_VOICE_MESSAGE;
-    return;
-  }
-
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
   if (!hasVoice){
     /* Tell the truth about which of the two this is. Telling someone to record
@@ -1494,6 +1485,7 @@ function playFinal(){
   finalPlaying = true;
   finalStartTime = Date.now();
   deviceSpeechFailures = 0;
+  deviceVoiceSilent = false;
   document.getElementById('finalPlayBtn').disabled = true;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
@@ -1681,6 +1673,12 @@ function playFinal(){
            outcome this code can produce, and it was the likeliest one. */
         function deviceSpeak(){
           if (!finalPlaying) return;
+          if (deviceVoiceSilent){
+            // Known not to speak here: keep the lines moving with the music
+            // rather than stalling four seconds on each one.
+            const t = setTimeout(advance, 2600); finalTimeouts.push(t);
+            return;
+          }
           const utter = new SpeechSynthesisUtterance(lines[idx]);
           utter.rate = 0.92; utter.pitch = 1.0;
 
@@ -1691,7 +1689,7 @@ function playFinal(){
             clearTimeout(watchdog);
             if (spoke) deviceSpeechFailures = 0;
             else deviceSpeechFailures++;
-            if (deviceSpeechFailures >= 3){ reportNoDeviceVoice(); return; }
+            if (deviceSpeechFailures >= 3 && !deviceVoiceSilent) reportNoDeviceVoice();
             advance();
           };
 
@@ -1784,18 +1782,26 @@ function playFinal(){
    subliminal built from typed text costs another thirteen seconds of hope
    before the same sentence appears. */
 const NO_DEVICE_VOICE_KEY = 'fthr_no_device_voice';
-function deviceVoiceKnownBroken(){
-  try { return localStorage.getItem(NO_DEVICE_VOICE_KEY) === '1'; } catch(e){ return false; }
-}
+/* Cleared on load. It was written when every layer went out through Web Audio,
+   which the ringer switch silenced, so it is a verdict on a version of this app
+   that no longer exists. Keeping it would have kept punishing phones that work
+   now. */
+try { localStorage.removeItem(NO_DEVICE_VOICE_KEY); } catch(e){}
 const DEVICE_VOICE_MESSAGE =
   "This device won't let the built-in voice speak inside the app — it's a limit " +
   "of the browser, not of your subliminal. Record the lines in your own voice, " +
   "or pick a studio voice, and it will play.";
 
+/* The device voice failing is not the session failing. The tone, the nature
+   sound and the soothing layer are all still playing and all still worth
+   listening to, so this stops waiting on speech and lets the rest run. It used
+   to call finishFinal, which ended everything -- and that is why pressing play
+   looked like it did nothing at all. */
+let deviceVoiceSilent = false;
 function reportNoDeviceVoice(){
-  try { localStorage.setItem(NO_DEVICE_VOICE_KEY, '1'); } catch(e){}
-  finishFinal();
-  document.getElementById('finalLine').textContent = DEVICE_VOICE_MESSAGE;
+  deviceVoiceSilent = true;
+  const el = document.getElementById('finalLine');
+  if (el) el.textContent = DEVICE_VOICE_MESSAGE;
 }
 
 function fmtClock(totalSec){
