@@ -76,7 +76,7 @@ export default async function handler(req, res) {
   const user = await whoIsCalling(bearerToken(req));
   if (!user) { res.status(401).json({ error: 'Sign in to use the studio voices.' }); return; }
 
-  const { text, voiceId } = await readJsonBody(req);
+  const { text, voiceId, speed } = await readJsonBody(req);
   const line = typeof text === 'string' ? text.trim() : '';
   if (!line) { res.status(400).json({ error: 'Nothing to say.' }); return; }
   if (line.length > MAX_CHARS) { res.status(400).json({ error: `Keep each line under ${MAX_CHARS} characters.` }); return; }
@@ -102,8 +102,16 @@ export default async function handler(req, res) {
         text: line,
         model_id: MODEL_ID,
         // Steady and unhurried — an affirmation read with performance in it is
-        // harder to absorb than one read plainly.
-        voice_settings: { stability: 0.55, similarity_boost: 0.75, style: 0.1, use_speaker_boost: true },
+        // harder to absorb than one read plainly. The speed comes from whichever
+        // pace was chosen in the builder; the provider's usable range is roughly
+        // 0.7 to 1.2, and anything outside it is clamped rather than refused.
+        voice_settings: {
+          stability: 0.55,
+          similarity_boost: 0.75,
+          style: 0.1,
+          use_speaker_boost: true,
+          speed: Math.min(1.2, Math.max(0.7, Number(speed) || 1)),
+        },
       }),
     });
     if (!el.ok) {
