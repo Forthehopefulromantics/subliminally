@@ -131,3 +131,36 @@ function faithAnswerForSave(){
   if (myFaith.id === 'other' && other) myFaith.own = other.value.trim().slice(0, 40);
   return { faith: myFaith.id || null, faith_other: myFaith.id === 'other' ? (myFaith.own || null) : null };
 }
+
+
+/* ---------- Settings: change spiritual language any time ---------- */
+function renderFaithSettings(){
+  const wrap = document.getElementById('settingsFaithChips');
+  if (!wrap) return;
+  wrap.innerHTML = FAITHS.map(f =>
+    `<button type="button" class="length-chip${f.id === myFaith.id ? ' sel' : ''}"
+      data-faith="${f.id}" onclick="pickSettingsFaith(this)">${f.label}</button>`).join('');
+  const other = document.getElementById('settingsFaithOther');
+  if (other){
+    other.style.display = myFaith.id === 'other' ? 'block' : 'none';
+    other.value = myFaith.id === 'other' ? (myFaith.own || '') : '';
+  }
+}
+function pickSettingsFaith(btn){
+  const id = btn.dataset.faith;
+  myFaith = { id, own: id === 'other' ? myFaith.own : '' };
+  renderFaithSettings();
+}
+async function saveFaithSettings(){
+  const msg = document.getElementById('faithSettingsMsg');
+  if (!sb || !currentUser) return;
+  const other = document.getElementById('settingsFaithOther');
+  if (myFaith.id === 'other' && other) myFaith.own = other.value.trim().slice(0,40);
+  if (msg){ msg.textContent='Saving…'; msg.className='save-msg'; }
+  const error = await saveProfile({
+    faith: myFaith.id || null,
+    faith_other: myFaith.id === 'other' ? (myFaith.own || null) : null,
+  });
+  if (error){ if(msg){ msg.textContent=describeSaveError(error); msg.className='save-msg err'; } return; }
+  if(msg){ msg.textContent='Saved. New subliminals and guidance will use these words.'; msg.className='save-msg ok'; }
+}

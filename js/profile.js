@@ -22,6 +22,8 @@ async function loadProfile(){
   if (!sb || !currentUser) return;
   document.getElementById('settingsEmail').value = currentUser.email || '';
   renderVoiceClone();
+  if (typeof loadFaith === 'function') await loadFaith();
+  if (typeof renderFaithSettings === 'function') renderFaithSettings();
 
   const prof = await myProfile();
   if (prof){
