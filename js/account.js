@@ -101,11 +101,13 @@ let currentUser = null;
 let authMode = 'login'; // 'login' | 'signup' | 'reset'
 let journalTab = 'received';
 
-// Where Supabase sends people after they click a password-reset email link.
-// This always points at the web site (not a custom app:// scheme) because the
-// link opens in the system browser/mail app, never inside the wrapped native
-// app — same pattern as the sign-up email-confirmation link.
-const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-password.html';
+// Where Supabase sends people after they click an email link. These always
+// point at the web site (not a custom app:// scheme) because the link opens in
+// the system browser/mail app, never inside the wrapped native app — and not at
+// window.location.origin either, which in the native app is capacitor://localhost
+// and is not on Supabase's redirect allow-list.
+const PASSWORD_RESET_REDIRECT_URL = SITE_ORIGIN + '/reset-password.html';
+const EMAIL_CONFIRM_REDIRECT_URL = SITE_ORIGIN + '/';
 
 /* ---------- your profile row ----------
    One row in `profiles` holds your username, your real name, what you call
@@ -359,7 +361,7 @@ async function submitAuth(){
   let data, error;
   try {
     const result = wasSignup
-      ? await sb.auth.signUp({ email, password })
+      ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: EMAIL_CONFIRM_REDIRECT_URL } })
       : await sb.auth.signInWithPassword({ email, password });
     data = result.data; error = result.error;
   } catch (e){
@@ -409,11 +411,89 @@ async function resendSignupConfirmation(emailOverride){
   const { error } = await sb.auth.resend({
     type: 'signup',
     email,
-    options: { emailRedirectTo: window.location.origin + '/' }
+    options: { emailRedirectTo: EMAIL_CONFIRM_REDIRECT_URL }
   });
   if (error){ msg.textContent = error.message || 'Could not resend the confirmation email.'; msg.className='auth-msg err'; return; }
   msg.innerHTML='Confirmation email sent. Check your inbox and spam/junk folder.';
   msg.className='auth-msg ok';
+}
+
+/* ---------- coming back from an email link ----------
+   Supabase drops people back here after a confirmation link, and three
+   different things can be waiting in the URL. None of them were being read, so
+   an expired link and a successful one looked identical: the marketing page,
+   signed out, with nothing said.
+
+   - `error` / `error_description`: the link expired or was already used.
+   - `token_hash` + `type`: the shape that works in *any* browser, because
+     there is no PKCE verifier to match. Set the email templates to use it
+     (see LAUNCH.md) and confirming from a mail app stops being a gamble.
+   - a leftover `code`: supabase-js only exchanges one when it also finds the
+     verifier it wrote at sign-up, which lives in the browser they signed up in.
+     Opened from a mail app, the account is confirmed server-side but the
+     exchange cannot happen here — so say so instead of going quiet. */
+async function handleAuthRedirect(){
+  if (!sb) return;
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+  const pick = (key) => query.get(key) || hash.get(key);
+
+  const errorCode = pick('error') || pick('error_code');
+  const tokenHash = pick('token_hash');
+  const type = pick('type');
+  const leftoverCode = query.get('code');
+  if (!errorCode && !tokenHash && !leftoverCode) return;
+
+  // A recovery link belongs on the page that can set a password.
+  if (!errorCode && tokenHash && type === 'recovery'){
+    window.location.replace('/reset-password.html' + window.location.search + window.location.hash);
+    return;
+  }
+
+  let message = '';
+  let good = false;
+  let offerResend = true;
+  if (errorCode){
+    const described = (pick('error_description') || '').replace(/\+/g, ' ');
+    message = /expired|invalid|already/i.test(described + ' ' + errorCode)
+      ? 'That link has expired or has already been used — send yourself a new one.'
+      : (described ? decodeURIComponent(described) : 'That link could not be used — send yourself a new one.');
+  } else if (tokenHash && type){
+    const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (error){
+      message = 'That link has expired or has already been used — send yourself a new one.';
+    } else {
+      good = true;
+    }
+  } else if (leftoverCode){
+    const { data } = await sb.auth.getSession();
+    if (data.session) good = true;
+    else {
+      // The account is confirmed either way — resending would not help, logging
+      // in would, so don't offer them the wrong door.
+      message = "Your email is confirmed. Because the link opened in a different browser than the one you signed up in, log in here once to finish.";
+      offerResend = false;
+    }
+  }
+
+  clearAuthParamsFromUrl();
+  if (good) return; // onAuthStateChange puts them where they belong.
+
+  openAuthModal('login');
+  const msg = document.getElementById('authMsg');
+  msg.innerHTML = message + (offerResend
+    ? '<br><button type="button" class="auth-inline-btn" onclick="resendSignupConfirmation()">Resend confirmation email</button>'
+    : '');
+  msg.className = offerResend ? 'auth-msg err' : 'auth-msg ok';
+}
+
+/* Tokens and error codes have no business sitting in the address bar once
+   they've been read — or in whatever someone pastes to a friend. */
+function clearAuthParamsFromUrl(){
+  const url = new URL(window.location.href);
+  ['error', 'error_code', 'error_description', 'token_hash', 'type', 'code'].forEach(k => url.searchParams.delete(k));
+  if (/access_token|error|token_hash|type=/.test(url.hash)) url.hash = '';
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
 }
 
 /* ---------------- SIGNUP: username ----------------
@@ -437,6 +517,10 @@ function clearPendingSignupProfile(){
 async function applyPendingSignupProfile(){
   if (!pendingSignupProfile || !sb || !currentUser) return;
   const pending = pendingSignupProfile;
+  // Stashed in localStorage, which outlives the sign-up: if somebody else logs
+  // in on this browser first, the name they picked is not theirs to take.
+  const mine = (pending.email || '').toLowerCase() === (currentUser.email || '').toLowerCase();
+  if (!mine){ clearPendingSignupProfile(); return; }
   const error = await saveProfile({ username: pending.username });
   if (!error) clearPendingSignupProfile();
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){

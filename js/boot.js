@@ -31,20 +31,27 @@ if (sb){
     if (currentUser) savePushToken();
     syncRevenueCatIdentity();
   });
-  sb.auth.getSession().then(({ data }) => {
-    currentUser = data.session ? data.session.user : null;
-    renderAccountArea();
-    if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
-    if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
-    if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
-    if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
-    if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
-    // Reopened on #sanctuary: set the view before rendering, so the stage is
-    // measured while it is on screen rather than while it is still display:none.
-    if (currentUser && location.hash === '#sanctuary' && SANCTUARY_ENABLED){ document.body.setAttribute('data-view','sanctuary'); renderSanctuaryHome(); }
-    // Signed in with nowhere particular to be: open Today, not the sales page.
-    if (currentUser && (!location.hash || location.hash === '#today')){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
-  });
+  // Before anything else decides what to draw: they may have arrived from a
+  // confirmation email, and the answer to that is in the URL. It has to finish
+  // first -- a link that just signed somebody in should land them on Today, and
+  // the code that decides that is the getSession block below.
+  handleAuthRedirect()
+    .catch((e) => console.warn('auth redirect:', e))
+    .then(() => sb.auth.getSession())
+    .then(({ data }) => {
+      currentUser = data.session ? data.session.user : null;
+      renderAccountArea();
+      if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
+      if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
+      if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
+      if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
+      if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
+      // Reopened on #sanctuary: set the view before rendering, so the stage is
+      // measured while it is on screen rather than while it is still display:none.
+      if (currentUser && location.hash === '#sanctuary' && SANCTUARY_ENABLED){ document.body.setAttribute('data-view','sanctuary'); renderSanctuaryHome(); }
+      // Signed in with nowhere particular to be: open Today, not the sales page.
+      if (currentUser && (!location.hash || location.hash === '#today')){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
+    });
 } else {
   renderAccountArea();
 }

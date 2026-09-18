@@ -42,13 +42,53 @@ Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
 
 ## Supabase
 
-Two redirect URLs must be registered:
+### Auth URLs
 
+**Site URL** must be `https://www.subliminallybyfthr.com` — it is where every
+email link lands when nothing else is asked for.
+
+Redirect URLs to register (Authentication -> URL Configuration):
+
+- `https://www.subliminallybyfthr.com/**`
 - `https://www.subliminallybyfthr.com/reset-password.html`
 - `com.fthr.subliminally://login-callback`
 
 And the Google OAuth consent screen needs its **App name** set, or the sign-in
 sheet shows the Supabase project id instead of "Subliminally by FTHR".
+
+### Email templates
+
+The stock templates use `{{ .ConfirmationURL }}`, which carries a PKCE code —
+and a PKCE code can only be redeemed by the browser that started the sign-up.
+Opened from a mail app, which is where most people open it, there is nothing to
+redeem it with. `{{ .TokenHash }}` has no such tie, so use these instead:
+
+**Confirm signup**
+
+```
+<a href="{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>
+```
+
+**Reset password**
+
+```
+<a href="{{ .SiteURL }}/reset-password.html?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>
+```
+
+The site reads both shapes, so nothing breaks while the templates are still the
+stock ones — they are just less reliable.
+
+### SMTP
+
+Supabase's built-in email sender is for development: a few messages an hour,
+shared across everyone on it, no delivery guarantee. It is why confirmation
+emails arrive for some people and not others. Configure custom SMTP under
+Authentication -> Emails -> SMTP Settings (Resend, Postmark and SendGrid all
+work) and send from a subdomain of `subliminallybyfthr.com` with SPF, DKIM and
+DMARC set in DNS, or Gmail will bin it.
+
+Leave **Confirm email** on (Authentication -> Sign In / Providers -> Email).
+The site is written for it and tells people to go and check their inbox.
 
 ## Migrations
 
@@ -65,3 +105,4 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260919_higher_self.sql` | run |
 | `20260920_usernames_and_avatar.sql` | run |
 | `20260921_light.sql` | run |
+| `20260930_auth_profile_writes.sql` | run |

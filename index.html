@@ -785,6 +785,11 @@
   .auth-msg{ font-size:12.5px; min-height:16px; margin-top:10px; }
   .auth-msg.err{ color:#E39A9A; }
   .auth-msg.ok{ color:var(--candle); }
+  /* The "Resend confirmation email" button the auth messages offer. It has been
+     in the markup all along with no rule to its name, so it rendered as a grey
+     system button in a dark modal — the one way out for somebody whose email
+     never arrived, and the hardest thing on the panel to see. */
+  .auth-inline-btn{ background:none; border:none; color:var(--lilac); cursor:pointer; font-size:12.5px; padding:4px 0 0; text-decoration:underline; font-family:inherit; }
   .auth-toggle{ text-align:center; font-size:12.5px; color:var(--haze); margin-top:16px; }
   .auth-toggle button{ background:none; border:none; color:var(--lilac); cursor:pointer; font-size:12.5px; padding:0; }
 

@@ -6,7 +6,8 @@
   "scripts": {
     "cap:sync": "node scripts/sync-web-assets.js && cap sync",
     "cap:ios": "npm run cap:sync && cap open ios",
-    "cap:android": "npm run cap:sync && cap open android"
+    "cap:android": "npm run cap:sync && cap open android",
+    "test:auth": "node scripts/test-auth-flow.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
