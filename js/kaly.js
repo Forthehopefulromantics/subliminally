@@ -6,7 +6,7 @@
    see the ones loaded before it. Order matters — see index.html. */
 
 /* ---------- who you are, and who you are becoming ----------
-   Eighteen identities, each drawn twice. `hero` is you as you are today -- cargo
+   Nineteen identities, each drawn twice. `hero` is you as you are today -- cargo
    trousers, headphones, a bag over the shoulder. `keeper` is the same person
    as your highest self, in the long starry robe, holding light. Same face,
    same hair, further along.
@@ -40,6 +40,7 @@ const AVATAR_PACK = [
   { id:'lavender-hijab',       label:'Lavender hijab',        look:'a lavender hijab and headphones to match' },
   { id:'facial-piercings',     label:'Dark hair and piercings', look:'fair skin, dark hair, and subtle facial piercings' },
   { id:'east-asian',           label:'Dark hair, warm eyes',  look:'dark hair and warm dark eyes' },
+  { id:'waist-length-black',   label:'Waist-length black hair', look:'deep brown skin, waist-length straight black hair, and warm brown eyes' },
   { id:'black-twists',         label:'Two-strand twists',     look:'deep brown skin, short two-strand twists, and warm brown eyes' },
   { id:'east-asian-crop',      label:'Textured black crop',   look:'light skin, a textured black crop, and dark brown eyes' },
   { id:'latino-waves',         label:'Dark wavy fade',        look:'warm tan skin, a dark wavy fade, and dark brown eyes' },
