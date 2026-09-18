@@ -62,7 +62,7 @@ const AVATAR_CUTS = { full:'', thumb:'-t', face:'-face' };
 function avatarSrc(id, state, cut){
   const st = AVATAR_STATES.includes(state) ? state : 'keeper';
   const entry = avatarEntry(id);
-  if (entry.external) return `img/avatar/${entry.asset}-${st}.webp`;
+  if (entry.external) return `img/avatar-new/${entry.asset}-${st}.webp`;
   return `img/avatar/${avatarId(id)}-${st}${AVATAR_CUTS[cut] || ''}.webp`;
 }
 /* Alt text says which of the two this is, because on a page that shows both
