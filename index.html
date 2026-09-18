@@ -788,6 +788,79 @@
   .auth-toggle{ text-align:center; font-size:12.5px; color:var(--haze); margin-top:16px; }
   .auth-toggle button{ background:none; border:none; color:var(--lilac); cursor:pointer; font-size:12.5px; padding:0; }
 
+  /* ---- the welcome questionnaire, one question at a time ----
+     Same questions, same words, same single save at the end. Ten of them
+     stacked in one modal is a form, and a form on a phone is work, so they
+     are asked one per screen with a bar to say how far in you are.
+
+     Everything here is scoped to #onboardOverlay on purpose: the chips and
+     the avatar roster are borrowed from the builder and the profile page,
+     and they have to keep behaving there exactly as they did. */
+  .ob-card{ display:flex; flex-direction:column; max-width:460px;
+    padding:20px 22px calc(18px + env(safe-area-inset-bottom));
+    max-height:760px; max-height:min(92svh, 760px); }
+  #onboardOverlay{ -webkit-tap-highlight-color:transparent; }
+  #onboardOverlay [hidden]{ display:none !important; }
+  /* A tap should register as a tap, not wait to see whether a second one is
+     coming -- that wait is most of what "it didn't respond the first time"
+     actually is on iOS. */
+  #onboardOverlay button, #onboardOverlay .length-chip, #onboardOverlay .av-opt{
+    touch-action:manipulation; }
+  /* 16px or Safari zooms the whole card in the moment a field is focused. */
+  #onboardOverlay .auth-field input{ font-size:16px; padding:14px; }
+  .ob-head{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .ob-progress{ flex:1; height:4px; border-radius:999px; background:var(--dusk); overflow:hidden; }
+  .ob-progress i{ display:block; height:100%; width:0; border-radius:999px;
+    background:linear-gradient(90deg, var(--lilac), var(--candle)); transition:width .28s ease; }
+  .ob-count{ flex-shrink:0; font-size:11.5px; color:var(--haze); font-variant-numeric:tabular-nums; }
+  .ob-steps{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; margin-top:18px; }
+  .ob-step{ display:none; }
+  .ob-step.is-active{ display:block; animation:ob-in .18s ease-out both; }
+  .ob-steps[data-dir="back"] .ob-step.is-active{ animation-name:ob-in-back; }
+  @keyframes ob-in{ from{ opacity:0; transform:translateX(16px); } to{ opacity:1; transform:none; } }
+  @keyframes ob-in-back{ from{ opacity:0; transform:translateX(-16px); } to{ opacity:1; transform:none; } }
+  .ob-q{ font-size:20px; font-weight:inherit; line-height:1.3; outline:none; }
+  .ob-note{ font-size:12px; color:var(--haze); line-height:1.6; margin-top:9px; }
+  .ob-step .auth-field:first-of-type{ margin-top:14px; }
+  /* One column, so the answer and its whole card are the same target. */
+  .ob-choices{ display:grid; grid-template-columns:1fr; gap:9px; margin-top:14px; }
+  #onboardOverlay .length-chip{ display:flex; align-items:center; gap:10px; width:100%;
+    min-height:54px; padding:14px 16px; text-align:left; font-size:14.5px; }
+  #onboardOverlay .length-chip::after{ content:"✓"; margin-left:auto; font-size:13px;
+    color:var(--lilac); opacity:0; transform:scale(.7);
+    transition:opacity .14s ease, transform .14s ease; }
+  #onboardOverlay .length-chip.sel::after{ opacity:1; transform:none; }
+  /* The chip's own selected tint was tuned for a dark card and all but
+     disappears against the day sky. Same colour, said loudly enough to read
+     the answer from across the room on either one. */
+  #onboardOverlay .length-chip.sel{ color:var(--lilac); box-shadow:inset 0 0 0 2px var(--lilac); }
+  /* On its own screen the roster has the room to be tappable rather than tidy. */
+  #onboardOverlay .av-roster-onboard{ grid-template-columns:repeat(auto-fill, minmax(84px,1fr));
+    gap:10px; max-height:none; overflow:visible; }
+  /* Hover belongs to pointers. On a touchscreen it is a state you get stuck in
+     after the first tap, which is exactly the tap that felt ignored. */
+  @media (hover:none){ #onboardOverlay .av-opt:hover, #onboardOverlay .btn:hover{ transform:none; box-shadow:none; } }
+  #onboardOverlay .length-chip, #onboardOverlay .av-opt, #onboardOverlay .btn{
+    transition:transform .12s ease, border-color .15s ease, background-color .15s ease, color .15s ease, opacity .15s ease; }
+  #onboardOverlay .is-pressed{ transform:scale(.97); filter:brightness(1.1); }
+  #onboardOverlay .btn:disabled{ opacity:.6; cursor:default; }
+  .ob-foot{ flex-shrink:0; padding-top:14px; }
+  .ob-nav{ display:flex; gap:10px; }
+  .ob-nav .btn{ min-height:52px; justify-content:center; padding:15px 20px; }
+  #obBackBtn{ flex:0 0 104px; }
+  #obNextBtn, #obSubmitBtn{ flex:1; }
+  @media (max-width:520px){
+    #onboardOverlay{ padding:0; align-items:stretch; }
+    .ob-card{ max-width:none; width:100%; border:none; border-radius:0;
+      max-height:none; min-height:100vh; min-height:100svh;
+      padding:calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom)); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ob-step.is-active{ animation:none; }
+    .ob-progress i{ transition:none; }
+    #onboardOverlay .is-pressed{ transform:none; }
+  }
+
   /* ---- journal ---- */
   .journal-section{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   .journal-section:has(> .page-head){ border-top:none; }
@@ -1575,71 +1648,125 @@
 </div>
 
 <!-- ============ PERSONALIZED ONBOARDING (shown once after sign-up) ============ -->
+<!-- One question per screen. The fields themselves are unchanged and still
+     carry the same ids, so the single save at the end reads exactly what it
+     always did; stepping backwards shows what you typed because it was never
+     taken off the page in the first place. -->
 <div class="modal-overlay" id="onboardOverlay">
-  <div class="modal-card" style="max-width:620px;">
-    <div class="modal-title">Welcome to Subliminally ✦</div>
-    <div class="modal-sub">Meet the version of you you're becoming. Nothing here is permanent; your preferences can grow with you.</div>
-    <div class="auth-field">
-      <label>What should we call you?</label>
-      <input type="text" id="obName" placeholder="Your first name" autocomplete="given-name">
+  <div class="modal-card ob-card" role="dialog" aria-modal="true" aria-label="Personalize Subliminally">
+    <div class="ob-head">
+      <div class="ob-progress" id="obProgress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="How far through setup you are"><i id="obProgressFill"></i></div>
+      <div class="ob-count" id="obStepCount">1 of 11</div>
     </div>
-    <div class="auth-field">
-      <label>Choose a username</label>
-      <input type="text" id="obUsername" placeholder="how others will find you" autocomplete="off">
+
+    <div class="ob-steps" id="obSteps" data-dir="forward">
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Welcome to Subliminally ✦<br>What should we call you?</h2>
+        <p class="modal-sub">Meet the version of you you're becoming. Nothing here is permanent; your preferences can grow with you.</p>
+        <div class="auth-field">
+          <input type="text" id="obName" placeholder="Your first name" autocomplete="given-name" enterkeyhint="next">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Choose a username</h2>
+        <p class="modal-sub">How others will find you.</p>
+        <div class="auth-field">
+          <input type="text" id="obUsername" placeholder="how others will find you" autocomplete="off" enterkeyhint="next">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Who are you becoming?</h2>
+        <p class="modal-sub">Name your highest self or alter ego.</p>
+        <div class="auth-field">
+          <input type="text" id="obHigherSelfName" placeholder="Name your highest self or alter ego" maxlength="24" enterkeyhint="next">
+          <p class="ob-note">Your Higher Self will guide parts of your experience using the avatar you choose next.</p>
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Choose your Higher Self</h2>
+        <p class="modal-sub">Tap the one you see yourself in. You can change her later.</p>
+        <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Your top three desires</h2>
+        <p class="modal-sub">What you are calling in.</p>
+        <div class="auth-field">
+          <div style="display:grid;gap:8px;">
+            <input type="text" name="obDesire" placeholder="1. What are you calling in?" enterkeyhint="next">
+            <input type="text" name="obDesire" placeholder="2. What do you want to become or experience?" enterkeyhint="next">
+            <input type="text" name="obDesire" placeholder="3. What would change your life?" enterkeyhint="next">
+          </div>
+          <p class="ob-note">Don't worry. You can change these as you grow or achieve them.</p>
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">What are you working through right now?</h2>
+        <p class="modal-sub">Optional — skip it if you'd rather not say.</p>
+        <div class="auth-field">
+          <input type="text" id="obStruggle" placeholder="Self-confidence, consistency, sleep, money mindset…" enterkeyhint="next">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">What would you most like Subliminally to help you achieve?</h2>
+        <p class="modal-sub">Tell your Higher Self where you're headed.</p>
+        <div class="auth-field">
+          <input type="text" id="obGoal" placeholder="Tell your Higher Self where you're headed" enterkeyhint="next">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">What language feels true to you?</h2>
+        <p class="modal-sub">Optional. This only changes the spiritual language we use, and you can change it anytime in Settings.</p>
+        <div class="ob-choices" id="obFaithChips"></div>
+        <div class="auth-field">
+          <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none;">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">Phone</h2>
+        <p class="modal-sub">Optional — for account updates, if you'd like.</p>
+        <div class="auth-field">
+          <input type="tel" id="obPhone" placeholder="For account updates, if you'd like" autocomplete="tel" enterkeyhint="next">
+        </div>
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">How did you hear about us?</h2>
+        <p class="modal-sub">It helps us know where to show up.</p>
+        <!-- Was a native select. Drawn as cards so the answer and its tap
+             target are the same thing; the hidden field below is what the
+             save still reads. -->
+        <div class="ob-choices" id="obSourceChips"></div>
+        <input type="hidden" id="obSource" value="">
+      </section>
+
+      <section class="ob-step" data-ob-step>
+        <h2 class="modal-title ob-q">That's everything ✦</h2>
+        <p class="modal-sub">Your Higher Self is ready when you are.</p>
+        <div class="auth-field" style="padding:14px;border:1px solid var(--dusk);border-radius:16px;background:var(--veil);">
+          <div style="font-family:var(--serif);color:var(--candle);margin-bottom:5px;">A note on subliminals</div>
+          <p style="font-size:12.5px;color:var(--haze);line-height:1.6;">Subliminals are one tool for reinforcing the thoughts and intentions you choose. Subliminally combines repetition with your own goals, routines and reflection rather than treating audio as a magic shortcut.</p>
+        </div>
+      </section>
     </div>
-    <div class="auth-field">
-      <label>Who are you becoming?</label>
-      <input type="text" id="obHigherSelfName" placeholder="Name your highest self or alter ego" maxlength="24">
-      <p style="font-size:12px;color:var(--haze);margin-top:6px;">Your Higher Self will guide parts of your experience using the avatar you choose below.</p>
-    </div>
-    <div class="auth-field">
-      <label>Your top three desires</label>
-      <div style="display:grid;gap:8px;">
-        <input type="text" name="obDesire" placeholder="1. What are you calling in?">
-        <input type="text" name="obDesire" placeholder="2. What do you want to become or experience?">
-        <input type="text" name="obDesire" placeholder="3. What would change your life?">
-      </div>
-      <p style="font-size:12px;color:var(--haze);margin-top:6px;">Don't worry. You can change these as you grow or achieve them.</p>
-    </div>
-    <div class="auth-field">
-      <label>What are you working through right now? <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
-      <input type="text" id="obStruggle" placeholder="Self-confidence, consistency, sleep, money mindset…">
-    </div>
-    <div class="auth-field">
-      <label>What would you most like Subliminally to help you achieve?</label>
-      <input type="text" id="obGoal" placeholder="Tell your Higher Self where you're headed">
-    </div>
-    <div class="auth-field" style="padding:14px;border:1px solid var(--dusk);border-radius:16px;background:var(--veil);">
-      <div style="font-family:var(--serif);color:var(--candle);margin-bottom:5px;">A note on subliminals</div>
-      <p style="font-size:12.5px;color:var(--haze);line-height:1.6;">Subliminals are one tool for reinforcing the thoughts and intentions you choose. Subliminally combines repetition with your own goals, routines and reflection rather than treating audio as a magic shortcut.</p>
-    </div>
-    <div class="auth-field">
-      <label>What language feels true to you? <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
-      <p style="font-size:12px;color:var(--haze);margin:0 0 9px;">This only changes the spiritual language we use. You can change it anytime in Settings.</p>
-      <div class="length-chip-grid" id="obFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
-      <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none;margin-top:9px;">
-    </div>
-    <div class="auth-field">
-      <label>Choose your Higher Self</label>
-      <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
-    </div>
-    <div class="auth-field">
-      <label>Phone <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
-      <input type="tel" id="obPhone" placeholder="For account updates, if you'd like" autocomplete="tel">
-    </div>
-    <div class="auth-field">
-      <label>How did you hear about us?</label>
-      <select id="obSource">
-        <option value="">Select one…</option><option value="social_media">Social media</option>
-        <option value="influencer">An influencer / creator</option><option value="google_search">Google search</option>
-        <option value="friend_family">Friend or family</option><option value="app_store">App Store / Play Store</option>
-        <option value="other">Something else</option>
-      </select>
-    </div>
+
     <input type="hidden" id="obReason" value="">
-    <div class="auth-msg" id="onboardMsg"></div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOnboarding()">Meet my Higher Self ✦</button>
-    <div class="auth-toggle"><button onclick="skipOnboarding()">I'll personalize later</button></div>
+    <div class="ob-foot">
+      <div class="auth-msg" id="onboardMsg"></div>
+      <div class="ob-nav">
+        <button type="button" class="btn btn-ghost" id="obBackBtn" onclick="obBack()" hidden>Back</button>
+        <button type="button" class="btn btn-primary" id="obNextBtn" onclick="obNext()">Continue</button>
+        <button type="button" class="btn btn-primary" id="obSubmitBtn" onclick="submitOnboarding()" hidden>Meet my Higher Self ✦</button>
+      </div>
+      <div class="auth-toggle"><button type="button" id="obSkipBtn" onclick="skipOnboarding()">I'll personalize later</button></div>
+    </div>
   </div>
 </div>
 

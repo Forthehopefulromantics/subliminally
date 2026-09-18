@@ -117,14 +117,29 @@ function renderFaithChips(){
   if (!wrap) return;
   wrap.innerHTML = FAITHS.map(f =>
     `<button type="button" class="length-chip${f.id === myFaith.id ? ' sel' : ''}"
-       data-faith="${f.id}" onclick="pickFaith(this)">${f.label}</button>`).join('');
+       data-faith="${f.id}" aria-pressed="${f.id === myFaith.id}" onclick="pickFaith(this)">${f.label}</button>`).join('');
+  syncFaithOtherField();
+}
+function syncFaithOtherField(reveal){
   const other = document.getElementById('obFaithOther');
-  if (other) other.style.display = myFaith.id === 'other' ? 'block' : 'none';
+  if (!other) return;
+  other.style.display = myFaith.id === 'other' ? 'block' : 'none';
+  // A box that opens below the fold has not opened as far as the person is
+  // concerned, so bring it up to meet them.
+  if (reveal && myFaith.id === 'other' && other.scrollIntoView){
+    requestAnimationFrame(() => other.scrollIntoView({ block:'nearest', behavior:'smooth' }));
+  }
 }
 function pickFaith(btn){
+  if (typeof obBusy !== 'undefined' && obBusy) return;
   const id = btn.dataset.faith;
   myFaith = { id, own: id === 'other' ? myFaith.own : '' };
-  renderFaithChips();
+  /* Marked where it stands. Redrawing the list would replace the chip the
+     finger is still on, and the highlight would never be seen. */
+  if (typeof obMarkSelected === 'function') obMarkSelected(btn); else renderFaithChips();
+  syncFaithOtherField(true);
+  /* 'Something else' opens a box to write in, so that one stays put. */
+  if (id !== 'other' && typeof obAdvanceAfterPick === 'function') obAdvanceAfterPick();
 }
 function faithAnswerForSave(){
   const other = document.getElementById('obFaithOther');

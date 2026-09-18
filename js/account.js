@@ -445,12 +445,139 @@ async function applyPendingSignupProfile(){
   }
 }
 
-/* ---------------- ONBOARDING: username ---------------- */
+/* ---------------- ONBOARDING: username ----------------
+
+   The questions and the answers they save are the same as they always were;
+   they are asked one screen at a time now. The state lives in the inputs
+   themselves and nothing is ever taken off the page, so going back shows you
+   what you typed without anything having to remember it.
+
+   Two flags do the rest of the work. `obBusy` is held for the beat between a
+   single-select answer lighting up and the screen moving, and it is what makes
+   a second tap in that window do nothing. `obSubmitting` is the same idea for
+   the one save at the end. */
+let obStepIndex = 0;
+let obSteps = [];
+let obBusy = false;
+let obSubmitting = false;
+
+function obCollectSteps(){
+  obSteps = Array.from(document.querySelectorAll('#obSteps [data-ob-step]'));
+}
+function obGoToStep(i, dir){
+  if (!obSteps.length) obCollectSteps();
+  if (!obSteps.length) return;
+  const wrap = document.getElementById('obSteps');
+  const next = Math.max(0, Math.min(obSteps.length - 1, i));
+  if (wrap) wrap.dataset.dir = dir === 'back' ? 'back' : 'forward';
+  obSteps.forEach((s, idx) => s.classList.toggle('is-active', idx === next));
+  obStepIndex = next;
+  if (wrap) wrap.scrollTop = 0;
+  obPaintProgress();
+  obPaintNav();
+  obFocusStep();
+}
+function obPaintProgress(){
+  const total = obSteps.length || 1;
+  const pct = Math.round(((obStepIndex + 1) / total) * 100);
+  const fill = document.getElementById('obProgressFill');
+  const bar = document.getElementById('obProgress');
+  const count = document.getElementById('obStepCount');
+  if (fill) fill.style.width = pct + '%';
+  if (bar) bar.setAttribute('aria-valuenow', String(pct));
+  if (count) count.textContent = (obStepIndex + 1) + ' of ' + total;
+}
+function obPaintNav(){
+  const last = obStepIndex === obSteps.length - 1;
+  const back = document.getElementById('obBackBtn');
+  const next = document.getElementById('obNextBtn');
+  const submit = document.getElementById('obSubmitBtn');
+  if (back) back.hidden = obStepIndex === 0;
+  if (next) next.hidden = last;
+  if (submit) submit.hidden = !last;
+}
+/* A keyboard that opens by itself is help on a laptop and an ambush on a
+   phone, where it covers half the question it was meant to answer. So: focus
+   the field where there's a real pointer, and only move the reading position
+   to the question everywhere else. */
+function obFocusStep(){
+  const step = obSteps[obStepIndex];
+  if (!step) return;
+  const fine = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+  const input = step.querySelector('input:not([type=hidden])');
+  const target = (fine && input) ? input : step.querySelector('.ob-q');
+  if (!target) return;
+  if (target.classList && target.classList.contains('ob-q')) target.setAttribute('tabindex', '-1');
+  try { target.focus({ preventScroll:true }); } catch(e){ try { target.focus(); } catch(e2){} }
+}
+function obNext(){ if (obBusy) return; obGoToStep(obStepIndex + 1, 'forward'); }
+function obBack(){ if (obBusy) return; obGoToStep(obStepIndex - 1, 'back'); }
+
+/* Marks the button that was tapped, in place. The old code redrew the whole
+   list on every pick, which threw away the element under the finger before it
+   could show anything -- the tap looked ignored, and the highlight only turned
+   up on the second one. */
+function obMarkSelected(btn){
+  const group = btn.parentElement;
+  if (group) Array.from(group.querySelectorAll('.sel')).forEach(el => {
+    el.classList.remove('sel');
+    if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', 'false');
+  });
+  btn.classList.add('sel');
+  if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', 'true');
+}
+/* The highlight has to be on screen before anything moves, or the answer reads
+   as "nothing happened, then the page jumped". One frame to paint it, a short
+   beat to be seen, then the next question. */
+function obAdvanceAfterPick(){
+  if (obBusy) return;
+  if (obStepIndex >= obSteps.length - 1) return;
+  obBusy = true;
+  requestAnimationFrame(() => setTimeout(() => {
+    obBusy = false;
+    obGoToStep(obStepIndex + 1, 'forward');
+  }, 240));
+}
+
+/* Pressed feedback, bound once on the overlay. It is a class rather than
+   :active because Safari only applies :active to some elements once a touch
+   listener exists, and "some" is not a thing to ship a tap state on. */
+function obBindTouchFeedback(){
+  const overlay = document.getElementById('onboardOverlay');
+  if (!overlay || overlay.dataset.obBound) return;
+  overlay.dataset.obBound = '1';
+  const clear = () => Array.from(overlay.querySelectorAll('.is-pressed'))
+    .forEach(el => el.classList.remove('is-pressed'));
+  overlay.addEventListener('pointerdown', e => {
+    const t = e.target.closest && e.target.closest('button, .length-chip, .av-opt');
+    if (t && overlay.contains(t) && !t.disabled) t.classList.add('is-pressed');
+  }, { passive:true });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev =>
+    overlay.addEventListener(ev, clear, { passive:true }));
+  window.addEventListener('pointerup', clear, { passive:true });
+  overlay.addEventListener('touchstart', () => {}, { passive:true });
+  // Return on a field means "next question", the way it would on any form.
+  overlay.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target || e.target.tagName !== 'INPUT') return;
+    e.preventDefault();
+    if (obStepIndex === obSteps.length - 1) submitOnboarding(); else obNext();
+  });
+}
+
 function openOnboardingModal(){
   document.getElementById('onboardOverlay').classList.add('open');
-  // Both of these are drawn from lists in JS, so they are empty until asked for.
+  obBusy = false;
+  obSubmitting = false;
+  obSetSubmitting(false);
+  const msg = document.getElementById('onboardMsg');
+  if (msg){ msg.textContent = ''; msg.className = 'auth-msg'; }
+  // These are drawn from lists in JS, so they are empty until asked for.
   if (typeof renderFaithChips === 'function') renderFaithChips();
   renderOnboardAvatars();
+  renderOnboardSource();
+  obCollectSteps();
+  obBindTouchFeedback();
+  obGoToStep(0, 'forward');
 }
 /* The same roster as the profile page, at the moment it actually matters --
    you are deciding who you are here, so it belongs with your name, not three
@@ -460,21 +587,75 @@ function renderOnboardAvatars(){
   if (!wrap || typeof AVATAR_PACK === 'undefined') return;
   wrap.innerHTML = AVATAR_PACK.map(a =>
     `<button type="button" class="av-opt${a.id === higherSelf.avatar ? ' sel' : ''}"
-       onclick="pickOnboardAvatar('${a.id}')" aria-pressed="${a.id === higherSelf.avatar}"
+       onclick="pickOnboardAvatar(this)" data-ob-avatar="${a.id}" aria-pressed="${a.id === higherSelf.avatar}"
        title="${a.label}" aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('');
 }
 /* Held until Finish setup, rather than written on every tap: there is no
    account row worth writing to yet, and the whole modal saves at once. */
-function pickOnboardAvatar(id){
+function pickOnboardAvatar(btn){
+  if (obBusy) return;
+  const el = typeof btn === 'string' ? null : btn;
+  const id = el ? el.dataset.obAvatar : btn;
   higherSelf.avatar = avatarId(id);
-  renderOnboardAvatars();
+  if (el) obMarkSelected(el); else renderOnboardAvatars();
+  obAdvanceAfterPick();
 }
-function closeOnboardingModal(){ document.getElementById('onboardOverlay').classList.remove('open'); }
-function skipOnboarding(){ closeOnboardingModal(); }
+
+/* Was a native <select>. Drawn as cards so the answer and its tap target are
+   the same shape, and so it behaves like every other answer in here; the
+   hidden #obSource field underneath is still what the save reads. */
+const OB_SOURCES = [
+  { id:'social_media',  label:'Social media' },
+  { id:'influencer',    label:'An influencer / creator' },
+  { id:'google_search', label:'Google search' },
+  { id:'friend_family', label:'Friend or family' },
+  { id:'app_store',     label:'App Store / Play Store' },
+  { id:'other',         label:'Something else' },
+];
+function renderOnboardSource(){
+  const wrap = document.getElementById('obSourceChips');
+  const field = document.getElementById('obSource');
+  if (!wrap) return;
+  const cur = field ? field.value : '';
+  wrap.innerHTML = OB_SOURCES.map(s =>
+    `<button type="button" class="length-chip${s.id === cur ? ' sel' : ''}" data-ob-source="${s.id}"
+       aria-pressed="${s.id === cur}" onclick="pickOnboardSource(this)">${s.label}</button>`).join('');
+}
+function pickOnboardSource(btn){
+  if (obBusy) return;
+  const field = document.getElementById('obSource');
+  if (field) field.value = btn.dataset.obSource;
+  obMarkSelected(btn);
+  obAdvanceAfterPick();
+}
+
+function obSetSubmitting(on){
+  const btn = document.getElementById('obSubmitBtn');
+  const skip = document.getElementById('obSkipBtn');
+  const back = document.getElementById('obBackBtn');
+  if (btn){
+    btn.disabled = on;
+    btn.setAttribute('aria-busy', on ? 'true' : 'false');
+    btn.textContent = on ? 'Saving…' : 'Meet my Higher Self ✦';
+  }
+  if (skip) skip.disabled = on;
+  if (back) back.disabled = on;
+}
+function closeOnboardingModal(){
+  document.getElementById('onboardOverlay').classList.remove('open');
+  obBusy = false;
+  obSubmitting = false;
+  obSetSubmitting(false);
+}
+function skipOnboarding(){ if (obSubmitting) return; closeOnboardingModal(); }
 
 async function submitOnboarding(){
   const msg = document.getElementById('onboardMsg');
+  // One save. A second tap while the first is in flight is the same tap.
+  if (obSubmitting) return;
   if (!sb || !currentUser){ closeOnboardingModal(); return; }
+  obSubmitting = true;
+  obSetSubmitting(true);
   const username = document.getElementById('obUsername').value.trim();
   const patch = {
     full_name: document.getElementById('obName').value.trim() || null,
@@ -492,8 +673,14 @@ async function submitOnboarding(){
   msg.textContent = 'Saving…'; msg.className = 'auth-msg';
   const error = await saveProfile(patch);
   if (error){
+    obSubmitting = false;
+    obSetSubmitting(false);
     if (error.message && error.message.toLowerCase().includes('duplicate')){
+      // The username is three screens back; take them there rather than
+      // leaving the fix somewhere they can no longer see.
       msg.textContent = 'That username is taken — try another.'; msg.className = 'auth-msg err';
+      const idx = obSteps.findIndex(s => s.querySelector('#obUsername'));
+      if (idx > -1) obGoToStep(idx, 'back');
     } else {
       msg.textContent = "Couldn't save — you can skip for now."; msg.className = 'auth-msg err';
     }
