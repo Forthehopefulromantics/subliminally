@@ -112,8 +112,12 @@
   body[data-sky="night"]{ --hero-wash:rgba(20,16,44,.78); }
   .hero > *:not(.hero-bg){ position:relative; z-index:1; }
   .orb-wrap{ width:180px; height:180px; position:relative; }
-  .orb{ position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 36% 30%, rgba(185,167,232,0.55), transparent 60%), radial-gradient(circle at 68% 72%, rgba(227,190,127,0.42), transparent 55%), radial-gradient(circle, #2E2650, var(--midnight-2) 75%); box-shadow:0 0 90px rgba(185,167,232,0.25), inset 0 0 50px rgba(227,190,127,0.18); animation:breathe 6s ease-in-out infinite; }
-  .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 40% 35%, rgba(237,233,246,0.14), transparent 65%); animation:breathe 6s ease-in-out infinite reverse; }
+  .orb{ position:absolute; inset:0; border-radius:50%; animation:breathe 6s ease-in-out infinite; transition:background .5s ease, box-shadow .5s ease; }
+  body[data-sky="day"] .orb{ background:radial-gradient(circle at 38% 34%,#fffbe5 0 10%,#ffe8a3 34%,#f6bf57 72%,#e79a38 100%); box-shadow:0 0 42px rgba(255,210,108,.72),0 0 100px rgba(255,188,76,.36),inset -18px -20px 32px rgba(203,126,32,.18); }
+  body[data-sky="night"] .orb{ background:radial-gradient(circle at 34% 30%,#fff 0 7%,#e9e8ef 34%,#c9c8d1 72%,#aaa9b3 100%); box-shadow:0 0 34px rgba(230,229,255,.42),0 0 92px rgba(185,167,232,.25),inset -18px -18px 28px rgba(75,72,91,.22); }
+  .orb::after{ content:''; position:absolute; inset:0; border-radius:50%; opacity:0; transition:opacity .5s; background:radial-gradient(circle at 67% 38%,rgba(105,103,116,.16) 0 5%,transparent 6%),radial-gradient(circle at 35% 66%,rgba(105,103,116,.13) 0 7%,transparent 8%),radial-gradient(circle at 56% 72%,rgba(105,103,116,.11) 0 4%,transparent 5%); }
+  body[data-sky="night"] .orb::after{ opacity:1; }
+  .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.16),transparent 65%); animation:breathe 6s ease-in-out infinite reverse; }
   @keyframes breathe{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.09);} }
   @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
   .motto{ font-size:13px; letter-spacing:.1em; color:var(--haze); }
@@ -1571,55 +1575,72 @@
   </div>
 </div>
 
-<!-- ============ ONBOARDING QUESTIONNAIRE (shown once, right after sign-up) ============ -->
+<!-- ============ PERSONALIZED ONBOARDING (shown once after sign-up) ============ -->
 <div class="modal-overlay" id="onboardOverlay">
-  <div class="modal-card">
-    <div class="modal-title">Welcome in</div>
-    <div class="modal-sub">A couple quick questions — helps us build the right thing.</div>
+  <div class="modal-card" style="max-width:620px;">
+    <div class="modal-title">Welcome to Subliminally ✦</div>
+    <div class="modal-sub">Meet the version of you you're becoming. Nothing here is permanent; your preferences can grow with you.</div>
     <div class="auth-field">
-      <label>Your name</label>
-      <input type="text" id="obName" placeholder="First name is fine" autocomplete="given-name">
+      <label>What should we call you?</label>
+      <input type="text" id="obName" placeholder="Your first name" autocomplete="given-name">
     </div>
     <div class="auth-field">
-      <label>Username</label>
+      <label>Choose a username</label>
       <input type="text" id="obUsername" placeholder="how others will find you" autocomplete="off">
     </div>
     <div class="auth-field">
-      <label>Phone <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
-      <input type="tel" id="obPhone" placeholder="For early-access texts, if you'd like" autocomplete="tel">
+      <label>Who are you becoming?</label>
+      <input type="text" id="obHigherSelfName" placeholder="Name your highest self or alter ego" maxlength="24">
+      <p style="font-size:12px;color:var(--haze);margin-top:6px;">Your Higher Self will guide parts of your experience using the avatar you choose below.</p>
     </div>
     <div class="auth-field">
-      <label>How'd you find us?</label>
+      <label>Your top three desires</label>
+      <div style="display:grid;gap:8px;">
+        <input type="text" name="obDesire" placeholder="1. What are you calling in?">
+        <input type="text" name="obDesire" placeholder="2. What do you want to become or experience?">
+        <input type="text" name="obDesire" placeholder="3. What would change your life?">
+      </div>
+      <p style="font-size:12px;color:var(--haze);margin-top:6px;">Don't worry. You can change these as you grow or achieve them.</p>
+    </div>
+    <div class="auth-field">
+      <label>What are you working through right now? <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
+      <input type="text" id="obStruggle" placeholder="Self-confidence, consistency, sleep, money mindset…">
+    </div>
+    <div class="auth-field">
+      <label>What would you most like Subliminally to help you achieve?</label>
+      <input type="text" id="obGoal" placeholder="Tell your Higher Self where you're headed">
+    </div>
+    <div class="auth-field" style="padding:14px;border:1px solid var(--dusk);border-radius:16px;background:var(--veil);">
+      <div style="font-family:var(--serif);color:var(--candle);margin-bottom:5px;">A note on subliminals</div>
+      <p style="font-size:12.5px;color:var(--haze);line-height:1.6;">Subliminals are one tool for reinforcing the thoughts and intentions you choose. Subliminally combines repetition with your own goals, routines and reflection rather than treating audio as a magic shortcut.</p>
+    </div>
+    <div class="auth-field">
+      <label>What language feels true to you? <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
+      <p style="font-size:12px;color:var(--haze);margin:0 0 9px;">This only changes the spiritual language we use. You can change it anytime in Settings.</p>
+      <div class="length-chip-grid" id="obFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
+      <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none;margin-top:9px;">
+    </div>
+    <div class="auth-field">
+      <label>Choose your Higher Self</label>
+      <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
+    </div>
+    <div class="auth-field">
+      <label>Phone <span style="color:var(--haze);font-weight:400;">(optional)</span></label>
+      <input type="tel" id="obPhone" placeholder="For account updates, if you'd like" autocomplete="tel">
+    </div>
+    <div class="auth-field">
+      <label>How did you hear about us?</label>
       <select id="obSource">
-        <option value="">Select one…</option>
-        <option value="social_media">Social media</option>
-        <option value="influencer">An influencer / creator</option>
-        <option value="google_search">Google search</option>
-        <option value="friend_family">Friend or family</option>
-        <option value="app_store">App Store / Play Store</option>
+        <option value="">Select one…</option><option value="social_media">Social media</option>
+        <option value="influencer">An influencer / creator</option><option value="google_search">Google search</option>
+        <option value="friend_family">Friend or family</option><option value="app_store">App Store / Play Store</option>
         <option value="other">Something else</option>
       </select>
     </div>
-    <div class="auth-field">
-      <label>What are you hoping this helps with? <span style="color:var(--haze); font-weight:400;">(optional)</span></label>
-      <input type="text" id="obReason" placeholder="Sleep, confidence, focus…">
-    </div>
-    <!-- What you believe, so the app can use your words rather than someone
-         else's. Answering is optional and it never changes what you can do
-         here — only how things are named. -->
-    <div class="auth-field">
-      <label>Does your practice have a faith behind it? <span style="color:var(--haze); font-weight:400;">(optional — changes the words we use, nothing else)</span></label>
-      <div class="length-chip-grid" id="obFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
-      <input type="text" id="obFaithOther" placeholder="In your own words" style="display:none; margin-top:9px;">
-    </div>
-    <!-- Choosing who you are, at the point you become someone here. -->
-    <div class="auth-field">
-      <label>Choose your avatar <span style="color:var(--haze); font-weight:400;">(you can change her any time)</span></label>
-      <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
-    </div>
+    <input type="hidden" id="obReason" value="">
     <div class="auth-msg" id="onboardMsg"></div>
-    <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="submitOnboarding()">Finish setup</button>
-    <div class="auth-toggle"><button onclick="skipOnboarding()">Skip for now</button></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="submitOnboarding()">Meet my Higher Self ✦</button>
+    <div class="auth-toggle"><button onclick="skipOnboarding()">I'll personalize later</button></div>
   </div>
 </div>
 
@@ -2315,6 +2336,14 @@
 
       <h3 class="profile-subhead">Account settings</h3>
       <div class="profile-settings-grid">
+        <div class="profile-field-card">
+          <label>Faith &amp; spiritual language</label>
+          <p style="font-size:12.5px;color:var(--haze);margin:0 0 12px;">Change this whenever you want. It personalizes the language used in guidance and the subliminals you create, never the features you can access.</p>
+          <div class="length-chip-grid" id="settingsFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
+          <input type="text" id="settingsFaithOther" placeholder="In your own words" style="display:none;margin-top:9px;">
+          <button class="mini-btn ghostbtn" onclick="saveFaithSettings()">Save preference</button>
+          <div class="save-msg" id="faithSettingsMsg"></div>
+        </div>
         <div class="profile-field-card">
           <label>Username</label>
           <input type="text" id="settingsUsername" placeholder="your username">
