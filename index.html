@@ -117,7 +117,7 @@
   body[data-sky="night"] .orb{ background:radial-gradient(circle at 34% 30%,#fff 0 7%,#e9e8ef 34%,#c9c8d1 72%,#aaa9b3 100%); box-shadow:0 0 34px rgba(230,229,255,.42),0 0 92px rgba(185,167,232,.25),inset -18px -18px 28px rgba(75,72,91,.22); }
   .orb::after{ content:''; position:absolute; inset:0; border-radius:50%; opacity:0; transition:opacity .5s; background:radial-gradient(circle at 67% 38%,rgba(105,103,116,.16) 0 5%,transparent 6%),radial-gradient(circle at 35% 66%,rgba(105,103,116,.13) 0 7%,transparent 8%),radial-gradient(circle at 56% 72%,rgba(105,103,116,.11) 0 4%,transparent 5%); }
   body[data-sky="night"] .orb::after{ opacity:1; }
-  .orb-inner{ position:absolute; inset:22%; border-radius:50%; background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.16),transparent 65%); animation:breathe 6s ease-in-out infinite reverse; }
+  
   @keyframes breathe{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.09);} }
   @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
   .motto{ font-size:13px; letter-spacing:.1em; color:var(--haze); }
@@ -1171,8 +1171,7 @@
                radial-gradient(circle at 66% 70%, rgba(247,210,103,.55), transparent 58%),
                radial-gradient(circle, #FFF6E6, rgba(255,246,230,.35) 72%);
     box-shadow:0 0 90px rgba(255,236,196,.55), inset 0 0 50px rgba(247,210,103,.25); }
-  body[data-sky="day"] .orb-inner{
-    background:radial-gradient(circle at 40% 35%, rgba(255,255,255,.7), transparent 65%); }
+  body[data-sky="day"] 
 
   /* The switch, in the bar, so it's reachable from any page. */
   .skybtn{ width:36px; height:36px; border-radius:50%; flex:0 0 auto; cursor:pointer;
@@ -1695,7 +1694,7 @@
 
 <section class="hero">
   <div class="hero-bg"><img src="img/hero.jpg" alt="" aria-hidden="true"></div>
-  <div class="orb-wrap"><div class="orb"></div><div class="orb-inner"></div></div>
+  <div class="orb-wrap" aria-hidden="true"><div class="orb"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
   <h1>Your all in one<br><em>wellness app.</em></h1>
   <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
