@@ -6,7 +6,7 @@
    see the ones loaded before it. Order matters — see index.html. */
 
 /* ---------- who you are, and who you are becoming ----------
-   Twelve identities, each drawn twice. `hero` is you as you are today -- cargo
+   Eighteen identities, each drawn twice. `hero` is you as you are today -- cargo
    trousers, headphones, a bag over the shoulder. `keeper` is the same person
    as your highest self, in the long starry robe, holding light. Same face,
    same hair, further along.
@@ -25,7 +25,7 @@
    reason to keep the files rather than turn somebody's choice into a broken
    image; here it isn't, because every path to a picture goes through
    avatarId(), which sends an id that is no longer offered to the default. A
-   retired choice shows the first of the new twelve, not a gap, and there was
+   retired choice shows the first of the roster, not a gap, and there was
    nothing to migrate to make that true. */
 const AVATAR_PACK = [
   { id:'box-braids',           label:'Long box braids',       look:'deep brown skin, long box braids, and warm brown eyes' },
@@ -40,6 +40,12 @@ const AVATAR_PACK = [
   { id:'lavender-hijab',       label:'Lavender hijab',        look:'a lavender hijab and headphones to match' },
   { id:'facial-piercings',     label:'Dark hair and piercings', look:'fair skin, dark hair, and subtle facial piercings' },
   { id:'east-asian',           label:'Dark hair, warm eyes',  look:'dark hair and warm dark eyes' },
+  { id:'black-twists',         label:'Two-strand twists',     look:'deep brown skin, short two-strand twists, and warm brown eyes' },
+  { id:'east-asian-crop',      label:'Textured black crop',   look:'light skin, a textured black crop, and dark brown eyes' },
+  { id:'latino-waves',         label:'Dark wavy fade',        look:'warm tan skin, a dark wavy fade, and dark brown eyes' },
+  { id:'south-asian-curls',    label:'Short dark curls',      look:'deep tan skin, short dark curls, and dark brown eyes' },
+  { id:'blond-blue-eyes',      label:'Sandy-blond curls',     look:'fair skin, sandy-blond curls, and blue eyes' },
+  { id:'androgynous-undercut', label:'Curly side undercut',   look:'brown skin, a curly side undercut, and dark brown eyes' },
 ];
 const AVATARS = AVATAR_PACK.map(a => a.id);
 const HIGHER_SELF_DEFAULTS = { avatar:'box-braids' };
