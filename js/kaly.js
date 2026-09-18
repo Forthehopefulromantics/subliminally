@@ -40,6 +40,12 @@ const AVATAR_PACK = [
   { id:'lavender-hijab',       label:'Lavender hijab',        look:'a lavender hijab and headphones to match' },
   { id:'facial-piercings',     label:'Dark hair and piercings', look:'fair skin, dark hair, and subtle facial piercings' },
   { id:'east-asian',           label:'Dark hair, warm eyes',  look:'dark hair and warm dark eyes' },
+  { id:'black-twists-man',      label:'Two-strand twists',     look:'deep brown skin, two-strand twists, and warm brown eyes', external:true, asset:'01-black-twists' },
+  { id:'east-asian-crop-man',   label:'Textured black crop',   look:'East Asian features, a textured black crop, and dark eyes', external:true, asset:'02-east-asian-crop' },
+  { id:'latino-waves-man',      label:'Dark wavy fade',        look:'warm tan skin, dark waves, and a faded cut', external:true, asset:'03-latino-waves' },
+  { id:'south-asian-curls-man', label:'Short dark curls',      look:'South Asian features, short dark curls, and dark eyes', external:true, asset:'04-south-asian-curls' },
+  { id:'blond-blue-eyes-man',   label:'Sandy-blond curls',     look:'fair skin, sandy-blond curls, and blue eyes', external:true, asset:'05-blond-blue-eyes' },
+  { id:'androgynous-undercut',  label:'Curly side undercut',   look:'an androgynous look with a curly side undercut', external:true, asset:'06-androgynous-undercut' },
 ];
 const AVATARS = AVATAR_PACK.map(a => a.id);
 const HIGHER_SELF_DEFAULTS = { avatar:'box-braids' };
@@ -55,6 +61,8 @@ function avatarEntry(id){ return AVATAR_PACK.find(a => a.id === avatarId(id)) ||
 const AVATAR_CUTS = { full:'', thumb:'-t', face:'-face' };
 function avatarSrc(id, state, cut){
   const st = AVATAR_STATES.includes(state) ? state : 'keeper';
+  const entry = avatarEntry(id);
+  if (entry.external) return `img/avatar/${entry.asset}-${st}.webp`;
   return `img/avatar/${avatarId(id)}-${st}${AVATAR_CUTS[cut] || ''}.webp`;
 }
 /* Alt text says which of the two this is, because on a page that shows both
