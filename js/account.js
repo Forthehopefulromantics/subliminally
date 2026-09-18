@@ -363,19 +363,24 @@ async function submitAuth(){
     const readable = (error && typeof error.message === 'string' && error.message.length)
       ? error.message
       : 'Something went wrong — check your connection and try again.';
-    msg.textContent = readable; msg.className = 'auth-msg err';
+    if (!wasSignup && /invalid login credentials|email not confirmed/i.test(readable)){
+      msg.innerHTML = 'We could not sign you in. If you just created this account, confirm your email first.<br><button type="button" class="auth-inline-btn" onclick="resendSignupConfirmation()">Resend confirmation email</button>';
+    } else {
+      msg.textContent = readable;
+    }
+    msg.className = 'auth-msg err';
     return;
   }
 
   if (wasSignup){
     // Stash the chosen username/avatar so we can apply it once there's a real session
     // (which may be now, or after they click the email confirmation link and log in).
-    pendingSignupProfile = { username: signupUsername };
+    rememberPendingSignupProfile({ username: signupUsername, email });
   }
 
   // Signed up, but Supabase requires clicking an email link before there's a real session.
   if (wasSignup && !data.session){
-    msg.innerHTML = 'Account created — check your email and click the confirmation link, then come back and log in. Your username and avatar will be applied when you first log in.';
+    msg.innerHTML = 'Account created. Check your email and click the confirmation link before logging in.<br><button type="button" class="auth-inline-btn" onclick="resendSignupConfirmation()">Resend confirmation email</button><br><small>Also check spam or junk if it does not arrive within a few minutes.</small>';
     msg.className = 'auth-msg ok';
     return;
   }
@@ -388,17 +393,44 @@ async function submitAuth(){
   }, 600);
 }
 
+async function resendSignupConfirmation(emailOverride){
+  if (!sb) return;
+  const msg = document.getElementById('authMsg');
+  const email = (emailOverride || document.getElementById('authEmail').value || '').trim();
+  if (!email){ msg.textContent='Enter the email you signed up with first.'; msg.className='auth-msg err'; return; }
+  msg.textContent='Sending a new confirmation email…'; msg.className='auth-msg';
+  const { error } = await sb.auth.resend({
+    type: 'signup',
+    email,
+    options: { emailRedirectTo: window.location.origin + '/' }
+  });
+  if (error){ msg.textContent = error.message || 'Could not resend the confirmation email.'; msg.className='auth-msg err'; return; }
+  msg.innerHTML='Confirmation email sent. Check your inbox and spam/junk folder.';
+  msg.className='auth-msg ok';
+}
+
 /* ---------------- SIGNUP: username ----------------
    There's no avatar to choose here any more: your higher self is the picture
    of you in this app, and she's made on the profile page where there's room
    for it. */
-let pendingSignupProfile = null;
+let pendingSignupProfile = (() => {
+  try { return JSON.parse(localStorage.getItem('subliminally_pending_signup_profile') || 'null'); }
+  catch(e){ return null; }
+})();
+function rememberPendingSignupProfile(profile){
+  pendingSignupProfile = profile;
+  try { localStorage.setItem('subliminally_pending_signup_profile', JSON.stringify(profile)); } catch(e){}
+}
+function clearPendingSignupProfile(){
+  pendingSignupProfile = null;
+  try { localStorage.removeItem('subliminally_pending_signup_profile'); } catch(e){}
+}
 
 // Applies the username/avatar chosen during signup, once a real session exists.
 async function applyPendingSignupProfile(){
   if (!pendingSignupProfile || !sb || !currentUser) return;
   const pending = pendingSignupProfile;
-  pendingSignupProfile = null;
+  clearPendingSignupProfile();
   const error = await saveProfile({ username: pending.username });
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){
     // Username collided — let them fix it in the questionnaire/profile rather than blocking login.
