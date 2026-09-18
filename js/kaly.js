@@ -6,7 +6,7 @@
    see the ones loaded before it. Order matters — see index.html. */
 
 /* ---------- who you are, and who you are becoming ----------
-   Twelve identities, each drawn twice. `hero` is you as you are today -- cargo
+   Nineteen identities, each drawn twice. `hero` is you as you are today -- cargo
    trousers, headphones, a bag over the shoulder. `keeper` is the same person
    as your highest self, in the long starry robe, holding light. Same face,
    same hair, further along.
@@ -25,8 +25,14 @@
    reason to keep the files rather than turn somebody's choice into a broken
    image; here it isn't, because every path to a picture goes through
    avatarId(), which sends an id that is no longer offered to the default. A
-   retired choice shows the first of the new twelve, not a gap, and there was
-   nothing to migrate to make that true. */
+   retired choice shows the first of the roster, not a gap, and there was
+   nothing to migrate to make that true.
+
+   Every drawing is cut from one box shared by all thirty-eight, so nobody
+   stands taller than anybody else in the same row and switching between a hero
+   and a keeper does not make the figure jump. Two robes in the second pack are
+   wider than the first pack's box, so rather than clip a sleeve the box was
+   recomputed across the lot and everything recut. */
 const AVATAR_PACK = [
   { id:'box-braids',           label:'Long box braids',       look:'deep brown skin, long box braids, and warm brown eyes' },
   { id:'straight-black',       label:'Straight black hair',   look:'light olive skin, straight black middle-parted hair, and dark brown eyes' },
@@ -40,6 +46,17 @@ const AVATAR_PACK = [
   { id:'lavender-hijab',       label:'Lavender hijab',        look:'a lavender hijab and headphones to match' },
   { id:'facial-piercings',     label:'Dark hair and piercings', look:'fair skin, dark hair, and subtle facial piercings' },
   { id:'east-asian',           label:'Dark hair, warm eyes',  look:'dark hair and warm dark eyes' },
+  { id:'long-straight-black',  label:'Long straight black hair', look:'deep brown skin, long straight black hair, and warm brown eyes' },
+  /* Kyla's second pack. One roster, not two: nobody is asked to say which of
+     these they are before being shown the ones they are allowed to pick from.
+     `androgynous-undercut` is drawn that way on purpose and is not filed under
+     either heading -- it sits in the same list as everything else. */
+  { id:'black-twists',         label:'Two-strand twists',     look:'deep brown skin and two-strand twists' },
+  { id:'east-asian-crop',      label:'Textured black crop',   look:'a textured black crop and dark eyes' },
+  { id:'latino-waves',         label:'Dark wavy fade',        look:'warm tan skin, dark wavy hair and a fade' },
+  { id:'south-asian-curls',    label:'Short dark curls',      look:'deep tan skin and short dark curls' },
+  { id:'blond-blue-eyes',      label:'Sandy-blond curls',     look:'fair skin, sandy-blond curls and blue eyes' },
+  { id:'androgynous-undercut', label:'Curly side undercut',   look:'a curly side undercut' },
 ];
 const AVATARS = AVATAR_PACK.map(a => a.id);
 const HIGHER_SELF_DEFAULTS = { avatar:'box-braids' };
@@ -66,7 +83,7 @@ function avatarAlt(id, state){
 /* Drawn full-length, so the box is portrait and the figure is fitted inside it
    rather than cropped to it -- no heads, hair, headphones, hands or feet cut
    off at any size. */
-const AVATAR_CUT_SIZE = { full:[281,500], thumb:[146,260], face:[128,128] };
+const AVATAR_CUT_SIZE = { full:[284,500], thumb:[148,260], face:[128,128] };
 function avatarMarkup(look, opts){
   const o = opts === true ? { cut:'thumb' } : (opts || {});
   const cut = AVATAR_CUT_SIZE[o.cut] ? o.cut : 'full';
