@@ -443,6 +443,10 @@ async function submitOnboarding(){
     phone: document.getElementById('obPhone').value.trim() || null,
     referral_source: document.getElementById('obSource').value || null,
     signup_reason: document.getElementById('obReason').value.trim() || null,
+    onboarding_desires: Array.from(document.querySelectorAll('[name="obDesire"]')).map(el => el.value.trim()).filter(Boolean).slice(0,3),
+    onboarding_struggle: document.getElementById('obStruggle').value.trim() || null,
+    onboarding_goal: document.getElementById('obGoal').value.trim() || null,
+    higher_self_name: document.getElementById('obHigherSelfName').value.trim().slice(0,24) || null,
     higher_self_avatar: higherSelf.avatar,
     ...(typeof faithAnswerForSave === 'function' ? faithAnswerForSave() : {}),
   };
@@ -456,6 +460,7 @@ async function submitOnboarding(){
     }
     return;
   }
+  higherSelf.name = patch.higher_self_name || '';
   closeOnboardingModal();
 }
 async function logOut(){
