@@ -136,7 +136,14 @@ async function myProfile(opts){
    callers were already written to expect: `const error = await saveProfile(…)`
    and then a message on screen. */
 async function saveProfile(patch){
-  if (!sb || !currentUser) return { message: 'Not signed in.' };
+  if (!sb) return { message: 'Not signed in.' };
+  // The header and a settings save used to disagree about whether a session
+  // existed. Ask Supabase for the authoritative session before refusing a save.
+  if (!currentUser){
+    const { data } = await sb.auth.getSession();
+    currentUser = data && data.session ? data.session.user : null;
+  }
+  if (!currentUser) return { message: 'Not signed in.' };
   const { error } = await sb.from('profiles')
     .upsert({ id: currentUser.id, ...patch }, { onConflict: 'id' });
   // Whether it saved or not, what is remembered is no longer trustworthy.
@@ -430,8 +437,8 @@ function clearPendingSignupProfile(){
 async function applyPendingSignupProfile(){
   if (!pendingSignupProfile || !sb || !currentUser) return;
   const pending = pendingSignupProfile;
-  clearPendingSignupProfile();
   const error = await saveProfile({ username: pending.username });
+  if (!error) clearPendingSignupProfile();
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){
     // Username collided — let them fix it in the questionnaire/profile rather than blocking login.
     console.warn('Username taken; user can set another in onboarding.');
