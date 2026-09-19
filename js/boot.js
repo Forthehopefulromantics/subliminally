@@ -15,10 +15,21 @@ if (sb){
 
 if (sb){
   setupNativeOAuthCallback();
+  reportWebOAuthError();
   setupNativeDayRollover();
   setupPushNotifications();
+  setupOnboarding();
   initRevenueCat();
   updateManageSubscriptionLinks();
+
+  /* Authentication has to finish settling before anything decides where a
+     person belongs. Until `getSession()` comes back, supabase-js has not
+     restored the stored session yet, and a signed-in account looks exactly
+     like no account at all -- so the page says "loading" and no routing runs.
+     data-auth is on the body for anything that wants to wait on it. */
+  document.body.setAttribute('data-auth', 'loading');
+  let authSettled = false;
+
   sb.auth.onAuthStateChange((event, session) => {
     const wasId = currentUser && currentUser.id;
     currentUser = session ? session.user : null;
@@ -27,12 +38,24 @@ if (sb){
     if (wasId !== (currentUser && currentUser.id)) forgetFetch();
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
-    if (currentUser && event === 'SIGNED_IN') promptOnboardingIfProfileIncomplete();
+    // A sign-in that happens after the first load -- typing a password, coming
+    // back from Google -- routes here. Before that, the block below does it
+    // once, with the restored session in hand.
+    //
+    // Only when the person actually changed: supabase-js also reports
+    // SIGNED_IN when it refreshes a token or a backgrounded tab comes back,
+    // and someone halfway through their journal should not be thrown onto
+    // Today for it.
+    const isNewPerson = wasId !== (currentUser && currentUser.id);
+    if (authSettled && isNewPerson && currentUser && event === 'SIGNED_IN') routeAfterAuth({ landOnToday: true });
     if (currentUser) savePushToken();
     syncRevenueCatIdentity();
   });
-  sb.auth.getSession().then(({ data }) => {
+
+  sb.auth.getSession().then(async ({ data }) => {
     currentUser = data.session ? data.session.user : null;
+    authSettled = true;
+    document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     renderAccountArea();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
@@ -44,8 +67,12 @@ if (sb){
     if (currentUser && location.hash === '#sanctuary' && SANCTUARY_ENABLED){ document.body.setAttribute('data-view','sanctuary'); renderSanctuaryHome(); }
     // Signed in with nowhere particular to be: open Today, not the sales page.
     if (currentUser && (!location.hash || location.hash === '#today')){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
+    // Session restored: now, and only now, ask the database whether this
+    // account still owes us onboarding.
+    if (currentUser) await routeAfterAuth();
   });
 } else {
+  document.body.setAttribute('data-auth', 'out');
   renderAccountArea();
 }
 /* library is now a static embed — nothing to fetch on load */

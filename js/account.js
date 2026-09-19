@@ -119,12 +119,23 @@ const PASSWORD_RESET_REDIRECT_URL = 'https://www.subliminallybyfthr.com/reset-pa
    migration hasn't added yet fails a named select outright and takes the whole
    row down with it, which is how the subliminal covers broke the Today list.
    Asking for everything returns whatever is actually there. */
+/* Set when the last read of the profile row was refused rather than empty.
+   Only the onboarding router reads it. */
+let lastProfileFetchFailed = false;
+
 async function myProfile(opts){
   if (!sb || !currentUser) return null;
   if (opts && opts.force) forgetFetch('profileRow');
   const { data, error } = await fetchOnce('profileRow', () =>
     sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle(), 300000);
-  if (error){ forgetFetch('profileRow'); console.warn('profile:', error.message); return null; }
+  if (error){
+    // A refusal and an empty account look identical from the outside -- both
+    // come back null -- and routing has to tell them apart, or a dropped
+    // connection sends someone who finished onboarding back through it.
+    lastProfileFetchFailed = true;
+    forgetFetch('profileRow'); console.warn('profile:', error.message); return null;
+  }
+  lastProfileFetchFailed = false;
   return data;
 }
 
@@ -199,6 +210,9 @@ async function startOAuthSignIn(provider){
     options: {
       redirectTo: native ? GOOGLE_OAUTH_NATIVE_CALLBACK : window.location.origin + '/',
       skipBrowserRedirect: native, // on native we open it ourselves, in an in-app browser tab
+      // Always show the account chooser. Without this, anyone already signed
+      // into one Google account is pushed straight through it with no say.
+      queryParams: { prompt: 'select_account' },
     },
   });
   if (error){
@@ -225,22 +239,104 @@ function setupNativeDayRollover(){
   });
 }
 
+/* Pulls a named value out of an OAuth return address, whether the provider put
+   it in the query string (`?code=…`, the PKCE flow) or the fragment
+   (`#error=…`, which is where Supabase puts failures). Hand-parsed rather than
+   `new URL()` because the native return address uses a custom scheme. */
+function oauthParam(url, name){
+  const match = String(url || '').match(new RegExp('[?&#]' + name + '=([^&#]*)'));
+  return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null;
+}
+
+/* What to say when Google (or Supabase) hands back a failure instead of a
+   session. `error_description` is written for developers; these are the two
+   cases a person can actually do something about. */
+function describeOAuthError(code, description){
+  const text = (String(code || '') + ' ' + String(description || '')).toLowerCase();
+  if (text.includes('access_denied') || text.includes('cancel')) return 'Google sign-in was cancelled.';
+  if (text.includes('provider is not enabled') || text.includes('unsupported provider')) return "Google sign-in isn't switched on yet — use your email and password for now.";
+  return description || 'Google sign-in did not complete — try again.';
+}
+
+function showOAuthError(code, description){
+  openAuthModal('login');
+  const msg = document.getElementById('authMsg');
+  msg.textContent = describeOAuthError(code, description);
+  msg.className = 'auth-msg err';
+  console.warn('OAuth sign-in failed:', code, description);
+}
+
+/* Web: Supabase sends people back to the address we asked for, and on a failure
+   that address carries `error` / `error_description` instead of a `code`.
+   supabase-js quietly ignores those, so without this the person lands back on
+   the home page signed out with nothing said — which is exactly what a failing
+   Google sign-in looked like. */
+function reportWebOAuthError(){
+  const code = oauthParam(window.location.search, 'error') || oauthParam(window.location.hash, 'error');
+  if (!code) return;
+  const description = oauthParam(window.location.search, 'error_description') || oauthParam(window.location.hash, 'error_description');
+  showOAuthError(code, description);
+  // Don't leave the failure in the address bar to fire again on a refresh.
+  try { history.replaceState({}, document.title, window.location.pathname); } catch(e){}
+}
+
 function setupNativeOAuthCallback(){
   if (!isNativeApp() || !sb || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
     if (!url || url.indexOf('login-callback') === -1) return;
     if (window.Capacitor.Plugins.Browser){ try { await window.Capacitor.Plugins.Browser.close(); } catch(e){} }
-    const { error } = await sb.auth.exchangeCodeForSession(url);
-    if (!error) closeAuthModal();
+    const failure = oauthParam(url, 'error');
+    if (failure){ showOAuthError(failure, oauthParam(url, 'error_description')); return; }
+    // exchangeCodeForSession takes the authorization code itself, not the whole
+    // return address — handing it the URL is why the native round trip never
+    // produced a session.
+    const code = oauthParam(url, 'code');
+    if (!code){ showOAuthError(null, 'Google sent us back without a sign-in code.'); return; }
+    const { error } = await sb.auth.exchangeCodeForSession(code);
+    if (error){ showOAuthError(null, error.message); return; }
+    closeAuthModal();
+    // Where they land -- Today, or onboarding -- is the SIGNED_IN handler's
+    // call in boot.js, off the profile row, same as every other way in.
   });
 }
 
-// Google sign-in creates the auth user but skips our username/avatar
-// questionnaire, so send anyone who lands here without one through onboarding.
-async function promptOnboardingIfProfileIncomplete(){
-  if (!sb || !currentUser) return;
+/* ---------- where a signed-in person goes ----------
+
+   One question decides it, and the answer comes from the database: has this
+   account finished onboarding? Not what this browser remembers, not whether
+   Google just redirected, not whether a username happens to be filled in --
+   which is what it used to read, and why anyone who left that field blank was
+   marched through onboarding again on every single login.
+
+   The row is keyed by auth.users.id, so the answer follows the person to any
+   browser, any device, and back from any provider. */
+function onboardingIsDone(prof){
+  return !!(prof && prof.onboarding_completed === true);
+}
+
+/* Returns 'today' | 'onboarding' | 'unknown'. 'unknown' means we could not
+   read the profile -- offline, a refused request -- and in that case nobody is
+   sent anywhere, because guessing wrong here is what makes a finished account
+   redo onboarding. */
+async function resolveOnboardingRoute(){
+  if (!sb || !currentUser) return 'unknown';
   const prof = await myProfile();
-  if (prof && !prof.username) openOnboardingModal();
+  if (!prof && lastProfileFetchFailed) return 'unknown';
+  return onboardingIsDone(prof) ? 'today' : 'onboarding';
+}
+
+/* Called once authentication has settled and never before it: an undefined
+   profile must not be mistaken for an unfinished one. */
+async function routeAfterAuth(opts){
+  const route = await resolveOnboardingRoute();
+  if (route === 'onboarding'){ openOnboardingModal(); return route; }
+  if (route === 'today' && opts && opts.landOnToday) showTodayPage();
+  return route;
+}
+
+// Kept under its old name because boot.js and the native callback both call it.
+async function promptOnboardingIfProfileIncomplete(){
+  return routeAfterAuth();
 }
 
 /* ---------- push notifications (native only) ----------
@@ -393,11 +489,11 @@ async function submitAuth(){
   }
 
   msg.textContent = 'You\'re in.'; msg.className = 'auth-msg ok';
-  setTimeout(() => {
-    closeAuthModal();
-    if (wasSignup) openOnboardingModal();
-    else showTodayPage();
-  }, 600);
+  // Where they go next is not decided here. The SIGNED_IN handler in boot.js
+  // asks the database whether this account has finished onboarding and routes
+  // on the answer, so email, Google and a restored session all land the same
+  // way and there is only ever one thing making that decision.
+  setTimeout(closeAuthModal, 600);
 }
 
 async function resendSignupConfirmation(emailOverride){
@@ -445,13 +541,244 @@ async function applyPendingSignupProfile(){
   }
 }
 
-/* ---------------- ONBOARDING: username ---------------- */
+/* ---------------- ONBOARDING: one question to a screen ----------------
+
+   A slideshow, not a form. Every slide lives in the markup from the start and
+   is shown or hidden, which is what makes going backwards free: the inputs
+   still hold what was typed, and the chip lists are drawn from `obAnswers`, so
+   what is on screen and what will be saved cannot drift apart.
+
+   Nothing is written to the database until the last slide. Up to that point
+   this is all in memory -- there is one row per person and it is written once,
+   with everything in it. */
+
+const OB_SLIDES = ['welcome','name','higher','avatar','desires','faith','struggles','goals','education','finish'];
+
+/* The wording on the button changes with the slide; the work it does does not. */
+const OB_CTA = {
+  welcome: 'Begin My Journey',
+  education: 'I understand',
+  finish: 'Meet My Higher Self',
+};
+
+const OB_DESIRES = [
+  { id:'confidence',   icon:'✦', label:'Confidence' },
+  { id:'money',        icon:'◈', label:'Money & Abundance' },
+  { id:'love',         icon:'♡', label:'Love' },
+  { id:'career',       icon:'➚', label:'Career & Success' },
+  { id:'health',       icon:'✚', label:'Health & Wellness' },
+  { id:'body',         icon:'◐', label:'Dream Body' },
+  { id:'self-love',    icon:'❤', label:'Self-Love' },
+  { id:'spiritual',    icon:'☾', label:'Spiritual Growth' },
+  { id:'peace',        icon:'❋', label:'Peace & Anxiety Relief' },
+  { id:'sleep',        icon:'☁', label:'Better Sleep' },
+  { id:'discipline',   icon:'▲', label:'Discipline & Motivation' },
+  { id:'creativity',   icon:'✷', label:'Creativity' },
+];
+const OB_MAX_DESIRES = 3;
+
+const OB_STRUGGLES = [
+  { id:'self-confidence', label:'Self-confidence' },
+  { id:'overthinking',    label:'Overthinking' },
+  { id:'stress',          label:'Stress' },
+  { id:'motivation',      label:'Motivation' },
+  { id:'self-image',      label:'Self-image' },
+  { id:'money-mindset',   label:'Money mindset' },
+  { id:'relationships',   label:'Relationships' },
+  { id:'sleep',           label:'Sleep' },
+  { id:'consistency',     label:'Consistency' },
+  { id:'purpose',         label:'Purpose' },
+  { id:'other',           label:'Something else' },
+];
+
+const OB_GOALS = [
+  { id:'inner-voice',  label:'How I speak to myself' },
+  { id:'confidence',   label:'My confidence' },
+  { id:'habits',       label:'My daily habits' },
+  { id:'focus',        label:'My focus' },
+  { id:'money',        label:'My money mindset' },
+  { id:'body-image',   label:'My body image' },
+  { id:'relationships',label:'My relationships' },
+  { id:'sleep',        label:'My sleep' },
+  { id:'purpose',      label:'My sense of purpose' },
+  { id:'other',        label:'Something else' },
+];
+
+let obIndex = 0;
+let obGoingBack = false;
+let obSaving = false;
+let obAnswers = { desires: [], struggles: [], goals: [] };
+
+function obSlideName(){ return OB_SLIDES[obIndex]; }
+function obEl(id){ return document.getElementById(id); }
+
 function openOnboardingModal(){
-  document.getElementById('onboardOverlay').classList.add('open');
-  // Both of these are drawn from lists in JS, so they are empty until asked for.
+  // Already in it: leave them where they are. A token refresh reported as a
+  // fresh sign-in must not throw anybody back to the first slide.
+  if (obEl('onboardOverlay').classList.contains('open')) return;
+  obIndex = 0;
+  obSaving = false;
+  obAnswers = { desires: [], struggles: [], goals: [] };
+  obEl('onboardOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  obPaintSky();
+  obRenderChips();
   if (typeof renderFaithChips === 'function') renderFaithChips();
   renderOnboardAvatars();
+  obShowSlide();
 }
+function closeOnboardingModal(){
+  obEl('onboardOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+/* "I'll personalize later" leaves onboarding unfinished on purpose: the row
+   still says onboarding_completed = false, so it will be waiting next time
+   rather than quietly never appearing again. */
+function skipOnboarding(){ closeOnboardingModal(); }
+
+/* Stars, scattered once. Fixed positions rather than random on every render,
+   so nothing twitches when a slide changes. */
+function obPaintSky(){
+  const sky = obEl('obSky');
+  if (!sky || sky.dataset.painted) return;
+  const spots = [[8,14],[18,32],[27,9],[36,24],[44,6],[52,19],[61,11],[69,29],[77,16],[86,26],[92,8],[13,46],[31,52],[58,44],[72,55],[89,48]];
+  sky.insertAdjacentHTML('beforeend', spots.map(([l,t],i) =>
+    `<div class="ob-star" style="left:${l}%;top:${t}%;animation-delay:${(i % 5) * 0.7}s"></div>`).join(''));
+  sky.dataset.painted = '1';
+}
+
+/* ---------- the slides ---------- */
+function obShowSlide(){
+  const name = obSlideName();
+  document.querySelectorAll('#obStage .ob-slide').forEach(el => {
+    const on = el.dataset.ob === name;
+    el.classList.toggle('back', obGoingBack);
+    el.classList.toggle('on', on);
+  });
+  obGoingBack = false;
+  obEl('obStage').scrollTop = 0;
+
+  const step = obIndex + 1;
+  obEl('obProgressFill').style.width = (step / OB_SLIDES.length * 100) + '%';
+  obEl('obStep').textContent = step + '/' + OB_SLIDES.length;
+  obEl('obBack').disabled = obIndex === 0;
+  obEl('obSkip').style.display = obIndex === 0 ? 'none' : 'block';
+
+  const cta = obEl('obCta');
+  cta.textContent = OB_CTA[name] || 'Continue';
+  cta.classList.remove('busy');
+  obEl('onboardMsg').textContent = '';
+  obEl('onboardMsg').className = 'auth-msg';
+
+  obPersonalize();
+  obRefreshGate();
+
+  // Give a text slide its field straight away, but never on a phone's first
+  // paint of a slide it has to scroll -- that yanks the keyboard up over the
+  // question. Desktop only, where there is room for both.
+  if (window.matchMedia('(min-width:700px)').matches){
+    const field = { name:'obName', higher:'obHigherSelfName', goals:'obGoal' }[name];
+    if (field) setTimeout(() => { const f = obEl(field); if (f) f.focus(); }, 60);
+  }
+}
+
+/* Their name, once we have it, everywhere it belongs. */
+function obPersonalize(){
+  const name = (obEl('obName').value || '').trim();
+  const her = (obEl('obHigherSelfName').value || '').trim();
+  obEl('obHigherQ').textContent = name ? `Hi ${name}, who are you becoming?` : 'Who are you becoming?';
+  obEl('obAvatarQ').textContent = her ? `Who does ${her} look like?` : 'Who does she look like?';
+  obEl('obStrugglesQ').textContent = name
+    ? `${name}, what would you like support with right now?`
+    : 'What would you like support with right now?';
+  obEl('obFinishQ').textContent = name ? `You're ready, ${name}.` : "You're ready.";
+  obEl('obFinishHelp').textContent = her
+    ? `${her} is waiting. Everything you just told us is saved to your account — on every device you sign in from.`
+    : 'Everything you just told us is saved to your account — on every device you sign in from.';
+
+  // The avatar they chose, standing there at the end.
+  const hero = obEl('obFinishHero');
+  if (hero && typeof avatarMarkup === 'function'){
+    hero.innerHTML = avatarMarkup({ avatar: higherSelf.avatar }, { state:'hero', cut:'full', alt:false })
+      + (her ? `<div class="ob-hero-name">${obEscape(her)}</div>` : '');
+  }
+}
+
+function obEscape(text){
+  return String(text).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+}
+
+/* Continue is only ever refused where an answer is genuinely required: a name,
+   because every later slide says it back to them. Everything else can be left
+   alone and changed later. */
+function obRefreshGate(){
+  const cta = obEl('obCta');
+  const needsName = obSlideName() === 'name' && !(obEl('obName').value || '').trim();
+  cta.disabled = obSaving || needsName;
+}
+
+function obNext(){
+  if (obSaving) return;
+  if (obSlideName() === 'name' && !(obEl('obName').value || '').trim()) return;
+  if (obIndex >= OB_SLIDES.length - 1){ submitOnboarding(); return; }
+  obIndex++;
+  obShowSlide();
+}
+function obPrev(){
+  if (obSaving || obIndex === 0) return;
+  obGoingBack = true;
+  obIndex--;
+  obShowSlide();
+}
+
+/* ---------- the chip lists ---------- */
+function obChipMarkup(item, selected, dimmed){
+  return `<button type="button" class="ob-chip${selected ? ' sel' : ''}${dimmed ? ' full' : ''}"
+     data-id="${item.id}" aria-pressed="${selected}">${item.icon ? `<span class="ob-chip-icon">${item.icon}</span>` : ''}<span>${item.label}</span></button>`;
+}
+
+function obRenderChips(){
+  const desiresFull = obAnswers.desires.length >= OB_MAX_DESIRES;
+  obEl('obDesireChips').innerHTML = OB_DESIRES.map(d =>
+    obChipMarkup(d, obAnswers.desires.includes(d.id), desiresFull && !obAnswers.desires.includes(d.id))).join('');
+  const left = OB_MAX_DESIRES - obAnswers.desires.length;
+  obEl('obDesireCount').textContent = obAnswers.desires.length === 0 ? ''
+    : left === 0 ? 'That\'s your three.' : `${left} more if you'd like.`;
+
+  obEl('obStruggleChips').innerHTML = OB_STRUGGLES.map(s =>
+    obChipMarkup(s, obAnswers.struggles.includes(s.id), false)).join('');
+  obEl('obStruggleOther').style.display = obAnswers.struggles.includes('other') ? 'block' : 'none';
+
+  obEl('obGoalChips').innerHTML = OB_GOALS.map(g =>
+    obChipMarkup(g, obAnswers.goals.includes(g.id), false)).join('');
+}
+
+/* One listener for all three lists rather than an onclick per chip: the chips
+   are redrawn on every tap, and a handler bound to the container survives that.
+   It also means a tap registers on the icon or the label, not just the gap
+   between them. */
+function obSetupChipTaps(){
+  const lists = { obDesireChips:'desires', obStruggleChips:'struggles', obGoalChips:'goals' };
+  Object.keys(lists).forEach(listId => {
+    const wrap = obEl(listId);
+    if (!wrap) return;
+    wrap.addEventListener('click', (e) => {
+      const chip = e.target.closest('.ob-chip');
+      if (!chip || obSaving) return;
+      obToggleChoice(lists[listId], chip.dataset.id);
+    });
+  });
+}
+
+function obToggleChoice(field, id){
+  const chosen = obAnswers[field];
+  const at = chosen.indexOf(id);
+  if (at > -1) chosen.splice(at, 1);
+  else if (field === 'desires' && chosen.length >= OB_MAX_DESIRES) return; // three means three
+  else chosen.push(id);
+  obRenderChips();
+}
+
 /* The same roster as the profile page, at the moment it actually matters --
    you are deciding who you are here, so it belongs with your name, not three
    screens into settings. */
@@ -463,45 +790,103 @@ function renderOnboardAvatars(){
        onclick="pickOnboardAvatar('${a.id}')" aria-pressed="${a.id === higherSelf.avatar}"
        title="${a.label}" aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('');
 }
-/* Held until Finish setup, rather than written on every tap: there is no
-   account row worth writing to yet, and the whole modal saves at once. */
+/* Held until the last slide, rather than written on every tap: the whole row
+   saves at once, so there is nothing to write yet. */
 function pickOnboardAvatar(id){
   higherSelf.avatar = avatarId(id);
   renderOnboardAvatars();
 }
-function closeOnboardingModal(){ document.getElementById('onboardOverlay').classList.remove('open'); }
-function skipOnboarding(){ closeOnboardingModal(); }
+
+/* Typing is the other way a slide changes: the name feeds later headlines, and
+   an empty name keeps Continue shut. */
+function obSetupInputs(){
+  ['obName','obHigherSelfName'].forEach(id => {
+    const el = obEl(id);
+    if (el) el.addEventListener('input', () => { obPersonalize(); obRefreshGate(); });
+  });
+  // Enter moves on, the way the on-screen keyboard's "next" key implies.
+  ['obName','obHigherSelfName','obFaithOther','obStruggleOther','obGoal'].forEach(id => {
+    const el = obEl(id);
+    if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); obNext(); } });
+  });
+}
+
+function setupOnboarding(){
+  if (!document.getElementById('onboardOverlay')) return;
+  obSetupChipTaps();
+  obSetupInputs();
+}
+
+/* ---------- saving, once, at the end ----------
+   The rule here is that nothing moves until the database says yes. A failed
+   save leaves them on this slide with their answers intact and something to
+   read, because the alternative -- closing onboarding on a write that did not
+   land -- is exactly the bug that sent people back through it every login. */
+function obLabelsFor(list, ids){
+  return ids.map(id => (list.find(x => x.id === id) || {}).label).filter(Boolean);
+}
 
 async function submitOnboarding(){
-  const msg = document.getElementById('onboardMsg');
+  const msg = obEl('onboardMsg');
+  const cta = obEl('obCta');
+  if (obSaving) return;                       // a second tap while saving does nothing
   if (!sb || !currentUser){ closeOnboardingModal(); return; }
-  const username = document.getElementById('obUsername').value.trim();
+
+  obSaving = true;
+  cta.classList.add('busy');
+  cta.disabled = true;
+  obEl('obBack').disabled = true;
+  msg.textContent = 'Saving…'; msg.className = 'auth-msg';
+
+  const higherName = (obEl('obHigherSelfName').value || '').trim().slice(0, 24);
+  const displayName = (obEl('obName').value || '').trim().slice(0, 40);
   const patch = {
-    full_name: document.getElementById('obName').value.trim() || null,
-    username: username || null,
-    phone: document.getElementById('obPhone').value.trim() || null,
-    referral_source: document.getElementById('obSource').value || null,
-    signup_reason: document.getElementById('obReason').value.trim() || null,
-    onboarding_desires: Array.from(document.querySelectorAll('[name="obDesire"]')).map(el => el.value.trim()).filter(Boolean).slice(0,3),
-    onboarding_struggle: document.getElementById('obStruggle').value.trim() || null,
-    onboarding_goal: document.getElementById('obGoal').value.trim() || null,
-    higher_self_name: document.getElementById('obHigherSelfName').value.trim().slice(0,24) || null,
+    full_name: displayName || null,
+    display_name: displayName || null,
+    higher_self_name: higherName || null,
     higher_self_avatar: higherSelf.avatar,
+    onboarding_desires: obLabelsFor(OB_DESIRES, obAnswers.desires),
+    onboarding_struggles: obLabelsFor(OB_STRUGGLES, obAnswers.struggles),
+    onboarding_struggle: obAnswers.struggles.includes('other')
+      ? ((obEl('obStruggleOther').value || '').trim().slice(0, 80) || null) : null,
+    onboarding_goals: obLabelsFor(OB_GOALS, obAnswers.goals),
+    onboarding_goal: (obEl('obGoal').value || '').trim().slice(0, 140) || null,
+    onboarding_completed: true,
+    onboarding_completed_at: new Date().toISOString(),
     ...(typeof faithAnswerForSave === 'function' ? faithAnswerForSave() : {}),
   };
-  msg.textContent = 'Saving…'; msg.className = 'auth-msg';
+
   const error = await saveProfile(patch);
   if (error){
-    if (error.message && error.message.toLowerCase().includes('duplicate')){
-      msg.textContent = 'That username is taken — try another.'; msg.className = 'auth-msg err';
-    } else {
-      msg.textContent = "Couldn't save — you can skip for now."; msg.className = 'auth-msg err';
-    }
+    obSaving = false;
+    cta.classList.remove('busy');
+    obEl('obBack').disabled = false;
+    obRefreshGate();
+    msg.textContent = describeSaveError(error);
+    msg.className = 'auth-msg err';
+    console.error('Onboarding save failed:', error);
     return;
   }
-  higherSelf.name = patch.higher_self_name || '';
+
+  // Read it back before moving. A write that reported no error but did not
+  // land is the whole reason this screen used to come back every time.
+  const saved = await myProfile({ force: true });
+  if (!saved || saved.onboarding_completed !== true){
+    obSaving = false;
+    cta.classList.remove('busy');
+    obEl('obBack').disabled = false;
+    obRefreshGate();
+    msg.textContent = "Saved, but we couldn't confirm it — tap again.";
+    msg.className = 'auth-msg err';
+    return;
+  }
+
+  higherSelf.name = higherName;
+  obSaving = false;
   closeOnboardingModal();
+  showTodayPage();
 }
+
 async function logOut(){
   if (!sb) return;
   // Don't carry one account's cloned voice or generated lines into the next.

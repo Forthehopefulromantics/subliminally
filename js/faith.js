@@ -41,6 +41,21 @@ const FAITHS = [
     habits: { morning:['Morning puja','Japa','Read a verse'], night:['Evening aarti','Reflect on the day','Seva'] },
   },
   {
+    id: 'universe', label: 'Universe / Manifestation',
+    higher: 'the Universe', figure: 'your future self', practice: 'manifesting', text: 'your journal',
+    line: 'What you are calling in is already on its way.',
+    habits: { morning:['Morning intention','Read your affirmations','Visualise the day'], night:['Scripting','Gratitude list','Thank the day'] },
+  },
+  {
+    id: 'psychology', label: 'Neutral / Psychology-based',
+    /* Deliberately the neutral vocabulary: chosen by people who want the
+       practice without the language around it. Everything else reads a blank
+       answer the same way, so this simply makes that choice sayable. */
+    higher: 'your potential', figure: 'the person you are becoming', practice: 'practice', text: 'your journal',
+    line: 'Repetition is how a new thought becomes a familiar one.',
+    habits: { morning:['Morning intention','Read your affirmations','Plan one priority'], night:['Reflect on the day','Note one win','Wind down'] },
+  },
+  {
     id: 'spirituality', label: 'Spiritual, not religious',
     higher: 'the Universe', figure: 'your higher self', practice: 'manifesting', text: 'your journal',
     line: 'The Universe is already moving toward you.',
