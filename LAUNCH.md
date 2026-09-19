@@ -80,3 +80,13 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260919_higher_self.sql` | run |
 | `20260920_usernames_and_avatar.sql` | run |
 | `20260921_light.sql` | run |
+| `20260929_onboarding_personalization.sql` | superseded — its columns are in 20260930 |
+| `20260930_onboarding_slideshow.sql` | run |
+
+This table stopped being updated after `20260921`; the ones between it and
+`20260929` are in the database (their columns and tables are there). `20260929`
+is the one that was written and never run, and that is what broke onboarding:
+every save named columns the database did not have, so PostgREST rejected the
+whole write and nothing saved at all — which is why people were asked the same
+questions again on every login. `20260930` carries those columns plus the
+completion flag, and is safe to run whether or not `20260929` ever was.
