@@ -1068,6 +1068,7 @@ async function submitOnboarding(){
   }
 
   higherSelf.name = higherName;
+  higherSelf.avatar = avatarId(saved.higher_self_avatar);
   obSaving = false;
   closeOnboardingModal();
   showTodayPage();
@@ -1157,6 +1158,7 @@ async function loadNavIdentity(){
   if (!nameEl || !avatarEl) return; // nav may have re-rendered already
   if (prof) nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
   // The chip is you, not her: the everyday drawing rather than the robed one.
-  avatarEl.innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face', alt:false });
+  // Use the avatar from the profile, not the global higherSelf which may not be initialized yet.
+  if (prof) avatarEl.innerHTML = avatarMarkup({ avatar: avatarId(prof.higher_self_avatar) }, { state:'hero', cut:'face', alt:false });
 }
 
