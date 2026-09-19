@@ -38,6 +38,11 @@ if (sb){
     if (wasId !== (currentUser && currentUser.id)) forgetFetch();
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
+    // Once the first read has settled, this attribute has to keep up with
+    // every sign-in and sign-out that follows, or it goes on saying "out"
+    // while somebody is signed in -- and it is the flag the rest of the page
+    // is told to wait on.
+    if (authSettled) document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     // A sign-in that happens after the first load -- typing a password, coming
     // back from Google -- routes here. Before that, the block below does it
     // once, with the restored session in hand.

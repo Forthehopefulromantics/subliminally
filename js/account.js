@@ -533,6 +533,17 @@ function clearPendingSignupProfile(){
 async function applyPendingSignupProfile(){
   if (!pendingSignupProfile || !sb || !currentUser) return;
   const pending = pendingSignupProfile;
+  // The stash belongs to the account it was made for. Confirming an email can
+  // take days, and in the meantime somebody else -- or the same person on
+  // another account -- may sign in on this browser; writing the stashed
+  // username then would rename a stranger. It waits instead.
+  const sameAccount = !!(pending.email && currentUser.email &&
+    pending.email.toLowerCase() === currentUser.email.toLowerCase());
+  if (!sameAccount) return;
+  // And it never writes over a username this account already has: the stash is
+  // a first name for a new row, not a correction to an existing one.
+  const existing = await myProfile();
+  if (existing && existing.username){ clearPendingSignupProfile(); return; }
   const error = await saveProfile({ username: pending.username });
   if (!error) clearPendingSignupProfile();
   if (error && error.message && error.message.toLowerCase().includes('duplicate')){
@@ -1077,6 +1088,11 @@ async function submitOnboarding(){
   higherSelf.avatar = avatarId(saved.higher_self_avatar);
   obSaving = false;
   closeOnboardingModal();
+  // The chip in the header was drawn before any of this was answered, and
+  // nothing else redraws it until the next page load -- which is why the
+  // avatar just chosen only turned up after a refresh. Redraw it from the row
+  // that was read back, so she is the picture everywhere from this moment.
+  if (typeof loadNavIdentity === 'function') loadNavIdentity();
   showTodayPage();
 }
 
