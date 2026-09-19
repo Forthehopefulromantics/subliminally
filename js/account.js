@@ -552,62 +552,78 @@ async function applyPendingSignupProfile(){
    this is all in memory -- there is one row per person and it is written once,
    with everything in it. */
 
-const OB_SLIDES = ['welcome','name','higher','avatar','desires','faith','struggles','goals','education','finish'];
+/* The middle of the flow used to ask the same question three times over --
+   desires, then struggles, then "what would you most like to change" -- and
+   got three versions of one answer for it. What replaces them is four things
+   the app cannot work out on its own (when to speak, how to speak, whose
+   words to use, and how long a session can honestly be), with the two short
+   teaching slides between them. */
+const OB_SLIDES = ['welcome','name','higher','avatar','intro','desires','teach-mind','when','voice','spirit','teach-percent','time','finish'];
 
 /* The wording on the button changes with the slide; the work it does does not. */
 const OB_CTA = {
-  welcome: 'Begin My Journey',
-  education: 'I understand',
-  finish: 'Meet My Higher Self',
+  welcome: "Let's begin",
+  'teach-mind': 'I understand',
+  'teach-percent': 'I understand',
+  finish: 'Begin My Journey',
 };
 
 const OB_DESIRES = [
-  { id:'confidence',   icon:'✦', label:'Confidence' },
-  { id:'money',        icon:'◈', label:'Money & Abundance' },
-  { id:'love',         icon:'♡', label:'Love' },
-  { id:'career',       icon:'➚', label:'Career & Success' },
-  { id:'health',       icon:'✚', label:'Health & Wellness' },
-  { id:'body',         icon:'◐', label:'Dream Body' },
-  { id:'self-love',    icon:'❤', label:'Self-Love' },
-  { id:'spiritual',    icon:'☾', label:'Spiritual Growth' },
-  { id:'peace',        icon:'❋', label:'Peace & Anxiety Relief' },
-  { id:'sleep',        icon:'☁', label:'Better Sleep' },
-  { id:'discipline',   icon:'▲', label:'Discipline & Motivation' },
-  { id:'creativity',   icon:'✷', label:'Creativity' },
+  { id:'confidence',  icon:'✦', label:'Confidence' },
+  { id:'wealth',      icon:'◈', label:'Wealth' },
+  { id:'love',        icon:'♡', label:'Love' },
+  { id:'career',      icon:'➚', label:'Career' },
+  { id:'health',      icon:'✚', label:'Health & Body' },
+  { id:'peace',       icon:'❋', label:'Peace' },
+  { id:'creativity',  icon:'✷', label:'Creativity' },
+  { id:'spiritual',   icon:'☾', label:'Spiritual Growth' },
+  { id:'other',       icon:'✎', label:'Other' },
 ];
-const OB_MAX_DESIRES = 3;
+const OB_DESIRE_COUNT = 3;   // three exactly, not up to three
 
-const OB_STRUGGLES = [
-  { id:'self-confidence', label:'Self-confidence' },
-  { id:'overthinking',    label:'Overthinking' },
-  { id:'stress',          label:'Stress' },
-  { id:'motivation',      label:'Motivation' },
-  { id:'self-image',      label:'Self-image' },
-  { id:'money-mindset',   label:'Money mindset' },
-  { id:'relationships',   label:'Relationships' },
-  { id:'sleep',           label:'Sleep' },
-  { id:'consistency',     label:'Consistency' },
-  { id:'purpose',         label:'Purpose' },
-  { id:'other',           label:'Something else' },
+const OB_WHEN = [
+  { id:'wake',    icon:'☀', label:'When I wake up' },
+  { id:'work',    icon:'✎', label:'During work or school' },
+  { id:'before',  icon:'▲', label:'Before something stressful' },
+  { id:'unwind',  icon:'☾', label:"When I'm winding down" },
+  { id:'sleep',   icon:'☁', label:'While I sleep' },
 ];
 
-const OB_GOALS = [
-  { id:'inner-voice',  label:'How I speak to myself' },
-  { id:'confidence',   label:'My confidence' },
-  { id:'habits',       label:'My daily habits' },
-  { id:'focus',        label:'My focus' },
-  { id:'money',        label:'My money mindset' },
-  { id:'body-image',   label:'My body image' },
-  { id:'relationships',label:'My relationships' },
-  { id:'sleep',        label:'My sleep' },
-  { id:'purpose',      label:'My sense of purpose' },
-  { id:'other',        label:'Something else' },
+const OB_VOICE = [
+  { id:'gentle',      label:'Gentle & reassuring' },
+  { id:'direct',      label:'Confident & direct' },
+  { id:'motivating',  label:'Motivating & energetic' },
+  { id:'calm',        label:'Calm & grounded' },
+  { id:'mix',         label:'A mix depending on what I need' },
+];
+
+/* `faith` is the id faith.js already knows this answer by, so the stance
+   question feeds the vocabulary the rest of the app reads without a second
+   system behind it. 'religion' is the one that decides nothing on its own --
+   it opens the tradition list instead. */
+const OB_SPIRIT = [
+  { id:'religion',   label:'Religion is important to me',      faith:null },
+  { id:'spiritual',  label:"I'm spiritual, but not religious", faith:'spirituality' },
+  { id:'agnostic',   label:"I'm agnostic / still exploring",   faith:'agnostic' },
+  { id:'secular',    label:'I prefer a secular approach',      faith:'psychology' },
+  { id:'else',       label:'Something else',                   faith:'other' },
+];
+/* Which of faith.js's existing chips belong under "religion is important to
+   me". The rest of its list answers the stance question above instead, so it
+   is hidden there rather than removed from a file Settings shares. */
+const OB_RELIGIONS = ['christianity','islam','hinduism','other'];
+
+const OB_TIME = [
+  { id:'5',   label:'5 minutes',   minutes:5,  start:'One 5-minute session a day' },
+  { id:'10',  label:'10 minutes',  minutes:10, start:'Two 5-minute sessions a day' },
+  { id:'20',  label:'20 minutes',  minutes:20, start:'Two 10-minute sessions a day' },
+  { id:'30',  label:'30+ minutes', minutes:30, start:'Three 10-minute sessions a day' },
 ];
 
 let obIndex = 0;
 let obGoingBack = false;
 let obSaving = false;
-let obAnswers = { desires: [], struggles: [], goals: [] };
+let obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
 
 function obSlideName(){ return OB_SLIDES[obIndex]; }
 function obEl(id){ return document.getElementById(id); }
@@ -618,7 +634,7 @@ function openOnboardingModal(){
   if (obEl('onboardOverlay').classList.contains('open')) return;
   obIndex = 0;
   obSaving = false;
-  obAnswers = { desires: [], struggles: [], goals: [] };
+  obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
   obEl('onboardOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   obPaintSky();
@@ -658,6 +674,7 @@ function obShowSlide(){
     el.classList.toggle('on', on);
   });
   obGoingBack = false;
+  obCancelAdvance();          // a slide change outruns any pending auto-advance
   obEl('obStage').scrollTop = 0;
 
   const step = obIndex + 1;
@@ -679,7 +696,7 @@ function obShowSlide(){
   // paint of a slide it has to scroll -- that yanks the keyboard up over the
   // question. Desktop only, where there is room for both.
   if (window.matchMedia('(min-width:700px)').matches){
-    const field = { name:'obName', higher:'obHigherSelfName', goals:'obGoal' }[name];
+    const field = { name:'obName', higher:'obHigherSelfName' }[name];
     if (field) setTimeout(() => { const f = obEl(field); if (f) f.focus(); }, 60);
   }
 }
@@ -690,9 +707,17 @@ function obPersonalize(){
   const her = (obEl('obHigherSelfName').value || '').trim();
   obEl('obHigherQ').textContent = name ? `Hi ${name}, who are you becoming?` : 'Who are you becoming?';
   obEl('obAvatarQ').textContent = her ? `Who does ${her} look like?` : 'Who does she look like?';
-  obEl('obStrugglesQ').textContent = name
-    ? `${name}, what would you like support with right now?`
-    : 'What would you like support with right now?';
+  obEl('obVoiceQ').textContent = her
+    ? `How do you want ${her} to speak to you?`
+    : 'How do you want your higher self to speak to you?';
+  // Her introduction, in her own voice, with the drawing just chosen.
+  obEl('obIntroQ').textContent = name ? `Hi, ${name}.` : 'Hi there.';
+  obEl('obIntroHelp').textContent =
+    `I'm ${her || 'your higher self'}. Let's build the version of you you've been imagining.`;
+  const introHero = obEl('obIntroHero');
+  if (introHero && typeof avatarMarkup === 'function'){
+    introHero.innerHTML = avatarMarkup({ avatar: higherSelf.avatar }, { state:'hero', cut:'full', alt:false });
+  }
   obEl('obFinishQ').textContent = name ? `You're ready, ${name}.` : "You're ready.";
   obEl('obFinishHelp').textContent = her
     ? `${her} is waiting. Everything you just told us is saved to your account — on every device you sign in from.`
@@ -704,29 +729,61 @@ function obPersonalize(){
     hero.innerHTML = avatarMarkup({ avatar: higherSelf.avatar }, { state:'hero', cut:'full', alt:false })
       + (her ? `<div class="ob-hero-name">${obEscape(her)}</div>` : '');
   }
+  obRenderFinishSummary();
+}
+
+/* Their own answers, read back before they commit to them. Only the rows they
+   actually answered: a half-finished list is worse than a short one. */
+function obRenderFinishSummary(){
+  const el = obEl('obFinishSummary');
+  if (!el) return;
+  const when = (OB_WHEN.find(w => w.id === obAnswers.when) || {}).label;
+  const time = OB_TIME.find(t => t.id === obAnswers.time);
+  const desires = obDesireLabels();
+  const rows = [
+    desires.length ? ['Your three', desires.join(' · ')] : null,
+    when ? ['Best time', when] : null,
+    time ? ['Start with', time.start] : null,
+  ].filter(Boolean);
+  el.innerHTML = rows.map(([k, v]) =>
+    `<div class="ob-summary-row"><dt>${k}</dt><dd>${obEscape(v)}</dd></div>`).join('');
+  el.style.display = rows.length ? 'block' : 'none';
 }
 
 function obEscape(text){
   return String(text).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
 }
 
-/* Continue is only ever refused where an answer is genuinely required: a name,
-   because every later slide says it back to them. Everything else can be left
-   alone and changed later. */
+/* Continue is refused only where the screen has nothing to carry forward: a
+   name, the three desires, and an unanswered question. Everything else can be
+   left alone and changed later. */
+function obBlocked(){
+  const name = obSlideName();
+  if (name === 'name') return !(obEl('obName').value || '').trim();
+  if (name === 'desires') return obAnswers.desires.length !== OB_DESIRE_COUNT;
+  if (name === 'when') return !obAnswers.when;
+  if (name === 'voice') return !obAnswers.voice;
+  if (name === 'time') return !obAnswers.time;
+  if (name === 'spirit'){
+    if (!obAnswers.spirit) return true;
+    // Naming a tradition is the whole of that answer, so it is asked for.
+    return obAnswers.spirit === 'religion' && !(typeof myFaith !== 'undefined' && myFaith.id);
+  }
+  return false;
+}
 function obRefreshGate(){
-  const cta = obEl('obCta');
-  const needsName = obSlideName() === 'name' && !(obEl('obName').value || '').trim();
-  cta.disabled = obSaving || needsName;
+  obEl('obCta').disabled = obSaving || obBlocked();
 }
 
 function obNext(){
-  if (obSaving) return;
-  if (obSlideName() === 'name' && !(obEl('obName').value || '').trim()) return;
+  obCancelAdvance();
+  if (obSaving || obBlocked()) return;
   if (obIndex >= OB_SLIDES.length - 1){ submitOnboarding(); return; }
   obIndex++;
   obShowSlide();
 }
 function obPrev(){
+  obCancelAdvance();
   if (obSaving || obIndex === 0) return;
   obGoingBack = true;
   obIndex--;
@@ -740,45 +797,115 @@ function obChipMarkup(item, selected, dimmed){
 }
 
 function obRenderChips(){
-  const desiresFull = obAnswers.desires.length >= OB_MAX_DESIRES;
+  const full = obAnswers.desires.length >= OB_DESIRE_COUNT;
   obEl('obDesireChips').innerHTML = OB_DESIRES.map(d =>
-    obChipMarkup(d, obAnswers.desires.includes(d.id), desiresFull && !obAnswers.desires.includes(d.id))).join('');
-  const left = OB_MAX_DESIRES - obAnswers.desires.length;
-  obEl('obDesireCount').textContent = obAnswers.desires.length === 0 ? ''
-    : left === 0 ? 'That\'s your three.' : `${left} more if you'd like.`;
+    obChipMarkup(d, obAnswers.desires.includes(d.id), full && !obAnswers.desires.includes(d.id))).join('');
+  const left = OB_DESIRE_COUNT - obAnswers.desires.length;
+  obEl('obDesireCount').textContent = left === 0 ? "That's your three." : `${left} more to choose.`;
+  obEl('obDesireOther').style.display = obAnswers.desires.includes('other') ? 'block' : 'none';
 
-  obEl('obStruggleChips').innerHTML = OB_STRUGGLES.map(s =>
-    obChipMarkup(s, obAnswers.struggles.includes(s.id), false)).join('');
-  obEl('obStruggleOther').style.display = obAnswers.struggles.includes('other') ? 'block' : 'none';
-
-  obEl('obGoalChips').innerHTML = OB_GOALS.map(g =>
-    obChipMarkup(g, obAnswers.goals.includes(g.id), false)).join('');
+  obRenderOneList('obWhenChips', OB_WHEN, obAnswers.when);
+  obRenderOneList('obVoiceChips', OB_VOICE, obAnswers.voice);
+  obRenderOneList('obSpiritChips', OB_SPIRIT, obAnswers.spirit);
+  obRenderOneList('obTimeChips', OB_TIME, obAnswers.time);
+  obRenderFaithBranch();
 }
 
-/* One listener for all three lists rather than an onclick per chip: the chips
-   are redrawn on every tap, and a handler bound to the container survives that.
-   It also means a tap registers on the icon or the label, not just the gap
-   between them. */
+function obRenderOneList(listId, list, chosen){
+  const wrap = obEl(listId);
+  if (wrap) wrap.innerHTML = list.map(x => obChipMarkup(x, x.id === chosen, false)).join('');
+}
+
+/* "Religion is important to me" opens the tradition list faith.js already
+   draws for Settings -- same chips, same ids, same save -- with the answers
+   that are stances rather than religions hidden, since the question above
+   just asked those. Nothing in faith.js changes. */
+function obRenderFaithBranch(){
+  const branch = obEl('obFaithPick');
+  if (!branch) return;
+  const religious = obAnswers.spirit === 'religion';
+  branch.style.display = religious ? 'block' : 'none';
+  if (religious && typeof renderFaithChips === 'function'){ renderFaithChips(); obFilterFaithChips(); }
+  // faith.js opens its own words field for 'other'; before the stance is
+  // answered there is nothing for it to belong to.
+  const other = obEl('obFaithOther');
+  if (other && !obAnswers.spirit) other.style.display = 'none';
+}
+function obFilterFaithChips(){
+  document.querySelectorAll('#obFaithChips [data-faith]').forEach(btn => {
+    btn.style.display = OB_RELIGIONS.includes(btn.dataset.faith) ? '' : 'none';
+  });
+}
+
+/* One listener per list rather than an onclick per chip: the chips are redrawn
+   on every tap, and a handler bound to the container survives that. It also
+   means the whole card takes the tap -- icon, label and the gap between. */
 function obSetupChipTaps(){
-  const lists = { obDesireChips:'desires', obStruggleChips:'struggles', obGoalChips:'goals' };
-  Object.keys(lists).forEach(listId => {
+  const multi = { obDesireChips:'desires' };
+  const single = { obWhenChips:'when', obVoiceChips:'voice', obSpiritChips:'spirit', obTimeChips:'time' };
+  Object.keys(multi).forEach(listId => {
     const wrap = obEl(listId);
     if (!wrap) return;
     wrap.addEventListener('click', (e) => {
       const chip = e.target.closest('.ob-chip');
       if (!chip || obSaving) return;
-      obToggleChoice(lists[listId], chip.dataset.id);
+      obToggleChoice(multi[listId], chip.dataset.id);
     });
   });
+  Object.keys(single).forEach(listId => {
+    const wrap = obEl(listId);
+    if (!wrap) return;
+    wrap.addEventListener('click', (e) => {
+      const chip = e.target.closest('.ob-chip');
+      if (!chip || obSaving) return;
+      obPickOne(single[listId], chip.dataset.id);
+    });
+  });
+  // faith.js's own chips re-render themselves on a tap, which puts back the
+  // ones hidden above -- so the filter and the gate are re-applied after it.
+  const faithWrap = obEl('obFaithChips');
+  if (faithWrap) faithWrap.addEventListener('click', () => { obFilterFaithChips(); obRefreshGate(); });
 }
 
 function obToggleChoice(field, id){
   const chosen = obAnswers[field];
   const at = chosen.indexOf(id);
   if (at > -1) chosen.splice(at, 1);
-  else if (field === 'desires' && chosen.length >= OB_MAX_DESIRES) return; // three means three
+  else if (chosen.length >= OB_DESIRE_COUNT) return;   // three means three
   else chosen.push(id);
   obRenderChips();
+  obRefreshGate();
+}
+
+/* A single answer answers the whole screen, so the gold lands on the card and
+   the screen moves on by itself -- long enough to see the choice register,
+   short enough not to feel like waiting. Two answers open something else on
+   the same screen instead, and those wait for Continue. */
+let obAdvanceTimer = null;
+function obCancelAdvance(){ if (obAdvanceTimer){ clearTimeout(obAdvanceTimer); obAdvanceTimer = null; } }
+
+function obPickOne(field, id){
+  obAnswers[field] = id;
+  if (field === 'spirit') obApplySpirit(id);
+  obRenderChips();
+  obRefreshGate();
+  const holds = field === 'spirit' && (id === 'religion' || id === 'else');
+  if (holds || obBlocked()) return;
+  obCancelAdvance();
+  const from = obIndex;
+  obAdvanceTimer = setTimeout(() => {
+    obAdvanceTimer = null;
+    if (obIndex === from) obNext();     // not if they went back in the meantime
+  }, 420);
+}
+
+/* The stance maps straight onto the vocabulary faith.js already has, so
+   answering it here is the same answer Settings reads and writes later. */
+function obApplySpirit(id){
+  const pick = OB_SPIRIT.find(x => x.id === id) || {};
+  if (typeof myFaith === 'undefined') return;
+  myFaith = { id: pick.faith || null, own: pick.faith === 'other' ? (myFaith.own || '') : '' };
+  if (typeof renderFaithChips === 'function') renderFaithChips();   // shows the "in your own words" field for 'other'
 }
 
 /* The same roster as the profile page, at the moment it actually matters --
@@ -845,7 +972,7 @@ function obSetupInputs(){
     if (el) el.addEventListener('input', () => { obPersonalize(); obRefreshGate(); });
   });
   // Enter moves on, the way the on-screen keyboard's "next" key implies.
-  ['obName','obHigherSelfName','obFaithOther','obStruggleOther','obGoal'].forEach(id => {
+  ['obName','obHigherSelfName','obFaithOther','obDesireOther'].forEach(id => {
     const el = obEl(id);
     if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); obNext(); } });
   });
@@ -864,6 +991,16 @@ function setupOnboarding(){
    land -- is exactly the bug that sent people back through it every login. */
 function obLabelsFor(list, ids){
   return ids.map(id => (list.find(x => x.id === id) || {}).label).filter(Boolean);
+}
+/* "Other" is saved as whatever they typed, not as the word "Other". */
+function obDesireOwnWords(){
+  return ((obEl('obDesireOther') || {}).value || '').trim().slice(0, 80);
+}
+function obDesireLabels(){
+  const own = obDesireOwnWords();
+  return obAnswers.desires
+    .map(id => id === 'other' ? (own || 'Other') : (OB_DESIRES.find(d => d.id === id) || {}).label)
+    .filter(Boolean);
 }
 
 async function submitOnboarding(){
@@ -885,12 +1022,21 @@ async function submitOnboarding(){
     display_name: displayName || null,
     higher_self_name: higherName || null,
     higher_self_avatar: higherSelf.avatar,
-    onboarding_desires: obLabelsFor(OB_DESIRES, obAnswers.desires),
-    onboarding_struggles: obLabelsFor(OB_STRUGGLES, obAnswers.struggles),
-    onboarding_struggle: obAnswers.struggles.includes('other')
-      ? ((obEl('obStruggleOther').value || '').trim().slice(0, 80) || null) : null,
-    onboarding_goals: obLabelsFor(OB_GOALS, obAnswers.goals),
-    onboarding_goal: (obEl('obGoal').value || '').trim().slice(0, 140) || null,
+    onboarding_desires: obDesireLabels(),
+    onboarding_goal: obAnswers.desires.includes('other') ? (obDesireOwnWords() || null) : null,
+    /* The four new answers go in the jsonb column that already holds what
+       somebody said during onboarding, keyed, rather than four columns this
+       change is not allowed to add. The two retired questions are cleared with
+       the same write, so nobody carries a stale answer to a question that is
+       no longer asked. */
+    onboarding_goals: {
+      support_when: (OB_WHEN.find(w => w.id === obAnswers.when) || {}).label || null,
+      voice: (OB_VOICE.find(v => v.id === obAnswers.voice) || {}).label || null,
+      spirituality: (OB_SPIRIT.find(x => x.id === obAnswers.spirit) || {}).label || null,
+      daily_minutes: (OB_TIME.find(t => t.id === obAnswers.time) || {}).minutes || null,
+    },
+    onboarding_struggles: [],
+    onboarding_struggle: null,
     onboarding_completed: true,
     onboarding_completed_at: new Date().toISOString(),
     ...(typeof faithAnswerForSave === 'function' ? faithAnswerForSave() : {}),
