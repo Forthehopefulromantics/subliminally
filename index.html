@@ -1571,6 +1571,43 @@
      fit into. Here the slide is the card and the stage does the scrolling, so
      the whole roster is laid out at once -- all nineteen, no inner scrollbar. */
   .ob-shell .av-roster-onboard{ grid-template-columns:repeat(auto-fill, minmax(74px,1fr)); gap:9px; max-height:none; overflow:visible; }
+
+  /* Four to a row is the right size for choosing between nineteen people and
+     the wrong size for looking at any one of them: at 74px the hair and the
+     skin read, the face does not. Tapping one opens it here, above the grid,
+     using the two cuts the app already ships -- the face crop beside the full
+     figure -- so features, eyes and headphones can be seen before committing.
+     Nothing is redrawn, re-cropped or substituted; these are the files as they
+     are. The grid stays where it is underneath, so the next tap swaps who is
+     standing here rather than closing anything. */
+  .ob-avatar-preview{ position:relative; margin:0 0 14px; padding:14px 14px 13px; border-radius:20px;
+    background:rgba(28,24,48,.85); border:1px solid var(--dusk); box-shadow:0 18px 38px rgba(0,0,0,.34);
+    animation:obIn .26s cubic-bezier(.22,.61,.36,1) both; }
+  .ob-avatar-preview[hidden]{ display:none; }
+  .ob-avatar-art{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  /* Both cuts keep their own aspect ratio -- sized by one side, never stretched
+     to a box. The gold on the face crop is the same gold as a chosen card. */
+  .ob-avatar-art .av-face{ width:128px; height:128px; flex:none; border-radius:18px; border:2px solid var(--candle); }
+  .ob-avatar-art .av-full{ width:auto; height:236px; flex:none; filter:drop-shadow(0 14px 26px rgba(0,0,0,.45)); }
+  .ob-avatar-copy{ text-align:center; margin-top:11px; }
+  .ob-avatar-copy b{ display:block; font-family:var(--serif); font-size:17px; font-weight:400; }
+  .ob-avatar-copy span{ display:block; font-size:12.5px; line-height:1.5; color:var(--haze); margin-top:3px; }
+  .ob-avatar-pick{ display:block; width:100%; margin-top:12px; padding:13px 18px; border-radius:999px;
+    background:rgba(227,190,127,.14); border:1px solid var(--candle); color:var(--candle);
+    font-family:inherit; font-size:14px; cursor:pointer; transition:background .18s, transform .12s; }
+  .ob-avatar-pick:hover{ background:rgba(227,190,127,.22); }
+  .ob-avatar-pick:active{ transform:scale(.985); }
+  .ob-avatar-close{ position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid var(--dusk); color:var(--moonlight);
+    font-size:15px; line-height:1; cursor:pointer; transition:background .18s; }
+  .ob-avatar-close:hover{ background:rgba(255,255,255,.16); }
+  /* A 320px phone still has to fit a face, a figure and the padding between. */
+  @media (max-width:380px){
+    .ob-avatar-preview{ padding:12px 10px 11px; }
+    .ob-avatar-art{ gap:10px; }
+    .ob-avatar-art .av-face{ width:112px; height:112px; }
+    .ob-avatar-art .av-full{ height:200px; }
+  }
   /* The spiritual-language chips are drawn by faith.js in its own markup, which
      Settings uses too. Rather than fork that, they are dressed as ob-chips here. */
   .ob-chips .length-chip{ padding:14px; border-radius:15px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); font-size:14px; text-align:left; transition:background .18s, border-color .18s, transform .12s; }
@@ -1584,6 +1621,7 @@
   }
   @media (prefers-reduced-motion: reduce){
     .ob-slide.on{ animation:none; }
+    .ob-avatar-preview{ animation:none; }
     .ob-sky .ob-star{ animation:none; }
     .ob-progress-fill{ transition:none; }
   }
@@ -1713,7 +1751,10 @@
 
     <section class="ob-slide" data-ob="avatar">
       <h2 class="ob-q" id="obAvatarQ">Who does she look like?</h2>
-      <p class="ob-help">She'll guide the rest of the way in.</p>
+      <p class="ob-help">She'll guide the rest of the way in. Tap anyone to see her up close.</p>
+      <!-- Filled by renderOnboardAvatarPreview() on the first tap, and swapped
+           in place on every tap after it. Empty and hidden until then. -->
+      <div class="ob-avatar-preview" id="obAvatarPreview" role="group" aria-label="Chosen avatar, enlarged" hidden></div>
       <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
     </section>
 

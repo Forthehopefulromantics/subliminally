@@ -624,7 +624,9 @@ function openOnboardingModal(){
   obPaintSky();
   obRenderChips();
   if (typeof renderFaithChips === 'function') renderFaithChips();
+  obAvatarPreviewOpen = false;
   renderOnboardAvatars();
+  renderOnboardAvatarPreview();
   obShowSlide();
 }
 function closeOnboardingModal(){
@@ -790,11 +792,49 @@ function renderOnboardAvatars(){
        onclick="pickOnboardAvatar('${a.id}')" aria-pressed="${a.id === higherSelf.avatar}"
        title="${a.label}" aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('');
 }
+/* The enlarged look at whoever is chosen, above the grid. Closed until the
+   first tap, and left open after it -- tapping somebody else swaps who is in
+   it rather than shutting it, which is what makes comparing two faces one tap
+   each instead of three. */
+let obAvatarPreviewOpen = false;
+
+function renderOnboardAvatarPreview(){
+  const wrap = document.getElementById('obAvatarPreview');
+  if (!wrap || typeof avatarEntry !== 'function') return;
+  if (!obAvatarPreviewOpen){ wrap.hidden = true; wrap.innerHTML = ''; return; }
+  const a = avatarEntry(higherSelf.avatar);
+  /* The face crop and the full drawing, both as they ship: one large enough to
+     read a face off, one to see who she is head to trainers. The label and the
+     description carry the meaning, so the two pictures are left decorative
+     rather than read out twice over. */
+  wrap.innerHTML = `
+    <button type="button" class="ob-avatar-close" onclick="closeOnboardAvatarPreview()" aria-label="Close this preview and keep browsing">&times;</button>
+    <div class="ob-avatar-art">
+      ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'face', alt:false })}
+      ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'full', alt:false })}
+    </div>
+    <div class="ob-avatar-copy"><b>${a.label}</b><span>${a.look}</span></div>
+    <button type="button" class="ob-avatar-pick" onclick="obNext()">Choose this avatar</button>`;
+  wrap.hidden = false;
+}
+
+function closeOnboardAvatarPreview(){
+  obAvatarPreviewOpen = false;
+  renderOnboardAvatarPreview();
+}
+
 /* Held until the last slide, rather than written on every tap: the whole row
    saves at once, so there is nothing to write yet. */
 function pickOnboardAvatar(id){
   higherSelf.avatar = avatarId(id);
+  obAvatarPreviewOpen = true;
   renderOnboardAvatars();
+  renderOnboardAvatarPreview();
+  // The preview sits above the grid, so opening it pushes the row that was
+  // just tapped down the page. `nearest` brings it back into view on the tap
+  // that opens it and does nothing on the taps after, when it is already there.
+  const wrap = document.getElementById('obAvatarPreview');
+  if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 
 /* Typing is the other way a slide changes: the name feeds later headlines, and
