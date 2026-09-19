@@ -1164,14 +1164,10 @@
   body[data-sky="day"] .journal-tabs button.active{ background:rgba(122,79,181,.14); }
   body[data-sky="day"] input::placeholder, body[data-sky="day"] textarea::placeholder{ color:#9C8FA8; }
 
-  /* The orb reads as a hole in a pale sky, so by day it becomes a soft sun
-     instead of a dark sphere. */
-  body[data-sky="day"] .orb{
-    background:radial-gradient(circle at 36% 30%, rgba(255,255,255,.95), transparent 62%),
-               radial-gradient(circle at 66% 70%, rgba(247,210,103,.55), transparent 58%),
-               radial-gradient(circle, #FFF6E6, rgba(255,246,230,.35) 72%);
-    box-shadow:0 0 90px rgba(255,236,196,.55), inset 0 0 50px rgba(247,210,103,.25); }
-  body[data-sky="day"] 
+  /* The day orb is painted once, up with the other orb rules, as an opaque
+     disc. It used to be repainted here in translucent gradients that faded out
+     well before the edge, which let the clouds drift straight through it -- a
+     bright patch of sky rather than a sun. */
 
   /* The switch, in the bar, so it's reachable from any page. */
   .skybtn{ width:36px; height:36px; border-radius:50%; flex:0 0 auto; cursor:pointer;
