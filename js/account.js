@@ -930,17 +930,16 @@ function renderOnboardAvatarPreview(){
   if (!wrap || typeof avatarEntry !== 'function') return;
   if (!obAvatarPreviewOpen){ wrap.hidden = true; wrap.innerHTML = ''; return; }
   const a = avatarEntry(higherSelf.avatar);
-  /* The face crop and the full drawing, both as they ship: one large enough to
-     read a face off, one to see who she is head to trainers. The label and the
-     description carry the meaning, so the two pictures are left decorative
-     rather than read out twice over. */
+  /* The full drawing as it ships, head to trainers, and nothing else: no face
+     crop and no written description. Who she is reads off the picture, so the
+     label is carried on the group rather than printed under it -- a screen
+     reader still hears which one is standing here. */
+  wrap.setAttribute('aria-label', a.label + ', enlarged');
   wrap.innerHTML = `
     <button type="button" class="ob-avatar-close" onclick="closeOnboardAvatarPreview()" aria-label="Close this preview and keep browsing">&times;</button>
     <div class="ob-avatar-art">
-      ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'face', alt:false })}
       ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'full', alt:false })}
     </div>
-    <div class="ob-avatar-copy"><b>${a.label}</b><span>${a.look}</span></div>
     <button type="button" class="ob-avatar-pick" onclick="obNext()">Choose this avatar</button>`;
   wrap.hidden = false;
 }
