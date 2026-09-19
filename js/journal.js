@@ -83,7 +83,17 @@ async function renderRitualsState(){
 
   // Both tabs want habit data: the calendar colours each day by how much of
   // that day's ritual was kept, so it loads habits too.
-  if (ritualsTab === 'habits'){ habitsPanel.style.display = 'block'; loadHabits(); }
+  if (ritualsTab === 'habits'){
+    habitsPanel.style.display = 'block';
+    /* The Habit Tracker's own first run, asked of the database rather than of
+       this browser -- and only once the tracker is actually the screen someone
+       is looking at, since this function also runs in the background whenever
+       the account area re-renders. Main onboarding is a separate state and is
+       not consulted here. */
+    const onTracker = document.body.getAttribute('data-view') === 'rituals';
+    if (onTracker && typeof maybeOpenHabitOnboarding === 'function' && await maybeOpenHabitOnboarding()) return;
+    loadHabits();
+  }
   else {
     calendarPanel.style.display = 'block';
     if (tierAtLeast(myTier, 'ritual')) await loadHabits({ silent: true });

@@ -11,8 +11,15 @@
    the habit; suggestion chips below do the same in one tap. */
 const HABIT_SLOTS = 15;
 const HABIT_BLANKS_VISIBLE = 3;   // empty slots shown before "+ more slots"
-let habitSlotsExpanded = { morning: false, night: false };
-let habitIdeasOpen = { morning: false, night: false };
+/* Morning and night are the two rituals; anytime is everything that does not
+   belong to an end of the day. Anytime habits are kept, counted and checked
+   off like any other -- they are simply not part of either ritual, so they
+   never make or break one. */
+const HABIT_TIMES = ['morning', 'night', 'anytime'];
+const HABIT_RITUAL_TIMES = ['morning', 'night'];
+function habitTimeSuffix(time){ return time.charAt(0).toUpperCase() + time.slice(1); }
+let habitSlotsExpanded = { morning: false, night: false, anytime: false };
+let habitIdeasOpen = { morning: false, night: false, anytime: false };
 function renderHabitUndoBar(){
   const bar = document.getElementById('habitUndoBar');
   if (!bar) return;
@@ -31,11 +38,15 @@ function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; r
    list and arrive from the faith answer instead, in the words that faith uses.
    Someone who did not answer gets the shared list alone. */
 const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
+/* The ones that are not tied to an end of the day. */
+const ANYTIME_HABIT_SUGGESTIONS = ['Drink water','Move your body','Read','Listen to a subliminal','Step outside','Take your vitamins','Text someone you love','Tidy one thing'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
 /* Whatever the faith offers goes first: it is the most specific thing we know
    about what this person's morning already looks like. */
 function habitSuggestionsFor(time){
-  const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS;
+  const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS
+    : time === 'night' ? NIGHT_HABIT_SUGGESTIONS
+    : ANYTIME_HABIT_SUGGESTIONS;
   const faith = (typeof faithHabitIdeas === 'function') ? faithHabitIdeas(time) : [];
   const seen = new Set();
   return [...faith, ...base].filter(s => {
@@ -49,8 +60,9 @@ function habitSuggestionsFor(time){
    client-side keeps working if sort_order hasn't been added yet, where every
    row reads as 0 and the list falls back to oldest-first. */
 function sortHabitsCache(){
+  const order = { morning: 0, night: 1, anytime: 2 };
   habitsCache.sort((a, b) => {
-    if (a.time_of_day !== b.time_of_day) return a.time_of_day === 'morning' ? -1 : 1;
+    if (a.time_of_day !== b.time_of_day) return (order[a.time_of_day] ?? 3) - (order[b.time_of_day] ?? 3);
     const d = (a.sort_order || 0) - (b.sort_order || 0);
     if (d) return d;
     return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
@@ -66,6 +78,11 @@ async function loadHabits(options){
   /* Today, Rituals and the calendar all want this, and moving between them used
      to ask for the whole list again each time. `force` is for after a write. */
   if (options && options.force) forgetFetch('habits');
+  /* The cycle moves on calendar days whether or not anybody came to look, so
+     it is settled before the list is drawn from it. */
+  if (typeof advanceHabitCycleIfDue === 'function') await advanceHabitCycleIfDue();
+  const prof = await myProfile();
+  if (prof && typeof habitCycleFromProfile === 'function') habitCycle = habitCycleFromProfile(prof);
   const since = shiftDateStr(localDateStr(), -400);
   const [{ data: habits, error: hErr }, { data: checkins, error: cErr }] = await fetchOnce('habits', () => Promise.all([
     sb.from('habits').select('*').eq('user_id', currentUser.id).eq('archived', false).order('created_at', { ascending: true }),
@@ -304,23 +321,61 @@ function habitCompletionFor(dateStr){
   const done = habitDoneByDate[dateStr];
   return (done ? done.size : 0) / habitsCache.length;
 }
+/* How many habits this account may keep active right now, and how many of
+   those are still free. Both read the cycle loaded from the profile row --
+   never this browser -- and both fall back to the full fifteen, so a profile
+   that has not been read yet can never wrongly refuse anybody. */
+function habitSpacesAllowed(){
+  const slots = (typeof habitCycle !== 'undefined' && habitCycle && habitCycle.slots) || HABIT_SLOT_MAX;
+  return Math.min(HABIT_SLOT_MAX, slots);
+}
+function habitSpacesLeft(){
+  return Math.max(0, habitSpacesAllowed() - habitsCache.length);
+}
+
+/* One line above the lists: where they are in the cycle, and what is still
+   free. Not a celebration screen -- that comes later, when there is something
+   to celebrate. */
+function renderHabitCycleBar(){
+  const bar = document.getElementById('habitCycleBar');
+  if (!bar) return;
+  const started = typeof habitCycle !== 'undefined' && habitCycle && habitCycle.startedOn;
+  if (!started){ bar.style.display = 'none'; return; }
+  const day = Math.min(HABIT_CYCLE_DAYS, Math.max(1, habitCycleDay()));
+  const allowed = habitSpacesAllowed();
+  const nextUnlock = allowed < HABIT_SLOT_MAX
+    ? ` · ${HABIT_CYCLE_DAYS - day + 1} day${HABIT_CYCLE_DAYS - day + 1 === 1 ? '' : 's'} to ${HABIT_SLOT_STEP} more spaces`
+    : '';
+  bar.innerHTML = `<span><b>Day ${day} of ${HABIT_CYCLE_DAYS}</b> · cycle ${habitCycle.number || 1}</span>`
+    + `<span><b>${habitsCache.length}</b> of ${allowed} habit spaces used${nextUnlock}</span>`;
+  bar.style.display = 'flex';
+}
+
 function renderHabits(){
   const today = localDateStr();
   const week = Array.from({ length: 7 }, (_, i) => shiftDateStr(today, i - 6));
   let doneToday = 0;
-  ['morning','night'].forEach(time => {
+  renderHabitCycleBar();
+  HABIT_TIMES.forEach(time => {
     const rows = habitsCache.filter(h => h.time_of_day === time);
-    const list = document.getElementById(time === 'morning' ? 'habitListMorning' : 'habitListNight');
-    const count = document.getElementById(time === 'morning' ? 'habitCountMorning' : 'habitCountNight');
-    const suggestWrap = document.getElementById(time === 'morning' ? 'habitSuggestMorning' : 'habitSuggestNight');
+    const suffix = habitTimeSuffix(time);
+    const list = document.getElementById('habitList' + suffix);
+    const count = document.getElementById('habitCount' + suffix);
+    const suggestWrap = document.getElementById('habitSuggest' + suffix);
+    if (!list) return;
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
+    // Non-negotiables and ritual streaks belong to the morning and the night.
+    // An anytime habit is not part of either, so it is not offered a ✦ that
+    // would protect nothing.
+    const isRitual = HABIT_RITUAL_TIMES.includes(time);
     const coreCount = rows.filter(h => h.is_core).length;
-    const streakHere = routineStreak(time);
+    const streakHere = isRitual ? routineStreak(time) : 0;
     count.textContent = rows.length
-      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable`
+      ? `${done} of ${rows.length} today`
+        + (isRitual ? ` · ${coreCount}/${CORE_HABIT_MAX} non-negotiable` : '')
         + (streakHere > 1 ? ` · ${streakHere}-day streak` : '')
-      : `0/${HABIT_SLOTS} added`;
+      : 'none yet';
 
     const realRowsHtml = rows.map((h, i) => {
       const days = habitCheckins[h.id] || new Set();
@@ -342,10 +397,10 @@ function renderHabits(){
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
         <div class="habit-actions">
-          <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
+          ${isRitual ? `<button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
             aria-pressed="${h.is_core ? 'true' : 'false'}"
             title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
-            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>
+            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>` : ''}
           <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove ${safeName}" title="Remove">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -357,7 +412,7 @@ function renderHabits(){
     const pool = habitSuggestionsFor(time).filter(s => !already.has(s.toLowerCase()));
     // All 15 slots are there, but showing 15 empty boxes at once reads as a
     // chore list. Offer a few at a time and let people ask for the rest.
-    const remaining = Math.max(0, HABIT_SLOTS - rows.length);
+    const remaining = Math.max(0, Math.min(HABIT_SLOTS - rows.length, habitSpacesLeft()));
     const blanksShown = habitSlotsExpanded[time] ? remaining : Math.min(HABIT_BLANKS_VISIBLE, remaining);
     const blankRowsHtml = Array.from({ length: blanksShown }, (_, i) => {
       const example = pool.length ? `e.g. ${pool[i % pool.length]}` : `Habit #${rows.length + i + 1}`;
@@ -375,14 +430,14 @@ function renderHabits(){
       : '';
 
     // Said once, where the decision is actually made.
-    const coreHint = rows.length && !rows.some(h => h.is_core)
+    const coreHint = isRitual && rows.length && !rows.some(h => h.is_core)
       ? `<p class="habit-core-hint">Tap ✦ on the few you'd still do on your worst day. Doing just those counts as keeping the ritual — twice a week.</p>`
       : '';
     list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
-      suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
-        ? `<span class="habit-suggest-full">15 of 15 — this ritual is full.</span>`
+      suggestWrap.innerHTML = habitSpacesLeft() <= 0
+        ? `<span class="habit-suggest-full">${habitSpacesAllowed()} of ${habitSpacesAllowed()} habit spaces in use${habitSpacesAllowed() < HABIT_SLOT_MAX ? ' — finish this cycle for three more.' : '.'}</span>`
         : pool.length
           ? `<button type="button" class="habit-ideas-toggle" onclick="toggleHabitIdeas('${time}')" aria-expanded="${habitIdeasOpen[time]}">Need ideas?</button>`
             + (habitIdeasOpen[time] ? `<div class="habit-ideas-chips">${pool.map(s => `<button type="button" class="habit-suggest-chip" onclick="addHabit('${time}','${s}')">${s}</button>`).join('')}</div>` : '')
@@ -397,7 +452,7 @@ function renderHabits(){
   const practiceStreak = streakFromDays(allDays);
   // If non-negotiables are set, the streak worth showing is the one they protect
   // — kept on the short nights as well as the full ones.
-  const kept = ['morning','night']
+  const kept = HABIT_RITUAL_TIMES
     .filter(t => habitsCache.some(h => h.time_of_day === t && h.is_core))
     .map(t => ({ t, n: routineStreak(t) }))
     .filter(x => x.n > 1)
@@ -415,6 +470,15 @@ async function addHabit(time, name){
   if (!name) return;
   if (habitsCache.filter(h => h.time_of_day === time).length >= HABIT_SLOTS) return;
   const msg = document.getElementById('habitsMsg');
+  /* The cycle's allowance, not just the fifteen slots a ritual can hold.
+     Nothing is removed when the allowance is reached -- it simply stops
+     growing until the next 21 days are done. */
+  if (habitSpacesLeft() <= 0){
+    msg.textContent = `You're using all ${habitSpacesAllowed()} of your habit spaces. Finish this 21-day cycle and three more open up.`;
+    msg.className = 'save-msg err';
+    renderHabits();
+    return;
+  }
   pushHabitUndo();
   const sortOrder = habitsCache.filter(h => h.time_of_day === time).length;
   /* Ask for the saved row back rather than adding it and then fetching the

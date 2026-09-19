@@ -1569,6 +1569,75 @@
   .ob-skip:hover{ color:var(--lilac); }
   .ob-foot .auth-msg{ text-align:center; }
 
+  /* ---- Habit Tracker onboarding ----
+     Sits on top of the .ob-* shell above and only adds the pieces that screen
+     does not already have: the cycle ladder, the recommendation cards, the
+     morning/night/anytime picker and the 21-day preview. */
+  #habitObOverlay .ob-q{ font-size:23px; padding:0 6px; }
+  .ht-ladder{ margin:14px auto 0; max-width:250px; text-align:center; }
+  .ht-rung{ background:rgba(28,24,48,.78); border:1px solid var(--dusk); border-radius:13px; padding:9px 12px; font-size:13px; }
+  .ht-rung-last{ border-color:rgba(227,190,127,.45); color:var(--candle); }
+  .ht-rung-arrow{ color:var(--lilac); font-size:12px; line-height:1; padding:4px 0; opacity:.8; }
+  .ht-reward{ margin-top:18px; background:linear-gradient(150deg, rgba(185,167,232,.16), rgba(227,190,127,.10)); border:1px solid rgba(227,190,127,.35); border-radius:18px; padding:16px 16px 14px; }
+  .ht-reward-head{ font-family:var(--serif); font-size:16px; text-align:center; margin-bottom:11px; }
+  .ht-reward-row{ display:flex; align-items:center; gap:9px; font-size:13.5px; padding:5px 0; }
+  .ht-reward-note{ font-size:12.5px; color:var(--haze); text-align:center; margin-top:10px; }
+
+  .ht-cards{ display:grid; gap:10px; }
+  .ht-card{ display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left; padding:14px; border-radius:16px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); color:var(--moonlight); font-family:inherit; cursor:pointer; transition:background .18s, border-color .18s, transform .12s, opacity .18s; }
+  .ht-card:active{ transform:scale(.985); }
+  .ht-card.sel{ background:rgba(185,167,232,.18); border-color:var(--lilac); }
+  .ht-card.full{ opacity:.45; }
+  .ht-card-icon{ flex:none; font-size:17px; line-height:1.4; opacity:.9; }
+  .ht-card-body{ flex:1; display:block; }
+  .ht-card-tag{ display:block; font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--candle); margin-bottom:4px; }
+  .ht-card-own .ht-card-tag{ color:var(--lilac); }
+  .ht-card-name{ display:block; font-size:15px; margin-bottom:3px; }
+  .ht-card-blurb{ display:block; font-size:12.5px; line-height:1.55; color:var(--haze); }
+  .ht-card-tick{ flex:none; width:20px; text-align:center; color:var(--candle); font-size:14px; }
+  .ht-card-remove{ flex:none; width:24px; height:24px; border-radius:50%; background:rgba(255,255,255,.07); border:1px solid var(--dusk); color:var(--haze); font-size:14px; line-height:1; cursor:pointer; }
+  .ht-own-row{ display:flex; gap:8px; align-items:center; }
+  .ht-own-row .ob-input{ flex:1; padding:13px 14px; font-size:14px; }
+  .ht-own-add{ flex:none; padding:13px 16px; border-radius:14px; border:1px solid var(--dusk); background:rgba(255,255,255,.07); color:var(--moonlight); font-family:inherit; font-size:13.5px; cursor:pointer; }
+  .ht-own-add:hover{ border-color:var(--lilac); }
+
+  .ht-times{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+  .ht-time{ padding:11px 6px; border-radius:13px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; transition:background .18s, border-color .18s; }
+  .ht-time.sel{ background:rgba(185,167,232,.2); border-color:var(--lilac); }
+  .ht-times.compact .ht-time{ padding:9px 4px; font-size:11.5px; }
+
+  .ht-rhythm{ display:grid; gap:14px; }
+  .ht-rhythm-row{ background:rgba(28,24,48,.6); border:1px solid var(--dusk); border-radius:18px; padding:14px; }
+  .ht-rhythm-name{ font-size:14.5px; margin-bottom:10px; }
+
+  .ht-tune{ display:grid; gap:14px; }
+  .ht-tune-card{ background:rgba(28,24,48,.6); border:1px solid var(--dusk); border-radius:18px; padding:14px; }
+  .ht-tune-name{ padding:12px 14px; font-size:14.5px; margin-bottom:12px; }
+  .ht-tune-label{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--haze); margin:12px 0 7px; }
+  .ht-tune-label span{ letter-spacing:.06em; text-transform:none; opacity:.7; }
+  .ht-mins{ display:flex; flex-wrap:wrap; gap:6px; }
+  .ht-min{ padding:8px 12px; border-radius:99px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; }
+  .ht-min.sel{ background:rgba(185,167,232,.2); border-color:var(--lilac); }
+  .ht-days{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
+  .ht-day{ padding:9px 0; border-radius:11px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); color:var(--haze); font-family:inherit; font-size:12px; cursor:pointer; }
+  .ht-day.sel{ background:rgba(185,167,232,.2); border-color:var(--lilac); color:var(--moonlight); }
+  .ht-time-input{ padding:12px 14px; font-size:14px; color-scheme:dark; }
+
+  .ht-hero-small img{ width:min(132px, 34vw); }
+  .ht-preview{ margin-top:6px; }
+  .ht-preview-group{ margin-bottom:14px; }
+  .ht-preview-head{ font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--haze); margin-bottom:8px; }
+  .ht-preview-row{ display:flex; align-items:center; gap:10px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); border-radius:14px; padding:12px 14px; margin-bottom:7px; }
+  .ht-preview-icon{ flex:none; font-size:14px; }
+  .ht-preview-name{ flex:1; font-size:14px; }
+  .ht-preview-min{ flex:none; font-size:12px; color:var(--candle); }
+  .ht-preview-line{ font-family:var(--serif); font-size:14.5px; font-style:italic; color:var(--moonlight); margin-top:4px; }
+  .ht-day-badge{ text-align:center; font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:var(--candle); margin-top:10px; }
+
+  /* The cycle line above the habit lists, in the tracker itself. */
+  .habit-cycle-bar{ display:flex; flex-wrap:wrap; align-items:baseline; justify-content:center; gap:4px 14px; background:rgba(255,255,255,0.03); border:1px solid var(--dusk); border-radius:14px; padding:10px 16px; margin-bottom:16px; font-size:12.5px; color:var(--haze); text-align:center; }
+  .habit-cycle-bar b{ color:var(--moonlight); font-weight:500; }
+
   /* The avatar roster is the existing one; it only needs room to breathe here. */
   /* The roster is a 230px scroller inside the old modal, where it had a card to
      fit into. Here the slide is the card and the stage does the scrolling, so
@@ -1834,6 +1903,92 @@
     <div class="auth-msg" id="onboardMsg" role="status" aria-live="polite"></div>
     <button type="button" class="ob-cta" id="obCta" onclick="obNext()">Begin My Journey</button>
     <button type="button" class="ob-skip" id="obSkip" onclick="skipOnboarding()">I'll personalize later</button>
+  </div>
+</div>
+
+<!-- ============ HABIT TRACKER ONBOARDING (its own first run, shown once) ============
+     Not main onboarding. This one is shown the first time somebody opens the
+     Habit Tracker, and it writes habit_onboarding_completed -- a separate
+     column from the main onboarding_completed. It reuses the .ob-* shell so it
+     is the same room as the rest of the app, with only the pieces it needs of
+     its own. The slides are filled by js/habit-onboarding.js. -->
+<div class="ob-shell" id="habitObOverlay" role="dialog" aria-modal="true" aria-label="Set up your Habit Tracker">
+  <div class="ob-sky" id="htObSky" aria-hidden="true">
+    <div class="ob-glow"></div>
+    <div class="ob-moon"></div>
+  </div>
+
+  <div class="ob-top">
+    <button type="button" class="ob-back" id="htObBack" onclick="htPrev()" aria-label="Back">&larr;</button>
+    <div class="ob-progress"><div class="ob-progress-fill" id="htObProgressFill"></div></div>
+    <div class="ob-step" id="htObStep"></div>
+  </div>
+
+  <div class="ob-stage" id="htObStage">
+
+    <section class="ob-slide" data-ht-ob="why">
+      <div class="ob-hero" id="htObWhyHero"></div>
+      <h2 class="ob-q">1% Better Every Day</h2>
+      <p class="ob-help">You don&rsquo;t have to change your whole life overnight.</p>
+      <p class="ob-help">Small choices, repeated consistently, can create a completely different life.</p>
+    </section>
+
+    <section class="ob-slide" data-ht-ob="cycle">
+      <h2 class="ob-q">Start Small. Build From There.</h2>
+      <p class="ob-help">Start with 1&ndash;3 habits for the next 21 days. Complete your first cycle and you&rsquo;ll unlock space for 3 more.</p>
+      <div class="ht-ladder" aria-label="How the cycle grows">
+        <div class="ht-rung">1&ndash;3 Habits</div>
+        <div class="ht-rung-arrow" aria-hidden="true">&darr;</div>
+        <div class="ht-rung">21 Days</div>
+        <div class="ht-rung-arrow" aria-hidden="true">&darr;</div>
+        <div class="ht-rung">+3 Habit Spaces</div>
+        <div class="ht-rung-arrow" aria-hidden="true">&darr;</div>
+        <div class="ht-rung">Repeat</div>
+        <div class="ht-rung-arrow" aria-hidden="true">&darr;</div>
+        <div class="ht-rung ht-rung-last">Up to 15 Habits</div>
+      </div>
+      <p class="ob-note">You never have to add more until you&rsquo;re ready.</p>
+      <div class="ht-reward">
+        <div class="ht-reward-head">Complete your first 21 days &#10024;</div>
+        <div class="ht-reward-row"><span aria-hidden="true">&#128275;</span> +3 Habit Spaces</div>
+        <div class="ht-reward-row"><span aria-hidden="true">&#127912;</span> Avatar Customization</div>
+        <p class="ht-reward-note">Keep showing up. Your world grows with you.</p>
+      </div>
+      <p class="ob-note">21 days is one Subliminally cycle &mdash; a rhythm to build in, not a claim about how long a habit takes to form.</p>
+    </section>
+
+    <section class="ob-slide" data-ht-ob="habits">
+      <h2 class="ob-q">Start With Your Foundation</h2>
+      <p class="ob-help">We recommend starting with a few habits that support your mind, your inner world, and the person you&rsquo;re becoming.</p>
+      <div class="ht-cards" id="htObHabitCards"></div>
+      <div class="ob-count" id="htObCount"></div>
+    </section>
+
+    <section class="ob-slide" data-ht-ob="rhythm">
+      <h2 class="ob-q">Build Your Rhythm</h2>
+      <p class="ob-help">When does each habit fit naturally into your life?</p>
+      <div class="ht-rhythm" id="htObRhythm"></div>
+    </section>
+
+    <section class="ob-slide" data-ht-ob="tune">
+      <h2 class="ob-q">Make It Yours</h2>
+      <p class="ob-help">Change anything here now, or leave it &mdash; all of it is editable later.</p>
+      <div class="ht-tune" id="htObTune"></div>
+    </section>
+
+    <section class="ob-slide" data-ht-ob="preview">
+      <div class="ob-hero ht-hero-small" id="htObPreviewHero"></div>
+      <h2 class="ob-q">Your Next 21 Days</h2>
+      <div class="ht-preview" id="htObPreview"></div>
+      <p class="ob-help ht-preview-line">Small actions become evidence of who you&rsquo;re becoming.</p>
+      <div class="ht-day-badge">Day 1 of 21</div>
+    </section>
+
+  </div>
+
+  <div class="ob-foot">
+    <div class="auth-msg" id="habitObMsg" role="status" aria-live="polite"></div>
+    <button type="button" class="ob-cta" id="htObCta" onclick="htNext()">Continue</button>
   </div>
 </div>
 
@@ -2456,6 +2611,7 @@
     <!-- Habit tracker: morning and night rituals -->
     <div id="habitsPanel" class="journal-panel" style="display:none;">
       <div class="journal-stat" id="habitsStat" style="display:none;"></div>
+      <div class="habit-cycle-bar" id="habitCycleBar" style="display:none;"></div>
       <div class="habit-undo-bar" id="habitUndoBar" style="display:none;">
         <span class="habit-undo-label">Changed something?</span>
         <button class="mini-btn ghostbtn" id="habitUndoBtn" onclick="undoHabits()">↩ Undo</button>
@@ -2476,6 +2632,17 @@
         </div>
         <div class="habit-list" id="habitListNight"></div>
         <div class="habit-suggest-row" id="habitSuggestNight"></div>
+      </div>
+      <!-- Not everything belongs to an end of the day. These are kept and
+           counted like any other habit; they are simply not part of the
+           morning or night ritual, so they never break one. -->
+      <div class="habit-block" data-time="anytime">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Anytime</div><h3>Whenever it fits</h3></div>
+          <span class="habit-block-count" id="habitCountAnytime"></span>
+        </div>
+        <div class="habit-list" id="habitListAnytime"></div>
+        <div class="habit-suggest-row" id="habitSuggestAnytime"></div>
       </div>
       <div class="save-msg" id="habitsMsg"></div>
     </div>
@@ -2739,6 +2906,7 @@
 <script src="js/profile.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
+<script src="js/habit-onboarding.js"></script>
 <script src="js/sanctuary.js"></script>
 <script src="js/boot.js"></script>
 </script>
