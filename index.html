@@ -1556,6 +1556,13 @@
   .ob-hero{ text-align:center; margin:4px 0 2px; }
   .ob-hero img{ width:min(196px, 52vw); height:auto; filter:drop-shadow(0 16px 34px rgba(0,0,0,.45)); }
   .ob-hero-name{ font-family:var(--serif); font-size:20px; margin-top:10px; }
+  /* Their own answers, read back on the last screen. Built out of the card the
+     teaching slides already use, so this is a layout rather than a component. */
+  .ob-summary{ margin:16px 0 0; padding:4px 16px; background:rgba(28,24,48,.78); border:1px solid var(--dusk); border-radius:18px; text-align:left; }
+  .ob-summary-row{ display:flex; gap:12px; align-items:baseline; padding:11px 0; border-top:1px solid var(--hairline); }
+  .ob-summary-row:first-child{ border-top:none; }
+  .ob-summary-row dt{ flex:none; width:92px; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--haze); }
+  .ob-summary-row dd{ margin:0; font-size:13.5px; line-height:1.5; color:var(--moonlight); }
 
   .ob-foot{ position:relative; z-index:2; padding:8px 20px 18px; padding-bottom:calc(18px + env(safe-area-inset-bottom)); max-width:460px; margin:0 auto; width:100%; }
   .ob-cta{ width:100%; border:none; border-radius:999px; padding:16px 20px; font-family:inherit; font-size:15px; font-weight:500; color:#241C0E; background:linear-gradient(100deg, var(--candle), #F0CE96); cursor:pointer; transition:transform .12s, box-shadow .2s, opacity .2s; box-shadow:0 12px 30px rgba(227,190,127,.22); }
@@ -1571,11 +1578,53 @@
      fit into. Here the slide is the card and the stage does the scrolling, so
      the whole roster is laid out at once -- all nineteen, no inner scrollbar. */
   .ob-shell .av-roster-onboard{ grid-template-columns:repeat(auto-fill, minmax(74px,1fr)); gap:9px; max-height:none; overflow:visible; }
+
+  /* Four to a row is the right size for choosing between nineteen people and
+     the wrong size for looking at any one of them: at 74px the hair and the
+     skin read, the face does not. Tapping one opens it here, above the grid,
+     using the two cuts the app already ships -- the face crop beside the full
+     figure -- so features, eyes and headphones can be seen before committing.
+     Nothing is redrawn, re-cropped or substituted; these are the files as they
+     are. The grid stays where it is underneath, so the next tap swaps who is
+     standing here rather than closing anything. */
+  .ob-avatar-preview{ position:relative; margin:0 0 14px; padding:14px 14px 13px; border-radius:20px;
+    background:rgba(28,24,48,.85); border:1px solid var(--dusk); box-shadow:0 18px 38px rgba(0,0,0,.34);
+    animation:obIn .26s cubic-bezier(.22,.61,.36,1) both; }
+  .ob-avatar-preview[hidden]{ display:none; }
+  .ob-avatar-art{ display:flex; align-items:center; justify-content:center; gap:14px; }
+  /* Both cuts keep their own aspect ratio -- sized by one side, never stretched
+     to a box. The gold on the face crop is the same gold as a chosen card. */
+  .ob-avatar-art .av-face{ width:128px; height:128px; flex:none; border-radius:18px; border:2px solid var(--candle); }
+  .ob-avatar-art .av-full{ width:auto; height:236px; flex:none; filter:drop-shadow(0 14px 26px rgba(0,0,0,.45)); }
+  .ob-avatar-copy{ text-align:center; margin-top:11px; }
+  .ob-avatar-copy b{ display:block; font-family:var(--serif); font-size:17px; font-weight:400; }
+  .ob-avatar-copy span{ display:block; font-size:12.5px; line-height:1.5; color:var(--haze); margin-top:3px; }
+  .ob-avatar-pick{ display:block; width:100%; margin-top:12px; padding:13px 18px; border-radius:999px;
+    background:rgba(227,190,127,.14); border:1px solid var(--candle); color:var(--candle);
+    font-family:inherit; font-size:14px; cursor:pointer; transition:background .18s, transform .12s; }
+  .ob-avatar-pick:hover{ background:rgba(227,190,127,.22); }
+  .ob-avatar-pick:active{ transform:scale(.985); }
+  .ob-avatar-close{ position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid var(--dusk); color:var(--moonlight);
+    font-size:15px; line-height:1; cursor:pointer; transition:background .18s; }
+  .ob-avatar-close:hover{ background:rgba(255,255,255,.16); }
+  /* A 320px phone still has to fit a face, a figure and the padding between. */
+  @media (max-width:380px){
+    .ob-avatar-preview{ padding:12px 10px 11px; }
+    .ob-avatar-art{ gap:10px; }
+    .ob-avatar-art .av-face{ width:112px; height:112px; }
+    .ob-avatar-art .av-full{ height:200px; }
+  }
   /* The spiritual-language chips are drawn by faith.js in its own markup, which
      Settings uses too. Rather than fork that, they are dressed as ob-chips here. */
   .ob-chips .length-chip{ padding:14px; border-radius:15px; background:rgba(28,24,48,.72); border:1px solid var(--dusk); font-size:14px; text-align:left; transition:background .18s, border-color .18s, transform .12s; }
   .ob-chips .length-chip:active{ transform:scale(.975); }
   .ob-chips .length-chip.sel{ background:rgba(185,167,232,.18); border-color:var(--lilac); }
+  /* By day the app repaints .length-chip cream, from a selector that outranks
+     the one above -- which left the tradition chips as pale text on a pale
+     card. Onboarding is night whatever the hour, so it says so here too. */
+  .ob-shell .ob-chips .length-chip{ background:rgba(28,24,48,.72); border-color:var(--dusk); color:var(--moonlight); }
+  .ob-shell .ob-chips .length-chip.sel{ background:rgba(185,167,232,.18); border-color:var(--lilac); }
 
   @media (max-width:380px){
     .ob-q{ font-size:23px; }
@@ -1584,6 +1633,7 @@
   }
   @media (prefers-reduced-motion: reduce){
     .ob-slide.on{ animation:none; }
+    .ob-avatar-preview{ animation:none; }
     .ob-sky .ob-star{ animation:none; }
     .ob-progress-fill{ transition:none; }
   }
@@ -1713,52 +1763,79 @@
 
     <section class="ob-slide" data-ob="avatar">
       <h2 class="ob-q" id="obAvatarQ">Who does she look like?</h2>
-      <p class="ob-help">She'll guide the rest of the way in.</p>
+      <p class="ob-help">She'll guide the rest of the way in. Tap anyone to see her up close.</p>
+      <!-- Filled by renderOnboardAvatarPreview() on the first tap, and swapped
+           in place on every tap after it. Empty and hidden until then. -->
+      <div class="ob-avatar-preview" id="obAvatarPreview" role="group" aria-label="Chosen avatar, enlarged" hidden></div>
       <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
+    </section>
+
+    <!-- She introduces herself with the name and the drawing just chosen. -->
+    <section class="ob-slide" data-ob="intro">
+      <div class="ob-hero" id="obIntroHero"></div>
+      <h2 class="ob-q" id="obIntroQ">Hi there.</h2>
+      <p class="ob-help" id="obIntroHelp"></p>
     </section>
 
     <section class="ob-slide" data-ob="desires">
       <h2 class="ob-q">What are your top 3 desires right now?</h2>
-      <p class="ob-help">Choose up to 3.</p>
+      <p class="ob-help">Choose exactly 3.</p>
       <div class="ob-chips" id="obDesireChips"></div>
       <div class="ob-count" id="obDesireCount"></div>
-      <p class="ob-note">Don't worry. You can change these whenever you want.</p>
+      <input type="text" class="ob-input" id="obDesireOther" placeholder="In your own words" style="display:none;margin-top:10px;" maxlength="80">
+      <p class="ob-note">Don't worry, you can change these anytime.</p>
     </section>
 
-    <section class="ob-slide" data-ob="faith">
-      <h2 class="ob-q">What language feels most aligned with your beliefs?</h2>
-      <p class="ob-help">This only changes the words Subliminally uses — nothing is added to your practice, and nothing is required. Change it any time in Settings.</p>
-      <div class="ob-chips" id="obFaithChips"></div>
+    <section class="ob-slide" data-ob="teach-mind">
+      <h2 class="ob-q">Your mind learns what you repeat.</h2>
+      <div class="ob-teach">
+        <p>What you hear often enough starts to feel familiar, and what feels familiar shapes <b>what you notice, what you expect and how you act</b>.</p>
+        <p>Subliminally makes that repetition deliberate — your words, chosen on purpose.</p>
+      </div>
+    </section>
+
+    <section class="ob-slide" data-ob="when">
+      <h2 class="ob-q">When does your mind need the most support?</h2>
+      <p class="ob-help">Pick the moment that matters most.</p>
+      <div class="ob-chips one" id="obWhenChips"></div>
+    </section>
+
+    <section class="ob-slide" data-ob="voice">
+      <h2 class="ob-q" id="obVoiceQ">How do you want your higher self to speak to you?</h2>
+      <div class="ob-chips one" id="obVoiceChips"></div>
+    </section>
+
+    <!-- The stance is the new question; the tradition list under it is the one
+         faith.js already draws for Settings, shown only where it is asked for. -->
+    <section class="ob-slide" data-ob="spirit">
+      <h2 class="ob-q">What role does spirituality play in your life?</h2>
+      <p class="ob-help">This only changes the words Subliminally uses. Change it any time in Settings.</p>
+      <div class="ob-chips one" id="obSpiritChips"></div>
+      <div id="obFaithPick" style="display:none;margin-top:14px;">
+        <p class="ob-note" style="margin:0 0 9px;">Which tradition should we speak from?</p>
+        <div class="ob-chips" id="obFaithChips"></div>
+      </div>
       <input type="text" class="ob-input" id="obFaithOther" placeholder="In your own words" style="display:none;margin-top:10px;" maxlength="40">
     </section>
 
-    <section class="ob-slide" data-ob="struggles">
-      <h2 class="ob-q" id="obStrugglesQ">What would you like support with right now?</h2>
-      <p class="ob-help">Choose all that apply.</p>
-      <div class="ob-chips" id="obStruggleChips"></div>
-      <input type="text" class="ob-input" id="obStruggleOther" placeholder="In your own words" style="display:none;margin-top:10px;" maxlength="80">
-    </section>
-
-    <section class="ob-slide" data-ob="goals">
-      <h2 class="ob-q">What would you most like to change?</h2>
-      <p class="ob-help">Choose what fits, and add anything else in your own words.</p>
-      <div class="ob-chips" id="obGoalChips"></div>
-      <input type="text" class="ob-input" id="obGoal" placeholder="Anything else you'd like to say" style="margin-top:10px;" maxlength="140">
-    </section>
-
-    <section class="ob-slide" data-ob="education">
-      <h2 class="ob-q">Your mind is always listening.</h2>
+    <section class="ob-slide" data-ob="teach-percent">
+      <h2 class="ob-q">1% better every day.</h2>
       <div class="ob-teach">
-        <p>All day, you're repeating something to yourself. <b>Subliminally makes that repetition deliberate</b> — your own words, in your own voice, chosen on purpose.</p>
-        <p>What you'll find here is the ordinary, unglamorous part: <b>repetition, attention and practice</b>. Hearing a thought often enough that it stops feeling like a stretch, then keeping the small habits that make it true.</p>
-        <p>It isn't medicine, and it isn't a shortcut. It's a way of being on your own side, every day, until that becomes the familiar voice.</p>
+        <p>You don't have to become your highest self overnight. <b>Small, intentional choices repeated consistently</b> can change how you think, feel, and show up.</p>
       </div>
+    </section>
+
+    <section class="ob-slide" data-ob="time">
+      <h2 class="ob-q">How much time feels realistic for you each day?</h2>
+      <p class="ob-help">The smallest one you'll actually keep is the right answer.</p>
+      <div class="ob-chips one" id="obTimeChips"></div>
     </section>
 
     <section class="ob-slide" data-ob="finish">
       <div class="ob-hero" id="obFinishHero"></div>
       <h2 class="ob-q" id="obFinishQ">You're ready.</h2>
       <p class="ob-help" id="obFinishHelp">Everything you just told us is saved to your account — on every device you sign in from.</p>
+      <dl class="ob-summary" id="obFinishSummary"></dl>
     </section>
 
   </div>
