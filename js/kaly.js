@@ -100,6 +100,11 @@ function avatarMarkup(look, opts){
 async function loadHigherSelf(){
   if (!sb || !currentUser) return;
   const d = (await myProfile()) || {};
+  // Today renders underneath the onboarding overlay -- a token refresh alone
+  // re-renders it -- and the row it reads has no avatar in it until the last
+  // slide saves one. Replacing the pick with that empty row is what left the
+  // wrong drawing standing on every slide after the grid.
+  if (typeof onboardingIsOpen === 'function' && onboardingIsOpen()) return;
   higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
 }
 

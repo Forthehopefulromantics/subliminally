@@ -649,6 +649,13 @@ function closeOnboardingModal(){
   obEl('onboardOverlay').classList.remove('open');
   document.body.style.overflow = '';
 }
+/* Onboarding holds an unsaved name and avatar in the same `higherSelf` the rest
+   of the app reads, so anything that refills that object from the database has
+   to know when not to. */
+function onboardingIsOpen(){
+  const el = document.getElementById('onboardOverlay');
+  return !!(el && el.classList.contains('open'));
+}
 /* "I'll personalize later" leaves onboarding unfinished on purpose: the row
    still says onboarding_completed = false, so it will be waiting next time
    rather than quietly never appearing again. */
@@ -930,17 +937,16 @@ function renderOnboardAvatarPreview(){
   if (!wrap || typeof avatarEntry !== 'function') return;
   if (!obAvatarPreviewOpen){ wrap.hidden = true; wrap.innerHTML = ''; return; }
   const a = avatarEntry(higherSelf.avatar);
-  /* The face crop and the full drawing, both as they ship: one large enough to
-     read a face off, one to see who she is head to trainers. The label and the
-     description carry the meaning, so the two pictures are left decorative
-     rather than read out twice over. */
+  /* The full drawing as it ships, head to trainers, and nothing else: no face
+     crop and no written description. Who she is reads off the picture, so the
+     label is carried on the group rather than printed under it -- a screen
+     reader still hears which one is standing here. */
+  wrap.setAttribute('aria-label', a.label + ', enlarged');
   wrap.innerHTML = `
     <button type="button" class="ob-avatar-close" onclick="closeOnboardAvatarPreview()" aria-label="Close this preview and keep browsing">&times;</button>
     <div class="ob-avatar-art">
-      ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'face', alt:false })}
       ${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'full', alt:false })}
     </div>
-    <div class="ob-avatar-copy"><b>${a.label}</b><span>${a.look}</span></div>
     <button type="button" class="ob-avatar-pick" onclick="obNext()">Choose this avatar</button>`;
   wrap.hidden = false;
 }
@@ -1068,6 +1074,7 @@ async function submitOnboarding(){
   }
 
   higherSelf.name = higherName;
+  higherSelf.avatar = avatarId(saved.higher_self_avatar);
   obSaving = false;
   closeOnboardingModal();
   showTodayPage();
@@ -1157,6 +1164,7 @@ async function loadNavIdentity(){
   if (!nameEl || !avatarEl) return; // nav may have re-rendered already
   if (prof) nameEl.textContent = prof.username || prof.full_name || currentUser.email.split('@')[0];
   // The chip is you, not her: the everyday drawing rather than the robed one.
-  avatarEl.innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face', alt:false });
+  // Use the avatar from the profile, not the global higherSelf which may not be initialized yet.
+  if (prof) avatarEl.innerHTML = avatarMarkup({ avatar: avatarId(prof.higher_self_avatar) }, { state:'hero', cut:'face', alt:false });
 }
 
