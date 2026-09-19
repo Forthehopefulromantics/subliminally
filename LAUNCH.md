@@ -42,13 +42,28 @@ Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
 
 ## Supabase
 
-Two redirect URLs must be registered:
+Redirect URLs that must be registered (Authentication -> URL Configuration ->
+Redirect URLs):
 
 - `https://www.subliminallybyfthr.com/reset-password.html`
-- `com.fthr.subliminally://login-callback`
+- `https://www.subliminallybyfthr.com/**` — where Google sign-in returns on web
+- `com.fthr.subliminally://login-callback` — where it returns in the apps
+- `http://localhost:3000/**` — only if you test sign-in locally
 
-And the Google OAuth consent screen needs its **App name** set, or the sign-in
-sheet shows the Supabase project id instead of "Subliminally by FTHR".
+Site URL must be `https://www.subliminallybyfthr.com`.
+
+Google sign-in also needs, in the **Google Cloud Console** (APIs & Services ->
+Credentials -> the OAuth 2.0 Web application client), this exact authorized
+redirect URI — it is Supabase's address, not ours, and without it Google stops
+the sign-in with `redirect_uri_mismatch` before it ever comes back:
+
+- `https://eiqylxcgexndzopesvhd.supabase.co/auth/v1/callback`
+
+That client's ID and secret go in Supabase under Authentication -> Sign In /
+Providers -> Google, with the provider toggled on. While the consent screen is
+in **Testing**, only accounts listed as test users can sign in — publish it, or
+add the testers. The consent screen also needs its **App name** set, or the
+sign-in sheet shows the Supabase project id instead of "Subliminally by FTHR".
 
 ## Migrations
 

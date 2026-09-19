@@ -15,6 +15,7 @@ if (sb){
 
 if (sb){
   setupNativeOAuthCallback();
+  reportWebOAuthError();
   setupNativeDayRollover();
   setupPushNotifications();
   initRevenueCat();

@@ -199,6 +199,9 @@ async function startOAuthSignIn(provider){
     options: {
       redirectTo: native ? GOOGLE_OAUTH_NATIVE_CALLBACK : window.location.origin + '/',
       skipBrowserRedirect: native, // on native we open it ourselves, in an in-app browser tab
+      // Always show the account chooser. Without this, anyone already signed
+      // into one Google account is pushed straight through it with no say.
+      queryParams: { prompt: 'select_account' },
     },
   });
   if (error){
@@ -225,13 +228,65 @@ function setupNativeDayRollover(){
   });
 }
 
+/* Pulls a named value out of an OAuth return address, whether the provider put
+   it in the query string (`?code=…`, the PKCE flow) or the fragment
+   (`#error=…`, which is where Supabase puts failures). Hand-parsed rather than
+   `new URL()` because the native return address uses a custom scheme. */
+function oauthParam(url, name){
+  const match = String(url || '').match(new RegExp('[?&#]' + name + '=([^&#]*)'));
+  return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : null;
+}
+
+/* What to say when Google (or Supabase) hands back a failure instead of a
+   session. `error_description` is written for developers; these are the two
+   cases a person can actually do something about. */
+function describeOAuthError(code, description){
+  const text = (String(code || '') + ' ' + String(description || '')).toLowerCase();
+  if (text.includes('access_denied') || text.includes('cancel')) return 'Google sign-in was cancelled.';
+  if (text.includes('provider is not enabled') || text.includes('unsupported provider')) return "Google sign-in isn't switched on yet — use your email and password for now.";
+  return description || 'Google sign-in did not complete — try again.';
+}
+
+function showOAuthError(code, description){
+  openAuthModal('login');
+  const msg = document.getElementById('authMsg');
+  msg.textContent = describeOAuthError(code, description);
+  msg.className = 'auth-msg err';
+  console.warn('OAuth sign-in failed:', code, description);
+}
+
+/* Web: Supabase sends people back to the address we asked for, and on a failure
+   that address carries `error` / `error_description` instead of a `code`.
+   supabase-js quietly ignores those, so without this the person lands back on
+   the home page signed out with nothing said — which is exactly what a failing
+   Google sign-in looked like. */
+function reportWebOAuthError(){
+  const code = oauthParam(window.location.search, 'error') || oauthParam(window.location.hash, 'error');
+  if (!code) return;
+  const description = oauthParam(window.location.search, 'error_description') || oauthParam(window.location.hash, 'error_description');
+  showOAuthError(code, description);
+  // Don't leave the failure in the address bar to fire again on a refresh.
+  try { history.replaceState({}, document.title, window.location.pathname); } catch(e){}
+}
+
 function setupNativeOAuthCallback(){
   if (!isNativeApp() || !sb || !window.Capacitor.Plugins.App) return;
   window.Capacitor.Plugins.App.addListener('appUrlOpen', async ({ url }) => {
     if (!url || url.indexOf('login-callback') === -1) return;
     if (window.Capacitor.Plugins.Browser){ try { await window.Capacitor.Plugins.Browser.close(); } catch(e){} }
-    const { error } = await sb.auth.exchangeCodeForSession(url);
-    if (!error) closeAuthModal();
+    const failure = oauthParam(url, 'error');
+    if (failure){ showOAuthError(failure, oauthParam(url, 'error_description')); return; }
+    // exchangeCodeForSession takes the authorization code itself, not the whole
+    // return address — handing it the URL is why the native round trip never
+    // produced a session.
+    const code = oauthParam(url, 'code');
+    if (!code){ showOAuthError(null, 'Google sent us back without a sign-in code.'); return; }
+    const { error } = await sb.auth.exchangeCodeForSession(code);
+    if (error){ showOAuthError(null, error.message); return; }
+    closeAuthModal();
+    // Returning people belong on Today; anyone brand-new gets the onboarding
+    // questionnaire on top of it, from the SIGNED_IN handler in boot.js.
+    showTodayPage();
   });
 }
 
@@ -240,7 +295,10 @@ function setupNativeOAuthCallback(){
 async function promptOnboardingIfProfileIncomplete(){
   if (!sb || !currentUser) return;
   const prof = await myProfile();
-  if (prof && !prof.username) openOnboardingModal();
+  // No row at all counts as incomplete too: the trigger that seeds `profiles`
+  // swallows its own failures, and a Google user arrives with nothing filled in
+  // either way. The questionnaire upserts by id, so this can't double up.
+  if (!prof || !prof.username) openOnboardingModal();
 }
 
 /* ---------- push notifications (native only) ----------
