@@ -641,6 +641,7 @@ function openOnboardingModal(){
   obRenderChips();
   if (typeof renderFaithChips === 'function') renderFaithChips();
   obAvatarPreviewOpen = false;
+  obAvatarPicked = false;
   renderOnboardAvatars();
   renderOnboardAvatarPreview();
   obShowSlide();
@@ -659,7 +660,25 @@ function onboardingIsOpen(){
 /* "I'll personalize later" leaves onboarding unfinished on purpose: the row
    still says onboarding_completed = false, so it will be waiting next time
    rather than quietly never appearing again. */
-function skipOnboarding(){ closeOnboardingModal(); }
+/* Leaving early is not the same as having chosen nothing. Whatever was already
+   named or picked is kept, so the profile shows it and the next time through
+   starts from it -- this used to close on all of it and write none of it.
+   Onboarding stays unfinished either way, so they are still asked the rest. */
+function skipOnboarding(){
+  const patch = {};
+  const you = (obEl('obName').value || '').trim().slice(0, 40);
+  const her = (obEl('obHigherSelfName').value || '').trim().slice(0, 24);
+  if (you){ patch.full_name = you; patch.display_name = you; }
+  if (her) patch.higher_self_name = her;
+  if (obAvatarPicked) patch.higher_self_avatar = higherSelf.avatar;
+
+  closeOnboardingModal();   // the tap gets its answer now, not after a round trip
+  if (!sb || !currentUser || !Object.keys(patch).length) return;
+  saveProfile(patch).then(error => {
+    if (error){ console.warn('Skipped onboarding, save failed:', error); return; }
+    if (typeof loadNavIdentity === 'function') loadNavIdentity();
+  });
+}
 
 /* Stars, scattered once. Fixed positions rather than random on every render,
    so nothing twitches when a slide changes. */
@@ -931,6 +950,9 @@ function renderOnboardAvatars(){
    it rather than shutting it, which is what makes comparing two faces one tap
    each instead of three. */
 let obAvatarPreviewOpen = false;
+/* Whether they actually chose, as opposed to the default that is shown selected
+   from the start -- so leaving early can tell one from the other. */
+let obAvatarPicked = false;
 
 function renderOnboardAvatarPreview(){
   const wrap = document.getElementById('obAvatarPreview');
@@ -960,6 +982,7 @@ function closeOnboardAvatarPreview(){
    saves at once, so there is nothing to write yet. */
 function pickOnboardAvatar(id){
   higherSelf.avatar = avatarId(id);
+  obAvatarPicked = true;
   obAvatarPreviewOpen = true;
   renderOnboardAvatars();
   renderOnboardAvatarPreview();

@@ -99,12 +99,20 @@ function avatarMarkup(look, opts){
    its own and shrugs off a refusal. */
 async function loadHigherSelf(){
   if (!sb || !currentUser) return;
-  const d = (await myProfile()) || {};
-  // Today renders underneath the onboarding overlay -- a token refresh alone
-  // re-renders it -- and the row it reads has no avatar in it until the last
-  // slide saves one. Replacing the pick with that empty row is what left the
-  // wrong drawing standing on every slide after the grid.
+  adoptHigherSelf(await myProfile());
+}
+
+/* Every refill of `higherSelf` from a profile row goes through here, so that
+   none of them can overwrite a choice onboarding is still holding.
+
+   Onboarding keeps the unsaved name and avatar in this same object, and the row
+   they would be read back from has neither until the last slide writes them --
+   so a refill mid-flow silently swaps the pick for the default. Both Today and
+   the profile panel re-render underneath the overlay on nothing more than a
+   token refresh, which is how the wrong avatar ended up being the one saved. */
+function adoptHigherSelf(row){
   if (typeof onboardingIsOpen === 'function' && onboardingIsOpen()) return;
+  const d = row || {};
   higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
 }
 
