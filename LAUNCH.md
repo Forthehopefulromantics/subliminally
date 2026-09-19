@@ -32,22 +32,15 @@ Two things that will bite:
 `REVENUECAT_WEBHOOK_AUTH` = `dhEdleK-okLF-HlqrfZLVGrU4O5S2szsBRYsxo7xFlo` in
 Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
 
-### Higher Self emotion portraits — the last six identities
+### Higher Self emotion portraits — complete
 
-Thirteen of the nineteen identities have all three emotion portraits
-(`welcoming`, `celebrating`, `reassuring`) in `img/avatar/emotion/`, built from
-the four packs supplied so far. **The six masculine-presenting and androgynous
-identities have none yet** — the packs for them have not arrived:
+All nineteen identities have all three emotion portraits (`welcoming`,
+`celebrating`, `reassuring`) in `img/avatar/emotion/` — 57 files, built from the
+six supplied packs. Nothing here is waiting on artwork and nothing needs
+switching on.
 
-`black-twists`, `east-asian-crop`, `latino-waves`, `south-asian-curls`,
-`blond-blue-eyes`, `androgynous-undercut`.
-
-Anybody who chose one of those is shown **their own** keeper drawing beside the
-speech bubble instead, never somebody else's face, and the console says which
-file was wanted. Nothing is broken and nothing needs switching on; it is
-artwork that is not drawn yet.
-
-When the packs arrive, unzip them anywhere and run:
+If an identity is ever redrawn, or a new one is added to the roster, unzip the
+pack anywhere and run:
 
 ```
 npm install --no-save sharp
@@ -55,9 +48,16 @@ node scripts/build-higher-self-emotions.js <unzipped-pack-dir>...
 ```
 
 It resizes them, writes them into `img/avatar/emotion/`, rewrites
-`js/avatar-emotions.js`, and prints anything still missing. Nothing else needs
-touching — the mapping from stored avatar id to pack id is already in the
-script, all nineteen of them.
+`js/avatar-emotions.js`, and prints anything missing. A pack already built from
+is skipped rather than re-encoded, so re-running is cheap. The mapping from
+stored avatar id to pack id lives in the script — a **new** identity needs a
+line adding there and to `AVATAR_PACK` in `js/kaly.js`, and an id that has
+already shipped must never be renamed.
+
+The fallback is still in place and still matters: an identity whose emotion is
+missing shows **its own** reassuring drawing, then its own keeper drawing, and
+the console says which file was wanted. It never borrows another identity's
+face.
 
 ### Avatar colour customization — NOT built
 
