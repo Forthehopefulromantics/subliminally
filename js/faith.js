@@ -124,7 +124,45 @@ async function loadFaith(){
   if (!sb || !currentUser) return;
   const d = (await myProfile()) || {};
   myFaith = { id: d.faith || null, own: d.faith_other || '' };
+  mySpiritStance = spiritStanceFrom(d);
 }
+
+/* ---------- prayer, or meditation ----------
+   The habit tracker offers one of two starting habits, and which one is a
+   question about what this person said, not about what they look like, what
+   they called their higher self, or which avatar they chose. Only the saved
+   answer decides it, and the suggestion stays a suggestion: it can be
+   unchecked, renamed, or swapped for their own habit, and changing the answer
+   in Settings changes what is offered next time.
+
+   Three of the traditions are unambiguous. The fourth answer, 'other', is
+   written by two different questions -- "religion is important to me, and it
+   is one you do not list" and "something else entirely" -- and only the first
+   of those is a religion. So the stance is read as well, and 'other' alone is
+   not treated as religious. Everything else -- spiritual, agnostic,
+   psychology, manifestation, unanswered, unrecognised -- gets meditation. */
+const RELIGIOUS_FAITHS = ['christianity', 'islam', 'hinduism'];
+/* 'religion' | 'spiritual' | 'agnostic' | 'secular' | 'else' | null */
+let mySpiritStance = null;
+
+/* Onboarding saved the stance as its own id from 20261001 onwards. Rows
+   written before that have only the label it showed on screen, so the label is
+   matched back to the list as a fallback rather than left unanswered. */
+function spiritStanceFrom(prof){
+  const goals = (prof && prof.onboarding_goals) || {};
+  if (goals.spirituality_id) return goals.spirituality_id;
+  const label = goals.spirituality;
+  if (!label || typeof OB_SPIRIT === 'undefined') return null;
+  const match = OB_SPIRIT.find(x => x.label === label);
+  return match ? match.id : null;
+}
+
+function faithPrefersPrayer(){
+  if (RELIGIOUS_FAITHS.includes(myFaith.id)) return true;
+  return myFaith.id === 'other' && mySpiritStance === 'religion';
+}
+/* The label, for the one habit card that changes with it. */
+function faithPracticeHabit(){ return faithPrefersPrayer() ? 'Prayer' : 'Meditation'; }
 
 /* ---------- asking ---------- */
 function renderFaithChips(){

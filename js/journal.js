@@ -83,7 +83,16 @@ async function renderRitualsState(){
 
   // Both tabs want habit data: the calendar colours each day by how much of
   // that day's ritual was kept, so it loads habits too.
-  if (ritualsTab === 'habits'){ habitsPanel.style.display = 'block'; loadHabits(); }
+  if (ritualsTab === 'habits'){
+    habitsPanel.style.display = 'block';
+    await loadHabits();
+    /* First time here with a subscription that reaches the tracker: set the
+       routine up before showing an empty one. It is checked after the gate
+       above and never before it, so the setup flow cannot become a way around
+       the subscription. Its own completion flag decides whether it opens --
+       finishing the account questionnaire says nothing about this. */
+    if (typeof maybeOpenHabitOnboarding === 'function') maybeOpenHabitOnboarding();
+  }
   else {
     calendarPanel.style.display = 'block';
     if (tierAtLeast(myTier, 'ritual')) await loadHabits({ silent: true });

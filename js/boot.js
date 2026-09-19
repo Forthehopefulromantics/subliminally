@@ -35,7 +35,13 @@ if (sb){
     currentUser = session ? session.user : null;
     // Whoever is signed in now, nothing remembered for the last person is
     // allowed to survive into their screens.
-    if (wasId !== (currentUser && currentUser.id)) forgetFetch();
+    if (wasId !== (currentUser && currentUser.id)){
+      forgetFetch();
+      // Including who their higher self is. Leaving the last person's choice
+      // marked as loaded would draw it, once, to whoever signed in next.
+      higherSelfLoaded = false;
+      higherSelf = { name:'', ...HIGHER_SELF_DEFAULTS };
+    }
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
     // A sign-in that happens after the first load -- typing a password, coming

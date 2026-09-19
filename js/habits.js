@@ -11,8 +11,81 @@
    the habit; suggestion chips below do the same in one tap. */
 const HABIT_SLOTS = 15;
 const HABIT_BLANKS_VISIBLE = 3;   // empty slots shown before "+ more slots"
-let habitSlotsExpanded = { morning: false, night: false };
-let habitIdeasOpen = { morning: false, night: false };
+/* Morning and night are the two ends of a day. Anytime is for the habits that
+   do not belong to either -- water, a walk, a page of a book -- and it is a
+   third list rather than a flag on a habit, so a habit lives in exactly one
+   place and takes exactly one space. */
+const HABIT_TIMES = ['morning', 'night', 'anytime'];
+const HABIT_TIME_LABEL = { morning:'Morning', night:'Night', anytime:'Anytime' };
+let habitSlotsExpanded = { morning: false, night: false, anytime: false };
+let habitIdeasOpen = { morning: false, night: false, anytime: false };
+
+/* ---------- the practice cycle ----------
+   Somebody who sets up the tracker through its own onboarding starts with room
+   for three habits across all three lists, and earns three more spaces each
+   time they finish a cycle, up to the fifteen the tracker has always had.
+
+   A cycle is twenty-one days practised, counted from the day the routine was
+   saved. Practised means any habit checked off that day. Three things it
+   deliberately is not:
+
+     - it is not twenty-one days in a row. Nothing here asks for consecutive
+       days and nothing here ever will; a missed day is a day that was not
+       counted, not a day that undoes the ones before it;
+     - it does not expire. The count only goes up, so a cycle picked up again
+       after a month away carries every day already practised;
+     - it does not take anything back. Spaces earned stay earned, check-ins
+       stay on record, and Light already awarded is never recalculated.
+
+   The whole thing is derived from the check-ins that are already stored, so
+   there is no second tally that can disagree with them -- only the start date
+   is written down.
+
+   Everyone who was using the tracker before this existed has no start date and
+   keeps all fifteen spaces in each list, which is what they already had. The
+   progression is part of the new setup, not something applied backwards to
+   people who never saw it. */
+const HABIT_CYCLE_DAYS = 21;
+const HABIT_SPACES_AT_START = 3;
+const HABIT_SPACES_PER_CYCLE = 3;
+let habitCycleStart = null;        // 'YYYY-MM-DD', or null for everyone before this
+
+/* Days with at least one habit checked, on or after the cycle start. */
+function habitPractiseDays(){
+  if (!habitCycleStart) return 0;
+  return Object.keys(habitDoneByDate)
+    .filter(d => d >= habitCycleStart && habitDoneByDate[d] && habitDoneByDate[d].size)
+    .length;
+}
+function habitCyclesDone(){
+  return habitCycleStart ? Math.floor(habitPractiseDays() / HABIT_CYCLE_DAYS) : 0;
+}
+/* Which day of the current cycle they are on, 1-based, for "Day 4 of 21". */
+function habitCycleDay(){
+  if (!habitCycleStart) return null;
+  return (habitPractiseDays() % HABIT_CYCLE_DAYS) + 1;
+}
+/* How many habits this person may hold in total, across all three lists.
+   `null` means the old behaviour: fifteen in each list, no total. */
+function habitSpacesTotal(){
+  if (!habitCycleStart) return null;
+  const earned = HABIT_SPACES_AT_START + HABIT_SPACES_PER_CYCLE * habitCyclesDone();
+  // Never below what they already hold. If a habit was added some other way,
+  // or these numbers are ever changed, nobody loses a habit over it.
+  return Math.max(Math.min(earned, HABIT_SLOTS), habitsCache.length);
+}
+function habitSpacesLeft(){
+  const total = habitSpacesTotal();
+  if (total === null) return null;
+  return Math.max(0, total - habitsCache.length);
+}
+/* What one list may hold: the total that is left plus what is already in it,
+   or the flat fifteen for anyone not on the cycle. */
+function habitSlotsFor(time){
+  const total = habitSpacesTotal();
+  if (total === null) return HABIT_SLOTS;
+  return habitsCache.filter(h => h.time_of_day === time).length + habitSpacesLeft();
+}
 function renderHabitUndoBar(){
   const bar = document.getElementById('habitUndoBar');
   if (!bar) return;
@@ -32,10 +105,16 @@ function toggleHabitIdeas(time){ habitIdeasOpen[time] = !habitIdeasOpen[time]; r
    Someone who did not answer gets the shared list alone. */
 const MORNING_HABIT_SUGGESTIONS = ['Meditate','Dance','Mirror work','Visualize your day','Practice presence','Go outside','Ground your feet','Journal','Read a book','Go on a walk','Listen to an audiobook','Eat breakfast'];
 const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light therapy','Pick out an outfit for tomorrow','Write a to-do list for tomorrow','Wind down','Drink tea','Journal','Set an alarm','Read a book','Nighttime hygiene'];
+/* The ones with no hour attached: done at some point, not at one end of the
+   day. Kept separate rather than merging the two lists above, which would
+   offer "set an alarm" to somebody filling in their afternoon. */
+const ANYTIME_HABIT_SUGGESTIONS = ['Drink water','Go on a walk','Listen to a subliminal','Move your body','Read a page','Step outside','Eat something green','Text someone you love','Ten deep breaths','Tidy one surface'];
 /* Whatever the faith offers goes first: it is the most specific thing we know
    about what this person's morning already looks like. */
 function habitSuggestionsFor(time){
-  const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS : NIGHT_HABIT_SUGGESTIONS;
+  const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS
+             : time === 'anytime' ? ANYTIME_HABIT_SUGGESTIONS
+             : NIGHT_HABIT_SUGGESTIONS;
   const faith = (typeof faithHabitIdeas === 'function') ? faithHabitIdeas(time) : [];
   const seen = new Set();
   return [...faith, ...base].filter(s => {
@@ -50,7 +129,8 @@ function habitSuggestionsFor(time){
    row reads as 0 and the list falls back to oldest-first. */
 function sortHabitsCache(){
   habitsCache.sort((a, b) => {
-    if (a.time_of_day !== b.time_of_day) return a.time_of_day === 'morning' ? -1 : 1;
+    if (a.time_of_day !== b.time_of_day)
+      return HABIT_TIMES.indexOf(a.time_of_day) - HABIT_TIMES.indexOf(b.time_of_day);
     const d = (a.sort_order || 0) - (b.sort_order || 0);
     if (d) return d;
     return (a.created_at || '') < (b.created_at || '') ? -1 : 1;
@@ -75,6 +155,7 @@ async function loadHabits(options){
   if (hErr || cErr){ forgetFetch('habits'); if (!silent){ msg.textContent = "Couldn't load your habits."; msg.className = 'save-msg err'; } return; }
   habitsCache = habits || [];
   sortHabitsCache();
+  await loadHabitCycle();
   habitCheckins = {};
   habitDoneByDate = {};
   (checkins || []).forEach(c => {
@@ -83,6 +164,15 @@ async function loadHabits(options){
   });
   if (!silent) renderHabits();
 }
+/* The start date, off the profile row everything else already reads. The
+   column arrives with 20261001; until it is run there is no start date, which
+   is exactly how every account that predates the cycle reads anyway. */
+async function loadHabitCycle(){
+  if (!sb || !currentUser) return;
+  const d = (await myProfile()) || {};
+  habitCycleStart = d.habit_cycle_started_on || null;
+}
+
 /* ---------- non-negotiables, and the short routine ----------
    Most people don't fall out of a ritual because it was too hard. They fall out
    because they built a nine-item evening, missed three items once, decided they
@@ -304,15 +394,35 @@ function habitCompletionFor(dateStr){
   const done = habitDoneByDate[dateStr];
   return (done ? done.size : 0) / habitsCache.length;
 }
+/* The three lists were two when the markup was written, so the ids read
+   habitListMorning and habitListNight rather than being indexed by the value
+   stored on the row. Anytime follows the same shape. */
+function habitElId(prefix, time){ return prefix + time[0].toUpperCase() + time.slice(1); }
+
+/* What "full" means depends on whether this person is on the cycle. Saying
+   "15 of 15" to somebody holding three of three would be a lie, and saying
+   "you have earned no more" to somebody who was here before the cycle existed
+   would be a different one. */
+function habitFullText(spacesTotal, inThisList){
+  if (spacesTotal === null) return `${HABIT_SLOTS} of ${HABIT_SLOTS} — this ritual is full.`;
+  if (spacesTotal >= HABIT_SLOTS) return `${spacesTotal} of ${HABIT_SLOTS} — every space earned.`;
+  const left = HABIT_CYCLE_DAYS - ((habitCycleDay() || 1) - 1);
+  return `${habitsCache.length} of ${spacesTotal} spaces used · ${HABIT_SPACES_PER_CYCLE} more after this cycle`
+    + (left > 0 ? ` (${left} day${left === 1 ? '' : 's'} of practice to go)` : '');
+}
+
 function renderHabits(){
   const today = localDateStr();
   const week = Array.from({ length: 7 }, (_, i) => shiftDateStr(today, i - 6));
   let doneToday = 0;
-  ['morning','night'].forEach(time => {
+  const spacesTotal = habitSpacesTotal();
+  HABIT_TIMES.forEach(time => {
+    const cap = habitSlotsFor(time);
     const rows = habitsCache.filter(h => h.time_of_day === time);
-    const list = document.getElementById(time === 'morning' ? 'habitListMorning' : 'habitListNight');
-    const count = document.getElementById(time === 'morning' ? 'habitCountMorning' : 'habitCountNight');
-    const suggestWrap = document.getElementById(time === 'morning' ? 'habitSuggestMorning' : 'habitSuggestNight');
+    const list = document.getElementById(habitElId('habitList', time));
+    const count = document.getElementById(habitElId('habitCount', time));
+    const suggestWrap = document.getElementById(habitElId('habitSuggest', time));
+    if (!list || !count) return;
     const done = rows.filter(h => (habitCheckins[h.id] || new Set()).has(today)).length;
     doneToday += done;
     const coreCount = rows.filter(h => h.is_core).length;
@@ -320,7 +430,7 @@ function renderHabits(){
     count.textContent = rows.length
       ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable`
         + (streakHere > 1 ? ` · ${streakHere}-day streak` : '')
-      : `0/${HABIT_SLOTS} added`;
+      : `0/${cap} added`;
 
     const realRowsHtml = rows.map((h, i) => {
       const days = habitCheckins[h.id] || new Set();
@@ -357,7 +467,7 @@ function renderHabits(){
     const pool = habitSuggestionsFor(time).filter(s => !already.has(s.toLowerCase()));
     // All 15 slots are there, but showing 15 empty boxes at once reads as a
     // chore list. Offer a few at a time and let people ask for the rest.
-    const remaining = Math.max(0, HABIT_SLOTS - rows.length);
+    const remaining = Math.max(0, cap - rows.length);
     const blanksShown = habitSlotsExpanded[time] ? remaining : Math.min(HABIT_BLANKS_VISIBLE, remaining);
     const blankRowsHtml = Array.from({ length: blanksShown }, (_, i) => {
       const example = pool.length ? `e.g. ${pool[i % pool.length]}` : `Habit #${rows.length + i + 1}`;
@@ -381,8 +491,8 @@ function renderHabits(){
     list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
-      suggestWrap.innerHTML = rows.length >= HABIT_SLOTS
-        ? `<span class="habit-suggest-full">15 of 15 — this ritual is full.</span>`
+      suggestWrap.innerHTML = rows.length >= cap
+        ? `<span class="habit-suggest-full">${habitFullText(spacesTotal, rows.length)}</span>`
         : pool.length
           ? `<button type="button" class="habit-ideas-toggle" onclick="toggleHabitIdeas('${time}')" aria-expanded="${habitIdeasOpen[time]}">Need ideas?</button>`
             + (habitIdeasOpen[time] ? `<div class="habit-ideas-chips">${pool.map(s => `<button type="button" class="habit-suggest-chip" onclick="addHabit('${time}','${s}')">${s}</button>`).join('')}</div>` : '')
@@ -397,7 +507,7 @@ function renderHabits(){
   const practiceStreak = streakFromDays(allDays);
   // If non-negotiables are set, the streak worth showing is the one they protect
   // — kept on the short nights as well as the full ones.
-  const kept = ['morning','night']
+  const kept = HABIT_TIMES
     .filter(t => habitsCache.some(h => h.time_of_day === t && h.is_core))
     .map(t => ({ t, n: routineStreak(t) }))
     .filter(x => x.n > 1)
@@ -413,7 +523,7 @@ async function addHabit(time, name){
   if (!sb || !currentUser) return;
   name = (name || '').trim();
   if (!name) return;
-  if (habitsCache.filter(h => h.time_of_day === time).length >= HABIT_SLOTS) return;
+  if (habitsCache.filter(h => h.time_of_day === time).length >= habitSlotsFor(time)) return;
   const msg = document.getElementById('habitsMsg');
   pushHabitUndo();
   const sortOrder = habitsCache.filter(h => h.time_of_day === time).length;

@@ -1627,6 +1627,165 @@
     .ob-sky .ob-star{ animation:none; }
     .ob-progress-fill{ transition:none; }
   }
+
+  /* ---------- avatar and speech bubble ----------
+     Her, and what she is saying, as one block. Two rules decide the whole
+     layout: her face is never covered, and the bubble grows with its text
+     rather than the text shrinking to fit the bubble.
+
+     On a phone the bubble sits above her and the tail points down at her
+     shoulder, so the picture is under the words and the face is in clear air
+     between them. On a wider screen she stands beside it and the tail points
+     across. Either way the tail is on the side she is on.
+
+     The portraits are the supplied files at their own aspect ratio -- sized by
+     height, `contain`, never stretched to a box, never a selector thumbnail
+     blown up, and never wrapped in an SVG and called a vector. Transparency is
+     the point of them, so there is no background behind the figure. */
+  .hsd{ display:grid; gap:0; margin:2px 0 16px; }
+  .hsd-art{ display:flex; justify-content:center; align-items:flex-end; min-height:0; }
+  /* `contain` and height-only sizing: the packs differ in aspect ratio from one
+     identity to the next, and every one of them keeps its own. */
+  .hsd-portrait{ width:auto; max-width:100%; height:clamp(168px, 34vh, 260px); object-fit:contain;
+    filter:drop-shadow(0 16px 32px rgba(0,0,0,.45)); }
+  /* The keeper drawings are full-length where the emotion portraits are drawn
+     from the waist up, so they are given more height to read at the same size. */
+  .hsd-portrait[data-art="keeper"]{ height:clamp(200px, 40vh, 310px); }
+  /* Smaller where the slide is mostly things to tap. She is still the one
+     talking, but on a screen with four habit cards under her the choices have
+     to be reachable without scrolling past her first. */
+  .hsd-sm .hsd-portrait{ height:clamp(116px, 21vh, 168px); }
+  .hsd-sm .hsd-portrait[data-art="keeper"]{ height:clamp(132px, 24vh, 196px); }
+
+  /* Waiting on the profile row. The same footprint as the portrait, so nothing
+     moves when she arrives -- and deliberately not a face: a stand-in avatar
+     that swaps to the real one a moment later is worse than a moment of calm. */
+  .hsd[data-state="loading"] .hsd-art::after{ content:''; width:min(150px,42vw); height:clamp(168px,34vh,260px);
+    border-radius:26px; background:linear-gradient(180deg, rgba(185,167,232,.12), rgba(185,167,232,.04));
+    animation:hsdWait 1.8s ease-in-out infinite; }
+  @keyframes hsdWait{ 0%,100%{ opacity:.5; } 50%{ opacity:.85; } }
+  /* Nobody chosen, or nothing drawn for them yet: the bubble stands on its own
+     and says the same words. Nothing is substituted in her place. */
+  .hsd[data-state="none"] .hsd-art{ display:none; }
+
+  /* Solid, not translucent. The tail below is the same colour drawn over the
+     bubble's own corner, so any alpha here stacks with itself and the tail
+     appears as a paler diamond floating off the edge rather than as part of
+     the shape. */
+  .hsd-bubble{ position:relative; background:#E7E3F2; color:#1B1630;
+    border-radius:22px; padding:16px 18px; box-shadow:0 14px 34px rgba(0,0,0,.34); }
+  .hsd-say{ font-family:var(--serif); font-size:16px; line-height:1.55; margin:0 0 10px; }
+  .hsd-say:last-child{ margin-bottom:0; }
+
+  /* The tail. Drawn as a rotated square off the edge of the bubble rather than
+     a border triangle, so it takes the bubble's own colour and its shadow. */
+  .hsd-bubble::after{ content:''; position:absolute; width:20px; height:20px;
+    background:#E7E3F2; transform:rotate(45deg); }
+
+  /* Phone: bubble first, she stands under it, tail points down at her. */
+  .hsd{ grid-template-areas:'bubble' 'art'; }
+  .hsd-bubble{ grid-area:bubble; margin-bottom:14px; }
+  .hsd-art{ grid-area:art; }
+  /* At her, not at the space beside her: she is centred under the bubble on a
+     phone, so the tail sits just inside centre rather than out at the corner. */
+  .hsd-bubble::after{ left:calc(50% - 26px); bottom:-7px; border-radius:0 0 5px 0; }
+  .hsd[data-state="none"] .hsd-bubble{ margin-bottom:0; }
+  .hsd[data-state="none"] .hsd-bubble::after{ display:none; }
+
+  /* Wider: she stands to the left, the bubble beside her, tail across. */
+  @media (min-width:640px){
+    .hsd{ grid-template-areas:'art bubble'; grid-template-columns:minmax(0,auto) minmax(0,1fr);
+      gap:18px; align-items:center; }
+    .hsd-bubble{ margin-bottom:0; }
+    .hsd-bubble::after{ left:-7px; bottom:auto; top:38px; border-radius:0 0 0 5px; }
+    .hsd-portrait{ height:clamp(220px, 40vh, 320px); }
+    .hsd-portrait[data-art="keeper"]{ height:clamp(240px, 44vh, 360px); }
+    .hsd[data-state="none"]{ grid-template-areas:'bubble bubble'; }
+    .hsd[data-state="none"] .hsd-bubble::after{ display:none; }
+  }
+  /* Larger accessibility text sizes: the bubble grows, the words do not
+     shrink, and she gives up the height instead. */
+  @media (max-width:380px){
+    .hsd-portrait{ height:clamp(150px, 28vh, 210px); }
+    .hsd-portrait[data-art="keeper"]{ height:clamp(176px, 32vh, 240px); }
+    .hsd-say{ font-size:15.5px; }
+  }
+  @media (max-height:680px){
+    .hsd-portrait{ height:clamp(140px, 26vh, 200px); }
+    .hsd-portrait[data-art="keeper"]{ height:clamp(160px, 30vh, 230px); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .hsd[data-state="loading"] .hsd-art::after{ animation:none; }
+  }
+
+  /* ---------- habit tracker setup ----------
+     The account questionnaire's shell, with the pieces this flow needs. */
+  .ho-headline{ font-family:var(--serif); font-size:13px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--candle); text-align:center; margin:6px 0 14px; }
+  .ho-day{ text-align:center; font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--lilac); margin:-8px 0 14px; }
+
+  .ho-facts{ list-style:none; margin:16px 0 0; padding:4px 16px; background:rgba(28,24,48,.78);
+    border:1px solid var(--dusk); border-radius:18px; }
+  .ho-facts li{ display:flex; gap:14px; align-items:baseline; padding:12px 0; border-top:1px solid var(--hairline);
+    font-size:13.5px; color:var(--moonlight); }
+  .ho-facts li:first-child{ border-top:none; }
+  .ho-fact-key{ flex:none; min-width:46px; font-family:var(--serif); font-size:19px; color:var(--candle); }
+
+  .ho-cards{ display:grid; gap:9px; margin-top:4px; }
+  .ho-card{ display:flex; gap:12px; align-items:center; text-align:left; padding:14px;
+    border-radius:16px; background:rgba(28,24,48,.72); border:1px solid var(--dusk);
+    color:var(--moonlight); font-family:inherit; cursor:pointer;
+    transition:background .18s, border-color .18s, transform .12s; }
+  .ho-card:active{ transform:scale(.985); }
+  .ho-card.sel{ background:rgba(185,167,232,.18); border-color:var(--lilac); }
+  .ho-card-icon{ flex:none; font-size:21px; }
+  .ho-card-text{ display:flex; flex-direction:column; gap:2px; }
+  .ho-card-name{ font-size:15px; }
+  .ho-card-note{ font-size:12px; color:var(--haze); }
+
+  .ho-own-row{ display:flex; gap:8px; align-items:center; margin-top:9px; }
+  .ho-own-remove{ flex:none; width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,.07);
+    border:1px solid var(--dusk); color:var(--moonlight); font-size:17px; line-height:1; cursor:pointer; }
+  .ho-add-own{ display:block; width:100%; margin-top:10px; padding:13px; border-radius:16px;
+    background:rgba(227,190,127,.1); border:1px dashed var(--candle); color:var(--candle);
+    font-family:inherit; font-size:14px; cursor:pointer; }
+  .ho-count{ text-align:center; font-size:12px; color:var(--lilac); margin-top:13px; min-height:16px; }
+
+  .ho-rhythm, .ho-tune{ display:grid; gap:11px; margin-top:4px; }
+  .ho-rhythm-row, .ho-tune-row{ padding:13px 14px; border-radius:16px; background:rgba(28,24,48,.72);
+    border:1px solid var(--dusk); }
+  .ho-rhythm-name{ font-size:14.5px; margin-bottom:10px; }
+  .ho-times{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+  /* 44px tall, three across on the narrowest phone this app supports. */
+  .ho-time{ min-height:44px; border-radius:12px; background:rgba(255,255,255,.05); border:1px solid var(--dusk);
+    color:var(--haze); font-family:inherit; font-size:13px; cursor:pointer;
+    transition:background .18s, border-color .18s, color .18s; }
+  .ho-time.sel{ background:rgba(185,167,232,.2); border-color:var(--lilac); color:var(--moonlight); }
+
+  .ho-tune-top{ display:flex; gap:9px; align-items:center; }
+  .ho-tune-icon{ flex:none; width:46px; height:46px; border-radius:14px; background:rgba(255,255,255,.06);
+    border:1px solid var(--dusk); font-size:20px; cursor:pointer; }
+  .ho-core{ display:flex; gap:10px; align-items:flex-start; margin-top:11px; font-size:12.5px;
+    line-height:1.5; color:var(--haze); cursor:pointer; }
+  .ho-core input{ flex:none; width:18px; height:18px; margin-top:1px; accent-color:var(--lilac); }
+
+  .ho-plan{ margin-top:4px; display:grid; gap:11px; }
+  .ho-plan-group{ padding:13px 16px; border-radius:16px; background:rgba(28,24,48,.78); border:1px solid var(--dusk); }
+  .ho-plan-head{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--haze); margin-bottom:8px; }
+  .ho-plan-list{ list-style:none; margin:0; padding:0; display:grid; gap:7px; }
+  .ho-plan-list li{ font-size:14px; }
+  .ho-plan-core{ color:var(--candle); }
+
+  /* The dialogue inside the setup: the bubble is the light card on the dark
+     sky the rest of this shell is built from. */
+  .ho-shell .hsd{ margin-bottom:18px; }
+  /* A wide screen is room for the conversation, not for one more column of
+     margin: the questionnaire's 460px column is right for one question and one
+     list, and narrow for a portrait standing beside a paragraph. */
+  @media (min-width:900px){
+    .ho-shell .ob-slide, .ho-shell .ob-foot{ max-width:620px; }
+  }
 </style>
 </head>
 <body>
@@ -1760,11 +1919,15 @@
       <div class="av-roster av-roster-onboard" id="obAvatarRoster"></div>
     </section>
 
-    <!-- She introduces herself with the name and the drawing just chosen. -->
+    <!-- She introduces herself with the name and the drawing just chosen, in
+         the same avatar-and-bubble component the habit tracker uses. This is
+         where the name is established; after this she simply speaks. The
+         greeting is the heading, outside the bubble; what she says is in it.
+         Nobody chosen yet -- they tapped past the roster -- and the bubble
+         stands on its own rather than borrowing somebody's face. -->
     <section class="ob-slide" data-ob="intro">
-      <div class="ob-hero" id="obIntroHero"></div>
       <h2 class="ob-q" id="obIntroQ">Hi there.</h2>
-      <p class="ob-help" id="obIntroHelp"></p>
+      <div id="obIntroDialogue"></div>
     </section>
 
     <section class="ob-slide" data-ob="desires">
@@ -1822,9 +1985,8 @@
     </section>
 
     <section class="ob-slide" data-ob="finish">
-      <div class="ob-hero" id="obFinishHero"></div>
       <h2 class="ob-q" id="obFinishQ">You're ready.</h2>
-      <p class="ob-help" id="obFinishHelp">Everything you just told us is saved to your account — on every device you sign in from.</p>
+      <div id="obFinishDialogue"></div>
       <dl class="ob-summary" id="obFinishSummary"></dl>
     </section>
 
@@ -1834,6 +1996,35 @@
     <div class="auth-msg" id="onboardMsg" role="status" aria-live="polite"></div>
     <button type="button" class="ob-cta" id="obCta" onclick="obNext()">Begin My Journey</button>
     <button type="button" class="ob-skip" id="obSkip" onclick="skipOnboarding()">I'll personalize later</button>
+  </div>
+</div>
+
+<!-- ============ HABIT TRACKER SETUP ============
+     Its own six slides, shown once, the first time somebody with Ritual opens
+     the Habit tracker. Built out of the account questionnaire's shell -- same
+     night sky, same progress bar, same gold button -- because it is the same
+     app speaking, and because the two flows then cannot drift apart visually.
+     Where they differ is inside: every slide here is drawn by
+     habit-onboarding.js from the draft in memory, so going back never loses a
+     choice. -->
+<div class="ob-shell ho-shell" id="habitOnboardOverlay" role="dialog" aria-modal="true" aria-label="Set up your habits">
+  <div class="ob-sky" id="hoSky" aria-hidden="true">
+    <div class="ob-glow"></div>
+    <div class="ob-moon"></div>
+  </div>
+
+  <div class="ob-top">
+    <button type="button" class="ob-back" id="hoBack" onclick="hoPrev()" aria-label="Back">&larr;</button>
+    <div class="ob-progress"><div class="ob-progress-fill" id="hoProgressFill"></div></div>
+    <div class="ob-step" id="hoStep"></div>
+  </div>
+
+  <div class="ob-stage" id="hoStage"></div>
+
+  <div class="ob-foot">
+    <div class="auth-msg" id="habitOnboardMsg" role="status" aria-live="polite"></div>
+    <button type="button" class="ob-cta" id="hoCta" onclick="hoNext()">Build My Routine</button>
+    <button type="button" class="ob-skip" id="hoSkip" onclick="skipHabitOnboarding()">I'll set this up later</button>
   </div>
 </div>
 
@@ -2477,6 +2668,16 @@
         <div class="habit-list" id="habitListNight"></div>
         <div class="habit-suggest-row" id="habitSuggestNight"></div>
       </div>
+      <!-- The habits that do not belong to either end of the day. Same list,
+           same rows, same spaces: a habit lives in one of the three. -->
+      <div class="habit-block" data-time="anytime">
+        <div class="habit-block-head">
+          <div><div class="eyebrow">Anytime</div><h3>Whenever it fits</h3></div>
+          <span class="habit-block-count" id="habitCountAnytime"></span>
+        </div>
+        <div class="habit-list" id="habitListAnytime"></div>
+        <div class="habit-suggest-row" id="habitSuggestAnytime"></div>
+      </div>
       <div class="save-msg" id="habitsMsg"></div>
     </div>
   </div>
@@ -2733,12 +2934,14 @@
 <script src="js/nav.js"></script>
 <script src="js/today.js"></script>
 <script src="js/light.js"></script>
+<script src="js/avatar-emotions.js"></script>
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
+<script src="js/habit-onboarding.js"></script>
 <script src="js/sanctuary.js"></script>
 <script src="js/boot.js"></script>
 </script>

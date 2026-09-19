@@ -63,6 +63,22 @@ const HIGHER_SELF_DEFAULTS = { avatar:'box-braids' };
 const AVATAR_STATES = ['hero', 'keeper'];
 
 let higherSelf = { name:'', ...HIGHER_SELF_DEFAULTS };
+/* False until the profile row has actually been read. `higherSelf` has to hold
+   something from the first line of this file -- the roster, the nav chip and
+   the profile circle all read it -- and what it holds until the row lands is
+   the first identity in the pack, which is somebody else's face for almost
+   everyone. Anything that draws her speaking waits on this instead of showing
+   that and swapping a moment later. See higherSelfChoice(). */
+let higherSelfLoaded = false;
+
+/* What to hand a dialogue as its `avatar`: the saved identity once it is
+   known, and `undefined` -- draw the skeleton, draw nobody -- until then.
+   `null` is a third answer, and only the caller knows it: main onboarding
+   before the roster has been reached has a person with no choice made yet, and
+   that is a character-free greeting rather than a wait. */
+function higherSelfChoice(){
+  return higherSelfLoaded ? avatarId(higherSelf.avatar) : undefined;
+}
 function avatarId(id){ return AVATARS.includes(id) ? id : HIGHER_SELF_DEFAULTS.avatar; }
 function avatarEntry(id){ return AVATAR_PACK.find(a => a.id === avatarId(id)) || AVATAR_PACK[0]; }
 /* Three cuts of each drawing. The full one is what she is -- head to trainers.
@@ -106,6 +122,7 @@ async function loadHigherSelf(){
   // wrong drawing standing on every slide after the grid.
   if (typeof onboardingIsOpen === 'function' && onboardingIsOpen()) return;
   higherSelf = { name: d.higher_self_name || '', avatar: avatarId(d.higher_self_avatar) };
+  higherSelfLoaded = true;
 }
 
 /* ---------- what she says ----------
@@ -281,3 +298,151 @@ async function updateHigherSelfName(){
   msg.className = 'save-msg ok';
 }
 
+
+/* ---------- her face, by feeling ----------
+   The same person, drawn three more times: welcoming (open, reaching toward
+   you), celebrating (proud of something you just did), reassuring (calm, hand
+   on heart). These are separate files, not filters over one drawing, and they
+   are looked up by the id already in `profiles.higher_self_avatar` -- never by
+   position in the roster, by what the avatar is labelled, by who the picture
+   looks like, or by the name somebody gave their higher self.
+
+   Which identity has which emotion drawn is in js/avatar-emotions.js, written
+   by scripts/build-higher-self-emotions.js from the supplied packs. Asking the
+   map rather than asking the network means a missing drawing is a decision
+   taken before the request, not a broken image that appears and then swaps.
+
+   When the emotion asked for is not drawn for this person:
+     1. their own reassuring drawing, which is the quietest of the three and
+        the least wrong thing to show in place of any other;
+     2. their existing keeper drawing, which every identity has;
+     3. nothing -- the dialogue is drawn without a character, and the gap is
+        reported to the console with the id and emotion that were wanted.
+   Never anybody else's face. A person who chose one identity is not shown
+   another because a file is late. */
+const HIGHER_SELF_EMOTION_FALLBACK = 'reassuring';
+
+function higherSelfEmotionSize(id, emotion){
+  if (typeof AVATAR_EMOTION_ART === 'undefined') return null;
+  const got = AVATAR_EMOTION_ART[id];
+  const size = got && got[emotion];
+  return Array.isArray(size) ? size : null;
+}
+function higherSelfEmotionAvailable(id, emotion){
+  return !!higherSelfEmotionSize(id, emotion);
+}
+
+/* { src, emotion, kind, w, h } for a resolved identity, or null when this
+   person has no artwork at all. `kind` is 'emotion' or 'keeper', which is what
+   lets the caller size the two differently -- the emotion portraits are drawn
+   from the waist up, the keeper drawings head to trainers.
+
+   `w` and `h` are that file's own size, not a house size: the packs are drawn
+   at ratios from 0.56 to 0.89 and each keeps its own. They go on the <img> so
+   the right box is reserved before the picture arrives and the slide does not
+   jump when it does. */
+function higherSelfEmotionArt(who, emotion){
+  const size = higherSelfEmotionSize(who, emotion);
+  if (!size) return null;
+  return { src:`img/avatar/emotion/${who}-${emotion}.webp`, emotion, kind:'emotion', w:size[0], h:size[1] };
+}
+function higherSelfArt(id, emotion){
+  const who = avatarId(id);
+  const want = (typeof AVATAR_EMOTIONS !== 'undefined' && AVATAR_EMOTIONS.includes(emotion))
+    ? emotion : HIGHER_SELF_EMOTION_FALLBACK;
+  const asked = higherSelfEmotionArt(who, want);
+  if (asked) return asked;
+  const calm = want !== HIGHER_SELF_EMOTION_FALLBACK
+    && higherSelfEmotionArt(who, HIGHER_SELF_EMOTION_FALLBACK);
+  if (calm) return calm;
+  reportMissingEmotionArt(who, want);
+  if (AVATARS.includes(who)){
+    const [w, h] = AVATAR_CUT_SIZE.full;
+    return { src:avatarSrc(who, 'keeper', 'full'), emotion:null, kind:'keeper', w, h };
+  }
+  return null;
+}
+
+/* Said once per identity-and-emotion, not once per render: a slideshow that
+   redraws on every tap would otherwise fill the console with the same line. */
+const higherSelfGapsReported = new Set();
+function reportMissingEmotionArt(id, emotion){
+  const key = `${id}|${emotion}`;
+  if (higherSelfGapsReported.has(key)) return;
+  higherSelfGapsReported.add(key);
+  console.warn(`Higher Self: no ${emotion} artwork for "${id}". Falling back to that identity's own drawing — run scripts/build-higher-self-emotions.js once the pack arrives.`);
+}
+
+/* The next picture, fetched while the current one is being read. Only ever the
+   one about to be needed: there are fifty-seven of these and a phone should
+   download three of them at most. Nothing is fetched for an identity whose
+   emotion is not drawn, because that request would 404. */
+const higherSelfPreloaded = new Set();
+function preloadHigherSelfEmotion(id, emotion){
+  const who = avatarId(id);
+  if (!higherSelfEmotionAvailable(who, emotion)) return;
+  const src = `img/avatar/emotion/${who}-${emotion}.webp`;
+  if (higherSelfPreloaded.has(src)) return;
+  higherSelfPreloaded.add(src);
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = src;
+}
+
+/* ---------- avatar and speech bubble ----------
+   One component, used wherever she speaks. It is handed a resolved identity
+   and told which feeling and what to say; it does not know which screen it is
+   on, does not reach for a profile, and has no avatar of its own to fall back
+   to. Every caller passes the person's actual saved choice or explicitly
+   passes none.
+
+   `avatar` says which of three things to draw:
+     a string  -- that identity, resolved through avatarId() like every other
+                  path to a picture;
+     null      -- deliberately no character. Main onboarding before anyone has
+                  chosen a face is the reason this exists: a greeting with no
+                  face is honest, and a stand-in face is not;
+     undefined -- not known yet. Draws a skeleton the size of the portrait, so
+                  a profile still loading holds the space instead of flashing
+                  somebody generic into it and swapping a moment later.
+
+   What goes in the bubble is what she says -- greetings, explanations,
+   encouragement, questions. Headings, choices, cards, buttons, progress and
+   form fields are the screen talking, and belong outside it. The bubble is
+   real text in the DOM, never drawn into the picture, and it is readable with
+   animation off and sound off.
+
+   `speaker` is the name this person gave their higher self. It is used for the
+   accessible label -- "Nova says" -- and is deliberately not printed above
+   every bubble: the name is established once, when they meet her, and
+   repeating it on every slide is a nameplate, not a conversation. */
+function higherSelfDialogue(opts){
+  const o = opts || {};
+  const lines = (Array.isArray(o.message) ? o.message : [o.message]).filter(Boolean);
+  const said = lines.map(t => `<p class="hsd-say">${obEscape(t)}</p>`).join('');
+  const speaker = (o.speaker || '').trim();
+  const label = speaker ? `${speaker} says` : 'Your higher self says';
+  const size = (o.size === 'lg' || o.size === 'sm') ? o.size : 'md';
+
+  let art, state;
+  if (o.avatar === undefined){ art = ''; state = 'loading'; }
+  else if (o.avatar === null){ art = ''; state = 'none'; }
+  else {
+    const found = higherSelfArt(o.avatar, o.emotion);
+    if (!found){ art = ''; state = 'none'; }
+    else {
+      state = 'ready';
+      /* Decorative on purpose. She is described in the roster where she is
+         chosen; here what matters is what she is saying, and that is the text
+         beside her. Alt text repeating "your higher self, with box braids" in
+         front of every line she speaks is noise, not description. */
+      art = `<img class="hsd-portrait" src="${found.src}" alt="" data-art="${found.kind}"
+        width="${found.w}" height="${found.h}" decoding="async" fetchpriority="high">`;
+    }
+  }
+
+  return `<div class="hsd hsd-${size}" data-state="${state}"${o.emotion ? ` data-emotion="${o.emotion}"` : ''}>
+    <div class="hsd-art" aria-hidden="true">${art}</div>
+    <div class="hsd-bubble" role="group" aria-label="${obEscape(label)}">${said}</div>
+  </div>`;
+}
