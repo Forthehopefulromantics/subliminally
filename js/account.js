@@ -649,6 +649,13 @@ function closeOnboardingModal(){
   obEl('onboardOverlay').classList.remove('open');
   document.body.style.overflow = '';
 }
+/* Onboarding holds an unsaved name and avatar in the same `higherSelf` the rest
+   of the app reads, so anything that refills that object from the database has
+   to know when not to. */
+function onboardingIsOpen(){
+  const el = document.getElementById('onboardOverlay');
+  return !!(el && el.classList.contains('open'));
+}
 /* "I'll personalize later" leaves onboarding unfinished on purpose: the row
    still says onboarding_completed = false, so it will be waiting next time
    rather than quietly never appearing again. */
