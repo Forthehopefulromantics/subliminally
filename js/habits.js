@@ -185,6 +185,12 @@ async function loadHabitCycle(){
    a miss is worked out from the check-ins already on record, so there is no
    second source of truth to fall out of step. */
 const CORE_HABIT_MAX = 5;
+/* Non-negotiables are what makes a *routine* count on a short night -- see
+   routineStatusFor, which is only ever asked about morning and night. An
+   anytime habit is not part of either, so marking one would decide nothing.
+   The control is not offered there rather than offered and ignored. */
+const HABIT_CORE_TIMES = ['morning', 'night'];
+function habitTimeHasCore(time){ return HABIT_CORE_TIMES.includes(time); }
 /* Kept because shortRoutinesUsedBy still counts them for the weekly report, but
    it no longer decides whether a day counts: doing your non-negotiables does
    that, every day of the week. See routineKept. */
@@ -428,7 +434,8 @@ function renderHabits(){
     const coreCount = rows.filter(h => h.is_core).length;
     const streakHere = routineStreak(time);
     count.textContent = rows.length
-      ? `${done} of ${rows.length} today · ${coreCount}/${CORE_HABIT_MAX} non-negotiable`
+      ? `${done} of ${rows.length} today`
+        + (habitTimeHasCore(time) ? ` · ${coreCount}/${CORE_HABIT_MAX} non-negotiable` : '')
         + (streakHere > 1 ? ` · ${streakHere}-day streak` : '')
       : `0/${cap} added`;
 
@@ -452,10 +459,16 @@ function renderHabits(){
         <div class="habit-week" aria-hidden="true">${dots}</div>
         <div class="habit-streak${streak ? '' : ' zero'}">${streak ? `${streak}-day streak` : 'no streak yet'}</div>
         <div class="habit-actions">
-          <button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
+          <label class="habit-mins${h.duration_minutes ? ' set' : ''}" title="How long this usually takes. Leave it blank if it varies.">
+            <input type="text" inputmode="numeric" value="${h.duration_minutes || ''}" placeholder="–" maxlength="3"
+              aria-label="Minutes ${safeName} usually takes"
+              onkeydown="if(event.key==='Enter') this.blur();"
+              onblur="setHabitDuration('${h.id}', this.value)"><span aria-hidden="true">m</span>
+          </label>
+          ${habitTimeHasCore(time) ? `<button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
             aria-pressed="${h.is_core ? 'true' : 'false'}"
             title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
-            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>
+            aria-label="${h.is_core ? 'Unmark' : 'Mark'} ${safeName} as non-negotiable">✦</button>` : ''}
           <button class="habit-delete" onclick="deleteHabit('${h.id}')" aria-label="Remove ${safeName}" title="Remove">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -485,7 +498,7 @@ function renderHabits(){
       : '';
 
     // Said once, where the decision is actually made.
-    const coreHint = rows.length && !rows.some(h => h.is_core)
+    const coreHint = habitTimeHasCore(time) && rows.length && !rows.some(h => h.is_core)
       ? `<p class="habit-core-hint">Tap ✦ on the few you'd still do on your worst day. Doing just those counts as keeping the ritual — twice a week.</p>`
       : '';
     list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
@@ -904,6 +917,33 @@ const HABIT_ICON_CHOICES = [
   '🧺','🧼','🚿','🛁','🪥','🧴','🗓','💰','💼','🎵','🎤','💃','🎨','☀','🌿',
   '🪴','📞','💬','💛','○',
 ];
+
+/* ---------- how long it takes ----------
+   Minutes, or nothing. Nothing is the honest default: plenty of habits do not
+   have a length, and a number invented to fill the box is worse than a blank.
+   Stored so it can be read back and shown -- not used to time anything, not
+   used to nag, and not part of whether a day counted. */
+const HABIT_MINUTES_MAX = 600;      // the database check agrees: 1..600
+/* parseInt on the trimmed string, not the digits pulled out of it: stripping
+   non-digits turns "12.5" into a hundred and twenty-five minutes and "-30"
+   into half an hour. Reading left to right and stopping at the first thing
+   that is not a digit gives 12 and nothing, which is what was meant. */
+function habitMinutes(value){
+  const n = parseInt(String(value == null ? '' : value).trim(), 10);
+  if (!Number.isFinite(n) || n < 1) return null;
+  return Math.min(n, HABIT_MINUTES_MAX);
+}
+async function setHabitDuration(habitId, value){
+  const mins = habitMinutes(value);
+  const h = habitsCache.find(x => x.id === habitId);
+  if (!h || h.duration_minutes === mins) return;      // a blur that changed nothing is not a write
+  h.duration_minutes = mins;
+  repaintHabitLists();
+  if (!sb || !currentUser) return;
+  const { error } = await sb.from('habits').update({ duration_minutes: mins })
+    .eq('id', habitId).eq('user_id', currentUser.id);
+  if (error) console.warn('habit duration:', error.message);
+}
 
 async function setHabitIcon(habitId, glyph){
   const h = habitsCache.find(x => x.id === habitId);

@@ -271,12 +271,20 @@ function hoSlideBody(name){
           <input type="text" class="ob-input" value="${obEscape(p.name)}" maxlength="80"
             aria-label="Name of this habit" oninput="hoRenamePick('${p.key}', this.value)">
         </div>
-        <label class="ho-core">
+        <label class="ho-mins">
+          <span>How long, roughly?</span>
+          <span class="ho-mins-field">
+            <input type="text" inputmode="numeric" maxlength="3" value="${p.minutes || ''}" placeholder="–"
+              aria-label="Minutes ${obEscape(p.name)} usually takes"
+              oninput="hoSetMinutes('${p.key}', this.value)">minutes
+          </span>
+        </label>
+        ${habitTimeHasCore(p.time) ? `<label class="ho-core">
           <input type="checkbox" ${p.core ? 'checked' : ''} onchange="hoSetCore('${p.key}', this.checked)">
           <span>Non-negotiable — the one you'd still do on your worst day</span>
-        </label>
+        </label>` : `<p class="ho-core-na">Anytime habits sit outside the morning and night routines, so there is no non-negotiable to set here.</p>`}
       </div>`).join('')}</div>
-    <p class="ob-note">Doing just your non-negotiables still counts as keeping the routine. All of this can be changed later.</p>`;
+    <p class="ob-note">Leave the minutes blank if it varies — plenty of habits do not have a length. Doing just your non-negotiables still counts as keeping the routine, and all of this can be changed later.</p>`;
 
   if (name === 'next21'){
     const byTime = HABIT_TIMES.map(t => {
@@ -284,7 +292,9 @@ function hoSlideBody(name){
       if (!rows.length) return '';
       return `<div class="ho-plan-group"><div class="ho-plan-head">${HABIT_TIME_LABEL[t]}</div>
         <ul class="ho-plan-list">${rows.map(p =>
-          `<li><span aria-hidden="true">${p.icon}</span> ${obEscape(p.name)}${p.core ? ' <span class="ho-plan-core">✦</span>' : ''}</li>`).join('')}</ul></div>`;
+          `<li><span aria-hidden="true">${p.icon}</span> ${obEscape(p.name)}`
+          + (p.minutes ? ` <span class="ho-plan-mins">${p.minutes} min</span>` : '')
+          + (p.core && habitTimeHasCore(p.time) ? ' <span class="ho-plan-core">✦</span>' : '') + `</li>`).join('')}</ul></div>`;
     }).join('');
     return `
       <h2 class="ho-headline">Your next 21 days</h2>
@@ -313,11 +323,11 @@ function hoToggleStarter(key){
   if (at > -1){ hoPicks.splice(at, 1); hoShowSlide(); return; }
   const card = hoStarterCards().find(c => c.key === key);
   if (!card) return;
-  hoAddPick({ key, name:card.name, icon:card.icon, time:'anytime', core:false });
+  hoAddPick({ key, name:card.name, icon:card.icon, time:'anytime', core:false, minutes:null });
   hoShowSlide();
 }
 function hoAddOwn(){
-  if (!hoAddPick({ key:`own:${++hoOwnCounter}`, name:'', icon:'○', time:'anytime', core:false })) return;
+  if (!hoAddPick({ key:`own:${++hoOwnCounter}`, name:'', icon:'○', time:'anytime', core:false, minutes:null })) return;
   hoShowSlide();
   // Straight into the field they just asked for.
   const fields = hoEl('hoStage').querySelectorAll('.ho-own-row .ob-input');
@@ -352,6 +362,12 @@ function hoSetTime(key, time){
 function hoSetCore(key, on){
   const p = hoPicks.find(x => x.key === key);
   if (p) p.core = !!on;
+}
+/* Typed into rather than redrawn from, like the name field beside it: this
+   slide is not re-rendered on a keystroke, so the cursor stays put. */
+function hoSetMinutes(key, value){
+  const p = hoPicks.find(x => x.key === key);
+  if (p) p.minutes = habitMinutes(value);
 }
 /* A picker would be a third thing on a slide that already has two. The same
    shelf of pictures the tracker uses, stepped through one tap at a time. */
@@ -437,7 +453,8 @@ async function hoSubmit(){
         name: p.name.trim().slice(0, 80),
         time_of_day: p.time,
         icon: p.icon === '○' ? null : p.icon,
-        is_core: !!p.core,
+        is_core: habitTimeHasCore(p.time) && !!p.core,
+        duration_minutes: p.minutes || null,
         sort_order: n,
       };
     });

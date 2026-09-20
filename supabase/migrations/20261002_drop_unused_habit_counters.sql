@@ -1,0 +1,31 @@
+-- Run this once in Supabase -> SQL Editor, after the earlier migrations.
+--
+-- Drops two columns nothing has ever read or written.
+--
+-- `habit_tracker_onboarding` (applied directly on 2026-09-19, reproduced in
+-- 20261001) stored the practice cycle as two counters: `habit_cycle_number`
+-- and `habit_slots`. The app does not use either. It works both of them out
+-- from `habit_checkins` instead -- see habitPractiseDays(), habitCyclesDone()
+-- and habitSpacesTotal() in js/habits.js -- because a derived number cannot
+-- drift from the days somebody actually practised, and a stored one can:
+--
+--   - a counter has to be incremented by something, and whatever increments it
+--     has to run exactly once per cycle, from whichever screen happens to be
+--     open when the twenty-first day lands;
+--   - a counter can be decremented, and this app has a rule that nothing is
+--     ever taken back for a missed day. A column that *can* go down is a
+--     standing invitation for something to take it down;
+--   - the backfill that set these was a guess from habit counts -- eight
+--     profiles were left holding `habit_slots = 3` -- and a wrong stored
+--     number stays wrong forever, where a derived one is right the moment the
+--     check-ins are right.
+--
+-- Nothing is lost by dropping them: no code path reads them, and everything
+-- they were meant to hold is recomputed from check-ins that are still there.
+-- `habit_cycle_started_on` stays -- that one is a real fact about a person
+-- (the day they started) and cannot be derived from anything.
+--
+-- Safe to run repeatedly.
+
+alter table public.profiles drop column if exists habit_cycle_number;
+alter table public.profiles drop column if exists habit_slots;

@@ -44,10 +44,10 @@ alter table public.profiles
   -- migration that was applied directly, which counted cycles and spaces as
   -- stored numbers; js/habits.js derives both from habit_checkins instead, so
   -- a missed day cannot quietly decrement a counter and a backfill cannot
-  -- disagree with the check-ins it was computed from. They are kept here only
-  -- so this file reproduces the live schema. Either wire them up or drop them
-  -- — leaving a stored `habit_slots = 3` that nothing maintains is a trap for
-  -- whoever reads this next. See LAUNCH.md.
+  -- disagree with the check-ins it was computed from.
+  -- 20261002_drop_unused_habit_counters.sql drops them again, and that is
+  -- where the reasoning lives. They are added here only so the two files, read
+  -- in order, tell the truth about what actually happened to this database.
   add column if not exists habit_cycle_number integer not null default 0,
   add column if not exists habit_slots integer not null default 3;
 
@@ -61,9 +61,11 @@ comment on column public.profiles.habit_slots is
   'UNUSED by the app — spaces are derived from habit_checkins. Kept because it exists in the live database.';
 
 -- ---------- per-habit settings ----------
--- Also unused so far. `duration_minutes` is the one of the three that is safe
--- to offer today; `reminder_at` would be a promise the app cannot keep, since
--- nothing sends a notification. See LAUNCH.md before surfacing either.
+-- `duration_minutes` is now offered, on the setup's "Make it yours" slide and
+-- on every habit row -- see setHabitDuration() in js/habits.js. The other two
+-- are still unused: nothing filters a habit out on its off days, and nothing
+-- sends a notification, so offering either would be a promise the app cannot
+-- keep. See LAUNCH.md.
 alter table public.habits
   add column if not exists duration_minutes integer
     check (duration_minutes is null or duration_minutes between 1 and 600),

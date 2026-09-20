@@ -140,6 +140,7 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260929_onboarding_personalization.sql` | superseded — its columns are in 20260930 |
 | `20260930_onboarding_slideshow.sql` | run |
 | `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
+| `20261002_drop_unused_habit_counters.sql` | run 2026-09-20 |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`
@@ -161,20 +162,29 @@ it: it was applied directly in Supabase on 2026-09-19 as
 `habit_tracker_onboarding`. The file now reproduces that migration exactly, so
 a fresh environment matches production and re-running it changes nothing.
 
-### Columns in the database that no code reads
+### Columns the directly-applied migration brought, and what happened to them
 
-The directly-applied migration brought five columns the app does not touch.
-They are inert, not broken, but they are two sources of truth waiting to
-disagree, and they should be either wired up or dropped:
+It added five columns the app did not touch. Three are now resolved and two
+are still deliberately unused:
 
-| Column | Why it is unused |
+| Column | Now |
 | --- | --- |
-| `profiles.habit_cycle_number` | `habitCyclesDone()` derives the cycle from `habit_checkins`, so a stored counter can drift from the days actually practised. |
-| `profiles.habit_slots` | `habitSpacesTotal()` derives spaces the same way. Eight profiles currently sit at a stored `3` that nothing maintains. |
-| `habits.duration_minutes` | No UI offers it. This is the one that is safe to surface — it is just a number on a habit. |
-| `habits.days_of_week` | No UI offers it, and nothing filters a habit out on its off days, so offering it would do nothing visible. |
-| `habits.reminder_at` | No UI offers it, and **nothing sends notifications** — the column's own comment says so. Surfacing it would promise a reminder that never arrives, which is the same mistake as the colour customization above. |
+| `profiles.habit_cycle_number` | **Dropped** by `20261002`. Cycles are derived from `habit_checkins` — a stored counter can only drift from the days actually practised, and a column that *can* go down invites something to take it down. |
+| `profiles.habit_slots` | **Dropped** by `20261002`. Same reasoning; eight profiles had been left holding a stale `3` that nothing maintained. |
+| `habits.duration_minutes` | **In use.** Offered on the setup's "Make it yours" slide and on every habit row — see `setHabitDuration()`. Blank is a real answer and the default: plenty of habits have no length. It is stored and shown back, nothing more — it does not time anything, does not nag, and is not part of whether a day counted. |
+| `habits.days_of_week` | Still unused. Nothing filters a habit out on its off days, so a day picker would change nothing visible. It needs `renderHabits()` and the streak logic to respect it first. |
+| `habits.reminder_at` | Still unused, and should stay that way until notifications exist. **Nothing sends one.** Taking a reminder time and never using it is the same broken promise as the colour customization above. |
 
 `habit_cycle_number`'s original comment said avatar customization unlocks at
 cycle 2. That is the reward described in the section above as not built, and
-the column does not change that: the artwork is still flattened.
+dropping the column does not change that either way: the artwork is still
+flattened.
+
+### Non-negotiables are a morning and night thing
+
+`routineStatusFor()` is only ever asked about morning and night, so a ✦ on an
+Anytime habit would decide nothing. The control is not offered there rather
+than offered and ignored — no toggle on the row, no checkbox on the setup
+slide, and the count line drops the tally. If Anytime should ever count toward
+keeping a routine, that is a change to `routineStatusFor()` and `routineKept()`
+first, and the control follows it.
