@@ -119,7 +119,7 @@ function paintToday(){
   renderLightStrip();
   renderTodaySanctuaryRow();
   const pageCard = document.getElementById('todayPageCard');
-  if (tierAtLeast(todayTier, 'whisper')) renderTodayPage_Page();
+  if (tierAtLeast(todayTier, 'ritual')) renderTodayPage_Page();
   else if (pageCard && todayPainted) pageCard.style.display = 'none';
   renderTodayJourney();
   /* Last, and only once the real plan has landed: a discovery card drawn off a

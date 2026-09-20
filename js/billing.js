@@ -37,49 +37,75 @@
    own page names the product and price it sells. Paste the buy.stripe.com URL
    onto that product's row here, and nowhere else. */
 const PLANS = {
-  whisper: {
-    label: 'Whisper',
-    entitlementId: 'whisper',   // RevenueCat -> Entitlements
-    periods: {
-      monthly: {
-        amountCents: 555,       // $5.55/mo
-        priceId: 'price_1UFRCkBiVHYI4vcXmZLmHBCH',
-        link: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',
-        productId: 'com.fthr.subliminally.whisper.monthly',
-      },
-      annual: {
-        amountCents: 5500,      // $55/yr
-        priceId: 'price_1UFRDzBiVHYI4vcX8QFMCHuQ',
-        link: 'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',
-        productId: 'com.fthr.subliminally.whisper.annual',
-      },
-    },
-  },
   ritual: {
     label: 'Ritual',
     entitlementId: 'ritual',
     periods: {
       monthly: {
-        amountCents: 1111,      // $11.11/mo
-        priceId: 'price_1UFRBTBiVHYI4vcXVfzNDr9I',
-        link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
+        amountCents: 1499,      // $14.99/mo
+        // NEEDS STRIPE DASHBOARD: create the $14.99/month price and a Payment
+        // Link for it, then paste them here. Left null/REPLACE_ rather than
+        // guessed — a wrong id here is a button that opens the wrong checkout.
+        priceId: null,
+        link: 'REPLACE_WITH_STRIPE_PAYMENT_LINK_RITUAL_MONTHLY',
         productId: 'com.fthr.subliminally.ritual.monthly',
       },
       annual: {
-        amountCents: 11100,     // $111/yr
-        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
-        link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
+        amountCents: 11199,     // $111.99/yr
+        // NEEDS STRIPE DASHBOARD: same, for the $111.99/year price.
+        priceId: null,
+        link: 'REPLACE_WITH_STRIPE_PAYMENT_LINK_RITUAL_ANNUAL',
         productId: 'com.fthr.subliminally.ritual.annual',
       },
     },
   },
 };
 
+/* ---------------- LEGACY PLANS (recognised, never sold) ----------------
+   Whisper is no longer offered. Nobody can buy it, it has no card on the
+   pricing page and no upgrade path points at it — but people are still paying
+   for it, and a subscription that quietly stops working is the worst possible
+   outcome of a price change.
+
+   So the tier is not deleted, it is retired: its store products and its old
+   Stripe amounts are still recognised, and everywhere access is decided a
+   legacy tier is read as Ritual (see normalizeTier below, and the same
+   mapping server-side in lib/supabase-auth.js). A legacy subscriber keeps the
+   row that says what they actually pay for, and gets Ritual-level access.
+
+   Reverie was retired the same way before Whisper was.
+
+   Nothing in here may grow a `link` — these rows exist to be read, never to be
+   sold. */
+const LEGACY_PRODUCT_IDS = {
+  'com.fthr.subliminally.whisper.monthly': 'whisper',
+  'com.fthr.subliminally.whisper.annual': 'whisper',
+};
+/* Which live tier a retired one is honoured as. One table, read by
+   normalizeTier() below and mirrored by PRODUCT_TO_TIER in
+   api/revenuecat-webhook.js and tierForUser() in lib/supabase-auth.js. */
+const LEGACY_TIER_TO_TIER = { whisper: 'ritual', reverie: 'ritual' };
+/* The one way to read a stored tier. A row still saying 'whisper' or 'reverie'
+   answers as 'ritual' everywhere access, length, labels or badges are decided,
+   without the row itself being rewritten. */
+function normalizeTier(tier){
+  if (!tier) return 'none';
+  return LEGACY_TIER_TO_TIER[tier] || tier;
+}
+/* The RevenueCat entitlements that count as Ritual. Legacy subscribers may
+   still hold the old `whisper` entitlement if their products have not been
+   re-attached to `ritual` in the RevenueCat dashboard, so restore and purchase
+   both accept either. New purchases only ever grant `ritual`. */
+const RITUAL_ENTITLEMENT_IDS = ['ritual', 'whisper'];
+function hasRitualEntitlement(active){
+  return RITUAL_ENTITLEMENT_IDS.some(id => active && active[id]);
+}
+
 /* The one way to ask what a tier sells. Everything that opens a checkout —
    web or native — goes through this, so there is no second lookup to get
    wrong. Returns null for a tier or period that isn't sold. */
 function planFor(tier, period){
-  const plan = PLANS[tier];
+  const plan = PLANS[normalizeTier(tier)];
   if (!plan) return null;
   return plan.periods[period || 'monthly'] || null;
 }
@@ -102,12 +128,13 @@ function assertPlanCatalog(){
       const row = PLANS[tier].periods[period];
       const where = tier + '/' + period;
       if (!row.link || row.link.startsWith('REPLACE_')){
-        problems.push(where + ' has no Stripe Payment Link yet');
+        problems.push(where + ' has no Stripe Payment Link yet — create the price and link in the Stripe dashboard and paste the buy.stripe.com URL onto that row');
       } else if (seenLink.has(row.link)){
         problems.push(where + ' and ' + seenLink.get(row.link) + ' share one Stripe Payment Link (' + row.link + ') — one of them is selling the other one’s plan');
       } else {
         seenLink.set(row.link, where);
       }
+      if (LEGACY_PRODUCT_IDS[row.productId]) problems.push(where + ' is selling a retired store product (' + row.productId + ') — retired products are recognised for existing subscribers only, never offered');
       if (seenProduct.has(row.productId)) problems.push(where + ' and ' + seenProduct.get(row.productId) + ' share one store product (' + row.productId + ')');
       else seenProduct.set(row.productId, where);
       if (!row.priceId) continue;   // not written down yet — nothing to check
@@ -204,9 +231,11 @@ async function restorePurchases(){
   say('Checking with the store…');
   try {
     const { customerInfo } = await window.Capacitor.Plugins.Purchases.restorePurchases();
-    const active = Object.keys(customerInfo.entitlements.active);
-    if (active.length){
-      say(`Restored — ${TIER_LABEL[active.includes('ritual') ? 'ritual' : 'whisper']} is back on this device.`, 'ok');
+    const active = customerInfo.entitlements.active || {};
+    /* A legacy Whisper subscriber may still hold the old entitlement; it is
+       honoured as Ritual rather than left unrecognised. */
+    if (hasRitualEntitlement(active)){
+      say(`Restored — ${TIER_LABEL.ritual} is back on this device.`, 'ok');
       setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
     } else {
       say('No active subscription found for this Apple ID / Google account.');
@@ -244,8 +273,7 @@ async function purchaseTier(tier, period){
     }
     msg.textContent = 'Opening purchase…'; msg.className = 'save-msg';
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
-    const entitlementId = PLANS[tier].entitlementId;
-    if (customerInfo.entitlements.active[entitlementId]){
+    if (hasRitualEntitlement(customerInfo.entitlements.active || {})){
       msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
       msg.className = 'save-msg ok';
       if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: period, via: 'revenuecat' });
@@ -284,12 +312,18 @@ function updateManageSubscriptionLinks(){
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
-const TIER_ORDER = ['none','whisper','ritual'];
-const TIER_LENGTH_SECONDS = { none: 1200, whisper: 7200, ritual: 28800 };
+// Free and Ritual, and nothing between them. Retired tiers are not rungs on
+// this ladder — normalizeTier() turns them into 'ritual' before they get here,
+// so a legacy Whisper subscriber ranks as Ritual rather than as nothing.
+const TIER_ORDER = ['none','ritual'];
+const TIER_LENGTH_SECONDS = { none: 1200, ritual: 28800 };
 // Names come off the plan catalog, so a tier is called one thing everywhere.
+// Retired tiers answer to the name of the tier they are honoured as, so a
+// stray label lookup for 'whisper' says "Ritual" rather than "undefined".
 const TIER_LABEL = Object.keys(PLANS).reduce((acc, tier) => { acc[tier] = PLANS[tier].label; return acc; }, { none: 'a free account' });
+Object.keys(LEGACY_TIER_TO_TIER).forEach(t => { TIER_LABEL[t] = TIER_LABEL[LEGACY_TIER_TO_TIER[t]]; });
 function tierAtLeast(myTier, requiredTier){
-  return TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier);
+  return TIER_ORDER.indexOf(normalizeTier(myTier)) >= TIER_ORDER.indexOf(normalizeTier(requiredTier));
 }
 /* Maps a chosen session length (in minutes, from the 5min–8hr slider) to the minimum
    tier that's allowed to actually generate/save a session that long. */
@@ -302,24 +336,29 @@ async function getMyTier(){
   const subRow = await getMySubscriberRow();
   const validStatuses = ['active', 'trialing'];
   const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
-  // Reverie was retired; anyone still on it keeps everything they paid for.
-  return tier === 'reverie' ? 'ritual' : tier;
+  /* Whisper and Reverie were retired; anyone still paying for either keeps
+     everything they paid for, at Ritual level. The stored row is left alone —
+     it still says what they actually subscribe to — and only what it *means*
+     is translated, here and in tierForUser() server-side. */
+  return normalizeTier(tier);
 }
 
-/* Show pricing as an upsell only for tiers above what you already have.
-   Ritual members see no marketing here at all — just account management. */
+/* Show pricing as an upsell only to people who have something to upgrade to.
+   There is one paid plan now, so this is a two-card page: Free, and Ritual.
+   Ritual members — including legacy subscribers honoured as Ritual — see no
+   marketing here at all, just account management. */
 async function applyPricingVisibility(){
   const myTier = await getMyTier();
-  const cards = { free: document.getElementById('priceCardFree'), whisper: document.getElementById('priceCardWhisper'), ritual: document.getElementById('priceCardRitual') };
+  const cards = { free: document.getElementById('priceCardFree'), ritual: document.getElementById('priceCardRitual') };
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
   const toggle = document.getElementById('billingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
-  if (!cards.whisper) return; // pricing markup not present yet
+  if (!cards.ritual) return; // pricing markup not present yet
 
-  Object.values(cards).forEach(c => c.style.display = '');
+  Object.values(cards).forEach(c => { if (c) c.style.display = ''; });
   const freeBtn = document.getElementById('priceCardFreeBtn');
   if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
   else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
@@ -339,20 +378,10 @@ async function applyPricingVisibility(){
   grid.style.display = 'grid';
   toggle.style.display = 'flex';
   footnote.style.display = 'block';
-
-  if (myTier === 'whisper'){
-    cards.free.style.display = 'none';
-    cards.whisper.style.display = 'none';
-    grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = 'Ritualize your mornings and nights';
-    document.getElementById('pricingSub').textContent = 'All-night 8-hour sessions, unlimited saved subliminals, the habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
-    manageSub.style.display = 'block';
-  } else {
-    grid.classList.remove('centered');
-    document.getElementById('pricingHeading').textContent = 'Your all in one wellness app';
-    document.getElementById('pricingSub').textContent = 'Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.';
-    manageSub.style.display = 'none';
-  }
+  grid.classList.remove('centered');
+  document.getElementById('pricingHeading').textContent = 'Your all in one wellness app';
+  document.getElementById('pricingSub').textContent = 'Start free with personalized subliminals. Ritualize your mornings and nights — journal, habits, EFT and all-night sessions — on Ritual.';
+  manageSub.style.display = 'none';
 }
 
 
@@ -375,7 +404,7 @@ async function getMySubscriberRow(){
   }, 300000);
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 2, whisper: 10, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');

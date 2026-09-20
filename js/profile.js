@@ -36,11 +36,12 @@ async function loadProfile(){
     document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face' });
   }
 
+  // getMyTier() already reads a retired tier as the one it is honoured as, so
+  // a legacy Whisper subscriber sees the Ritual badge rather than their old one.
   const myTier = await getMyTier();
-  const tierIcons = { none: '', whisper: '✦ ', ritual: '★ ' };
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
-  badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
+  badge.textContent = myTier === 'none' ? 'Free account' : (tierMark(myTier) + ' ' + TIER_LABEL[myTier] + ' member');
   const ladder = document.getElementById('profilePlanLadder');
   if (ladder) ladder.innerHTML = planLadderMarkup(myTier);
 }
@@ -391,7 +392,7 @@ async function uploadVoiceClone(blob){
     const out = await res.json().catch(() => ({}));
     if (!res.ok){
       msg.textContent = out.error === 'upgrade_required'
-        ? 'Cloning your voice comes with Ritual — $11.11 a month, or $111 a year.'
+        ? `Cloning your voice comes with Ritual — ${tierPriceText('ritual')}.`
         : out.error === 'not_configured'
           ? "Voice cloning isn't switched on yet."
           : (out.error || "Couldn't clone your voice — try again in a moment.");

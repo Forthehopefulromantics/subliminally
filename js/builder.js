@@ -846,7 +846,7 @@ function speakWithDeviceVoice(line){
 }
 function ttsErrorText(e){
   const m = (e && e.message) || '';
-  if (m === 'upgrade_required') return 'Studio voices come with Whisper — using this device\'s voice for now.';
+  if (m === 'upgrade_required') return 'Studio voices come with Ritual — using this device\'s voice for now.';
   if (m === 'not_configured') return 'Studio voices aren\'t switched on yet — using this device\'s voice.';
   return 'That voice is unavailable right now — using this device\'s voice.';
 }

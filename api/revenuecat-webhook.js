@@ -31,13 +31,23 @@ const REVENUECAT_WEBHOOK_AUTH = process.env.REVENUECAT_WEBHOOK_AUTH;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Must match TIER_PRODUCT_IDS in index.html, and the product IDs you create
-// in App Store Connect / Google Play Console / RevenueCat.
+// Must match the PLANS catalog in js/billing.js and the product IDs created in
+// App Store Connect / Google Play Console / RevenueCat. Both Ritual products
+// carry the `ritual` entitlement in the RevenueCat dashboard.
+//
+// Whisper is retired: it is not sold anywhere and has no pricing card, but
+// people are still subscribed to it, so its two products stay mapped here.
+// A renewal for one keeps writing tier 'whisper' — the row is left saying what
+// the person actually pays for — and every place that *reads* a tier honours
+// 'whisper' as Ritual (normalizeTier() in js/billing.js, tierForUser() in
+// lib/supabase-auth.js). Deleting these rows would leave a paying subscriber
+// with tier null, which is a free account.
 const PRODUCT_TO_TIER = {
-  'com.fthr.subliminally.whisper.monthly': 'whisper',
-  'com.fthr.subliminally.whisper.annual': 'whisper',
   'com.fthr.subliminally.ritual.monthly': 'ritual',
   'com.fthr.subliminally.ritual.annual': 'ritual',
+  // --- legacy, recognised only so existing subscribers keep their access ---
+  'com.fthr.subliminally.whisper.monthly': 'whisper',
+  'com.fthr.subliminally.whisper.annual': 'whisper',
 };
 
 // Event types where the subscriber gained or renewed access.

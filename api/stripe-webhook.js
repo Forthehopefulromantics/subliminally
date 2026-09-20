@@ -30,13 +30,22 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // one decides which tier a completed payment grants. Change a price in Stripe
 // and both have to move.
 //
-// Legacy amounts are from before the plan restructure. Reverie was retired;
-// anyone still paying for it keeps everything they had, which now lives on Ritual.
+// Legacy amounts are from before the plan restructures. Whisper and Reverie
+// are both retired; anyone still paying for either keeps everything they had,
+// which now lives on Ritual. Their amounts stay mapped so a renewal is still
+// recognised — the stored tier keeps saying what they actually pay for, and
+// every place that reads a tier honours it as Ritual (normalizeTier() in
+// js/billing.js, tierForUser() in lib/supabase-auth.js). Dropping a legacy
+// amount here would write tier null on the next renewal, which is a free
+// account for somebody who is still being charged.
 const AMOUNT_TO_PLAN = {
-  555: { tier: 'whisper', period: 'monthly' },   // Whisper monthly, $5.55
-  5500: { tier: 'whisper', period: 'annual' },   // Whisper yearly, $55
-  1111: { tier: 'ritual', period: 'monthly' },   // Ritual monthly, $11.11
-  11100: { tier: 'ritual', period: 'annual' },   // Ritual yearly, $111
+  1499: { tier: 'ritual', period: 'monthly' },   // Ritual monthly, $14.99
+  11199: { tier: 'ritual', period: 'annual' },   // Ritual yearly, $111.99
+  // --- legacy, recognised only so existing subscribers keep their access ---
+  1111: { tier: 'ritual', period: 'monthly' },   // legacy Ritual, $11.11/mo
+  11100: { tier: 'ritual', period: 'annual' },   // legacy Ritual, $111/yr
+  555: { tier: 'whisper', period: 'monthly' },   // legacy Whisper, $5.55/mo
+  5500: { tier: 'whisper', period: 'annual' },   // legacy Whisper, $55/yr
   1000: { tier: 'whisper', period: 'monthly' },  // legacy Whisper, $10/mo
   2200: { tier: 'ritual', period: 'monthly' },   // legacy Reverie, $22/mo
   3500: { tier: 'ritual', period: 'monthly' },   // legacy Ritual, $35/mo
