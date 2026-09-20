@@ -30,6 +30,7 @@ async function loadProfile(){
     document.getElementById('profileNameDisplay').textContent = prof.full_name || prof.username || currentUser.email.split('@')[0];
     document.getElementById('settingsUsername').value = prof.username || '';
     higherSelf = { name: prof.higher_self_name || '', avatar: avatarId(prof.higher_self_avatar) };
+    higherSelfLoaded = true;
     document.getElementById('higherSelfNameInput').value = higherSelf.name;
     renderHigherSelfMaker();
     document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face' });

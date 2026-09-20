@@ -634,6 +634,7 @@ function openOnboardingModal(){
   if (obEl('onboardOverlay').classList.contains('open')) return;
   obIndex = 0;
   obSaving = false;
+  obAvatarPicked = false;
   obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
   obEl('onboardOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
@@ -717,26 +718,54 @@ function obPersonalize(){
   obEl('obVoiceQ').textContent = her
     ? `How do you want ${her} to speak to you?`
     : 'How do you want your higher self to speak to you?';
-  // Her introduction, in her own voice, with the drawing just chosen.
-  obEl('obIntroQ').textContent = name ? `Hi, ${name}.` : 'Hi there.';
-  obEl('obIntroHelp').textContent =
-    `I'm ${her || 'your higher self'}. Let's build the version of you you've been imagining.`;
-  const introHero = obEl('obIntroHero');
-  if (introHero && typeof avatarMarkup === 'function'){
-    introHero.innerHTML = avatarMarkup({ avatar: higherSelf.avatar }, { state:'hero', cut:'full', alt:false });
-  }
-  obEl('obFinishQ').textContent = name ? `You're ready, ${name}.` : "You're ready.";
-  obEl('obFinishHelp').textContent = her
-    ? `${her} is waiting. Everything you just told us is saved to your account — on every device you sign in from.`
-    : 'Everything you just told us is saved to your account — on every device you sign in from.';
 
-  // The avatar they chose, standing there at the end.
-  const hero = obEl('obFinishHero');
-  if (hero && typeof avatarMarkup === 'function'){
-    hero.innerHTML = avatarMarkup({ avatar: higherSelf.avatar }, { state:'hero', cut:'full', alt:false })
-      + (her ? `<div class="ob-hero-name">${obEscape(her)}</div>` : '');
+  /* Her introduction and her sign-off, both through the one avatar-and-bubble
+     component. The greeting and "you're ready" are headings; what she says is
+     in the bubble. This slide is the once that her name is established -- she
+     says it here, and no bubble after it is labelled with it again. */
+  obEl('obIntroQ').textContent = name ? `Hi, ${name}.` : 'Hi there.';
+  const intro = obEl('obIntroDialogue');
+  if (intro && typeof higherSelfDialogue === 'function'){
+    obPaintDialogue(intro, {
+      avatar: obChosenAvatar(),
+      emotion: 'welcoming',
+      message: `I'm ${her || 'your higher self'}. Let's build the version of you you've been imagining.`,
+      speaker: her,
+    });
+    if (obChosenAvatar()) preloadHigherSelfEmotion(higherSelf.avatar, 'celebrating');
+  }
+
+  obEl('obFinishQ').textContent = name ? `You're ready, ${name}.` : "You're ready.";
+  const finish = obEl('obFinishDialogue');
+  if (finish && typeof higherSelfDialogue === 'function'){
+    obPaintDialogue(finish, {
+      avatar: obChosenAvatar(),
+      emotion: 'celebrating',
+      message: her
+        ? `${her} is waiting. Everything you just told me is saved to your account — on every device you sign in from.`
+        : 'Everything you just told me is saved to your account — on every device you sign in from.',
+      speaker: her,
+    });
   }
   obRenderFinishSummary();
+}
+
+/* What the dialogue should draw during the questionnaire: the identity in the
+   draft once one has actually been tapped, and `null` -- nobody, deliberately
+   -- until then. `higherSelf.avatar` holds the first of the roster from the
+   moment the page loads, so reading it directly would introduce somebody the
+   person has never seen and may not have chosen. */
+function obChosenAvatar(){ return obAvatarPicked ? avatarId(higherSelf.avatar) : null; }
+
+/* obPersonalize() runs on every slide change and on every keystroke in the two
+   name fields, so writing the dialogue out each time would rebuild an <img>
+   several times a second while somebody types. Written only when what it would
+   say or show has actually changed. */
+function obPaintDialogue(el, opts){
+  const html = higherSelfDialogue(opts);
+  if (el.dataset.painted === html) return;
+  el.dataset.painted = html;
+  el.innerHTML = html;
 }
 
 /* Their own answers, read back before they commit to them. Only the rows they
@@ -931,6 +960,10 @@ function renderOnboardAvatars(){
    it rather than shutting it, which is what makes comparing two faces one tap
    each instead of three. */
 let obAvatarPreviewOpen = false;
+/* Whether the roster has actually been tapped. The avatar slide can be walked
+   past without choosing, and in that case there is no chosen identity to draw
+   -- not the default one standing in for it. */
+let obAvatarPicked = false;
 
 function renderOnboardAvatarPreview(){
   const wrap = document.getElementById('obAvatarPreview');
@@ -960,7 +993,11 @@ function closeOnboardAvatarPreview(){
    saves at once, so there is nothing to write yet. */
 function pickOnboardAvatar(id){
   higherSelf.avatar = avatarId(id);
+  obAvatarPicked = true;
   obAvatarPreviewOpen = true;
+  // The next two slides are her speaking; fetch the first of those drawings
+  // while the roster is still on screen.
+  if (typeof preloadHigherSelfEmotion === 'function') preloadHigherSelfEmotion(higherSelf.avatar, 'welcoming');
   renderOnboardAvatars();
   renderOnboardAvatarPreview();
   // The preview sits above the grid, so opening it pushes the row that was
@@ -1039,6 +1076,12 @@ async function submitOnboarding(){
       support_when: (OB_WHEN.find(w => w.id === obAnswers.when) || {}).label || null,
       voice: (OB_VOICE.find(v => v.id === obAnswers.voice) || {}).label || null,
       spirituality: (OB_SPIRIT.find(x => x.id === obAnswers.spirit) || {}).label || null,
+      /* The id as well as the label. The habit tracker has to tell "religion
+         is important to me, and it is not on your list" apart from "something
+         else entirely" -- both of which set faith to 'other' -- and matching a
+         display label back to a list is not a thing to build a person's
+         starting habits on. See faithPrefersPrayer(). */
+      spirituality_id: obAnswers.spirit || null,
       daily_minutes: (OB_TIME.find(t => t.id === obAnswers.time) || {}).minutes || null,
     },
     onboarding_struggles: [],
@@ -1075,6 +1118,7 @@ async function submitOnboarding(){
 
   higherSelf.name = higherName;
   higherSelf.avatar = avatarId(saved.higher_self_avatar);
+  higherSelfLoaded = true;
   obSaving = false;
   closeOnboardingModal();
   showTodayPage();
