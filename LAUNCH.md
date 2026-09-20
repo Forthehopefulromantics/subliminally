@@ -136,9 +136,10 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260919_higher_self.sql` | run |
 | `20260920_usernames_and_avatar.sql` | run |
 | `20260921_light.sql` | run |
+| `20260926_habit_icons.sql` | run 2026-09-20 — it had been missed |
 | `20260929_onboarding_personalization.sql` | superseded — its columns are in 20260930 |
 | `20260930_onboarding_slideshow.sql` | run |
-| `20261001_habit_onboarding.sql` | **not run** — needed for the habit tracker's setup |
+| `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`
@@ -148,9 +149,32 @@ whole write and nothing saved at all — which is why people were asked the same
 questions again on every login. `20260930` carries those columns plus the
 completion flag, and is safe to run whether or not `20260929` ever was.
 
-`20261001` is the new one. It adds `anytime` to the habits table's time-of-day
-constraint and three columns to `profiles`
-(`habit_onboarding_completed`, `habit_onboarding_completed_at`,
-`habit_cycle_started_on`). Until it is run, the Habit tracker's setup will
-refuse to save and say so on the last slide rather than closing over a write
-that did not land, and nobody is marked as having finished it.
+`20260926` was the one still genuinely missing, and it had been missed
+quietly: `habits.icon` did not exist, so the icon picker had been saving
+nothing since it shipped (`setHabitIcon` warns and carries on), and the Habit
+tracker's setup would have failed its first write outright, because PostgREST
+rejects an insert naming a column it cannot see — the same failure mode as
+`20260929`. Run on 2026-09-20.
+
+`20261001` was **already in the database** before this folder had a file for
+it: it was applied directly in Supabase on 2026-09-19 as
+`habit_tracker_onboarding`. The file now reproduces that migration exactly, so
+a fresh environment matches production and re-running it changes nothing.
+
+### Columns in the database that no code reads
+
+The directly-applied migration brought five columns the app does not touch.
+They are inert, not broken, but they are two sources of truth waiting to
+disagree, and they should be either wired up or dropped:
+
+| Column | Why it is unused |
+| --- | --- |
+| `profiles.habit_cycle_number` | `habitCyclesDone()` derives the cycle from `habit_checkins`, so a stored counter can drift from the days actually practised. |
+| `profiles.habit_slots` | `habitSpacesTotal()` derives spaces the same way. Eight profiles currently sit at a stored `3` that nothing maintains. |
+| `habits.duration_minutes` | No UI offers it. This is the one that is safe to surface — it is just a number on a habit. |
+| `habits.days_of_week` | No UI offers it, and nothing filters a habit out on its off days, so offering it would do nothing visible. |
+| `habits.reminder_at` | No UI offers it, and **nothing sends notifications** — the column's own comment says so. Surfacing it would promise a reminder that never arrives, which is the same mistake as the colour customization above. |
+
+`habit_cycle_number`'s original comment said avatar customization unlocks at
+cycle 2. That is the reward described in the section above as not built, and
+the column does not change that: the artwork is still flattened.
