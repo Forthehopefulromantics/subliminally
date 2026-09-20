@@ -24,6 +24,16 @@
    amount charged, so these numbers and AMOUNT_TO_PLAN over there are the two
    ends of one contract: change a price in Stripe and both have to move.
 
+   priceId is the Stripe price each link is supposed to sell. Nothing reads it
+   at runtime — a Payment Link carries its own price, and the webhook goes by
+   the amount charged. It's written down because it's the only thing that says,
+   in the repo, which Stripe object a row is claiming: the link is an opaque
+   URL, and two rows quietly holding one price is a thing you can otherwise
+   only find out from a customer. ritual/annual is null rather than wrong —
+   the dashboard reported the monthly price for it, and one price can't be both
+   $11.11 a month and $111 a year, so that link needs a look before anything
+   here claims to know what it sells.
+
    To wire or re-create a Payment Link: Stripe -> Payment Links. Each link's
    own page names the product and price it sells. Paste the buy.stripe.com URL
    onto that product's row here, and nowhere else. */
@@ -34,12 +44,14 @@ const PLANS = {
     periods: {
       monthly: {
         amountCents: 555,       // $5.55/mo
-        link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
+        priceId: 'price_1UFRCkBiVHYI4vcXmZLmHBCH',
+        link: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',
         productId: 'com.fthr.subliminally.whisper.monthly',
       },
       annual: {
         amountCents: 5500,      // $55/yr
-        link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
+        priceId: 'price_1UFRDzBiVHYI4vcX8QFMCHuQ',
+        link: 'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',
         productId: 'com.fthr.subliminally.whisper.annual',
       },
     },
@@ -50,12 +62,14 @@ const PLANS = {
     periods: {
       monthly: {
         amountCents: 1111,      // $11.11/mo
-        link: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',
+        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
+        link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
         productId: 'com.fthr.subliminally.ritual.monthly',
       },
       annual: {
         amountCents: 11100,     // $111/yr
-        link: 'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',
+        priceId: null,          // unconfirmed — see the note above
+        link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
         productId: 'com.fthr.subliminally.ritual.annual',
       },
     },
@@ -71,9 +85,9 @@ function planFor(tier, period){
   return plan.periods[period || 'monthly'] || null;
 }
 
-/* Catches the two ways the table above goes wrong in practice: a row left on
-   its placeholder, and one link (or one store product) pasted onto two rows,
-   which is how a tier quietly starts selling another tier's plan. Runs at
+/* Catches the ways the table above goes wrong in practice: a row left on its
+   placeholder, and one link, store product or Stripe price sitting on two
+   rows, which is how a tier quietly starts selling another tier's plan. Runs at
    load, so it surfaces in the console on the deploy that introduced it rather
    than in somebody's checkout. It can only catch a link used *twice* — a link
    that points at the wrong product and is used once looks fine from here, so
@@ -83,6 +97,7 @@ function assertPlanCatalog(){
   const problems = [];
   const seenLink = new Map();
   const seenProduct = new Map();
+  const seenPrice = new Map();
   for (const tier of Object.keys(PLANS)){
     for (const period of Object.keys(PLANS[tier].periods)){
       const row = PLANS[tier].periods[period];
@@ -96,6 +111,9 @@ function assertPlanCatalog(){
       }
       if (seenProduct.has(row.productId)) problems.push(where + ' and ' + seenProduct.get(row.productId) + ' share one store product (' + row.productId + ')');
       else seenProduct.set(row.productId, where);
+      if (!row.priceId) continue;   // not written down yet — nothing to check
+      if (seenPrice.has(row.priceId)) problems.push(where + ' and ' + seenPrice.get(row.priceId) + ' claim one Stripe price (' + row.priceId + '), which can only charge one amount on one interval');
+      else seenPrice.set(row.priceId, where);
     }
   }
   if (problems.length) console.error('Plan catalog is wrong:\n  ' + problems.join('\n  '));
