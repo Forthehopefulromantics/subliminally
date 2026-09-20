@@ -29,10 +29,9 @@
    the amount charged. It's written down because it's the only thing that says,
    in the repo, which Stripe object a row is claiming: the link is an opaque
    URL, and two rows quietly holding one price is a thing you can otherwise
-   only find out from a customer. ritual/annual is null rather than wrong —
-   the dashboard reported the monthly price for it, and one price can't be both
-   $11.11 a month and $111 a year, so that link needs a look before anything
-   here claims to know what it sells.
+   only find out from a customer. Leave a row's priceId null rather than guess
+   at it — the check below reads null as "not written down yet" and says
+   nothing, which is the honest state to be in.
 
    To wire or re-create a Payment Link: Stripe -> Payment Links. Each link's
    own page names the product and price it sells. Paste the buy.stripe.com URL
@@ -62,13 +61,13 @@ const PLANS = {
     periods: {
       monthly: {
         amountCents: 1111,      // $11.11/mo
-        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
+        priceId: 'price_1UFRBTBiVHYI4vcXVfzNDr9I',
         link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
         productId: 'com.fthr.subliminally.ritual.monthly',
       },
       annual: {
         amountCents: 11100,     // $111/yr
-        priceId: null,          // unconfirmed — see the note above
+        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
         link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
         productId: 'com.fthr.subliminally.ritual.annual',
       },
