@@ -125,7 +125,10 @@ assertPlanCatalog();
    those — Apple/Google require subscriptions sold inside the app to go
    through their own billing — so on native this hands off to RevenueCat
    instead. See the RevenueCat block below for the purchase flow itself. */
-let billingPeriod = 'monthly'; // 'monthly' | 'annual'
+/* The pricing cards open on the yearly price and toggle down to monthly. The
+   static figures in index.html are rendered at this same period — they're what
+   shows until someone touches the toggle, so the two have to agree. */
+let billingPeriod = 'annual'; // 'monthly' | 'annual'
 
 function setBillingPeriod(period){
   billingPeriod = period;
