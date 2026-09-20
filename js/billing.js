@@ -187,8 +187,8 @@ async function restorePurchases(){
   try {
     const { customerInfo } = await window.Capacitor.Plugins.Purchases.restorePurchases();
     const active = Object.keys(customerInfo.entitlements.active);
-    if (active.length){
-      say(`Restored — ${TIER_LABEL[active.includes('ritual') ? 'ritual' : 'whisper']} is back on this device.`, 'ok');
+    if (active.some(id => ['premium','ritual','whisper','reverie'].includes(id))){
+      say('Restored — Premium is back on this device.', 'ok');
       setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
     } else {
       say('No active subscription found for this Apple ID / Google account.');
@@ -292,27 +292,44 @@ async function getMyTier(){
    Ritual members see no marketing here at all — just account management. */
 async function applyPricingVisibility(){
   const myTier = await getMyTier();
-  const free = document.getElementById('priceCardFree');
-  const premium = document.getElementById('priceCardRitual');
+  const freeCard = document.getElementById('priceCardFree');
+  const premiumCard = document.getElementById('priceCardRitual'); // legacy DOM id; card is Premium
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
   const toggle = document.getElementById('billingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
-  if (!premium) return;
+  if (!premiumCard) return;
+
+  if (freeCard) freeCard.style.display = '';
+  premiumCard.style.display = '';
   const freeBtn = document.getElementById('priceCardFreeBtn');
-  if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
-  else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
+  if (freeBtn){
+    if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
+    else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
+  }
+
   if (myTier === 'premium'){
-    head.style.display='none'; grid.style.display='none'; toggle.style.display='none';
-    footnote.style.display='none'; thanks.style.display='block'; manageSub.style.display='block';
+    if (head) head.style.display = 'none';
+    if (grid) grid.style.display = 'none';
+    if (toggle) toggle.style.display = 'none';
+    if (footnote) footnote.style.display = 'none';
+    if (thanks) thanks.style.display = 'block';
+    if (manageSub) manageSub.style.display = 'block';
     return;
   }
-  head.style.display='block'; grid.style.display='grid'; toggle.style.display='flex';
-  footnote.style.display='block'; thanks.style.display='none'; manageSub.style.display='none';
-  if (free) free.style.display='';
-  premium.style.display='';
+
+  if (thanks) thanks.style.display = 'none';
+  if (head) head.style.display = 'block';
+  if (grid) { grid.style.display = 'grid'; grid.classList.remove('centered'); }
+  if (toggle) toggle.style.display = 'flex';
+  if (footnote) footnote.style.display = 'block';
+  if (manageSub) manageSub.style.display = 'none';
+  const heading = document.getElementById('pricingHeading');
+  const sub = document.getElementById('pricingSub');
+  if (heading) heading.textContent = 'Your all in one wellness app';
+  if (sub) sub.textContent = 'Start free, then unlock the complete Subliminally experience with Premium.';
 }
 
 
