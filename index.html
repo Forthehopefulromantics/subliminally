@@ -35,8 +35,8 @@
   "description": "Build a personalized nightly audio ritual with a Solfeggio frequency, affirmations in your own voice, and layered ambience.",
   "offers": [
     { "@type": "Offer", "name": "Free", "price": "0.00", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Whisper", "price": "5.55", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
-    { "@type": "Offer", "name": "Ritual", "price": "11.11", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
+    { "@type": "Offer", "name": "Premium Monthly", "price": "14.99", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" },
+    { "@type": "Offer", "name": "Premium Annual", "price": "99.99", "priceCurrency": "USD", "priceValidUntil": "2027-12-31" }
   ]
 }
 </script>
@@ -3084,77 +3084,40 @@
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
       <h2 id="pricingHeading">Your all in one wellness app</h2>
-      <p id="pricingSub">Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.</p>
+      <p id="pricingSub">Start free, then unlock the complete Subliminally experience with Premium.</p>
     </div>
-
     <div id="pricingRitualThanks" style="display:none; text-align:center; max-width:420px; margin:0 auto;">
-      <p style="font-size:14.5px; color:var(--haze);">You're on Ritual — the full ritual, unlocked. Nothing to upgrade to here.</p>
+      <p style="font-size:14.5px; color:var(--haze);">You're on Premium. Everything is unlocked.</p>
     </div>
-
     <div class="billing-toggle" id="billingToggle">
-      <button class="active" data-period="annual" onclick="setBillingPeriod('annual')">Yearly <span>save ~17%</span></button>
+      <button class="active" data-period="annual" onclick="setBillingPeriod('annual')">Annual <span>3 days free</span></button>
       <button data-period="monthly" onclick="setBillingPeriod('monthly')">Monthly</button>
     </div>
-
     <div class="pricing-grid" id="pricingGrid">
       <div class="price-card" id="priceCardFree">
         <h3>Free</h3>
         <p class="price-tagline">Build subliminals in your own voice.</p>
         <div class="price-amount">$0<span>/forever</span></div>
         <div class="limit">Sessions up to 20 minutes</div>
-        <details class="price-more">
-          <summary>What's included</summary>
-          <ul class="price-feats">
-            <li>Personalized subliminals — align your frequency</li>
-            <li>Layer frequency, nature sounds, binaural beats, and affirmations</li>
-            <li>Your own voice or AI voice</li>
-            <li>Save 2 subliminals to your library (an account is required to save)</li>
-            <li>Library of general subliminals on YouTube</li>
-          </ul>
-        </details>
+        <details class="price-more"><summary>What's included</summary><ul class="price-feats">
+          <li>Personalized subliminals</li><li>Your own voice or AI voice</li><li>Save 2 subliminals to your library</li><li>Sessions up to 20 minutes</li>
+        </ul></details>
         <button class="btn btn-ghost" id="priceCardFreeBtn" onclick="openAuthModal('signup')">Create a free account</button>
       </div>
-      <div class="price-card" id="priceCardWhisper">
-        <h3>Whisper</h3>
-        <p class="price-tagline">Add your journal and manifestation practice.</p>
-        <div class="price-amount"><span class="price-figure" data-monthly="$5.55" data-annual="$55">$55</span><span class="price-period" data-monthly="/month" data-annual="/year">/year</span></div>
-        <div class="limit">Sessions up to 2 hours</div>
-        <details class="price-more">
-          <summary>What's included</summary>
-          <ul class="price-feats">
-            <li>Everything in Free, with sessions up to 2 hours</li>
-            <li>Save up to 10 subliminals to your library</li>
-            <li>Gratitude Journal</li>
-            <li>Daily Journaling — write in your physical journal, upload each day's entry to the app</li>
-            <li>Manifestation tracker</li>
-          </ul>
-        </details>
-        <a class="btn btn-ghost" href="#" onclick="return goToCheckout(event,'whisper')">Get Whisper</a>
-      </div>
       <div class="price-card featured" id="priceCardRitual">
-        <span class="badge">Mornings + nights</span>
-        <h3>Ritual</h3>
-        <p class="price-tagline">Ritualize your mornings and your nights.</p>
-        <div class="price-amount"><span class="price-figure" data-monthly="$11.11" data-annual="$111">$111</span><span class="price-period" data-monthly="/month" data-annual="/year">/year</span></div>
-        <div class="limit">Sessions up to 8 hours</div>
-        <details class="price-more">
-          <summary>What's included</summary>
-          <ul class="price-feats">
-            <li>Everything in Whisper, with all-night sessions up to 8 hours</li>
-            <li>Unlimited saved subliminals</li>
-            <li>Habit tracker — build your morning and night rituals</li>
-            <li>Subliminal + EFT Tapping</li>
-            <li>Visualization scripting</li>
-          </ul>
-        </details>
-        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'ritual')">Get Ritual</a>
+        <span class="badge">Premium</span>
+        <h3>Subliminally Premium</h3>
+        <p class="price-tagline">Unlock the complete Subliminally experience.</p>
+        <div class="price-amount"><span class="price-figure" data-monthly="$14.99" data-annual="$99.99">$99.99</span><span class="price-period" data-monthly="/month" data-annual="/year">/year</span></div>
+        <div class="limit"><span class="annual-trial-copy">3-day free trial with annual</span> · Sessions up to 8 hours</div>
+        <details class="price-more"><summary>What's included</summary><ul class="price-feats">
+          <li>Everything in Free, with sessions up to 8 hours</li><li>Unlimited saved subliminals</li><li>Habit Tracker</li><li>Journaling and manifestation tools</li><li>Subliminal + EFT Tapping</li><li>Visualization scripting</li>
+        </ul></details>
+        <a class="btn btn-primary" href="#" onclick="return goToCheckout(event,'premium')">Get Premium</a>
       </div>
     </div>
-    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">We support written journals over digital — physical FTHR journals made for the app are coming soon.</p>
-    <div class="pricing-legal" id="pricingLegal">
-      <p>Paid plans renew automatically every month or every year at the price shown until you cancel. Cancel anytime — in the App Store or Google Play if you subscribed in the app, or through "Manage your subscription" below if you subscribed on the web.</p>
-      <p><a href="/terms.html" target="_blank" rel="noopener">Terms of Use</a> · <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span id="restorePurchasesRow" style="display:none;"> · <button type="button" onclick="restorePurchases()">Restore purchases</button></span></p>
-    </div>
+    <p id="pricingFootnote" style="text-align:center; font-size:12px; color:var(--haze); margin-top:24px;">Annual Premium includes a 3-day free trial, then renews at $99.99/year unless canceled.</p>
+    <div class="pricing-legal" id="pricingLegal"><p>Paid plans renew automatically at the price shown until you cancel. Cancel anytime through the service where you subscribed.</p><p><a href="/terms.html" target="_blank" rel="noopener">Terms of Use</a> · <a href="/privacy.html" target="_blank" rel="noopener">Privacy Policy</a><span id="restorePurchasesRow" style="display:none;"> · <button type="button" onclick="restorePurchases()">Restore purchases</button></span></p></div>
     <div class="save-msg" id="pricingPurchaseMsg" style="text-align:center; margin-top:14px;"></div>
     <div class="manage-sub" id="pricingManageSub" style="display:none;"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="pricingManageSubLink">Manage your subscription →</a></div>
   </div>
