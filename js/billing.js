@@ -44,13 +44,13 @@ const PLANS = {
       monthly: {
         amountCents: 1499,      // $14.99/mo
         priceId: 'price_1UHpj5BiVHYI4vcXbgLYFIiu',
-        link: null,              // Web checkout requires a Payment Link or server-created Checkout Session
+        link: 'https://buy.stripe.com/00weVc3Tw48PdDFdX7gYU07'
         productId: 'com.fthr.subliminally.premium.monthly',
       },
       annual: {
         amountCents: 9999,      // $99.99/yr
         priceId: 'price_1UHpjQBiVHYI4vcXoiYG0uc2',
-        link: null,
+        link: 'https://buy.stripe.com/9B6eVc2PsaxdgPRg5fgYU08',
         productId: 'com.fthr.subliminally.premium.annual',
       },
     },
