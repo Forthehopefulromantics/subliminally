@@ -53,7 +53,7 @@ const FEATURES = {
   subliminal_8hr:    { minutes: 480, name: '8-hour sessions', page: 'builder',
                        headline: 'Sleep with your subliminal tonight ✦',
                        why: 'Eight hours plays from the moment you close your eyes until your alarm — a whole night of your own voice, every night.' },
-  soothing_layer:    { tier: 'whisper', name: 'Soothing layer', page: 'builder',
+  soothing_layer:    { tier: 'ritual', name: 'Soothing layer', page: 'builder',
                        headline: 'Soften the whole session ✦',
                        why: 'A warm pad, soft chimes or a low hum underneath everything, so the frequency stops sounding like a tone and starts sounding like somewhere to rest.' },
   custom_track:      { tier: 'ritual', name: 'Your own track', page: 'builder',
@@ -70,21 +70,21 @@ const FEATURES = {
                        why: 'Write the scene in your own detail and play it back as one continuous script — mental rehearsal, in the voice you trust most.' },
 
   /* ---- saving what you build ---- */
-  library_space:     { tier: 'whisper', name: 'More library space', page: 'library',
+  library_space:     { tier: 'ritual', name: 'More library space', page: 'library',
                        headline: 'Room for the whole practice ✦',
-                       why: 'Whisper holds ten saved subliminals, Ritual holds as many as you build — one for sleep, one for the morning, one for the week you are having.' },
+                       why: 'A free account holds two saved subliminals, Ritual holds as many as you build — one for sleep, one for the morning, one for the week you are having.' },
 
   /* ---- journal ---- */
-  journal:           { tier: 'whisper', name: 'Gratitude journal', page: 'journal',
+  journal:           { tier: 'ritual', name: 'Gratitude journal', page: 'journal',
                        headline: 'Keep your own record ✦',
                        why: 'Three lines each morning is the whole practice — written in present tense, kept where you can read them back.' },
-  manifestation:     { tier: 'whisper', name: 'Manifestation tracker', page: 'journal',
+  manifestation:     { tier: 'ritual', name: 'Manifestation tracker', page: 'journal',
                        headline: 'Track your transformation ✦',
                        why: 'Write what has not arrived yet as though it already has, and watch the entries turn from asking into remembering.' },
-  journal_voice:     { tier: 'whisper', name: 'Spoken entries', page: 'journal',
+  journal_voice:     { tier: 'ritual', name: 'Spoken entries', page: 'journal',
                        headline: 'Say it out loud instead ✦',
                        why: 'Some mornings you do not want to type. Record the entry in your own voice and it is kept exactly the same way.' },
-  daily_log:         { tier: 'whisper', name: 'Daily log', page: 'rituals',
+  daily_log:         { tier: 'ritual', name: 'Daily log', page: 'rituals',
                        headline: 'Honour the page you wrote by hand ✦',
                        why: 'Photograph the journal you already keep and the calendar fills in around it — the app keeps the record, your notebook keeps the practice.' },
 
@@ -134,10 +134,11 @@ async function canUseFeature(key){
   if (!currentUser) return featureRequiredTier(key) === 'none';
   return tierHasFeature(await getMyTier(), key);
 }
-/* FREE / WHISPER / RITUAL, for a badge. TIER_LABEL is the sentence-shaped name
-   ("a free account", "Whisper") and stays the one used in prose. */
-function tierShortName(tier){ return tier === 'none' ? 'FREE' : (PLANS[tier] ? PLANS[tier].label.toUpperCase() : 'FREE'); }
-function tierMark(tier){ return tier === 'ritual' ? '★' : tier === 'whisper' ? '✦' : ''; }
+/* FREE / RITUAL, for a badge. TIER_LABEL is the sentence-shaped name
+   ("a free account", "Ritual") and stays the one used in prose. Both read a
+   normalized tier, so a legacy row still saying 'whisper' badges as RITUAL. */
+function tierShortName(tier){ const t = normalizeTier(tier); return t === 'none' ? 'FREE' : (PLANS[t] ? PLANS[t].label.toUpperCase() : 'FREE'); }
+function tierMark(tier){ return normalizeTier(tier) === 'ritual' ? '★' : ''; }
 /* What a plan costs, read off the catalog rather than written out again. */
 function tierPriceText(tier){
   const monthly = planFor(tier, 'monthly'), annual = planFor(tier, 'annual');
@@ -152,7 +153,7 @@ function tierAbove(tier){
   return i >= 0 && i < TIER_ORDER.length - 1 ? TIER_ORDER[i + 1] : null;
 }
 /* How much room a plan gives you in the library. Infinity on Ritual. */
-function tierLibraryCap(tier){ return TIER_SUBLIMINAL_CAPS[tier || 'none']; }
+function tierLibraryCap(tier){ return TIER_SUBLIMINAL_CAPS[normalizeTier(tier)]; }
 
 function pwEscape(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -196,14 +197,14 @@ function currentPageName(){ return document.body.getAttribute('data-view') || 'h
 /* The tier without waiting: what Today cached for its first paint. Used for
    labelling events and drawing locks, never for deciding access. */
 function lastKnownTier(){
-  if (typeof todayTier === 'string') return todayTier;
-  try { return localStorage.getItem('fthr_tier') || 'none'; } catch(e){ return 'none'; }
+  if (typeof todayTier === 'string') return normalizeTier(todayTier);
+  // A tier cached before Whisper was retired is still honoured, not ignored.
+  try { return normalizeTier(localStorage.getItem('fthr_tier')); } catch(e){ return 'none'; }
 }
 
 /* ---------------- <PremiumBadge /> ----------------
-   The tiny word that says which plan something belongs to. Lavender for
-   Whisper, gold for Ritual — the two colours the tier badge on the profile
-   has always used. */
+   The tiny word that says which plan something belongs to. Gold for Ritual —
+   the colour the tier badge on the profile has always used for it. */
 function premiumBadge(tier, opts){
   const o = opts || {};
   if (!tier || tier === 'none') return '';
@@ -390,10 +391,10 @@ function upgradeFromModal(key, needed){
   goTo('pricing');
   spotlightPlanCard(needed);
 }
-/* A soft ring around the card they came here for, so a two-card pricing page
-   does not make them look for it. Wears off on its own. */
+/* A soft ring around the card they came here for. There is one paid card now,
+   so this always rings Ritual. Wears off on its own. */
 function spotlightPlanCard(tier){
-  const card = document.getElementById(tier === 'ritual' ? 'priceCardRitual' : 'priceCardWhisper');
+  const card = document.getElementById('priceCardRitual');
   if (!card) return;
   card.classList.add('plan-spotlight');
   setTimeout(() => card.classList.remove('plan-spotlight'), 2600);
@@ -470,10 +471,11 @@ function renderUpgradeDiscoveryCard(){
 }
 
 /* ---------------- the plan ladder ----------------
-   Free → Whisper → Ritual, on the profile, with where you are marked. This is
+   Free → Ritual, on the profile, with where you are marked. This is
    the one place in the app that is allowed to be about plans rather than about
    a feature, because it is the screen where somebody went looking. */
 function planLadderMarkup(tier){
+  tier = normalizeTier(tier);
   const rungs = TIER_ORDER.map(t => ({
     tier: t,
     label: t === 'none' ? 'Free' : PLANS[t].label,
@@ -494,11 +496,10 @@ function planLadderMarkup(tier){
 /* What the next rung adds, in the words the feature table already uses. No
    price shouting, no countdown — a list and a way to read more. */
 const LADDER_UNLOCKS = {
-  whisper: ['subliminal_2hr','soothing_layer','journal','manifestation','daily_log','library_space'],
-  ritual:  ['subliminal_8hr','habit_tracker','eft','visualization','custom_track','layer_voice'],
+  ritual: ['subliminal_8hr','journal','manifestation','habit_tracker','eft','visualization'],
 };
 function planLadderNext(tier){
-  const next = tierAbove(tier);
+  const next = tierAbove(normalizeTier(tier));
   if (!next) return `<p class="plan-ladder-note">You are on ${pwEscape(PLANS.ritual.label)} — everything in Subliminally is open to you.</p>`;
   const keys = LADDER_UNLOCKS[next] || [];
   return `<details class="plan-ladder-next">

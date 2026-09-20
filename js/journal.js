@@ -10,7 +10,7 @@
    gratitude/manifestation entries (journal_entries); 'photos' is the daily
    log of photographed handwritten pages (journal_photos + storage bucket);
    'habits' is the morning/night habit tracker (habits + habit_checkins).
-   Journal tabs need Whisper; habits need Ritual. */
+   Every tab here needs Ritual — it is the one paid plan. */
 const JOURNAL_TAB_COPY = {
   received:     { placeholder: 'I am so grateful for…',      prompt: "A good morning practice: write down three things you're grateful for, right when you wake up." },
   manifesting:  { placeholder: 'I am so grateful now that…', prompt: "Try one thing you're grateful for that hasn't arrived yet — write it, or say it out loud, as if it already has." },
@@ -24,7 +24,7 @@ function setJournalTab(cat){
   document.getElementById('journalAddMsg').textContent = '';
   renderJournalState();
 }
-/* Journal page — gratitude and manifesting, both Whisper features. */
+/* Journal page — gratitude and manifesting, both Ritual features. */
 async function renderJournalState(){
   const locked = document.getElementById('journalLocked');
   const upgrade = document.getElementById('journalUpgrade');
@@ -34,7 +34,7 @@ async function renderJournalState(){
   panel.style.display = 'none';
   upgrade.style.display = 'none';
   if (preview) preview.style.display = 'none';
-  // The 3D/4D/5D explainer is a Whisper feature — it only appears once the
+  // The 3D/4D/5D explainer is a Ritual feature — it only appears once the
   // tier check below has passed and the Manifesting tab is open.
   philosophy.style.display = 'none';
   locked.style.display = currentUser ? 'none' : 'block';
@@ -45,7 +45,7 @@ async function renderJournalState(){
     // Same as the rituals panel: the figure comes off the plan catalog rather
     // than being typed into the markup where a price change cannot reach it.
     document.getElementById('journalUpgradeText').textContent =
-      `Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — ${tierPriceText('whisper')}.`;
+      `Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Ritual — ${tierPriceText('ritual')}.`;
     upgrade.style.display = 'block';
     renderJournalPreview(journalTier);
     return;
@@ -57,14 +57,14 @@ async function renderJournalState(){
 }
 
 /* ---------------- what the journal is, when you cannot open it yet ----------------
-   The journal is a Whisper feature in full, so the gate above stays a gate —
-   the existing subscription structure requires it and this is not the task that
+   The journal is a Ritual feature in full, so the gate above stays a gate —
+   the subscription structure requires it and this is not the task that
    changes that. What it should not be is a page that says only "this is part of
-   Whisper" and nothing about what "this" is.
+   Ritual" and nothing about what "this" is.
 
    Every card here points at something that genuinely exists behind the gate: the
    two tabs, spoken entries, and the 3D/4D/5D explainer. Nothing is described
-   that a Whisper member would then go looking for and not find.
+   that a Ritual member would then go looking for and not find.
 
    The blurred paragraph is the real explainer, read out of the DOM it is already
    sitting in. A mock-up would have been easier and would have been a lie. */
@@ -82,7 +82,7 @@ function renderJournalPreview(tier){
   host.innerHTML = `
     <div class="locked-preview-head">
       <h4>What the journal holds</h4>
-      <p>${pwEscape(tierPriceText('whisper'))}</p>
+      <p>${pwEscape(tierPriceText('ritual'))}</p>
     </div>
     <div class="locked-grid">
       ${JOURNAL_PREVIEW_CARDS.map(c => lockedCard(c.feature, { title:c.title, body:c.body, locked: !tierHasFeature(tier, c.feature), trigger:'journal_preview_card' })).join('')}
@@ -100,10 +100,10 @@ function journalPhilosophyPeek(){
   if (!text) return '';
   return `<button type="button" class="locked-card is-locked locked-peek" style="margin-top:10px;"
       onclick="openUpgradeModal('manifestation', { trigger:'journal_philosophy_peek' })"
-      aria-label="Why hasn't this shown up yet — locked, Whisper">
+      aria-label="Why hasn't this shown up yet — locked, Ritual">
     <span class="lc-top" style="position:relative; z-index:1;">
       <span class="lc-title">Why hasn't this shown up yet? ${lockGlyph(11)}</span>
-      ${premiumBadge('whisper', { small:true })}
+      ${premiumBadge('ritual', { small:true })}
     </span>
     <span class="lp-body" aria-hidden="true" style="font-size:12.5px; line-height:1.6; display:block; text-align:left;">${pwEscape(text)}…</span>
     <span class="lc-cta" style="position:relative; z-index:1;">Unlock →</span>
@@ -144,7 +144,7 @@ async function renderRitualsPreview(tier, tab){
   host.innerHTML = `
     <div class="locked-preview-head">
       <h4>${isHabits ? 'Build your 1% better routine ✦' : 'Keep the record, keep the practice ✦'}</h4>
-      <p>${pwEscape(tierPriceText(isHabits ? 'ritual' : 'whisper'))}</p>
+      <p>${pwEscape(tierPriceText('ritual'))}</p>
     </div>
     ${isHabits ? habitProgressionPeek() : ''}
     <div class="locked-grid">
@@ -224,12 +224,12 @@ async function renderRitualsState(){
   const requiredTier = featureRequiredTier(feature);
   if (!tierAtLeast(myTier, requiredTier)){
     const isHabits = ritualsTab === 'habits';
-    document.getElementById('ritualsUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The daily log is part of Whisper';
+    document.getElementById('ritualsUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The daily log is part of Ritual';
     // The price comes off the plan catalog now, so a change in Stripe does not
     // leave a stale figure sitting on this panel.
     document.getElementById('ritualsUpgradeText').textContent = isHabits
       ? `Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — ${tierPriceText('ritual')}.`
-      : `Daily Journaling — writing by hand and logging each page here — comes with Whisper, ${tierPriceText('whisper')}.`;
+      : `Daily Journaling — writing by hand and logging each page here — comes with Ritual, ${tierPriceText('ritual')}.`;
     const btn = document.getElementById('ritualsUpgradeBtn');
     btn.textContent = 'See what it unlocks ✦';
     btn.onclick = () => openUpgradeModal(feature, { tier: myTier, trigger: 'rituals_panel' });

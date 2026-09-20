@@ -90,7 +90,7 @@ export default async function handler(req, res) {
   }
   const tier = await tierForUser(user.id);
   if (tier === 'none') {
-    res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Whisper.' });
+    res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Ritual.' });
     return;
   }
 

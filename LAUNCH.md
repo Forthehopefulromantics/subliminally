@@ -23,8 +23,8 @@ Two things that will bite:
 - **A paid plan is required.** The free tier forbids commercial API use and
   gives about one subliminal's worth of characters a month. Creator (~$22/mo)
   is the realistic floor, and voice cloning needs Creator or above.
-- **Studio voices are gated to Whisper and up** in `api/tts.js`. A free account
-  gets "Studio voices come with Whisper" even once the key is set. Kyla's own
+- **Studio voices are gated to any paid plan** in `api/tts.js`. A free account
+  gets "Studio voices come with Ritual" even once the key is set. Kyla's own
   account needs a tier, or the gate needs a test bypass.
 
 ### RevenueCat webhook
