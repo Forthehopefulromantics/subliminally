@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Terms of Service — Subliminally by FTHR</title>
+<title>Terms of Use — Subliminally by FTHR</title>
+<meta name="description" content="The Terms of Use for Subliminally by FTHR — accounts, Subliminally Premium, your content, the wellness disclaimer, and how to reach us." />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -13,92 +16,255 @@
     --serif:'Fraunces', Georgia, serif; --sans:'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{ background:var(--midnight); color:var(--moonlight); font-family:var(--sans); font-weight:300; line-height:1.7; }
-  .wrap{ max-width:760px; margin:0 auto; padding:60px 24px 100px; }
+  html{ scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+  body{ background:var(--midnight); color:var(--moonlight); font-family:var(--sans); font-weight:300; line-height:1.7; overflow-x:hidden; }
+  /* The same celestial wash the site itself sits on, so a legal page still
+     feels like part of Subliminally rather than a bare document. */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:-2;
+    background:
+      radial-gradient(ellipse 800px 500px at 15% -5%, rgba(185,167,232,0.10), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 90% 15%, rgba(227,190,127,0.07), transparent 55%),
+      radial-gradient(ellipse 700px 500px at 50% 100%, rgba(185,167,232,0.06), transparent 55%),
+      var(--midnight);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image:radial-gradient(rgba(237,233,246,0.035) 1px, transparent 1px); background-size:3px 3px;
+  }
+  ::selection{ background:var(--candle); color:#241C0E; }
+  .wrap{ max-width:760px; margin:0 auto; padding:48px 24px 96px; }
   a{ color:var(--lilac); }
-  .back{ display:inline-flex; align-items:center; gap:6px; color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:32px; }
+  a:hover{ color:var(--moonlight); }
+  .back{ display:inline-flex; align-items:center; gap:6px; color:var(--haze); text-decoration:none; font-size:13px; margin-bottom:28px; }
+  .back:hover{ color:var(--moonlight); }
   .brand{ font-family:var(--serif); font-size:22px; margin-bottom:6px; }
-  .updated{ font-size:12.5px; color:var(--haze); margin-bottom:40px; }
-  h1{ font-family:var(--serif); font-size:clamp(28px,4vw,38px); margin-bottom:8px; }
-  h2{ font-family:var(--serif); font-size:20px; color:var(--moonlight); margin-top:40px; margin-bottom:10px; }
-  p, li{ font-size:14.5px; color:var(--haze); margin-bottom:12px; }
-  li{ margin-left:20px; }
+  .updated{ font-size:12.5px; color:var(--haze); margin-bottom:32px; }
+  h1{ font-family:var(--serif); font-weight:500; font-size:clamp(28px,5.4vw,40px); line-height:1.15; margin-bottom:8px; }
+  h2{ font-family:var(--serif); font-weight:500; font-size:clamp(18px,3.4vw,21px); color:var(--moonlight); margin-top:44px; margin-bottom:10px; scroll-margin-top:24px; }
+  h3{ font-family:var(--sans); font-weight:500; font-size:14.5px; color:var(--moonlight); margin-top:22px; margin-bottom:6px; letter-spacing:.01em; }
+  p, li{ font-size:15px; color:var(--haze); margin-bottom:12px; }
+  ul, ol{ margin-bottom:12px; padding-left:20px; }
+  li{ margin-bottom:8px; }
+  li::marker{ color:rgba(185,167,232,0.55); }
   strong{ color:var(--moonlight); font-weight:500; }
-  .notice{ background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.25); border-radius:14px; padding:16px 20px; font-size:13px; color:var(--lilac); margin-bottom:36px; }
+  .notice{ background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.25); border-radius:14px; padding:16px 20px; font-size:13.5px; color:var(--lilac); margin-bottom:36px; }
+  .notice p{ color:inherit; font-size:inherit; margin:0; }
+  /* The wellness disclaimer earns the warmer colour — it is the one box on the
+     page somebody skimming must not skim past. */
+  .disclaimer{ background:rgba(227,190,127,0.09); border:1px solid rgba(227,190,127,0.28); border-radius:14px; padding:18px 20px; margin:20px 0 12px; }
+  .disclaimer p{ color:var(--moonlight); font-size:14.5px; }
+  .disclaimer p:last-child{ margin-bottom:0; }
+  /* Contents. Two columns where there is room, one on a phone. */
+  .toc{ border:1px solid var(--dusk); border-radius:14px; padding:18px 20px; margin-bottom:8px; background:rgba(28,24,48,0.4); }
+  .toc h2{ font-family:var(--sans); font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:var(--lilac); margin:0 0 12px; font-weight:500; }
+  .toc ol{ columns:2; column-gap:28px; margin:0; padding-left:18px; }
+  .toc li{ font-size:13.5px; margin-bottom:6px; break-inside:avoid; }
+  .toc a{ text-decoration:none; color:var(--haze); }
+  .toc a:hover{ color:var(--moonlight); }
+  table{ width:100%; border-collapse:collapse; margin:16px 0 20px; font-size:13.5px; }
+  th{ text-align:left; color:var(--moonlight); font-weight:500; padding:9px 10px; border-bottom:1px solid var(--dusk); vertical-align:top; }
+  td{ padding:9px 10px; border-bottom:1px solid var(--dusk); color:var(--haze); vertical-align:top; }
+  td:first-child{ color:var(--moonlight); }
+  /* A phone cannot hold two columns of prose, and a wide table on a phone is a
+     table nobody reads — so both collapse rather than scroll sideways. */
+  @media (max-width:640px){
+    .wrap{ padding:36px 20px 80px; }
+    .toc ol{ columns:1; }
+    table, tbody, tr, td, th{ display:block; width:100%; }
+    thead{ position:absolute; left:-9999px; }
+    tr{ border-bottom:1px solid var(--dusk); padding:12px 0; }
+    td{ border:none; padding:2px 0; }
+    td:first-child{ font-weight:500; margin-bottom:4px; }
+  }
+  .foot{ margin-top:56px; padding-top:24px; border-top:1px solid var(--dusk); display:flex; flex-wrap:wrap; gap:18px; font-size:13px; }
+  .foot a{ color:var(--haze); text-decoration:none; }
+  .foot a:hover{ color:var(--moonlight); }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } *{ animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <a href="/" class="back">← Back to Subliminally</a>
   <div class="brand">Subliminally <span style="color:var(--haze); font-weight:300;">by FTHR</span></div>
-  <h1>Terms of Service</h1>
-  <div class="updated">Last updated: August 4, 2026</div>
+  <h1>Terms of Use</h1>
+  <div class="updated">Last updated: September 20, 2026</div>
+  <div class="notice">
+    <p>Plain English, on purpose. These Terms are the agreement between you and us about how Subliminally may be used — what you get, what you owe, and what we don't promise. Please read the wellness disclaimer in section 9; it's the most important part.</p>
+  </div>
 
-  <div class="notice">This is a plain-language summary alongside the actual terms. If anything here ever conflicts with specific legal language elsewhere in this document, the specific language controls.</div>
+  <nav class="toc" aria-label="Contents">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#who">Who we are</a></li>
+      <li><a href="#accepting">Accepting these Terms</a></li>
+      <li><a href="#eligibility">Who can use Subliminally</a></li>
+      <li><a href="#accounts">Your account</a></li>
+      <li><a href="#free">Free accounts</a></li>
+      <li><a href="#premium">Subliminally Premium</a></li>
+      <li><a href="#purchases">Where you bought it</a></li>
+      <li><a href="#cancelling">Renewal, cancellation &amp; refunds</a></li>
+      <li><a href="#wellness">Wellness disclaimer</a></li>
+      <li><a href="#outcomes">No guaranteed outcomes</a></li>
+      <li><a href="#your-content">Your content</a></li>
+      <li><a href="#ai">AI-generated content</a></li>
+      <li><a href="#acceptable-use">Acceptable use</a></li>
+      <li><a href="#ip">Our intellectual property</a></li>
+      <li><a href="#third-parties">Third-party services</a></li>
+      <li><a href="#termination">Termination</a></li>
+      <li><a href="#as-is">Disclaimer of warranties</a></li>
+      <li><a href="#liability">Limitation of liability</a></li>
+      <li><a href="#indemnity">Indemnification</a></li>
+      <li><a href="#changes">Changes to these Terms</a></li>
+      <li><a href="#law">Governing law</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </nav>
 
-  <h2>1. Who this is</h2>
-  <p>Subliminally by FTHR ("Subliminally," "we," "us") is a nightly audio ritual service operated by Adaku LLC. These Terms govern your use of subliminallybyfthr.com and any related app we release (together, the "Service").</p>
+  <h2 id="who">1. Who we are</h2>
+  <p>Subliminally by FTHR ("Subliminally," "we," "us," "our") is a wellness and personal-development app from <strong>For The Hopeful Romantics (FTHR)</strong>, operated by Adaku LLC. These Terms of Use ("Terms") govern your use of subliminallybyfthr.com, the Subliminally iOS and Android apps, and everything we offer through them (together, the "Service").</p>
 
-  <h2>2. Accepting these terms</h2>
-  <p>By creating an account or using the Service, you agree to these Terms and our <a href="/privacy.html">Privacy Policy</a>. If you don't agree, don't use the Service.</p>
+  <h2 id="accepting">2. Accepting these Terms</h2>
+  <p>By creating an account, subscribing, or otherwise using the Service, you agree to these Terms and to our <a href="/privacy.html">Privacy Policy</a>, which is part of this agreement. If you don't agree, please don't use the Service.</p>
 
-  <h2>3. Who can use this</h2>
-  <p>You must be at least 18 years old, or the age of majority in your jurisdiction, to create an account. The Service is not directed at children, and we do not knowingly collect information from anyone under 13.</p>
+  <h2 id="eligibility">3. Who can use Subliminally</h2>
+  <p>You must be at least 18 years old, or the age of majority where you live, to create an account and to subscribe. The Service is not directed at children, and we do not knowingly collect information from anyone under 13. See section 8 of our <a href="/privacy.html#children">Privacy Policy</a>.</p>
 
-  <h2>4. Your account</h2>
+  <h2 id="accounts">4. Your account</h2>
   <ul>
-    <li>You're responsible for keeping your login credentials secure and for all activity under your account.</li>
-    <li>You must provide accurate information when signing up.</li>
-    <li>You may delete your account at any time by contacting us at hello@subliminallybyfthr.com.</li>
+    <li>You can browse the site without an account, but you need one to save your work — saved subliminals, journal entries and habits are all tied to an account.</li>
+    <li>You may sign up with an email address and password, or by signing in with Google. Either way you choose a username, and you may name and choose an illustrated "Higher Self" and answer a few optional onboarding questions that personalize the app's language and suggestions.</li>
+    <li>You're responsible for keeping your credentials secure and for everything that happens under your account. Tell us promptly if you believe someone else has access to it.</li>
+    <li>Please give us accurate information, and keep it accurate. A username must not impersonate someone else.</li>
+    <li><strong>Deleting your account.</strong> You can delete your account yourself at any time from Profile → Your account → Delete my account, on the web or in the app. Deletion is immediate and permanent: it removes your profile, saved subliminals, recordings, journal entries and photos, habits and check-ins, and any voice you cloned. It cannot be undone, and we cannot restore a deleted account.</li>
+    <li><strong>Deleting your account does not cancel your subscription.</strong> Cancel first, in the store you bought it from (see section 8), then delete.</li>
   </ul>
 
-  <h2>5. Subscriptions and billing</h2>
+  <h2 id="free">5. Free accounts</h2>
+  <p>A free account lets you build personalized subliminals — layering a frequency, ambience, binaural beats and affirmations in your own voice or an AI voice — with sessions up to 20 minutes and up to 2 saved subliminals in your library. We may change what the free tier includes over time.</p>
+
+  <h2 id="premium">6. Subliminally Premium</h2>
+  <p>Subliminally Premium (currently offered as our <strong>Ritual</strong> plan) is our paid subscription. It unlocks longer sessions, an unlimited library, the gratitude and manifestation journal, the daily log for photographs of your handwritten journal, the habit tracker, EFT tapping sessions, visualization scripting, studio voices and voice cloning.</p>
+  <h3>Pricing</h3>
   <ul>
-    <li>Subliminally offers a paid subscription (currently Ritual), billed monthly or yearly through Stripe, our payment processor. Retired plans (Whisper and Reverie) are no longer sold; existing subscribers keep their access until they cancel.</li>
-    <li>Subscriptions renew automatically each billing period until you cancel.</li>
-    <li>You can cancel anytime through the "Manage your subscription" link in your account, which takes you to Stripe's customer portal. Cancellation takes effect at the end of your current billing period — we don't offer partial refunds for unused time, except where required by law.</li>
-    <li>We may change our pricing with advance notice. Changes won't apply retroactively to a period you've already paid for.</li>
-    <li>We do not store your full payment card details — Stripe handles and stores that information directly.</li>
+    <li><strong>$14.99 per month</strong>, or <strong>$99.99 per year</strong>.</li>
+    <li>The annual plan <strong>may include a 3-day free trial where it is offered</strong>. A trial isn't available on every platform, in every region, or to everyone — for example, it may not be offered on a repeat subscription. Whether you're getting one, and how long it runs, is shown to you before you confirm the purchase. <strong>Unless you cancel at least 24 hours before a free trial ends, it converts automatically into a paid subscription at the price shown.</strong></li>
+    <li>All prices are in U.S. dollars and exclude any tax the store or processor adds at checkout.</li>
+    <li>The price shown to you at the moment you confirm your purchase is the price that applies to that purchase. If it ever differs from the figures above, the price at checkout controls.</li>
+    <li>We may change our prices. A change never applies retroactively to a period you've already paid for, and we'll give notice as required by law and by the store you subscribed through before it affects a renewal.</li>
   </ul>
 
-  <h2>6. What the Service actually does — and doesn't do</h2>
-  <p>Subliminally helps you build audio sessions combining a Solfeggio frequency tone, spoken affirmations (in your own voice or an AI voice), and ambient sound. <strong>Frequency associations are drawn from cultural and spiritual traditions, not medical science, and are not medical treatment, therapy, or a substitute for professional mental health care.</strong> If you're experiencing a mental health crisis, please contact a licensed professional or a crisis line in your area — this Service is not equipped to help with that.</p>
-
-  <h2>7. Your content</h2>
+  <h2 id="purchases">7. Where you bought it</h2>
+  <p>How your subscription is billed and cancelled depends on where you bought it, and we can only act on the side we control.</p>
+  <h3>Apple App Store (and Google Play)</h3>
   <ul>
-    <li>You own the affirmations you write, the voice recordings you make, the journal entries you keep, and any audio tracks you upload ("Your Content").</li>
-    <li>By uploading or creating content through the Service, you grant us a limited license to store, process, and play back that content solely to provide the Service to you.</li>
-    <li>If you use the "upload your own track" feature (available on the Ritual tier), you confirm you have the legal right to use that audio — we are not responsible for verifying music licensing, and you're responsible for any copyright issues arising from content you upload.</li>
-    <li>We do not claim ownership of Your Content and will not use it to train AI models or share it publicly without your explicit action (like a future public-sharing feature, which will always be opt-in).</li>
+    <li>Subscriptions purchased inside our iOS app are sold and billed by <strong>Apple</strong> through your Apple Account; purchases inside our Android app are sold and billed by <strong>Google</strong> through Google Play. This is required by those platforms for in-app subscriptions.</li>
+    <li>Payment is charged to your Apple or Google account at confirmation of purchase. Your subscription renews automatically unless you turn off auto-renew at least 24 hours before the end of the current period, and your account is charged for renewal within 24 hours before the period ends.</li>
+    <li>You manage and cancel these subscriptions in your <strong>App Store</strong> or <strong>Google Play</strong> account settings — not in Subliminally, and we cannot cancel them for you.</li>
+    <li>Refunds for store purchases are handled by Apple or Google under their own policies. We cannot issue them.</li>
+    <li><strong>Restore Purchases.</strong> If you reinstall the app or sign in on another device, use <strong>Restore purchases</strong> (on the pricing screen and on your profile) to have your existing store subscription recognized on your account. Restoring reconnects a purchase you already own — it never creates a new charge. Restore Purchases works only for App Store and Google Play purchases; if you subscribed on the web, your subscription is already attached to your account.</li>
+  </ul>
+  <h3>Web purchases</h3>
+  <ul>
+    <li>Subscriptions bought on subliminallybyfthr.com are processed by <strong>Stripe</strong>, our payment processor. We never receive or store your full card details — Stripe handles them directly.</li>
+    <li>Web subscriptions renew automatically each period until cancelled. You can cancel at any time through "Manage your subscription," which opens Stripe's customer portal.</li>
+  </ul>
+  <p>Please subscribe in one place. If a web subscription and a store subscription are active on the same account at once, you may be charged twice by two separate billers, and only one of them will be reflected on your account.</p>
+
+  <h2 id="cancelling">8. Renewal, cancellation &amp; refunds</h2>
+  <ul>
+    <li><strong>Every paid plan renews automatically</strong> — monthly plans every month, annual plans every year — at the then-current price, until you cancel.</li>
+    <li>Cancel any time. Cancellation stops the next renewal; it does not end your current period. You keep Premium access through the end of the period you've already paid for, and then return to a free account.</li>
+    <li>Cancel in the App Store or Google Play if you subscribed in the app, or through "Manage your subscription" if you subscribed on the web. Deleting the app does not cancel a subscription.</li>
+    <li>Except where the law requires otherwise, or where Apple or Google grant one under their policies, <strong>payments are non-refundable and we don't offer partial refunds for unused time.</strong></li>
   </ul>
 
-  <h2>8. Acceptable use</h2>
+  <h2 id="wellness">9. Wellness disclaimer — please read this</h2>
+  <div class="disclaimer">
+    <p><strong>Subliminally is a wellness and personal-development tool. It is not medical, psychological, psychiatric, or any other form of professional healthcare treatment, and it is not a substitute for care from a qualified professional.</strong></p>
+    <p>Nothing in the Service is a diagnosis, a treatment, a therapy, or medical advice. We are not your doctor, therapist, or counselor, and using Subliminally does not create a professional relationship of any kind.</p>
+    <p>Never disregard professional medical advice, or delay seeking it, because of something you read, heard, or built in Subliminally. Talk to a qualified professional before relying on it if you have a physical or mental health condition, are pregnant, have epilepsy or a seizure disorder, have a hearing condition, or are in treatment of any kind.</p>
+    <p><strong>If you are in crisis or may be in danger, stop and get real help now.</strong> In the U.S., call or text 988 (Suicide &amp; Crisis Lifeline), or call 911. Elsewhere, contact your local emergency number. Subliminally is not a crisis service, is not monitored, and cannot help in an emergency.</p>
+  </div>
+  <p>Please also use the Service sensibly: don't listen while driving or operating machinery, and keep the volume at a comfortable level, particularly with headphones and for sessions that run overnight.</p>
+
+  <h2 id="outcomes">10. No guaranteed outcomes</h2>
+  <p>Subliminally offers practices drawn from wellness, spiritual and self-development traditions. <strong>We make no promise, guarantee or representation that any feature will produce any particular result for you</strong> — and that includes subliminal audio, manifestation practices, Solfeggio and other frequencies, binaural beats, EFT tapping, visualization, affirmations, journaling, habit tracking, and everything else in the app.</p>
+  <p>Where the app describes what a frequency or a practice is "for," it is repeating an association from those traditions, not a medical or scientific claim, and not a claim we have tested. Results, if any, differ from person to person. Nothing here is a promise about your health, your finances, your relationships, or anything else in your life.</p>
+
+  <h2 id="your-content">11. Your content</h2>
+  <ul>
+    <li>"Your Content" means everything you create or upload: affirmations you write, voice recordings you make, gratitude and manifestation entries typed or spoken, photographs of your handwritten journal, cover images, custom audio tracks, habits, feedback you send us, and everything else you put into the Service.</li>
+    <li><strong>You own Your Content.</strong> We don't claim ownership of it.</li>
+    <li>You give us a limited, non-exclusive licence to store, host, process, transmit and play back Your Content <strong>solely in order to provide the Service to you</strong> — for example, storing a recording so you can play it back, or sending a line of text to our speech provider so it can be spoken in your chosen voice. This licence ends when you delete the content or your account.</li>
+    <li><strong>We do not use Your Content to train AI models, and we do not publish it or share it publicly.</strong></li>
+    <li>You're responsible for Your Content, and you confirm you have the right to use it. If you upload a custom audio track, you confirm you hold the necessary rights to that audio; we don't verify music licensing, and you're responsible for any infringement claim arising from what you upload.</li>
+    <li>Please keep your own copies of anything you'd be upset to lose. We back up in the ordinary course but we don't guarantee that any content will be preserved.</li>
+  </ul>
+
+  <h2 id="ai">12. AI-generated and AI-assisted content</h2>
+  <ul>
+    <li>Parts of the Service use AI. When you ask for affirmations, an EFT tapping script, or a visualization script, the details you provide are sent to our AI provider, which returns generated text for you to keep, edit, or discard. When you use a studio voice or your own cloned voice, the text of a line is sent to our speech provider, which returns spoken audio.</li>
+    <li><strong>AI output can be wrong, odd, or unsuitable.</strong> It is generated automatically, it isn't reviewed by a person before you see it, and it is never medical, psychological, legal or financial advice. Read what comes back before you use it — you're always free to edit or replace it, and you decide what goes into your session.</li>
+    <li>AI output isn't unique to you. Someone else may receive something similar from a similar request, and we make no claim of ownership or exclusivity in generated text or audio on your behalf.</li>
+    <li>Cloning a voice is limited to <strong>your own voice</strong>. Do not submit a recording of anyone else, and do not use a generated voice to impersonate any person.</li>
+    <li>As stated above, we do not use your prompts, recordings or other content to train AI models.</li>
+  </ul>
+
+  <h2 id="acceptable-use">13. Acceptable use</h2>
   <p>Don't use the Service to:</p>
   <ul>
-    <li>Upload content that's illegal, infringing, harassing, or that you don't have rights to use</li>
-    <li>Attempt to access other users' accounts or data</li>
-    <li>Interfere with or disrupt the Service's infrastructure</li>
-    <li>Use the Service to generate content intended to harm, deceive, or exploit others</li>
+    <li>Break the law, or infringe anyone's intellectual property, privacy or other rights;</li>
+    <li>Upload content you don't have the rights to, including copyrighted music;</li>
+    <li>Record, clone or imitate another person's voice, or impersonate anyone;</li>
+    <li>Create content intended to harass, threaten, defame, deceive, exploit or harm anyone;</li>
+    <li>Access, or try to access, another person's account, content or data;</li>
+    <li>Probe, scan, overload, disrupt or reverse-engineer the Service or its infrastructure, or get around any security, access control or usage limit;</li>
+    <li>Scrape or bulk-download the Service, or use it as a general-purpose text-to-speech, audio-generation or AI endpoint outside of the app's own features;</li>
+    <li>Resell, sublicense, or share paid access with people who haven't paid for it.</li>
   </ul>
-  <p>We may suspend or terminate accounts that violate these terms.</p>
+  <p>We may investigate suspected misuse and may suspend or terminate accounts that violate these Terms.</p>
 
-  <h2>9. Third-party services we rely on</h2>
-  <p>The Service uses several third-party providers to function: Supabase (accounts, database, file storage), Stripe (payments), Resend (transactional email), and Anthropic (AI-generated affirmation text). Your use of the Service means your relevant data is processed by these providers as described in our <a href="/privacy.html">Privacy Policy</a>.</p>
+  <h2 id="ip">14. Our intellectual property</h2>
+  <p>Everything in the Service that isn't Your Content — the Subliminally and For The Hopeful Romantics names and logos, the app and website, the illustrations and Higher Self artwork, the sound library, the interface, the text, and the underlying software — belongs to us or to our licensors and is protected by copyright, trademark and other laws.</p>
+  <p>Your subscription is a personal, non-transferable, revocable licence to use the Service for your own personal, non-commercial use. It doesn't transfer any ownership. Don't copy, modify, distribute, sell, lease, or create derivative works from any part of the Service, and don't use our names, logos or artwork without our written permission.</p>
 
-  <h2>10. Disclaimers</h2>
-  <p>The Service is provided "as is" without warranties of any kind, express or implied. We don't guarantee the Service will be uninterrupted, error-free, or that it will produce any particular outcome for you. Solfeggio frequency associations and affirmation practices are offered as a wellness tool grounded in tradition and self-affirmation practice, not as a clinically proven treatment for any condition.</p>
+  <h2 id="third-parties">15. Third-party services</h2>
+  <p>Subliminally depends on outside providers to work: Supabase for accounts, database and file storage; Vercel for hosting; Anthropic for generated text; ElevenLabs for studio voices and voice cloning; Stripe for web payments; RevenueCat together with the Apple App Store and Google Play for app subscriptions; Google for optional sign-in; and Resend for our emails. What each one receives is set out in our <a href="/privacy.html#sharing">Privacy Policy</a>.</p>
+  <p>These providers have their own terms and privacy policies, which govern their handling of your information. We're not responsible for their services, and an outage or change at a provider may affect features of Subliminally. The Service may also link to third-party sites — including our YouTube library of general subliminals — which we don't control or endorse.</p>
+  <p>Where you subscribe through the Apple App Store, Apple is not a party to these Terms, is not responsible for the Service, and has no obligation to provide support for it. Apple and its subsidiaries are third-party beneficiaries of these Terms and may enforce them against you.</p>
 
-  <h2>11. Limitation of liability</h2>
-  <p>To the fullest extent permitted by law, Adaku LLC and Subliminally by FTHR won't be liable for any indirect, incidental, or consequential damages arising from your use of the Service. Our total liability for any claim relating to the Service is limited to the amount you paid us in the 12 months before the claim arose.</p>
+  <h2 id="termination">16. Termination</h2>
+  <p>You may stop using the Service at any time, cancel your subscription as described in section 8, and delete your account as described in section 4.</p>
+  <p>We may suspend or terminate your account or access, with or without notice, if you breach these Terms, if we're required to by law, or if we reasonably believe your use puts other people, the Service, or us at risk. We may also discontinue the Service, or any part of it, with reasonable notice where practical.</p>
+  <p>If we terminate your account for a reason other than your breach of these Terms, and you have paid for a period you can no longer use, we'll refund the unused part of that period where we're the biller. On termination, your right to use the Service ends immediately, and your content may be deleted. Sections 11, 14, 17, 18, 19 and 21 survive the end of this agreement.</p>
 
-  <h2>12. Changes to these terms</h2>
-  <p>We may update these Terms as the Service evolves. We'll update the "Last updated" date above, and for material changes, we'll make a reasonable effort to notify active subscribers by email.</p>
+  <h2 id="as-is">17. Disclaimer of warranties</h2>
+  <p>To the fullest extent permitted by law, the Service is provided <strong>"as is" and "as available," without warranties of any kind</strong>, express or implied, including any implied warranties of merchantability, fitness for a particular purpose, title, non-infringement, and any warranty arising from course of dealing or usage of trade.</p>
+  <p>We don't warrant that the Service will be uninterrupted, timely, secure, or error-free, that defects will be corrected, that any content or AI output will be accurate or suitable, or — as section 10 says — that the Service will produce any particular result for you. Some jurisdictions don't allow certain exclusions, so parts of this section may not apply to you.</p>
 
-  <h2>13. Governing law</h2>
-  <p>These Terms are governed by the laws of the state in which Adaku LLC is organized, without regard to conflict-of-law principles.</p>
+  <h2 id="liability">18. Limitation of liability</h2>
+  <p>To the fullest extent permitted by law, Adaku LLC, For The Hopeful Romantics, Subliminally by FTHR, and our officers, employees, contractors and suppliers will not be liable for any indirect, incidental, special, consequential, exemplary or punitive damages, or for any loss of profits, revenue, data, goodwill, or content, arising out of or relating to your use of (or inability to use) the Service — whether in contract, tort, or any other theory, and even if we've been advised such damages are possible.</p>
+  <p>To the fullest extent permitted by law, our total aggregate liability for all claims relating to the Service is limited to the greater of the amount you paid us in the 12 months before the claim arose, or $50 USD.</p>
+  <p>Nothing in these Terms excludes or limits liability that cannot lawfully be excluded or limited, including liability for death or personal injury caused by negligence, or for fraud. Some jurisdictions don't allow certain limitations, so parts of this section may not apply to you.</p>
 
-  <h2>14. Contact</h2>
-  <p>Questions about these Terms? Reach us at <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a>.</p>
+  <h2 id="indemnity">19. Indemnification</h2>
+  <p>You agree to indemnify and hold harmless Adaku LLC, For The Hopeful Romantics, and Subliminally by FTHR from any claim, loss, liability, or expense (including reasonable legal fees) arising out of Your Content, your use of the Service, or your breach of these Terms or of any law or third-party right.</p>
+
+  <h2 id="changes">20. Changes to these Terms</h2>
+  <p>We may update these Terms as the Service changes. When we do, we'll update the "Last updated" date at the top, and for material changes we'll make a reasonable effort to let active subscribers know by email or in the app before they take effect. Continuing to use the Service after a change means you accept the updated Terms. If you don't accept them, stop using the Service, cancel, and delete your account.</p>
+
+  <h2 id="law">21. Governing law</h2>
+  <p>These Terms are governed by the laws of the state in which Adaku LLC is organized, and the federal laws of the United States, without regard to conflict-of-law principles — except that nothing here deprives you of the protection of mandatory consumer-protection laws where you live. If any provision is found unenforceable, the rest stays in force.</p>
+
+  <h2 id="contact">22. Contact</h2>
+  <p>Questions about these Terms, your account, or anything else? Email us at <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a> and a real person will read it.</p>
+
+  <div class="foot">
+    <a href="/">← Back to Subliminally</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="mailto:hello@subliminallybyfthr.com">hello@subliminallybyfthr.com</a>
+  </div>
 </div>
 </body>
 </html>

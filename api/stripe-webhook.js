@@ -40,8 +40,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // account for somebody who is still being charged.
 const AMOUNT_TO_PLAN = {
   1499: { tier: 'ritual', period: 'monthly' },   // Ritual monthly, $14.99
-  11199: { tier: 'ritual', period: 'annual' },   // Ritual yearly, $111.99
+  9999: { tier: 'ritual', period: 'annual' },    // Ritual yearly, $99.99
   // --- legacy, recognised only so existing subscribers keep their access ---
+  11199: { tier: 'ritual', period: 'annual' },   // previous Ritual yearly, $111.99
   1111: { tier: 'ritual', period: 'monthly' },   // legacy Ritual, $11.11/mo
   11100: { tier: 'ritual', period: 'annual' },   // legacy Ritual, $111/yr
   555: { tier: 'whisper', period: 'monthly' },   // legacy Whisper, $5.55/mo
