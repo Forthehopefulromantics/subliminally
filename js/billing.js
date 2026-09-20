@@ -154,6 +154,7 @@ function goToCheckout(evt, tier){
     return false;
   }
   if (isNativeApp()){
+    if (typeof trackPaywall === 'function') trackPaywall('checkout_started', { page: currentPageName(), feature: null, required_tier: tier, current_tier: lastKnownTier(), period: billingPeriod, via: 'revenuecat' });
     purchaseTier(tier, billingPeriod);
     return false;
   }
@@ -164,6 +165,7 @@ function goToCheckout(evt, tier){
     msg.className = 'save-msg err';
     return false;
   }
+  if (typeof trackPaywall === 'function') trackPaywall('checkout_started', { page: currentPageName(), feature: null, required_tier: tier, current_tier: lastKnownTier(), period: billingPeriod, via: 'stripe' });
   window.open(row.link + '?client_reference_id=' + encodeURIComponent(checkoutReference(currentUser.id, tier, billingPeriod)), '_blank');
   return false;
 }
@@ -205,7 +207,7 @@ async function restorePurchases(){
     const active = Object.keys(customerInfo.entitlements.active);
     if (active.length){
       say(`Restored — ${TIER_LABEL[active.includes('ritual') ? 'ritual' : 'whisper']} is back on this device.`, 'ok');
-      setTimeout(applyPricingVisibility, 1500);
+      setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
     } else {
       say('No active subscription found for this Apple ID / Google account.');
     }
@@ -246,9 +248,10 @@ async function purchaseTier(tier, period){
     if (customerInfo.entitlements.active[entitlementId]){
       msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
       msg.className = 'save-msg ok';
+      if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: period, via: 'revenuecat' });
       // The RevenueCat webhook updates the subscribers table server-side;
       // give it a moment to land, then refresh what the pricing page shows.
-      setTimeout(applyPricingVisibility, 1500);
+      setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
     } else {
       msg.textContent = 'Purchase completed, but the plan is taking a moment to activate — check back shortly.';
       msg.className = 'save-msg';
@@ -399,18 +402,24 @@ async function saveSubliminal(){
   const cap = TIER_LENGTH_SECONDS[myTier];
 
   if (seconds > cap){
-    msg.innerHTML = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${formatSessionLength(cap/60)}. This one runs longer — <a href="#pricing" onclick="closeAuthModal();">upgrade to save it</a>.`;
+    msg.textContent = `${TIER_LABEL[myTier][0].toUpperCase()+TIER_LABEL[myTier].slice(1)} can save sessions up to ${formatSessionLength(cap/60)}. This one runs longer.`;
     msg.className = 'save-msg err';
+    /* The sheet says what a longer session is *for*, which is the thing somebody
+       about to save an eight-hour one already believes. It is the same sheet the
+       locked length chip opens, from the same row of the feature table. */
+    openUpgradeModal(featureCoveringMinutes(Math.ceil(seconds/60)), { tier: myTier, trigger: 'save_too_long' });
     return;
   }
 
   const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
   const subCap = TIER_SUBLIMINAL_CAPS[myTier];
+  /* Being full only ever stops a *new* save. Everything already in the library
+     stays openable and playable — see renderLibraryPlanLimit, which says so on
+     the library page itself rather than leaving it to be discovered here. */
   if ((count || 0) >= subCap){
-    msg.innerHTML = myTier === 'whisper'
-      ? `You've saved ${count} subliminals — that's the limit on Whisper. <a href="#pricing" onclick="closeAuthModal();">Upgrade to Ritual for unlimited</a>.`
-      : `You've saved ${count} subliminals — that's the limit on a free account. <a href="#pricing" onclick="closeAuthModal();">Whisper holds 10, Ritual is unlimited</a>.`;
+    msg.textContent = `You've saved ${count} subliminals — that's the room a ${myTier === 'none' ? 'free account has' : TIER_LABEL[myTier] + ' has'}. Everything here keeps playing; it's saving another that needs more space.`;
     msg.className = 'save-msg err';
+    openUpgradeModal('library_space', { tier: myTier, trigger: 'save_library_full' });
     return;
   }
 

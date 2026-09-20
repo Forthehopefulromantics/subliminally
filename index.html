@@ -1810,6 +1810,194 @@
   @media (min-width:900px){
     .ho-shell .ob-slide, .ho-shell .ob-foot{ max-width:620px; }
   }
+
+  /* ============ LOCKS, BADGES, AND THE UPGRADE SHEET ============
+     Premium features stay on the screen for everyone. What changes for a free
+     account is a lock, a plan name, and a softer contrast — so a locked control
+     reads as something waiting rather than something missing.
+
+     Two colours only, and they are the two the tier badge already uses:
+     lavender is Whisper, gold is Ritual. Nothing here invents a palette. */
+  .premium-badge{ display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
+    font-size:9.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    padding:3px 8px; border-radius:999px; line-height:1.4; white-space:nowrap; }
+  .premium-badge[data-size="sm"]{ font-size:8.5px; padding:2px 6px; letter-spacing:.1em; }
+  .premium-badge[data-tier="whisper"]{ background:rgba(185,167,232,0.18); color:var(--lilac); }
+  .premium-badge[data-tier="ritual"]{ background:rgba(227,190,127,0.16); color:var(--candle); }
+  .premium-badge .pb-mark{ font-size:10px; line-height:1; }
+  body[data-sky="day"] .premium-badge[data-tier="whisper"]{ background:rgba(122,79,181,.13); color:#6B3FA8; }
+  body[data-sky="day"] .premium-badge[data-tier="ritual"]{ background:rgba(217,98,59,.13); color:#B45A2B; }
+  .lock-ic{ vertical-align:-1px; opacity:.75; flex-shrink:0; }
+
+  /* A control that is already on the screen, dressed as locked. It keeps its
+     size and its place; the lock and badge tuck into the corner. */
+  .is-locked{ position:relative; }
+  .length-chip.is-locked, .soothing-picker .is-locked{ opacity:.62; }
+  .length-chip.is-locked.sel{ opacity:1; }
+  .locked-tag{ display:inline-flex; align-items:center; gap:3px; margin-left:6px; vertical-align:middle;
+    color:var(--haze); }
+  .length-chip .locked-tag{ display:flex; justify-content:center; align-items:center; gap:4px; margin:5px 0 0; }
+  .length-chip .premium-badge{ display:inline-flex; font-size:8.5px; margin:0; }
+  .locked-row{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+
+  /* A whole preview card for something not open yet: a locked journal prompt, a
+     locked session category. Beautiful on purpose — this is the first thing a
+     free account sees of a feature, and it should read as an invitation. */
+  .locked-card{ display:flex; flex-direction:column; gap:7px; text-align:left; width:100%;
+    background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:15px 16px;
+    color:var(--moonlight); font-family:inherit; font-size:13.5px; cursor:pointer;
+    transition:border-color .2s, transform .12s, box-shadow .2s; }
+  .locked-card:hover{ transform:translateY(-1px); }
+  .locked-card.is-locked{ border-color:rgba(185,167,232,0.22);
+    box-shadow:inset 0 0 34px rgba(185,167,232,0.06); }
+  .locked-card.is-locked[data-feature]:hover{ border-color:rgba(185,167,232,0.42);
+    box-shadow:inset 0 0 34px rgba(185,167,232,0.09), 0 8px 22px rgba(8,6,20,.32); }
+  .lc-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .lc-title{ font-family:var(--serif); font-size:15.5px; color:var(--moonlight); line-height:1.35; }
+  .lc-body{ font-size:12.5px; color:var(--haze); line-height:1.6; }
+  .lc-cta{ font-size:11.5px; letter-spacing:.06em; color:var(--lilac); margin-top:2px; }
+  .locked-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:10px; margin-top:14px; }
+  body[data-sky="day"] .locked-card{ background:#FFFDF8; border-color:rgba(62,42,72,.12);
+    box-shadow:0 8px 20px rgba(23,18,51,.08); }
+
+  /* A blurred taste of the real thing, for the previews where showing the shape
+     of it says more than describing it. Never used over anything interactive. */
+  .locked-peek{ position:relative; overflow:hidden; border-radius:16px; }
+  .locked-peek > .lp-body{ filter:blur(5px); opacity:.5; pointer-events:none; user-select:none; }
+  .locked-peek::after{ content:''; position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(13,11,24,.55)); }
+  body[data-sky="day"] .locked-peek::after{ background:linear-gradient(180deg, transparent, rgba(255,253,248,.62)); }
+
+  /* How much of your plan you have used. Quiet, factual, with the way to get
+     more sitting beside it rather than shouting over it. */
+  .plan-limit{ display:flex; flex-direction:column; gap:8px; margin:0 0 18px;
+    padding:13px 16px; border:1px solid var(--dusk); border-radius:16px; background:var(--veil); }
+  .plan-limit-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .plan-limit-text{ font-size:13px; color:var(--moonlight); }
+  .plan-limit-cta{ background:none; border:none; padding:0; cursor:pointer; font-family:inherit;
+    font-size:12.5px; color:var(--lilac); transition:color .2s; }
+  .plan-limit-cta:hover{ color:var(--candle); }
+  .plan-limit-track{ height:3px; border-radius:999px; background:rgba(156,147,184,.18); overflow:hidden; }
+  .plan-limit-fill{ display:block; height:100%; border-radius:999px;
+    background:linear-gradient(90deg, var(--lilac), var(--candle)); transition:width .4s ease; }
+  .plan-limit.is-full .plan-limit-fill{ background:var(--candle); }
+  .plan-limit-note{ font-size:12px; color:var(--haze); line-height:1.6; }
+  body[data-sky="day"] .plan-limit{ background:#FFFDF8; border-color:rgba(62,42,72,.12); }
+
+  /* The contextual sheet. A dialog on a wide screen, a bottom sheet on a phone,
+     which is where most of these taps happen. It reuses .modal-overlay and
+     .modal-card so it inherits the same glass, blur and close button as the
+     auth and confirm dialogs. */
+  .upgrade-modal{ max-width:400px; padding:30px 26px 22px; overflow:hidden; text-align:left; }
+  .upgrade-modal .upgrade-modal-glow{ position:absolute; inset:-40% 20% auto -20%; height:220px;
+    background:radial-gradient(ellipse at center, rgba(185,167,232,.22), transparent 68%);
+    pointer-events:none; }
+  .upgrade-modal > *:not(.upgrade-modal-glow){ position:relative; }
+  .upgrade-modal[data-tier="ritual"] .upgrade-modal-glow{
+    background:radial-gradient(ellipse at center, rgba(227,190,127,.20), transparent 68%); }
+  .upgrade-modal-badge{ display:flex; align-items:center; gap:7px; color:var(--haze); margin-bottom:12px; }
+  .upgrade-modal .modal-title{ font-size:21px; line-height:1.3; padding-right:18px; }
+  .upgrade-modal .modal-sub{ margin-top:9px; font-size:13.5px; line-height:1.65; }
+  .um-plan{ display:flex; flex-direction:column; gap:2px; margin:18px 0 20px;
+    padding:12px 14px; border-radius:14px; background:rgba(255,255,255,0.04); border:1px solid var(--dusk); }
+  .um-plan-label{ font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--haze); }
+  .um-plan-name{ font-family:var(--serif); font-size:16.5px; color:var(--moonlight); }
+  .um-plan-price{ font-size:12.5px; color:var(--haze); }
+  body[data-sky="day"] .um-plan{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
+  .upgrade-modal .btn-primary{ width:100%; justify-content:center; text-align:center; }
+  .um-not-now{ display:block; width:100%; margin-top:6px; padding:12px 0; background:none; border:none;
+    font-family:inherit; font-size:13px; color:var(--haze); cursor:pointer; transition:color .2s; }
+  .um-not-now:hover{ color:var(--moonlight); }
+  @media (max-width:560px){
+    .upgrade-overlay{ align-items:flex-end; padding:0; }
+    .upgrade-modal{ max-width:none; border-radius:24px 24px 0 0; border-bottom:none;
+      padding:26px 22px calc(18px + env(safe-area-inset-bottom)); animation:sheetUp .26s ease; }
+  }
+  @keyframes sheetUp{ from{ transform:translateY(14%); opacity:.6; } to{ transform:translateY(0); opacity:1; } }
+  body.paywall-open{ overflow:hidden; }
+
+  /* One discovery card, low down on Today. It is a today-card like any other —
+     the same border, padding and rhythm — with a soft wash behind it. */
+  .upgrade-card{ border:1px solid rgba(185,167,232,0.26); border-radius:20px; padding:22px 22px 20px;
+    margin-bottom:14px; background:linear-gradient(160deg, rgba(185,167,232,0.09), transparent 72%), var(--veil);
+    backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); }
+  .upgrade-card[data-tier="ritual"]{ border-color:rgba(227,190,127,0.28);
+    background:linear-gradient(160deg, rgba(227,190,127,0.09), transparent 72%), var(--veil); }
+  .upgrade-card-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .upgrade-card-head .today-card-label{ margin-bottom:0; }
+  .upgrade-card h3{ font-family:var(--serif); font-size:19px; color:var(--moonlight); font-weight:400;
+    line-height:1.35; margin-top:10px; }
+  .upgrade-card p{ font-size:13.5px; color:var(--haze); margin-top:7px; line-height:1.6; }
+  .upgrade-card .btn{ margin-top:16px; }
+  body[data-sky="day"] .upgrade-card{ box-shadow:0 10px 26px rgba(23,18,51,.10);
+    background:linear-gradient(160deg, rgba(122,79,181,.07), transparent 72%), #FFFDF8; }
+
+  /* Free → Whisper → Ritual, on the profile. Informative, not a pitch. */
+  .plan-ladder{ max-width:520px; margin:10px 0 6px; }
+  .plan-ladder-rungs{ list-style:none; display:flex; align-items:stretch; gap:0; margin:0 0 4px; padding:0; }
+  .plan-rung{ flex:1; position:relative; display:flex; flex-direction:column; align-items:center;
+    gap:6px; padding:0 4px; text-align:center; }
+  .plan-rung::before{ content:''; position:absolute; top:9px; left:0; right:50%; height:1px;
+    background:var(--dusk); }
+  .plan-rung::after{ content:''; position:absolute; top:9px; left:50%; right:0; height:1px;
+    background:var(--dusk); }
+  .plan-rung:first-child::before, .plan-rung:last-child::after{ display:none; }
+  .plan-rung.is-have::before{ background:var(--lilac); }
+  .pr-dot{ position:relative; z-index:1; width:19px; height:19px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; font-size:10px;
+    background:var(--midnight-2); border:1px solid var(--dusk); color:var(--haze); }
+  .plan-rung.is-have .pr-dot{ border-color:var(--lilac); color:var(--lilac); }
+  .plan-rung.is-here .pr-dot{ background:var(--lilac); border-color:var(--lilac); color:#1B1630; }
+  .pr-label{ font-size:12.5px; color:var(--haze); }
+  .plan-rung.is-here .pr-label{ color:var(--moonlight); }
+  .pr-you{ font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--lilac); }
+  .plan-ladder-next{ margin-top:14px; }
+  .plan-ladder-next summary{ cursor:pointer; font-size:13px; color:var(--lilac); list-style:none; }
+  .plan-ladder-next summary::-webkit-details-marker{ display:none; }
+  .plan-ladder-list{ list-style:none; display:grid; gap:9px; margin:14px 0 16px; padding:0; }
+  .plan-ladder-list li{ font-size:12.5px; color:var(--haze); line-height:1.6; }
+  .plan-ladder-list li b{ color:var(--moonlight); font-weight:500; }
+  .plan-ladder-list .lock-ic{ margin-right:6px; }
+  .plan-ladder-note{ font-size:12.5px; color:var(--haze); margin-top:12px; }
+  body[data-sky="day"] .pr-dot{ background:#FFFDF8; }
+  body[data-sky="day"] .plan-rung.is-here .pr-dot{ background:#6B3FA8; border-color:#6B3FA8; color:#fff; }
+
+  /* The card somebody was sent here to look at, ringed for a couple of seconds
+     so a pricing page with two cards on it doesn't become a search. */
+  .plan-spotlight{ animation:planSpotlight 2.6s ease; }
+  @keyframes planSpotlight{
+    0%,100%{ box-shadow:none; }
+    18%,72%{ box-shadow:0 0 0 2px rgba(227,190,127,.55), 0 14px 40px rgba(227,190,127,.18); }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .plan-spotlight{ animation:none; box-shadow:0 0 0 2px rgba(227,190,127,.55); }
+    .upgrade-modal{ animation:none; }
+  }
+
+  /* The locked previews on the pages whose feature is premium in full. They
+     replace a bare "this is part of Whisper" panel with the thing itself,
+     described, so the value is visible before the payment is. */
+  .locked-preview{ margin-top:22px; }
+  .locked-preview-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; margin-bottom:4px; }
+  .locked-preview-head h4{ font-family:var(--serif); font-size:16px; color:var(--moonlight); font-weight:400; }
+  .locked-preview-head p{ font-size:12.5px; color:var(--haze); }
+  .locked-progress{ display:flex; flex-direction:column; gap:9px; margin-top:16px;
+    padding:16px; border:1px solid var(--dusk); border-radius:18px; background:var(--veil); }
+  .locked-progress-title{ font-family:var(--serif); font-size:15.5px; color:var(--moonlight); }
+  .locked-progress-track{ height:4px; border-radius:999px; background:rgba(156,147,184,.18); overflow:hidden; }
+  .locked-progress-fill{ display:block; height:100%; border-radius:999px;
+    background:linear-gradient(90deg, var(--lilac), var(--candle)); }
+  .locked-progress-steps{ display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+  .locked-progress-step{ font-size:11.5px; color:var(--haze); padding:4px 9px; border-radius:999px;
+    background:rgba(255,255,255,.04); }
+  .locked-progress-step[data-state="open"]{ color:var(--lilac); }
+  body[data-sky="day"] .locked-progress{ background:#FFFDF8; border-color:rgba(62,42,72,.12); }
+  body[data-sky="day"] .locked-progress-step{ background:rgba(62,42,72,.05); }
+  /* Her line inside a preview: the bubble is already styled globally, this only
+     stops the portrait from taking over a page that is not onboarding. */
+  .locked-preview .hsd{ margin:18px 0 6px; }
+  .locked-preview .hsd-portrait{ height:clamp(104px, 18vh, 152px); }
 </style>
 </head>
 <body>
@@ -1848,6 +2036,25 @@
     <button class="modal-close" onclick="closeAsk()" aria-label="Close">✕</button>
     <div class="modal-title" id="askTitle"></div>
     <div id="askBody"></div>
+  </div>
+</div>
+
+<!-- One contextual upgrade sheet for the whole app. It is filled in by
+     openUpgradeModal() from the feature table in js/entitlements.js, so there is
+     exactly one of these rather than one per page, and nothing here decides what
+     any feature costs or which plan it belongs to.
+
+     It opens when somebody taps a lock. It is never opened by a page load. -->
+<div class="modal-overlay upgrade-overlay" id="upgradeOverlay" onclick="if(event.target===this) closeUpgradeModal('backdrop')">
+  <div class="modal-card upgrade-modal" id="upgradeModalCard" role="dialog" aria-modal="true" aria-labelledby="upgradeModalTitle" aria-describedby="upgradeModalWhy">
+    <div class="upgrade-modal-glow" aria-hidden="true"></div>
+    <button class="modal-close" onclick="closeUpgradeModal('close')" aria-label="Close">✕</button>
+    <div class="upgrade-modal-badge" id="upgradeModalBadge"></div>
+    <div class="modal-title" id="upgradeModalTitle"></div>
+    <p class="modal-sub" id="upgradeModalWhy"></p>
+    <div class="um-plan" id="upgradeModalPlan"></div>
+    <button class="btn btn-primary" id="upgradeModalCta" type="button">Explore plans</button>
+    <button class="um-not-now" type="button" onclick="closeUpgradeModal('not_now')">Not now</button>
   </div>
 </div>
 
@@ -2077,6 +2284,12 @@
     <div class="today-card" id="todaySessionCard"></div>
     <div class="today-card" id="todayRitualCard" style="display:none;"></div>
     <div class="today-card" id="todayPageCard" style="display:none;"></div>
+    <!-- One premium discovery card, here rather than at the top: below the cards
+         that are about today, above the links out. It is never a banner, there is
+         never more than one of it, and on Ritual there is none at all. Which
+         benefit it offers is picked in renderUpgradeDiscoveryCard() from what this
+         person's own screen suggests they would want next. -->
+    <div id="todayUpgradeCard" style="display:none;"></div>
     <div class="today-links">
       <button onclick="showJournalPage()">Journal</button>
       <button onclick="showRitualsPage()">Rituals</button>
@@ -2200,10 +2413,18 @@
         <h3>How it works inside a subliminal here</h3>
         <p>On Ritual, you can build a session as "Subliminal + EFT Tapping" instead of subliminal only. You get 11 lines total — the setup statement, then one line for each tap in the round. Each line repeats back-to-back (3 times for the setup, 5 to 7 times for each round point, your choice) with a pause between points so you have a moment to shift positions, whether you record it yourself or use the AI voice.</p>
 
+        <!-- The four things people most often tap on, as starting points. They are
+             shown to everybody: on Ritual a card opens the builder in tapping mode
+             with the theme already in the prompt, and on a free or Whisper account
+             it opens the sheet that explains what tapping is for. Built by
+             renderSessionCategories() in js/builder.js. -->
+        <h3>What people tap on</h3>
+        <div class="locked-grid" id="eftCategoryGrid"></div>
+
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="showBuildPage()">Build a tapping session →</button>
-          <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
+          <button class="btn btn-primary" onclick="startPremiumSession('eft')">Build a tapping session →</button>
+          <button class="btn btn-ghost" onclick="openUpgradeModal('eft', { trigger:'science_eft' })">What Ritual unlocks ✦</button>
         </div>
       </div>
     </div>
@@ -2219,10 +2440,15 @@
         <h3>How it works inside a subliminal here</h3>
         <p>On Ritual, you can build a session as "Visualization Script" instead of subliminal or EFT tapping. You write the scene yourself, ask for a draft to start from and rewrite, or both — then record it in your own voice or use the AI voice, same as the rest of the app. It plays back as one continuous script rather than short repeated lines, looping for however long you set the session to run.</p>
 
+        <!-- Six scenes to rehearse, the last one blank. Same rule as tapping: every
+             card is visible to everybody, and what a tap does depends on the plan. -->
+        <h3>What people rehearse</h3>
+        <div class="locked-grid" id="visualizationCategoryGrid"></div>
+
         <div class="science-cta">
           <p>This one's a Ritual feature.</p>
-          <button class="btn btn-primary" onclick="showBuildPage()">Write your script →</button>
-          <button class="btn btn-ghost" onclick="showMarketingHome(); goTo('pricing');">Upgrade to Ritual</button>
+          <button class="btn btn-primary" onclick="startPremiumSession('visualization')">Write your script →</button>
+          <button class="btn btn-ghost" onclick="openUpgradeModal('visualization', { trigger:'science_visualization' })">What Ritual unlocks ✦</button>
         </div>
       </div>
     </div>
@@ -2265,6 +2491,11 @@
         <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
       </div>
       <div id="myLibraryPanel" style="display:none;">
+        <!-- How much room this plan gives you, and how much of it is used. Drawn
+             for every tier — "Unlimited subliminals" is something a Ritual member
+             paid for and should get to read. Filled in by loadMyLibrary() off the
+             rows it already fetched, so it costs no extra query. -->
+        <div id="myLibraryPlanLimit"></div>
         <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
       </div>
     </div>
@@ -2310,8 +2541,8 @@
             <label>How do you want to use this ritual tonight?</label>
             <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
               <button class="length-chip sel" data-mode="subliminal" onclick="pickRitualMode(this)">Subliminal only</button>
-              <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping<span>Ritual</span></button>
-              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script<span>Ritual</span></button>
+              <button class="length-chip" data-mode="eft" onclick="pickRitualMode(this)">Subliminal + EFT Tapping</button>
+              <button class="length-chip" data-mode="visualization" onclick="pickRitualMode(this)">Visualization Script</button>
             </div>
             <div class="length-msg" id="ritualModeMsg"></div>
             <div class="eft-guide-panel" id="visualizationGuidePanel" style="display:none;">
@@ -2329,6 +2560,13 @@
           </div>
           <div class="quiz-q" id="sessionLengthRow">
             <label>How long should tonight's session run? <span class="session-length-val" id="sessionLengthVal">5 min</span></label>
+            <!-- The five lengths people actually pick, and the slider for anything
+                 else. Every one of them stays on the screen whatever plan you are
+                 on: the ones past your plan are drawn muted with a lock and the
+                 plan they belong to, and tapping one explains what a longer
+                 session is for rather than refusing. Built by renderDurationChips()
+                 in js/builder.js, off the same table that decides the slider. -->
+            <div class="length-chip-grid" id="durationChips" style="grid-template-columns:repeat(3,1fr);"></div>
             <div class="session-length-row">
               <input type="range" id="sessionLengthSlider" min="5" max="480" step="1" value="5" oninput="onSessionLengthInput()">
             </div>
@@ -2416,7 +2654,7 @@
             <summary>Add more layers <em>soothing pad, your own track, a second voice, binaural beats</em></summary>
             <div class="more-options-body">
           <div class="soothing-picker">
-            <label>Extra soothing layer <span style="color:var(--haze); font-weight:400;">(Whisper & Ritual)</span></label>
+            <label class="locked-row">Extra soothing layer <span id="lockSoothing"></span></label>
             <div class="length-chip-grid" id="soothingChips">
               <button class="length-chip sel" data-variant="none" onclick="pickSoothingLayer(this)">None</button>
               <button class="length-chip" data-variant="pad" onclick="pickSoothingLayer(this)">Warm pad</button>
@@ -2426,7 +2664,7 @@
             <div class="length-msg" id="soothingMsg"></div>
           </div>
           <div class="soothing-picker">
-            <label>Your own track <span style="color:var(--haze); font-weight:400;">(Ritual only — layer a melody of your choice underneath everything)</span></label>
+            <label class="locked-row">Your own track <span id="lockCustomTrack"></span> <span style="color:var(--haze); font-weight:400;">(layer a melody of your choice underneath everything)</span></label>
             <div id="customTrackArea">
               <button class="mini-btn ghostbtn" onclick="triggerCustomTrackUpload()">Upload a track</button>
               <input type="file" id="customTrackFile" accept="audio/*" style="display:none;">
@@ -2435,7 +2673,7 @@
             <div class="length-msg" id="customTrackMsg"></div>
           </div>
           <div class="soothing-picker">
-            <label>Second voice layer <span style="color:var(--haze); font-weight:400;">(Ritual only — a second, quieter set of affirmations layered underneath the main ones)</span></label>
+            <label class="locked-row">Second voice layer <span id="lockLayerVoice"></span> <span style="color:var(--haze); font-weight:400;">(a second, quieter set of affirmations layered underneath the main ones)</span></label>
             <label class="layer-voice-toggle"><input type="checkbox" id="layerVoiceToggle" onchange="toggleLayerVoice(this.checked)"> Add a second, layered voice</label>
             <div class="layer-voice-panel" id="layerVoicePanel">
               <label style="font-size:12px; color:var(--haze);">Lines for this layer — one per line. Leave blank to quietly reuse your main affirmations.</label>
@@ -2584,8 +2822,14 @@
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3 id="journalUpgradeTitle">The journal is part of Whisper</h3>
       <p id="journalUpgradeText">Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — $5.55 a month, or $55 a year.</p>
-      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="showMarketingHome(); goTo('pricing');">Get Whisper</button>
+      <button class="btn btn-primary" id="journalUpgradeBtn" onclick="openUpgradeModal('journal', { trigger:'journal_panel' })">See what Whisper adds ✦</button>
     </div>
+    <!-- What the journal actually is, for somebody who cannot open it yet. The
+         gate above is the existing one and stays — the journal is a Whisper
+         feature in full — but a locked page that only says "this is part of
+         Whisper" shows nothing of what is being locked. Drawn by
+         renderJournalPreview() in js/journal.js. -->
+    <div id="journalPreview" class="locked-preview" style="display:none;"></div>
 
     <div id="journalPanel" class="journal-panel" style="display:none;">
       <div class="journal-add">
@@ -2636,8 +2880,13 @@
       <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
       <h3 id="ritualsUpgradeTitle">The daily log is part of Whisper</h3>
       <p id="ritualsUpgradeText"></p>
-      <button class="btn btn-primary" id="ritualsUpgradeBtn" onclick="showMarketingHome(); goTo('pricing');">See plans</button>
+      <button class="btn btn-primary" id="ritualsUpgradeBtn" onclick="openUpgradeModal('habit_tracker', { trigger:'rituals_panel' })">See what it unlocks ✦</button>
     </div>
+    <!-- The progression itself, shown rather than described: three habits now,
+         three more every twenty-one days practised, up to fifteen. It is the
+         existing cycle from js/habits.js, not a second set of numbers.
+         Drawn by renderRitualsPreview(). -->
+    <div id="ritualsPreview" class="locked-preview" style="display:none;"></div>
 
     <!-- Daily log: calendar of handwritten pages + habits kept -->
     <div id="journalPhotoPanel" class="journal-panel" style="display:none;">
@@ -2730,6 +2979,12 @@
           <div class="tier-badge" id="profileTierDisplay" data-tier="none">Free account</div>
         </div>
       </div>
+
+      <!-- Free → Whisper → Ritual, with where you are marked, and a fold-out of
+           what the next one adds. This is the one screen in the app allowed to be
+           about plans rather than about a feature, because it is the screen
+           somebody opens when they went looking. Drawn by renderProfile(). -->
+      <div id="profilePlanLadder"></div>
 
       <button class="mini-btn ghostbtn" onclick="showLibraryPage(); setLibraryTab('mine');"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>View my saved subliminals →</button>
 
@@ -2954,6 +3209,7 @@
 <script src="js/sky.js"></script>
 <script src="js/builder.js"></script>
 <script src="js/billing.js"></script>
+<script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
 <script src="js/today.js"></script>

@@ -64,12 +64,18 @@ function showReprogramPage(){
   document.body.setAttribute('data-view', 'reprogram');
   window.scrollTo(0,0);
   history.pushState({ page:'reprogram' }, '', '#reprogram');
+  /* The tapping and visualization tabs each carry a row of starting points whose
+     locks depend on the plan, so they are drawn when the page opens rather than
+     once at load — a purchase or a sign-in in between would otherwise leave the
+     wrong locks on them. */
+  renderSessionCategories();
 }
 function setScienceTab(tab){
   document.querySelectorAll('[data-scitab]').forEach(b => b.classList.toggle('active', b.dataset.scitab === tab));
   document.getElementById('scienceTabSubliminals').style.display = tab === 'subliminals' ? 'block' : 'none';
   document.getElementById('scienceTabEft').style.display = tab === 'eft' ? 'block' : 'none';
   document.getElementById('scienceTabVisualization').style.display = tab === 'visualization' ? 'block' : 'none';
+  if (tab === 'eft' || tab === 'visualization') renderSessionCategories();
 }
 const scienceEftPointsList = document.getElementById('scienceEftPointsList');
 if (scienceEftPointsList){

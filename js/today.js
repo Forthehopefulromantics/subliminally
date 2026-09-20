@@ -122,6 +122,9 @@ function paintToday(){
   if (tierAtLeast(todayTier, 'whisper')) renderTodayPage_Page();
   else if (pageCard && todayPainted) pageCard.style.display = 'none';
   renderTodayJourney();
+  /* Last, and only once the real plan has landed: a discovery card drawn off a
+     guessed tier would show a member something they already have. */
+  renderUpgradeDiscoveryCard();
 }
 function refreshToday(){
   // One refresh at a time. Tapping Today twice used to start the whole set of
