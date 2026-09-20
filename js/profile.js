@@ -37,7 +37,7 @@ async function loadProfile(){
   }
 
   const myTier = await getMyTier();
-  const tierIcons = { none: '', whisper: '✦ ', ritual: '★ ' };
+  const tierIcons = { none: '', premium: '✦ ' };
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
@@ -391,7 +391,7 @@ async function uploadVoiceClone(blob){
     const out = await res.json().catch(() => ({}));
     if (!res.ok){
       msg.textContent = out.error === 'upgrade_required'
-        ? 'Cloning your voice comes with Ritual — $11.11 a month, or $111 a year.'
+        ? 'Cloning your voice comes with Premium — $14.99 a month, or $99.99 a year.'
         : out.error === 'not_configured'
           ? "Voice cloning isn't switched on yet."
           : (out.error || "Couldn't clone your voice — try again in a moment.");
