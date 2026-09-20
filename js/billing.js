@@ -148,7 +148,7 @@ function goToCheckout(evt, tier){
     return false;
   }
   if (typeof trackPaywall === 'function') trackPaywall('checkout_started', { page: currentPageName(), feature: null, required_tier: tier, current_tier: lastKnownTier(), period: billingPeriod, via: 'stripe' });
-  window.open(row.link + '?client_reference_id=' + encodeURIComponent(checkoutReference(currentUser.id, tier, billingPeriod)), '_blank');
+  window.location.href = row.link + '?client_reference_id=' + encodeURIComponent(checkoutReference(currentUser.id, tier, billingPeriod));
   return false;
 }
 
@@ -266,8 +266,8 @@ function updateManageSubscriptionLinks(){
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */
 // Matches the durations promised on the pricing cards.
-const TIER_ORDER = ['none','whisper','ritual'];
-const TIER_LENGTH_SECONDS = { none: 1200, whisper: 7200, ritual: 28800 };
+const TIER_ORDER = ['none','premium'];
+const TIER_LENGTH_SECONDS = { none: 1200, premium: 28800 };
 // Names come off the plan catalog, so a tier is called one thing everywhere.
 const TIER_LABEL = Object.keys(PLANS).reduce((acc, tier) => { acc[tier] = PLANS[tier].label; return acc; }, { none: 'a free account' });
 function tierAtLeast(myTier, requiredTier){
@@ -277,64 +277,42 @@ function tierAtLeast(myTier, requiredTier){
    tier that's allowed to actually generate/save a session that long. */
 function requiredTierForMinutes(minutes){
   for (const tier of TIER_ORDER){ if (minutes*60 <= TIER_LENGTH_SECONDS[tier]) return tier; }
-  return 'ritual';
+  return 'premium';
 }
 
 async function getMyTier(){
   const subRow = await getMySubscriberRow();
   const validStatuses = ['active', 'trialing'];
   const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
-  // Reverie was retired; anyone still on it keeps everything they paid for.
-  return tier === 'reverie' ? 'ritual' : tier;
+  // Grandfather legacy paid tiers into Premium so existing members keep access.
+  return ['whisper','ritual','reverie'].includes(tier) ? 'premium' : tier;
 }
 
 /* Show pricing as an upsell only for tiers above what you already have.
    Ritual members see no marketing here at all — just account management. */
 async function applyPricingVisibility(){
   const myTier = await getMyTier();
-  const cards = { free: document.getElementById('priceCardFree'), whisper: document.getElementById('priceCardWhisper'), ritual: document.getElementById('priceCardRitual') };
+  const free = document.getElementById('priceCardFree');
+  const premium = document.getElementById('priceCardRitual');
   const head = document.getElementById('pricingHead');
   const grid = document.getElementById('pricingGrid');
   const toggle = document.getElementById('billingToggle');
   const thanks = document.getElementById('pricingRitualThanks');
   const footnote = document.getElementById('pricingFootnote');
   const manageSub = document.getElementById('pricingManageSub');
-  if (!cards.whisper) return; // pricing markup not present yet
-
-  Object.values(cards).forEach(c => c.style.display = '');
+  if (!premium) return;
   const freeBtn = document.getElementById('priceCardFreeBtn');
   if (currentUser){ freeBtn.textContent = 'Your current plan'; freeBtn.disabled = true; }
   else { freeBtn.textContent = 'Create a free account'; freeBtn.disabled = false; }
-
-  if (myTier === 'ritual'){
-    head.style.display = 'none';
-    grid.style.display = 'none';
-    toggle.style.display = 'none';
-    footnote.style.display = 'none';
-    thanks.style.display = 'block';
-    manageSub.style.display = 'block';
+  if (myTier === 'premium'){
+    head.style.display='none'; grid.style.display='none'; toggle.style.display='none';
+    footnote.style.display='none'; thanks.style.display='block'; manageSub.style.display='block';
     return;
   }
-
-  thanks.style.display = 'none';
-  head.style.display = 'block';
-  grid.style.display = 'grid';
-  toggle.style.display = 'flex';
-  footnote.style.display = 'block';
-
-  if (myTier === 'whisper'){
-    cards.free.style.display = 'none';
-    cards.whisper.style.display = 'none';
-    grid.classList.add('centered');
-    document.getElementById('pricingHeading').textContent = 'Ritualize your mornings and nights';
-    document.getElementById('pricingSub').textContent = 'All-night 8-hour sessions, unlimited saved subliminals, the habit tracker, EFT tapping, and visualization scripting are all still ahead of you on Ritual.';
-    manageSub.style.display = 'block';
-  } else {
-    grid.classList.remove('centered');
-    document.getElementById('pricingHeading').textContent = 'Your all in one wellness app';
-    document.getElementById('pricingSub').textContent = 'Start free with personalized subliminals. Add your journal and manifestation practice on Whisper; ritualize your mornings and nights on Ritual.';
-    manageSub.style.display = 'none';
-  }
+  head.style.display='block'; grid.style.display='grid'; toggle.style.display='flex';
+  footnote.style.display='block'; thanks.style.display='none'; manageSub.style.display='none';
+  if (free) free.style.display='';
+  premium.style.display='';
 }
 
 
@@ -357,7 +335,7 @@ async function getMySubscriberRow(){
   }, 300000);
 }
 
-const TIER_SUBLIMINAL_CAPS = { none: 2, whisper: 10, ritual: Infinity };
+const TIER_SUBLIMINAL_CAPS = { none: 2, premium: Infinity };
 
 async function saveSubliminal(){
   const msg = document.getElementById('saveMsg');
