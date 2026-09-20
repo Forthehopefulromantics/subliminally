@@ -30,19 +30,165 @@ async function renderJournalState(){
   const upgrade = document.getElementById('journalUpgrade');
   const panel = document.getElementById('journalPanel');
   const philosophy = document.getElementById('journalPhilosophy');
+  const preview = document.getElementById('journalPreview');
   panel.style.display = 'none';
   upgrade.style.display = 'none';
+  if (preview) preview.style.display = 'none';
   // The 3D/4D/5D explainer is a Whisper feature — it only appears once the
   // tier check below has passed and the Manifesting tab is open.
   philosophy.style.display = 'none';
   locked.style.display = currentUser ? 'none' : 'block';
   if (!currentUser) return;
 
-  if (!tierAtLeast(await getMyTier(), 'whisper')){ upgrade.style.display = 'block'; return; }
+  const journalTier = await getMyTier();
+  if (!tierAtLeast(journalTier, featureRequiredTier('journal'))){
+    // Same as the rituals panel: the figure comes off the plan catalog rather
+    // than being typed into the markup where a price change cannot reach it.
+    document.getElementById('journalUpgradeText').textContent =
+      `Gratitude Journal, Daily Journaling, and the Manifestation tracker come with Whisper — ${tierPriceText('whisper')}.`;
+    upgrade.style.display = 'block';
+    renderJournalPreview(journalTier);
+    return;
+  }
 
   panel.style.display = 'block';
   philosophy.style.display = journalTab === 'manifesting' ? 'block' : 'none';
   loadJournalEntries();
+}
+
+/* ---------------- what the journal is, when you cannot open it yet ----------------
+   The journal is a Whisper feature in full, so the gate above stays a gate —
+   the existing subscription structure requires it and this is not the task that
+   changes that. What it should not be is a page that says only "this is part of
+   Whisper" and nothing about what "this" is.
+
+   Every card here points at something that genuinely exists behind the gate: the
+   two tabs, spoken entries, and the 3D/4D/5D explainer. Nothing is described
+   that a Whisper member would then go looking for and not find.
+
+   The blurred paragraph is the real explainer, read out of the DOM it is already
+   sitting in. A mock-up would have been easier and would have been a lie. */
+const JOURNAL_PREVIEW_CARDS = [
+  { feature:'journal',       title:'Gratitude, first thing ✦',
+    body:'Three lines the moment you wake up, in present tense, kept where you can read them back on the mornings you need to.' },
+  { feature:'manifestation', title:'Future Self ✦',
+    body:"Write from the perspective of the person you're becoming — \u201cI am so grateful now that\u2026\u201d — and watch the entries turn from asking into remembering." },
+  { feature:'journal_voice', title:'Say it out loud ✦',
+    body:'Some mornings you do not want to type. Record it in your own voice instead and it is kept exactly the same way.' },
+];
+function renderJournalPreview(tier){
+  const host = document.getElementById('journalPreview');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="locked-preview-head">
+      <h4>What the journal holds</h4>
+      <p>${pwEscape(tierPriceText('whisper'))}</p>
+    </div>
+    <div class="locked-grid">
+      ${JOURNAL_PREVIEW_CARDS.map(c => lockedCard(c.feature, { title:c.title, body:c.body, locked: !tierHasFeature(tier, c.feature), trigger:'journal_preview_card' })).join('')}
+    </div>
+    ${journalPhilosophyPeek()}`;
+  host.style.display = 'block';
+}
+/* The first paragraph of the real 3D/4D/5D explainer, blurred. It is taken from
+   the page rather than written out again here, so it cannot drift from the copy
+   a member actually reads. If the explainer is ever removed, this quietly
+   renders nothing instead of showing a stale quote. */
+function journalPhilosophyPeek(){
+  const para = document.querySelector('#journalPhilosophy .journal-philosophy-body p');
+  const text = para ? para.textContent.trim().slice(0, 260) : '';
+  if (!text) return '';
+  return `<button type="button" class="locked-card is-locked locked-peek" style="margin-top:10px;"
+      onclick="openUpgradeModal('manifestation', { trigger:'journal_philosophy_peek' })"
+      aria-label="Why hasn't this shown up yet — locked, Whisper">
+    <span class="lc-top" style="position:relative; z-index:1;">
+      <span class="lc-title">Why hasn't this shown up yet? ${lockGlyph(11)}</span>
+      ${premiumBadge('whisper', { small:true })}
+    </span>
+    <span class="lp-body" aria-hidden="true" style="font-size:12.5px; line-height:1.6; display:block; text-align:left;">${pwEscape(text)}…</span>
+    <span class="lc-cta" style="position:relative; z-index:1;">Unlock →</span>
+  </button>`;
+}
+
+/* ---------------- the tracker, shown as a progression ----------------
+   The habit tracker is the one place where the thing being sold and the thing
+   motivating the sale are the same: three habits now, three more every
+   twenty-one days practised, up to fifteen. So the preview is the ladder itself,
+   drawn from the constants in js/habits.js rather than from numbers typed again
+   here — change HABIT_SPACES_PER_CYCLE and this moves with it.
+
+   Her line at the bottom is the only place in this work she speaks about a plan,
+   and she does it the way she speaks about everything else: as the next stretch
+   of the same road. It is her real saved face, or no face at all until the
+   profile row has landed — never a stand-in. */
+async function renderRitualsPreview(tier, tab){
+  const host = document.getElementById('ritualsPreview');
+  if (!host) return;
+  const isHabits = tab === 'habits';
+  /* Her face comes off the profile row, and somebody who opened this page
+     directly may not have read that row yet. Waiting on it is a cached lookup
+     in every case that matters, and it is the difference between her actual
+     saved drawing and a skeleton standing there instead. */
+  if (isHabits && typeof loadHigherSelf === 'function') { try { await loadHigherSelf(); } catch(e){} }
+  const cards = isHabits
+    ? [
+        { feature:'habit_tracker',  title:'Morning and night ✦' },
+        { feature:'habit_cycles',   title:'Twenty-one day cycles ✦' },
+        { feature:'habit_insights', title:'Your whole run, in colour ✦' },
+      ]
+    : [
+        { feature:'daily_log',      title:'The page you wrote by hand ✦' },
+        { feature:'journal',        title:'Gratitude, first thing ✦' },
+        { feature:'manifestation',  title:'Future Self ✦' },
+      ];
+  host.innerHTML = `
+    <div class="locked-preview-head">
+      <h4>${isHabits ? 'Build your 1% better routine ✦' : 'Keep the record, keep the practice ✦'}</h4>
+      <p>${pwEscape(tierPriceText(isHabits ? 'ritual' : 'whisper'))}</p>
+    </div>
+    ${isHabits ? habitProgressionPeek() : ''}
+    <div class="locked-grid">
+      ${cards.map(c => lockedCard(c.feature, { title:c.title, locked: !tierHasFeature(tier, c.feature), trigger:'rituals_preview_card' })).join('')}
+    </div>
+    ${isHabits ? higherSelfUpgradeNote() : ''}`;
+  host.style.display = 'block';
+}
+/* The ladder, with the numbers the tracker itself uses. */
+function habitProgressionPeek(){
+  const perCycle = HABIT_SPACES_PER_CYCLE, start = HABIT_SPACES_AT_START, days = HABIT_CYCLE_DAYS, max = HABIT_SLOTS;
+  const steps = [];
+  for (let spaces = start, cycle = 0; spaces < max; spaces = Math.min(max, spaces + perCycle), cycle++){
+    steps.push(cycle === 0
+      ? `${spaces} habits to start`
+      : `+${perCycle} at ${cycle * days} days`);
+    if (steps.length >= 4) break;
+  }
+  steps.push(`up to ${max}`);
+  return `<div class="locked-progress">
+    <div class="locked-progress-title">Day 1 of ${days}</div>
+    <div class="locked-progress-track" role="img" aria-label="A cycle is ${days} days practised"><span class="locked-progress-fill" style="width:6%"></span></div>
+    <div class="locked-progress-steps">
+      ${steps.map((t, i) => `<span class="locked-progress-step" data-state="${i === 0 ? 'open' : 'ahead'}">${pwEscape(t)}</span>`).join('')}
+    </div>
+    <p style="font-size:12.5px; color:var(--haze); line-height:1.6; margin:0;">A cycle is ${days} days practised, not ${days} in a row — a missed day is a day that did not count, never a day that undoes the ones before it.</p>
+  </div>`;
+}
+/* Her one line about going deeper. Progression, not a pitch, and not repeated
+   anywhere else: she says this on the page somebody opened looking for the
+   tracker, and nowhere they did not ask. */
+function higherSelfUpgradeNote(){
+  if (typeof higherSelfDialogue !== 'function') return '';
+  // No face until we actually know which one is theirs. `null` is "no
+  // character", which is honest; a stand-in would be somebody else's face.
+  if (!higherSelfLoaded) return '';
+  const name = (higherSelf.name || '').trim();
+  return higherSelfDialogue({
+    message: `Ready to go deeper? Ritual unlocks the morning and night we keep together — longer sessions, and more tools for the version of you we're building.`,
+    speaker: name,
+    avatar: higherSelfChoice(),
+    emotion: 'welcoming',
+    size: 'sm',
+  });
 }
 
 /* Rituals page — the daily log calendar and the habit lists that fill it in. */
@@ -60,24 +206,35 @@ function setRitualsTab(tab){
 async function renderRitualsState(){
   const locked = document.getElementById('ritualsLocked');
   const upgrade = document.getElementById('ritualsUpgrade');
+  const preview = document.getElementById('ritualsPreview');
   const calendarPanel = document.getElementById('journalPhotoPanel');
   const habitsPanel = document.getElementById('habitsPanel');
   calendarPanel.style.display = 'none';
   habitsPanel.style.display = 'none';
   upgrade.style.display = 'none';
+  if (preview) preview.style.display = 'none';
   locked.style.display = currentUser ? 'none' : 'block';
   if (!currentUser) return;
 
   const myTier = await getMyTier();
-  const requiredTier = ritualsTab === 'habits' ? 'ritual' : 'whisper';
+  /* Which plan this tab needs, named once and then used for the panel copy, the
+     button and the preview underneath — rather than three places each deciding
+     for themselves which tier the tab belongs to. */
+  const feature = ritualsTab === 'habits' ? 'habit_tracker' : 'daily_log';
+  const requiredTier = featureRequiredTier(feature);
   if (!tierAtLeast(myTier, requiredTier)){
     const isHabits = ritualsTab === 'habits';
     document.getElementById('ritualsUpgradeTitle').textContent = isHabits ? 'The habit tracker is part of Ritual' : 'The daily log is part of Whisper';
+    // The price comes off the plan catalog now, so a change in Stripe does not
+    // leave a stale figure sitting on this panel.
     document.getElementById('ritualsUpgradeText').textContent = isHabits
-      ? 'Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — $11.11 a month, or $111 a year.'
-      : 'Daily Journaling — writing by hand and logging each page here — comes with Whisper, $5.55 a month or $55 a year.';
-    document.getElementById('ritualsUpgradeBtn').textContent = isHabits ? 'Get Ritual' : 'Get Whisper';
+      ? `Morning and night rituals, EFT tapping, and visualization scripting come with Ritual — ${tierPriceText('ritual')}.`
+      : `Daily Journaling — writing by hand and logging each page here — comes with Whisper, ${tierPriceText('whisper')}.`;
+    const btn = document.getElementById('ritualsUpgradeBtn');
+    btn.textContent = 'See what it unlocks ✦';
+    btn.onclick = () => openUpgradeModal(feature, { tier: myTier, trigger: 'rituals_panel' });
     upgrade.style.display = 'block';
+    renderRitualsPreview(myTier, ritualsTab);
     return;
   }
 

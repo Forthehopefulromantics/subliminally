@@ -104,7 +104,13 @@ function showStep(n){
   document.querySelectorAll('.flow-step').forEach(s=>s.classList.remove('active'));
   document.querySelector(`.flow-step[data-step="${n}"]`).classList.add('active');
   step = n; renderProgress();
-  if (n === 1) updateSessionLengthHint();
+  if (n === 1){ updateSessionLengthHint(); renderDurationChips(); }
+  if (n === 1 || n === 5) applyBuilderLocks();
+  if (n === 1 && pendingRitualMode){
+    const chip = document.querySelector(`#ritualModeChips .length-chip[data-mode="${pendingRitualMode}"]`);
+    pendingRitualMode = null;
+    if (chip) pickRitualMode(chip);
+  }
   if (n === 7) renderFinalFreqPicker();
 }
 /* The session-length slider runs from 5 minutes to 8 hours with no restriction on
@@ -121,6 +127,7 @@ async function onSessionLengthInput(){
   const minutes = parseInt(document.getElementById('sessionLengthSlider').value, 10);
   state.targetLengthMinutes = minutes;
   document.getElementById('sessionLengthVal').textContent = formatSessionLength(minutes);
+  syncDurationChips();
   await updateSessionLengthHint();
   updateSessionTimerLabel();
 }
@@ -132,8 +139,93 @@ async function updateSessionLengthHint(){
   if (requiredTier === 'none'){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
   const myTier = currentUser ? await getMyTier() : 'none';
   if (tierAtLeast(myTier, requiredTier)){ hintEl.textContent = ''; hintEl.className = 'length-msg'; return; }
-  hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
+  hintEl.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#" onclick="openUpgradeModal('${featureCoveringMinutes(minutes)}', { trigger:'length_hint' }); return false;">see what it unlocks</a>. You can still build this, you'll just be asked to upgrade before generating or saving it.`;
   hintEl.className = 'length-msg err';
+}
+
+/* ---------------- the lengths, as chips ----------------
+   The slider is the whole range and always was; these are the five lengths
+   people actually choose, sitting above it so the choice is a tap rather than a
+   drag to a number. Every one of them is drawn for everybody — a free account
+   sees 8 hours, muted, with a lock and the word RITUAL under it, because a
+   length you cannot see is a length you cannot want.
+
+   Which plan each one needs is not decided here. `featureForMinutes` finds the
+   row in the feature table, and that row reads its tier off
+   requiredTierForMinutes — the same function the slider's hint and the save
+   check already use, so the chip, the hint and the save can never disagree. */
+const DURATION_PRESETS = [20, 60, 120, 240, 480];
+async function renderDurationChips(){
+  const wrap = document.getElementById('durationChips');
+  if (!wrap) return;
+  const tier = currentUser ? await getMyTier() : 'none';
+  wrap.innerHTML = DURATION_PRESETS.map(m =>
+    `<button type="button" class="length-chip" data-minutes="${m}" onclick="pickDuration(${m})">${formatSessionLength(m)}</button>`
+  ).join('') +
+    `<button type="button" class="length-chip" data-custom="1" onclick="pickCustomDuration()">Custom<span>any length</span></button>`;
+  wrap.querySelectorAll('[data-minutes]').forEach(chip => {
+    const key = featureForMinutes(parseInt(chip.dataset.minutes, 10));
+    if (key) lockedControl(chip, key, tier);
+  });
+  syncDurationChips();
+}
+/* Which chip is lit: the preset that matches the slider exactly, or Custom for
+   any other number. Called on every drag, so it only moves a class. */
+function syncDurationChips(){
+  const wrap = document.getElementById('durationChips');
+  if (!wrap) return;
+  const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
+  const exact = DURATION_PRESETS.includes(minutes);
+  wrap.querySelectorAll('.length-chip').forEach(c => {
+    const isSel = c.dataset.custom ? !exact : parseInt(c.dataset.minutes, 10) === minutes;
+    c.classList.toggle('sel', isSel);
+  });
+}
+/* Tapping a length past your plan does not move the slider and does not scold.
+   It opens the one contextual sheet for that length and leaves the choice
+   exactly where it was. */
+async function pickDuration(minutes){
+  const key = featureForMinutes(minutes);
+  const tier = currentUser ? await getMyTier() : 'none';
+  if (key && !tierHasFeature(tier, key)){
+    openUpgradeModal(key, { tier, trigger: 'duration_chip' });
+    return;
+  }
+  const slider = document.getElementById('sessionLengthSlider');
+  slider.value = minutes;
+  state.targetLengthMinutes = minutes;
+  document.getElementById('sessionLengthVal').textContent = formatSessionLength(minutes);
+  syncDurationChips();
+  await updateSessionLengthHint();
+  updateSessionTimerLabel();
+}
+/* ---------------- the premium layers, drawn as locked ----------------
+   Tapping, visualization, the soothing pad, your own track and the second voice
+   all stay on the screen for everybody. This is the one pass that marks whichever
+   of them this account cannot reach yet, off the feature table — so the chip, its
+   badge and the sheet it opens are all reading the same row.
+
+   It runs when a step that holds one of them opens, because the plan can change
+   under a page that is already loaded (a purchase in another tab, a restore). */
+async function applyBuilderLocks(){
+  const tier = currentUser ? await getMyTier() : 'none';
+  const MODE_FEATURE = { eft:'eft', visualization:'visualization' };
+  document.querySelectorAll('#ritualModeChips .length-chip').forEach(chip => {
+    const key = MODE_FEATURE[chip.dataset.mode];
+    if (key) lockedControl(chip, key, tier);
+  });
+  document.querySelectorAll('#soothingChips .length-chip').forEach(chip => {
+    if (chip.dataset.variant !== 'none') lockedControl(chip, 'soothing_layer', tier);
+  });
+  lockSlot('lockSoothing', 'soothing_layer', tier);
+  lockSlot('lockCustomTrack', 'custom_track', tier);
+  lockSlot('lockLayerVoice', 'layer_voice', tier);
+}
+
+/* Custom is not a sixth length — it is the slider, which was already there. */
+function pickCustomDuration(){
+  document.querySelectorAll('#durationChips .length-chip').forEach(c => c.classList.toggle('sel', !!c.dataset.custom));
+  document.getElementById('sessionLengthSlider').focus({ preventScroll: true });
 }
 function nextStep(){ showStep(step+1); }
 function prevStep(){ showStep(Math.max(0,step-1)); }
@@ -147,6 +239,7 @@ function resetFlow(){
   document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
+  renderDurationChips();
   const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
   if (defaultSoothing) defaultSoothing.classList.add('sel');
   state.binauralBand = null;
@@ -234,16 +327,14 @@ async function pickRitualMode(btn){
   const msg = document.getElementById('ritualModeMsg');
   const mode = btn.dataset.mode;
   msg.textContent = '';
+  /* Both of these are Ritual features, and both stay tappable for everybody:
+     the tap is how somebody asks what they are, and the sheet answers with what
+     the mode is for rather than with a price. The mode itself is not selected,
+     so nothing about the session changes behind the explanation. */
   if (mode === 'eft' || mode === 'visualization'){
-    if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
-      msg.className = 'length-msg err';
-      return;
-    }
-    const myTier = await getMyTier();
-    if (!tierAtLeast(myTier, 'ritual')){
-      msg.innerHTML = `${mode === 'eft' ? 'Subliminal + EFT Tapping' : 'Visualization Scripting'} is a Ritual feature — <a href="#pricing">see plans</a>.`;
-      msg.className = 'length-msg err';
+    const myTier = currentUser ? await getMyTier() : 'none';
+    if (!tierHasFeature(myTier, mode)){
+      openUpgradeModal(mode, { tier: myTier, trigger: 'mode_chip' });
       return;
     }
   }
@@ -277,6 +368,77 @@ async function pickRitualMode(btn){
   if (lengthQ) lengthQ.style.display = state.eftMode ? 'none' : '';
   answered(btn);
 }
+/* ---------------- starting a premium session from outside the builder ----------------
+   The Science page explains tapping and visualization scripting and then has to
+   offer a way in. Both are Ritual modes, so both cards do one of two things: on
+   Ritual they open the builder already in that mode with the theme sitting in
+   the prompt, and on anything else they open the sheet that says what the mode
+   is for. What they never do is nothing.
+
+   The mode is applied when step 1 opens rather than now: the mode chips live on
+   step 1, and selecting one while it is off screen scrolls a hidden element and
+   skips the frequency the session still needs. */
+let pendingRitualMode = null;
+async function startPremiumSession(mode, seed){
+  const tier = currentUser ? await getMyTier() : 'none';
+  if (!tierHasFeature(tier, mode)){
+    openUpgradeModal(mode, { tier, trigger: 'session_category' });
+    return;
+  }
+  showBuildPage();
+  resetFlow();
+  showStep(0);
+  pendingRitualMode = mode;
+  const goal = document.getElementById('quizGoal');
+  if (goal) goal.value = seed || '';
+}
+
+/* ---------------- the session categories on the Science page ----------------
+   Starting points, not a second catalog: each one is a line of prompt text the
+   builder would have asked for anyway. Everybody sees all of them; the lock and
+   the badge are what change with the plan. */
+const SESSION_CATEGORIES = {
+  eft: [
+    { title:'Release Anxiety',  body:'Name the worry out loud and tap the charge out of it, point by point.',
+      seed:'I want to stop feeling anxious about everything I cannot control, and trust that I can handle what actually arrives.' },
+    { title:'Self Worth',       body:'The setup statement most people need first: even though this is here, I accept myself.',
+      seed:'I want to stop measuring my worth by what I produce, and believe I am enough as I already am.' },
+    { title:'Abundance',        body:'For the tightness that shows up around money before any number does.',
+      seed:'I want to release the fear I feel around money and believe there is more than enough coming to me.' },
+    { title:'Confidence',       body:'For the moment before the thing — the room, the call, the conversation.',
+      seed:'I want to walk into rooms without shrinking, and trust that I belong wherever I have been invited.' },
+  ],
+  visualization: [
+    { title:'Dream Life',       body:'An ordinary Tuesday in the life you are building. The details are the point.',
+      seed:'It is an ordinary Tuesday morning a year from now. Describe where I wake up, what the light is like, what I do first, and how it feels to be this version of me.' },
+    { title:'Confidence',       body:'Rehearse the moment in first-hand detail so the real one feels familiar.',
+      seed:'I walk into the room where I have to speak. Describe what I see, what I hear, how steady my hands are, and how it goes.' },
+    { title:'Love',             body:'The relationship as it actually feels day to day, not as a wish.',
+      seed:'Describe an evening with the person I am calling in — what we talk about, how safe it feels, what we do at the end of the night.' },
+    { title:'Abundance',        body:'What it is like to stop checking, and simply have enough.',
+      seed:'Describe the morning I stop checking my balance before I do anything else, and what I do with the room that gives me.' },
+    { title:'Career',           body:'The work, the room, and the moment it lands.',
+      seed:'Describe the day the work I have been building is recognised — where I am, who tells me, and what I feel in my chest when they do.' },
+    { title:'Custom Visualization', body:'A blank page. Write the scene entirely yourself.', seed:'' },
+  ],
+};
+async function renderSessionCategories(){
+  const tier = currentUser ? await getMyTier() : 'none';
+  [['eft','eftCategoryGrid'], ['visualization','visualizationCategoryGrid']].forEach(([mode, id]) => {
+    const host = document.getElementById(id);
+    if (!host) return;
+    const locked = !tierHasFeature(tier, mode);
+    host.innerHTML = SESSION_CATEGORIES[mode].map(c => lockedCard(mode, {
+      title: c.title,
+      body: c.body,
+      locked,
+      openLabel: 'Start',
+      trigger: 'session_category',
+      onOpen: `startPremiumSession('${mode}', ${JSON.stringify(c.seed)})`,
+    })).join('');
+  });
+}
+
 /* Swaps the quiz-step copy (prompt label, generate button, loading/review titles)
    to match whichever of the three modes is active. */
 function applyModeCopy(mode){
@@ -331,8 +493,9 @@ async function generateAffirmations(){
     }
     const myTier = await getMyTier();
     if (!tierAtLeast(myTier, requiredTier)){
-      msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — <a href="#pricing">see plans</a>, or drag the slider back down to build at your current tier.`;
+      msg.innerHTML = `${formatSessionLength(minutes)} needs ${TIER_LABEL[requiredTier]} or higher — or drag the slider back down to build at your current plan.`;
       msg.className = 'length-msg err';
+      openUpgradeModal(featureCoveringMinutes(minutes), { tier: myTier, trigger: 'generate_blocked' });
       return;
     }
   }
@@ -748,17 +911,10 @@ async function toggleLayerVoice(checked){
   const toggle = document.getElementById('layerVoiceToggle');
   msg.textContent = '';
   if (!checked){ layerVoiceEnabled = false; panel.classList.remove('open'); return; }
-  if (!currentUser){
+  const myTier = currentUser ? await getMyTier() : 'none';
+  if (!tierHasFeature(myTier, 'layer_voice')){
     toggle.checked = false;
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
-    msg.className = 'length-msg err';
-    return;
-  }
-  const myTier = await getMyTier();
-  if (myTier !== 'ritual'){
-    toggle.checked = false;
-    msg.innerHTML = `A second, layered voice is a Ritual feature — <a href="#pricing">see plans</a>.`;
-    msg.className = 'length-msg err';
+    openUpgradeModal('layer_voice', { tier: myTier, trigger: 'layer_voice_toggle' });
     return;
   }
   layerVoiceEnabled = true;
@@ -1222,15 +1378,9 @@ let customTrackBlob = null;
 async function triggerCustomTrackUpload(){
   const msg = document.getElementById('customTrackMsg');
   msg.textContent = '';
-  if (!currentUser){
-    msg.innerHTML = `Log in first — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a>.`;
-    msg.className = 'length-msg err';
-    return;
-  }
-  const myTier = await getMyTier();
-  if (myTier !== 'ritual'){
-    msg.innerHTML = `Uploading your own track is a Ritual feature — <a href="#pricing">see plans</a>.`;
-    msg.className = 'length-msg err';
+  const myTier = currentUser ? await getMyTier() : 'none';
+  if (!tierHasFeature(myTier, 'custom_track')){
+    openUpgradeModal('custom_track', { tier: myTier, trigger: 'custom_track_button' });
     return;
   }
   document.getElementById('customTrackFile').click();
@@ -1270,15 +1420,9 @@ async function pickSoothingLayer(btn){
   msg.textContent = '';
 
   if (variant !== 'none'){
-    if (!currentUser){
-      msg.innerHTML = `Log in to unlock this — <a href="#" onclick="openAuthModal('signup'); return false;">create a free account</a> first.`;
-      msg.className = 'length-msg err';
-      return;
-    }
-    const myTier = await getMyTier();
-    if (myTier === 'none'){
-      msg.innerHTML = `The soothing layer is included on Whisper & Ritual — <a href="#pricing">see plans</a>.`;
-      msg.className = 'length-msg err';
+    const myTier = currentUser ? await getMyTier() : 'none';
+    if (!tierHasFeature(myTier, 'soothing_layer')){
+      openUpgradeModal('soothing_layer', { tier: myTier, trigger: 'soothing_chip' });
       return;
     }
   }

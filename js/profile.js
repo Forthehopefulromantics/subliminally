@@ -41,6 +41,8 @@ async function loadProfile(){
   const badge = document.getElementById('profileTierDisplay');
   badge.dataset.tier = myTier;
   badge.textContent = myTier === 'none' ? 'Free account' : (tierIcons[myTier] + myTier[0].toUpperCase()+myTier.slice(1) + ' member');
+  const ladder = document.getElementById('profilePlanLadder');
+  if (ladder) ladder.innerHTML = planLadderMarkup(myTier);
 }
 
 /* ---------- change your username ---------- */
@@ -57,6 +59,15 @@ async function updateUsername(){
   loadNavIdentity();
 }
 
+/* The storage line above the library. `used` of null means the fetch failed —
+   an honest blank beats a wrong count. */
+async function renderLibraryPlanLimit(used){
+  const host = document.getElementById('myLibraryPlanLimit');
+  if (!host) return;
+  if (used == null || !currentUser){ host.innerHTML = ''; return; }
+  host.innerHTML = planLimitMarkup(used, await getMyTier());
+}
+
 async function loadMyLibrary(options){
   if (!sb || !currentUser) return;
   const list = document.getElementById('myLibraryList');
@@ -68,6 +79,11 @@ async function loadMyLibrary(options){
   const { data: subs, error } = await fetchOnce('myLibrary',
     () => sb.from('subliminals').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }));
   if (error) forgetFetch('myLibrary');
+  /* How full the library is, said at the top before the list itself. Free
+     accounts reaching their two do not lose anything here: every saved
+     subliminal stays open and playable, and only saving another one is gated —
+     which is what the note under the bar says. */
+  renderLibraryPlanLimit(error ? null : (subs || []).length);
   if (error || !subs || !subs.length){ list.innerHTML = '<div class="library-empty">Nothing saved yet — build one and hit "Save to my library."</div>'; return; }
   list.innerHTML = subs.map(s => {
     const mins = Math.round((s.duration_seconds||0)/60);
