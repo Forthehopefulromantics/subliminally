@@ -51,10 +51,9 @@ const PLANS = {
         productId: 'com.fthr.subliminally.ritual.monthly',
       },
       annual: {
-        amountCents: 11199,     // $111.99/yr
-        // NEEDS STRIPE DASHBOARD: same, for the $111.99/year price.
+        amountCents: 9999,      // $99.99/yr
         priceId: null,
-        link: 'REPLACE_WITH_STRIPE_PAYMENT_LINK_RITUAL_ANNUAL',
+        link: 'https://buy.stripe.com/9B6eVc2PsaxdgPRg5fgYU08',
         productId: 'com.fthr.subliminally.ritual.annual',
       },
     },
