@@ -25,24 +25,64 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // keep working without a code change, and there's no ID to copy across by hand
 // and get wrong.
 //
+// The amounts are the same contract as amountCents in the PLANS catalog in
+// js/billing.js — that table decides which link a tier's button opens, this
+// one decides which tier a completed payment grants. Change a price in Stripe
+// and both have to move.
+//
 // Legacy amounts are from before the plan restructure. Reverie was retired;
 // anyone still paying for it keeps everything they had, which now lives on Ritual.
-const AMOUNT_TO_TIER = {
-  555: 'whisper',    // Whisper monthly, $5.55
-  5500: 'whisper',   // Whisper yearly, $55
-  1111: 'ritual',    // Ritual monthly, $11.11
-  11100: 'ritual',   // Ritual yearly, $111
-  1000: 'whisper',   // legacy Whisper, $10/mo
-  2200: 'ritual',    // legacy Reverie, $22/mo
-  3500: 'ritual',    // legacy Ritual, $35/mo
+const AMOUNT_TO_PLAN = {
+  555: { tier: 'whisper', period: 'monthly' },   // Whisper monthly, $5.55
+  5500: { tier: 'whisper', period: 'annual' },   // Whisper yearly, $55
+  1111: { tier: 'ritual', period: 'monthly' },   // Ritual monthly, $11.11
+  11100: { tier: 'ritual', period: 'annual' },   // Ritual yearly, $111
+  1000: { tier: 'whisper', period: 'monthly' },  // legacy Whisper, $10/mo
+  2200: { tier: 'ritual', period: 'monthly' },   // legacy Reverie, $22/mo
+  3500: { tier: 'ritual', period: 'monthly' },   // legacy Ritual, $35/mo
 };
 
-function tierForSubscription(sub) {
+function planForSubscription(sub) {
   const price = sub.items?.data?.[0]?.price;
   if (!price) return null;
-  const tier = AMOUNT_TO_TIER[price.unit_amount] || null;
-  if (!tier) console.error('No tier mapped for amount', price.unit_amount, 'price', price.id);
-  return tier;
+  const plan = AMOUNT_TO_PLAN[price.unit_amount] || null;
+  if (!plan) console.error('No tier mapped for amount', price.unit_amount, 'price', price.id);
+  return plan;
+}
+
+function tierForSubscription(sub) {
+  const plan = planForSubscription(sub);
+  return plan ? plan.tier : null;
+}
+
+// client_reference_id carries the Supabase user id, and — since the plan
+// catalog landed — the plan the button claimed to be selling, as
+// "<user id>__<tier>_<period>". Older checkouts sent the bare user id, so a
+// reference with no "__" is read as a user id and nothing else.
+function parseClientReference(raw) {
+  if (!raw) return { userId: null, intended: null };
+  const [userId, plan] = String(raw).split('__');
+  if (!plan) return { userId: userId || null, intended: null };
+  const cut = plan.lastIndexOf('_');
+  if (cut < 1) return { userId: userId || null, intended: null };
+  return { userId: userId || null, intended: { tier: plan.slice(0, cut), period: plan.slice(cut + 1) } };
+}
+
+// A Payment Link points at one product, and which URL sits on which pricing
+// button is a hand-pasted thing that nothing downstream can see. This is the
+// check for it: what the button offered, against what Stripe actually charged.
+// A mismatch means a link on the pricing page opens the wrong product's
+// checkout, so it's logged loudly with both sides named. What somebody paid
+// for is still what they get — the amount is the truth here, never the button.
+function warnIfPlanMismatch(intended, charged, price) {
+  if (!intended || !charged) return;
+  if (intended.tier === charged.tier && intended.period === charged.period) return;
+  console.error(
+    `Checkout plan mismatch: the pricing page offered ${intended.tier}/${intended.period} ` +
+      `but Stripe charged ${price?.unit_amount} (${charged.tier}/${charged.period}, price ${price?.id}). ` +
+      'A Payment Link in the PLANS catalog in js/billing.js is pointed at the wrong product. ' +
+      `Granting ${charged.tier} — what was actually paid for.`
+  );
 }
 
 function getRawBody(req) {
@@ -168,10 +208,12 @@ export default async function handler(req, res) {
   try {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
-      const userId = session.client_reference_id;
+      const { userId, intended } = parseClientReference(session.client_reference_id);
       if (userId && session.subscription) {
         const sub = await fetchStripeSubscription(session.subscription);
-        const tier = tierForSubscription(sub);
+        const charged = planForSubscription(sub);
+        const tier = charged ? charged.tier : null;
+        warnIfPlanMismatch(intended, charged, sub.items?.data?.[0]?.price);
         await upsertByUserId(userId, {
           stripe_customer_id: session.customer,
           tier,

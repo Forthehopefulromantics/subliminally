@@ -5,32 +5,145 @@
    onclick handlers in index.html keep working, and what lets each file
    see the ones loaded before it. Order matters — see index.html. */
 
+/* ---------------- THE PLAN CATALOG ----------------
+   One table, one place. Everything that decides *what a tier sells* lives
+   here: the Stripe Payment Link the web sends you to, the price that link has
+   to charge, the App Store / Play product the native apps buy, and the
+   RevenueCat entitlement that proves you own it. Nothing else in the app
+   keeps a second copy of any of these — read them from here.
+
+   Keeping them on one row per tier and billing period is the point. These are
+   opaque pasted-in strings; a link pasted onto the wrong row is invisible at a
+   glance and just as invisible in a diff, and what it looks like in the wild
+   is a plan whose button opens somebody else's checkout. Side by side with the
+   tier and the price they belong to, a wrong paste has something to disagree
+   with — and assertPlanCatalog() below refuses to let two rows share a link.
+
+   amountCents is what the linked Stripe price must charge. The Stripe webhook
+   (api/stripe-webhook.js) works out which tier a payment bought from the
+   amount charged, so these numbers and AMOUNT_TO_PLAN over there are the two
+   ends of one contract: change a price in Stripe and both have to move.
+
+   priceId is the Stripe price each link is supposed to sell. Nothing reads it
+   at runtime — a Payment Link carries its own price, and the webhook goes by
+   the amount charged. It's written down because it's the only thing that says,
+   in the repo, which Stripe object a row is claiming: the link is an opaque
+   URL, and two rows quietly holding one price is a thing you can otherwise
+   only find out from a customer. Leave a row's priceId null rather than guess
+   at it — the check below reads null as "not written down yet" and says
+   nothing, which is the honest state to be in.
+
+   To wire or re-create a Payment Link: Stripe -> Payment Links. Each link's
+   own page names the product and price it sells. Paste the buy.stripe.com URL
+   onto that product's row here, and nowhere else. */
+const PLANS = {
+  whisper: {
+    label: 'Whisper',
+    entitlementId: 'whisper',   // RevenueCat -> Entitlements
+    periods: {
+      monthly: {
+        amountCents: 555,       // $5.55/mo
+        priceId: 'price_1UFRCkBiVHYI4vcXmZLmHBCH',
+        link: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',
+        productId: 'com.fthr.subliminally.whisper.monthly',
+      },
+      annual: {
+        amountCents: 5500,      // $55/yr
+        priceId: 'price_1UFRDzBiVHYI4vcX8QFMCHuQ',
+        link: 'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',
+        productId: 'com.fthr.subliminally.whisper.annual',
+      },
+    },
+  },
+  ritual: {
+    label: 'Ritual',
+    entitlementId: 'ritual',
+    periods: {
+      monthly: {
+        amountCents: 1111,      // $11.11/mo
+        priceId: 'price_1UFRBTBiVHYI4vcXVfzNDr9I',
+        link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
+        productId: 'com.fthr.subliminally.ritual.monthly',
+      },
+      annual: {
+        amountCents: 11100,     // $111/yr
+        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
+        link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
+        productId: 'com.fthr.subliminally.ritual.annual',
+      },
+    },
+  },
+};
+
+/* The one way to ask what a tier sells. Everything that opens a checkout —
+   web or native — goes through this, so there is no second lookup to get
+   wrong. Returns null for a tier or period that isn't sold. */
+function planFor(tier, period){
+  const plan = PLANS[tier];
+  if (!plan) return null;
+  return plan.periods[period || 'monthly'] || null;
+}
+
+/* Catches the ways the table above goes wrong in practice: a row left on its
+   placeholder, and one link, store product or Stripe price sitting on two
+   rows, which is how a tier quietly starts selling another tier's plan. Runs at
+   load, so it surfaces in the console on the deploy that introduced it rather
+   than in somebody's checkout. It can only catch a link used *twice* — a link
+   that points at the wrong product and is used once looks fine from here, so
+   the Stripe dashboard is still the thing that has the last word on which URL
+   belongs on which row. */
+function assertPlanCatalog(){
+  const problems = [];
+  const seenLink = new Map();
+  const seenProduct = new Map();
+  const seenPrice = new Map();
+  for (const tier of Object.keys(PLANS)){
+    for (const period of Object.keys(PLANS[tier].periods)){
+      const row = PLANS[tier].periods[period];
+      const where = tier + '/' + period;
+      if (!row.link || row.link.startsWith('REPLACE_')){
+        problems.push(where + ' has no Stripe Payment Link yet');
+      } else if (seenLink.has(row.link)){
+        problems.push(where + ' and ' + seenLink.get(row.link) + ' share one Stripe Payment Link (' + row.link + ') — one of them is selling the other one’s plan');
+      } else {
+        seenLink.set(row.link, where);
+      }
+      if (seenProduct.has(row.productId)) problems.push(where + ' and ' + seenProduct.get(row.productId) + ' share one store product (' + row.productId + ')');
+      else seenProduct.set(row.productId, where);
+      if (!row.priceId) continue;   // not written down yet — nothing to check
+      if (seenPrice.has(row.priceId)) problems.push(where + ' and ' + seenPrice.get(row.priceId) + ' claim one Stripe price (' + row.priceId + '), which can only charge one amount on one interval');
+      else seenPrice.set(row.priceId, where);
+    }
+  }
+  if (problems.length) console.error('Plan catalog is wrong:\n  ' + problems.join('\n  '));
+  return problems;
+}
+assertPlanCatalog();
+
 /* ---------------- CHECKOUT LINKING ----------------
    Web keeps the existing Stripe Payment Links. The native apps can't use
    those — Apple/Google require subscriptions sold inside the app to go
    through their own billing — so on native this hands off to RevenueCat
    instead. See the RevenueCat block below for the purchase flow itself. */
-// Stripe Payment Links, one per plan + billing period. Create these in
-// Stripe -> Payment Links (subscription, recurring monthly or yearly) and
-// paste the buy.stripe.com URLs here. The matching Price IDs also go into
-// PRICE_TO_TIER in api/stripe-webhook.js so the webhook knows which tier
-// a checkout was for.
-const STRIPE_LINKS = {
-  whisper: {
-    monthly: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',   // $5.55/mo
-    annual:  'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',   // $55/yr
-  },
-  ritual: {
-    monthly: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',   // $11.11/mo
-    annual:  'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',   // $111/yr
-  },
-};
-let billingPeriod = 'monthly'; // 'monthly' | 'annual'
+/* The pricing cards open on the yearly price and toggle down to monthly. The
+   static figures in index.html are rendered at this same period — they're what
+   shows until someone touches the toggle, so the two have to agree. */
+let billingPeriod = 'annual'; // 'monthly' | 'annual'
 
 function setBillingPeriod(period){
   billingPeriod = period;
   document.querySelectorAll('#billingToggle button').forEach(b => b.classList.toggle('active', b.dataset.period === period));
   document.querySelectorAll('.price-figure, .price-period').forEach(el => { el.textContent = el.dataset[period]; });
+}
+
+/* What we tell Stripe this checkout was *meant* to be. The user id is what the
+   webhook needs to find the account; the plan tag after it is what lets the
+   webhook compare the plan the button offered against the amount Stripe
+   actually charged, and say so loudly when a Payment Link is pointed at the
+   wrong product. Stripe allows letters, digits, dashes and underscores here,
+   which is why the two halves are joined with a double underscore. */
+function checkoutReference(userId, tier, period){
+  return userId + '__' + tier + '_' + period;
 }
 
 function goToCheckout(evt, tier){
@@ -44,14 +157,14 @@ function goToCheckout(evt, tier){
     purchaseTier(tier, billingPeriod);
     return false;
   }
-  const link = STRIPE_LINKS[tier] && STRIPE_LINKS[tier][billingPeriod];
-  if (!link || link.startsWith('REPLACE_')){
+  const row = planFor(tier, billingPeriod);
+  if (!row || !row.link || row.link.startsWith('REPLACE_')){
     const msg = document.getElementById('pricingPurchaseMsg');
     msg.textContent = "Checkout for this plan isn't connected yet — check back soon.";
     msg.className = 'save-msg err';
     return false;
   }
-  window.open(link + '?client_reference_id=' + encodeURIComponent(currentUser.id), '_blank');
+  window.open(row.link + '?client_reference_id=' + encodeURIComponent(checkoutReference(currentUser.id, tier, billingPeriod)), '_blank');
   return false;
 }
 
@@ -67,19 +180,11 @@ function goToCheckout(evt, tier){
 const REVENUECAT_API_KEY_IOS = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
 const REVENUECAT_API_KEY_ANDROID = 'test_BFAnoyuXlkSVafvsTxJTgiStDoB';
 
-// Product identifiers to create — matching — in App Store Connect / Google
-// Play Console / RevenueCat. Each tier is an auto-renewable subscription
-// with a monthly and a yearly product. Entitlement identifiers are set in
-// the RevenueCat dashboard (Entitlements tab) and attached to both of a
-// tier's products there.
-const TIER_PRODUCT_IDS = {
-  whisper: { monthly: 'com.fthr.subliminally.whisper.monthly', annual: 'com.fthr.subliminally.whisper.annual' },
-  ritual:  { monthly: 'com.fthr.subliminally.ritual.monthly',  annual: 'com.fthr.subliminally.ritual.annual' },
-};
-const TIER_ENTITLEMENT_IDS = {
-  whisper: 'whisper',
-  ritual: 'ritual',
-};
+// The store products and entitlements themselves live on each tier's row in
+// PLANS at the top of this file — they have to be created to match in App
+// Store Connect / Google Play Console / RevenueCat, and the entitlement ids
+// are attached to both of a tier's products in the RevenueCat dashboard
+// (Entitlements tab).
 
 function initRevenueCat(){
   if (!isNativeApp() || !window.Capacitor.Plugins.Purchases) return;
@@ -128,8 +233,8 @@ async function purchaseTier(tier, period){
   msg.textContent = 'Loading plan…'; msg.className = 'save-msg';
   try {
     const { current } = await Purchases.getOfferings();
-    const productId = TIER_PRODUCT_IDS[tier][period || 'monthly'];
-    const pkg = current?.availablePackages.find(p => p.product.identifier === productId);
+    const row = planFor(tier, period);
+    const pkg = row && current?.availablePackages.find(p => p.product.identifier === row.productId);
     if (!pkg){
       msg.textContent = "That plan isn't set up yet — check back soon.";
       msg.className = 'save-msg err';
@@ -137,7 +242,7 @@ async function purchaseTier(tier, period){
     }
     msg.textContent = 'Opening purchase…'; msg.className = 'save-msg';
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
-    const entitlementId = TIER_ENTITLEMENT_IDS[tier];
+    const entitlementId = PLANS[tier].entitlementId;
     if (customerInfo.entitlements.active[entitlementId]){
       msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
       msg.className = 'save-msg ok';
@@ -178,7 +283,8 @@ function updateManageSubscriptionLinks(){
 // Matches the durations promised on the pricing cards.
 const TIER_ORDER = ['none','whisper','ritual'];
 const TIER_LENGTH_SECONDS = { none: 1200, whisper: 7200, ritual: 28800 };
-const TIER_LABEL = { none: 'a free account', whisper: 'Whisper', ritual: 'Ritual' };
+// Names come off the plan catalog, so a tier is called one thing everywhere.
+const TIER_LABEL = Object.keys(PLANS).reduce((acc, tier) => { acc[tier] = PLANS[tier].label; return acc; }, { none: 'a free account' });
 function tierAtLeast(myTier, requiredTier){
   return TIER_ORDER.indexOf(myTier) >= TIER_ORDER.indexOf(requiredTier);
 }
