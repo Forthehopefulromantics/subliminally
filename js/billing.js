@@ -43,11 +43,8 @@ const PLANS = {
     periods: {
       monthly: {
         amountCents: 1499,      // $14.99/mo
-        // NEEDS STRIPE DASHBOARD: create the $14.99/month price and a Payment
-        // Link for it, then paste them here. Left null/REPLACE_ rather than
-        // guessed — a wrong id here is a button that opens the wrong checkout.
         priceId: null,
-        link: 'REPLACE_WITH_STRIPE_PAYMENT_LINK_RITUAL_MONTHLY',
+        link: 'https://buy.stripe.com/00weVc3Tw48PdDFdX7gYU07',
         productId: 'com.fthr.subliminally.ritual.monthly',
       },
       annual: {
