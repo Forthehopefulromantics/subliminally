@@ -37,39 +37,21 @@
    own page names the product and price it sells. Paste the buy.stripe.com URL
    onto that product's row here, and nowhere else. */
 const PLANS = {
-  whisper: {
-    label: 'Whisper',
-    entitlementId: 'whisper',   // RevenueCat -> Entitlements
+  premium: {
+    label: 'Premium',
+    entitlementId: 'premium',
     periods: {
       monthly: {
-        amountCents: 555,       // $5.55/mo
-        priceId: 'price_1UFRCkBiVHYI4vcXmZLmHBCH',
-        link: 'https://buy.stripe.com/dRmfZgblY6gXfLNcT3gYU04',
-        productId: 'com.fthr.subliminally.whisper.monthly',
+        amountCents: 1499,      // $14.99/mo
+        priceId: 'price_1UHpj5BiVHYI4vcXbgLYFIiu',
+        link: null,              // Web checkout requires a Payment Link or server-created Checkout Session
+        productId: 'com.fthr.subliminally.premium.monthly',
       },
       annual: {
-        amountCents: 5500,      // $55/yr
-        priceId: 'price_1UFRDzBiVHYI4vcX8QFMCHuQ',
-        link: 'https://buy.stripe.com/6oUfZg3TwdJp5795qBgYU05',
-        productId: 'com.fthr.subliminally.whisper.annual',
-      },
-    },
-  },
-  ritual: {
-    label: 'Ritual',
-    entitlementId: 'ritual',
-    periods: {
-      monthly: {
-        amountCents: 1111,      // $11.11/mo
-        priceId: 'price_1UFRBTBiVHYI4vcXVfzNDr9I',
-        link: 'https://buy.stripe.com/14AeVc75IaxdgPRg5fgYU03',
-        productId: 'com.fthr.subliminally.ritual.monthly',
-      },
-      annual: {
-        amountCents: 11100,     // $111/yr
-        priceId: 'price_1UFREXBiVHYI4vcXXZ2sArIc',
-        link: 'https://buy.stripe.com/bJecN4cq220H4356uFgYU06',
-        productId: 'com.fthr.subliminally.ritual.annual',
+        amountCents: 9999,      // $99.99/yr
+        priceId: 'price_1UHpjQBiVHYI4vcXoiYG0uc2',
+        link: null,
+        productId: 'com.fthr.subliminally.premium.annual',
       },
     },
   },
