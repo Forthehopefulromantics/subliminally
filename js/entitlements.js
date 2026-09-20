@@ -53,49 +53,49 @@ const FEATURES = {
   subliminal_8hr:    { minutes: 480, name: '8-hour sessions', page: 'builder',
                        headline: 'Sleep with your subliminal tonight ✦',
                        why: 'Eight hours plays from the moment you close your eyes until your alarm — a whole night of your own voice, every night.' },
-  soothing_layer:    { tier: 'whisper', name: 'Soothing layer', page: 'builder',
+  soothing_layer:    { tier: 'premium', name: 'Soothing layer', page: 'builder',
                        headline: 'Soften the whole session ✦',
                        why: 'A warm pad, soft chimes or a low hum underneath everything, so the frequency stops sounding like a tone and starts sounding like somewhere to rest.' },
-  custom_track:      { tier: 'ritual', name: 'Your own track', page: 'builder',
+  custom_track:      { tier: 'premium', name: 'Your own track', page: 'builder',
                        headline: 'Build it on your own music ✦',
                        why: 'Layer the melody you already fall asleep to underneath your affirmations, instead of choosing from ours.' },
-  layer_voice:       { tier: 'ritual', name: 'Second voice layer', page: 'builder',
+  layer_voice:       { tier: 'premium', name: 'Second voice layer', page: 'builder',
                        headline: 'A second voice, quieter, underneath ✦',
                        why: 'A separate set of affirmations layered beneath the main ones — twice the repetition in the same session, without it ever feeling crowded.' },
-  eft:               { tier: 'ritual', name: 'EFT tapping', page: 'builder',
+  eft:               { tier: 'premium', name: 'EFT tapping', page: 'builder',
                        headline: 'Tap into deeper change ✦',
                        why: 'Build the session as a full tapping round — a setup statement and one line for every point, in your own voice, with a pause to move your hands.' },
-  visualization:     { tier: 'ritual', name: 'Visualization scripting', page: 'builder',
+  visualization:     { tier: 'premium', name: 'Visualization scripting', page: 'builder',
                        headline: 'Rehearse it before it happens ✦',
                        why: 'Write the scene in your own detail and play it back as one continuous script — mental rehearsal, in the voice you trust most.' },
 
   /* ---- saving what you build ---- */
-  library_space:     { tier: 'whisper', name: 'More library space', page: 'library',
+  library_space:     { tier: 'premium', name: 'More library space', page: 'library',
                        headline: 'Room for the whole practice ✦',
-                       why: 'Whisper holds ten saved subliminals, Ritual holds as many as you build — one for sleep, one for the morning, one for the week you are having.' },
+                       why: 'Premium gives you unlimited saved subliminals — one for sleep, one for the morning, one for the week you are having.' },
 
   /* ---- journal ---- */
-  journal:           { tier: 'whisper', name: 'Gratitude journal', page: 'journal',
+  journal:           { tier: 'premium', name: 'Gratitude journal', page: 'journal',
                        headline: 'Keep your own record ✦',
                        why: 'Three lines each morning is the whole practice — written in present tense, kept where you can read them back.' },
-  manifestation:     { tier: 'whisper', name: 'Manifestation tracker', page: 'journal',
+  manifestation:     { tier: 'premium', name: 'Manifestation tracker', page: 'journal',
                        headline: 'Track your transformation ✦',
                        why: 'Write what has not arrived yet as though it already has, and watch the entries turn from asking into remembering.' },
-  journal_voice:     { tier: 'whisper', name: 'Spoken entries', page: 'journal',
+  journal_voice:     { tier: 'premium', name: 'Spoken entries', page: 'journal',
                        headline: 'Say it out loud instead ✦',
                        why: 'Some mornings you do not want to type. Record the entry in your own voice and it is kept exactly the same way.' },
-  daily_log:         { tier: 'whisper', name: 'Daily log', page: 'rituals',
+  daily_log:         { tier: 'premium', name: 'Daily log', page: 'rituals',
                        headline: 'Honour the page you wrote by hand ✦',
                        why: 'Photograph the journal you already keep and the calendar fills in around it — the app keeps the record, your notebook keeps the practice.' },
 
   /* ---- rituals ---- */
-  habit_tracker:     { tier: 'ritual', name: 'Habit tracker', page: 'rituals',
+  habit_tracker:     { tier: 'premium', name: 'Habit tracker', page: 'rituals',
                        headline: 'Build your 1% better routine ✦',
                        why: 'A morning and a night you actually keep: three habits to start, three more every twenty-one days practised, and a streak that forgives a missed day.' },
-  habit_cycles:      { tier: 'ritual', name: 'Practice cycles', page: 'rituals',
+  habit_cycles:      { tier: 'premium', name: 'Practice cycles', page: 'rituals',
                        headline: 'Twenty-one days, then twenty-one more ✦',
                        why: 'Every cycle you finish earns room for three more habits — the routine grows as you do, up to fifteen.' },
-  habit_insights:    { tier: 'ritual', name: 'Streak history', page: 'rituals',
+  habit_insights:    { tier: 'premium', name: 'Streak history', page: 'rituals',
                        headline: 'See the whole run behind you ✦',
                        why: 'Every day you practised, coloured in on one calendar — the weeks you kept are far more convincing than any streak counter.' },
 };
@@ -105,7 +105,7 @@ const FEATURES = {
    there is exactly one place that knows 20 minutes is free and 8 hours is not. */
 function featureRequiredTier(key){
   const f = FEATURES[key];
-  if (!f) { console.warn('Unknown feature:', key); return 'ritual'; }
+  if (!f) { console.warn('Unknown feature:', key); return 'premium'; }
   if (f.minutes != null) return requiredTierForMinutes(f.minutes);
   return f.tier || 'none';
 }
@@ -137,7 +137,7 @@ async function canUseFeature(key){
 /* FREE / WHISPER / RITUAL, for a badge. TIER_LABEL is the sentence-shaped name
    ("a free account", "Whisper") and stays the one used in prose. */
 function tierShortName(tier){ return tier === 'none' ? 'FREE' : (PLANS[tier] ? PLANS[tier].label.toUpperCase() : 'FREE'); }
-function tierMark(tier){ return tier === 'ritual' ? '★' : tier === 'whisper' ? '✦' : ''; }
+function tierMark(tier){ return tier === 'premium' ? '✦' : ''; }
 /* What a plan costs, read off the catalog rather than written out again. */
 function tierPriceText(tier){
   const monthly = planFor(tier, 'monthly'), annual = planFor(tier, 'annual');
@@ -393,7 +393,7 @@ function upgradeFromModal(key, needed){
 /* A soft ring around the card they came here for, so a two-card pricing page
    does not make them look for it. Wears off on its own. */
 function spotlightPlanCard(tier){
-  const card = document.getElementById(tier === 'ritual' ? 'priceCardRitual' : 'priceCardWhisper');
+  const card = document.getElementById('priceCardRitual');
   if (!card) return;
   card.classList.add('plan-spotlight');
   setTimeout(() => card.classList.remove('plan-spotlight'), 2600);
@@ -494,12 +494,11 @@ function planLadderMarkup(tier){
 /* What the next rung adds, in the words the feature table already uses. No
    price shouting, no countdown — a list and a way to read more. */
 const LADDER_UNLOCKS = {
-  whisper: ['subliminal_2hr','soothing_layer','journal','manifestation','daily_log','library_space'],
-  ritual:  ['subliminal_8hr','habit_tracker','eft','visualization','custom_track','layer_voice'],
+  premium: ['subliminal_2hr','soothing_layer','journal','manifestation','daily_log','library_space','subliminal_8hr','habit_tracker','eft','visualization','custom_track','layer_voice'],
 };
 function planLadderNext(tier){
   const next = tierAbove(tier);
-  if (!next) return `<p class="plan-ladder-note">You are on ${pwEscape(PLANS.ritual.label)} — everything in Subliminally is open to you.</p>`;
+  if (!next) return `<p class="plan-ladder-note">You are on ${pwEscape(PLANS.premium.label)} — everything in Subliminally is open to you.</p>`;
   const keys = LADDER_UNLOCKS[next] || [];
   return `<details class="plan-ladder-next">
     <summary>What ${pwEscape(PLANS[next].label)} unlocks <span aria-hidden="true">↓</span></summary>
