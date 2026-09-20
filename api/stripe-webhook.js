@@ -33,13 +33,16 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Legacy amounts are from before the plan restructure. Reverie was retired;
 // anyone still paying for it keeps everything they had, which now lives on Ritual.
 const AMOUNT_TO_PLAN = {
-  555: { tier: 'whisper', period: 'monthly' },   // Whisper monthly, $5.55
-  5500: { tier: 'whisper', period: 'annual' },   // Whisper yearly, $55
-  1111: { tier: 'ritual', period: 'monthly' },   // Ritual monthly, $11.11
-  11100: { tier: 'ritual', period: 'annual' },   // Ritual yearly, $111
-  1000: { tier: 'whisper', period: 'monthly' },  // legacy Whisper, $10/mo
-  2200: { tier: 'ritual', period: 'monthly' },   // legacy Reverie, $22/mo
-  3500: { tier: 'ritual', period: 'monthly' },   // legacy Ritual, $35/mo
+  1499: { tier: 'premium', period: 'monthly' }, // Premium monthly, $14.99
+  9999: { tier: 'premium', period: 'annual' },  // Premium annual, $99.99
+  // Grandfathered legacy subscriptions keep Premium access.
+  555: { tier: 'premium', period: 'monthly' },
+  5500: { tier: 'premium', period: 'annual' },
+  1111: { tier: 'premium', period: 'monthly' },
+  11100: { tier: 'premium', period: 'annual' },
+  1000: { tier: 'premium', period: 'monthly' },
+  2200: { tier: 'premium', period: 'monthly' },
+  3500: { tier: 'premium', period: 'monthly' },
 };
 
 function planForSubscription(sub) {
