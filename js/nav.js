@@ -47,8 +47,7 @@ const REPROGRAM_ANSWERS = {
   relationships: `<b>On relationships — with others or with yourself:</b> repetition and self-talk research both point to the same place: how you talk to yourself, repeatedly, shapes the baseline you bring into other relationships. There's nothing here that replaces communication or therapy where that's needed — but a consistent, calm, self-directed practice is a reasonable complement to that work, not a substitute for it.`
 };
 function answerReprogramQuiz(btn, key){
-  document.querySelectorAll('#reprogramQuizChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
+  syncSelection('#reprogramQuizChips .length-chip', c => c === btn);
   const result = document.getElementById('reprogramQuizResult');
   result.innerHTML = REPROGRAM_ANSWERS[key] || '';
   result.classList.add('show');

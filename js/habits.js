@@ -1314,8 +1314,9 @@ function pickAskChip(kind, value, el){
   const group = el.parentElement;
   const off = reflection[kind] === value;
   reflection[kind] = off ? null : value;
-  group.querySelectorAll('.ask-chip').forEach(c => c.classList.remove('sel'));
-  if (!off) el.classList.add('sel');
+  // Drawn from `reflection`, not from the tap, so re-rendering the sheet cannot
+  // lose the answer -- and so a chip untoggled stops announcing itself pressed.
+  syncSelection(group.querySelectorAll('.ask-chip'), c => c.dataset.value === reflection[kind]);
   // The box appears under whichever list "Something else" was picked in, and
   // takes the focus, because opening a field nobody is typing in is just a
   // field in the way.
@@ -1344,14 +1345,14 @@ function openReflection(time, dateStr){
     </button>
     <div class="ask-label">What got in the way</div>
     <div class="ask-chips">${MISS_REASONS.concat([ASK_OTHER]).map(r =>
-      `<button type="button" class="ask-chip" onclick="pickAskChip('reason','${r.replace(/'/g,"\\'")}',this)">${r}</button>`).join('')}
+      `<button type="button" class="ask-chip" aria-pressed="false" data-value="${r.replace(/"/g,'&quot;')}" onclick="pickAskChip('reason','${r.replace(/'/g,"\\'")}',this)">${r}</button>`).join('')}
       <input type="text" class="ask-other" id="askOther-reason" style="display:none"
         maxlength="120" placeholder="In your own words…"
         oninput="askOtherInput('reason', this.value)" aria-label="What got in the way">
     </div>
     <div class="ask-label">How you feel about it</div>
     <div class="ask-chips">${MISS_FEELINGS.concat([ASK_OTHER]).map(f =>
-      `<button type="button" class="ask-chip" onclick="pickAskChip('feeling','${f.replace(/'/g,"\\'")}',this)">${f}</button>`).join('')}
+      `<button type="button" class="ask-chip" aria-pressed="false" data-value="${f.replace(/"/g,'&quot;')}" onclick="pickAskChip('feeling','${f.replace(/'/g,"\\'")}',this)">${f}</button>`).join('')}
       <input type="text" class="ask-other" id="askOther-feeling" style="display:none"
         maxlength="120" placeholder="In your own words…"
         oninput="askOtherInput('feeling', this.value)" aria-label="How you feel about it">

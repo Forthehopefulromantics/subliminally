@@ -94,7 +94,30 @@ function eftRepeatsForIndex(i){ return 1; }
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
+
+/* ---------------- WHOSE VOICE: the three answers, named ----------------
+   There are exactly three answers to "whose voice tonight?", and every one of
+   them means a different route out of the voice step. They are named here, once,
+   and nothing downstream is allowed to infer the route from anything else.
+
+   Why this exists: the route used to be read off `voiceMode`/`aiVoiceId`, which
+   are the *storage* fields -- what gets written to the subliminals row and handed
+   to the player. 'ai' covers both Serenity and a cloned voice, and null covers
+   both "not answered yet" and "the paywall stopped them", so the one question
+   the flow actually has to answer -- does this person record, or not -- was being
+   reconstructed from fields that were never about that. Falling back to
+   recording was the default, and it is the worst possible default: it is the
+   long path, and it is the one nobody who chose an AI voice asked for.
+
+   So: `state.selectedVoice` is the answer to the question on the screen, and
+   `voiceMode`/`aiVoiceId` stay exactly what they were, derived from it. Nothing
+   in billing.js, profile.js or the player changes. */
+const VOICE_RECORD_OWN = 'record_own';   // record the lines yourself, one by one
+const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
+const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
+const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
+
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -106,10 +129,21 @@ function showStep(n){
   step = n; renderProgress();
   if (n === 1){ updateSessionLengthHint(); renderDurationChips(); }
   if (n === 1 || n === 5) applyBuilderLocks();
+  /* The record panel is drawn as it opens, every time, from whatever the lines
+     and the index currently are. This is what makes the "..." placeholder in
+     index.html unreachable rather than merely unlikely: there is no route onto
+     step 6, present or future, that can skip it. */
+  if (n === 6) showRecordLine();
   /* The three voice cards are always on screen, so their locks — and the demo
      the Serenity one can play — are drawn as the step opens rather than as a
      side effect of picking something. */
-  if (n === 4) renderVoiceCards();
+  if (n === 4){
+    /* Draw what is chosen before anything is awaited, so coming back to this
+       screen never shows three blank cards for a beat. */
+    paintVoiceCards();
+    renderVoiceCards();
+    restoreVoiceChoice();
+  }
   else stopSerenityPreview();   // the demo does not follow you to the next screen
   if (n === 1 && pendingRitualMode){
     const chip = document.querySelector(`#ritualModeChips .length-chip[data-mode="${pendingRitualMode}"]`);
@@ -181,10 +215,8 @@ function syncDurationChips(){
   if (!wrap) return;
   const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
   const exact = DURATION_PRESETS.includes(minutes);
-  wrap.querySelectorAll('.length-chip').forEach(c => {
-    const isSel = c.dataset.custom ? !exact : parseInt(c.dataset.minutes, 10) === minutes;
-    c.classList.toggle('sel', isSel);
-  });
+  syncSelection('#durationChips .length-chip',
+    c => c.dataset.custom ? !exact : parseInt(c.dataset.minutes, 10) === minutes);
 }
 /* Tapping a length past your plan does not move the slider and does not scold.
    It opens the one contextual sheet for that length and leaves the choice
@@ -229,7 +261,7 @@ async function applyBuilderLocks(){
 
 /* Custom is not a sixth length — it is the slider, which was already there. */
 function pickCustomDuration(){
-  document.querySelectorAll('#durationChips .length-chip').forEach(c => c.classList.toggle('sel', !!c.dataset.custom));
+  syncSelection('#durationChips .length-chip', c => !!c.dataset.custom);
   document.getElementById('sessionLengthSlider').focus({ preventScroll: true });
 }
 /* The fewest lines a subliminal is built from. Five is enough for a loop to
@@ -260,13 +292,36 @@ function nextStep(){
     }
     if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   }
+  /* THE BUG THIS LINE FIXES, because it caused both of the ones reported.
+
+     Step 5 is the last screen before the flow forks: record your own lines
+     (step 6) or go straight to assembly (step 7). `startNextPhase()` is the
+     fork, and the Continue button called it -- but three other things on step 5
+     called plain `nextStep()` instead, and plain `nextStep()` is step+1, which
+     is step 6 unconditionally. Picking a background did it, and picking a
+     background is the most ordinary thing anybody does on that screen.
+
+     So somebody who chose Serenity tapped "Rain" and landed in the manual
+     recorder. And because nothing routed them there, nothing had *prepared*
+     them there either: showRecordLine() never ran, so the panel still held the
+     literal "..." and "1 of 14" that sit in index.html as placeholders, and
+     `recordings` was never sized to the affirmations. One missing fork, two
+     bugs.
+
+     step+1 is right for every other screen. From step 5 the only way on is the
+     fork. */
+  if (step === 5){ startNextPhase(); return; }
   showStep(step+1);
 }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
-  document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
+  /* Clearing through the one helper rather than stripping the class by hand:
+     that left every chip on the page still announcing itself as pressed. */
+  clearSelection('.sel');
+  forgetVoiceChoice();
+  paintVoiceCards();
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
@@ -274,10 +329,10 @@ function resetFlow(){
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
   renderDurationChips();
-  const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
-  if (defaultSoothing) defaultSoothing.classList.add('sel');
+  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
   state.binauralBand = null;
-  document.querySelectorAll('#binauralChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.band==='none'));
+  syncSelectionByData('#binauralChips .length-chip', 'band', 'none');
+  paintBgCards();
   document.getElementById('binauralGuideText').style.display = 'none';
   document.getElementById('soothingMixRow').style.display = 'none';
   document.getElementById('soothingMsg').textContent = '';
@@ -292,7 +347,7 @@ function resetFlow(){
   document.getElementById('layerVoicePanel').classList.remove('open');
   document.getElementById('layerAffText').value = '';
   document.getElementById('layerVoiceMsg').textContent = '';
-  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
+  paintLayerVoiceOptions();
   document.getElementById('layerVoiceMixRow').style.display = 'none';
   affirmationPace = DEFAULT_PACE;
   setAffirmationGap(DEFAULT_GAP_SECONDS);
@@ -302,7 +357,7 @@ function resetFlow(){
   document.getElementById('mixVoice').value = 65; document.getElementById('mixVoiceVal').value = 65;
   state.eftMode = false;
   state.visualizationMode = false;
-  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.mode==='subliminal'));
+  paintRitualModeChips();
   document.getElementById('eftGuidePanel').style.display = 'none';
   document.getElementById('visualizationGuidePanel').style.display = 'none';
   document.getElementById('ritualModeMsg').textContent = '';
@@ -320,31 +375,47 @@ function resetFlow(){
 
 /* ---- step 0: frequency ---- */
 const freqChips = document.getElementById('freqChips');
+/* Which frequency is lit, derived from state.freq. Tapping writes the answer and
+   then calls this -- rather than painting the tapped card and hoping nothing
+   ever redraws the list, which is how a chosen frequency used to vanish when
+   you came back to step 0 from step 1. */
+function paintFreqCards(){
+  syncSelection('#freqChips .freq-card3', el => !!state.freq && el.dataset.hz === String(state.freq.hz));
+}
 FREQS.forEach(f=>{
   const c = document.createElement('button'); c.className='freq-card3';
+  c.dataset.hz = f.hz;
+  c.setAttribute('role', 'radio');
   c.innerHTML = `<div class="hz">${f.hz} Hz</div><div class="word">${f.word}</div>`;
   c.onclick = ()=>{
-    document.querySelectorAll('.freq-card3').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel'); state.freq = f;
+    state.freq = f;
+    paintFreqCards();
     document.getElementById('freqGuideText').textContent = '"'+f.guide+'"';
     document.getElementById('toStep1').disabled = false;
   };
   freqChips.appendChild(c);
 });
+paintFreqCards();
 
 /* ---- step 1: quiz ---- */
 const intentionChips = document.getElementById('intentionChips');
+function paintIntentionChips(){ syncSelectionByData('#intentionChips .chip', 'key', state.intention); }
 INTENTIONS.forEach(([k,label])=>{
   const c = document.createElement('button'); c.className='chip'; c.textContent = label;
-  c.onclick = ()=>{ document.querySelectorAll('#intentionChips .chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); state.intention=k; };
+  c.dataset.key = k; c.setAttribute('role', 'radio');
+  c.onclick = ()=>{ state.intention = k; paintIntentionChips(); };
   intentionChips.appendChild(c);
 });
+paintIntentionChips();
 const toneChips = document.getElementById('toneChips');
+function paintToneChips(){ syncSelectionByData('#toneChips .chip', 'key', state.tone); }
 [["gentle","Gentle & nurturing"],["bold","Bold & direct"],["calm","Calm & neutral"]].forEach(([k,label])=>{
   const c = document.createElement('button'); c.className='chip'; c.textContent=label;
-  c.onclick=()=>{ document.querySelectorAll('#toneChips .chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); state.tone=k; };
+  c.dataset.key = k; c.setAttribute('role', 'radio');
+  c.onclick=()=>{ state.tone = k; paintToneChips(); };
   toneChips.appendChild(c);
 });
+paintToneChips();
 const countRange = document.getElementById('countRange');
 countRange.addEventListener('input', ()=>{ document.getElementById('countVal').textContent = countRange.value; state.count = parseInt(countRange.value); });
 
@@ -357,6 +428,15 @@ EFT_LINE_POINTS.forEach((p, i) => {
   li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
   eftPointsList.appendChild(li);
 });
+/* Which mode is lit, off the two booleans that actually decide the build. */
+function currentRitualMode(){
+  if (state.eftMode) return 'eft';
+  if (state.visualizationMode) return 'visualization';
+  return 'subliminal';
+}
+function paintRitualModeChips(){
+  syncSelectionByData('#ritualModeChips .length-chip', 'mode', currentRitualMode());
+}
 async function pickRitualMode(btn){
   const msg = document.getElementById('ritualModeMsg');
   const mode = btn.dataset.mode;
@@ -372,10 +452,9 @@ async function pickRitualMode(btn){
       return;
     }
   }
-  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.remove('sel'));
-  btn.classList.add('sel');
   state.eftMode = (mode === 'eft');
   state.visualizationMode = (mode === 'visualization');
+  paintRitualModeChips();
   document.getElementById('eftGuidePanel').style.display = state.eftMode ? 'block' : 'none';
   document.getElementById('visualizationGuidePanel').style.display = state.visualizationMode ? 'block' : 'none';
   document.getElementById('countRow').style.display = (state.eftMode || state.visualizationMode) ? 'none' : 'block';
@@ -881,9 +960,101 @@ function answered(el){
    separate control inside the card (toggleSerenityPreview) which plays one
    pre-generated file and does nothing else. */
 function chooseVoice(choice){
-  if (choice === 'own') return chooseOwnVoice();
-  if (choice === 'serenity') return chooseSerenity();
-  if (choice === 'clone') return chooseClonedVoice();
+  if (choice === 'own' || choice === VOICE_RECORD_OWN) return chooseOwnVoice();
+  if (choice === 'serenity' || choice === VOICE_SERENITY) return chooseSerenity();
+  if (choice === 'clone' || choice === VOICE_CLONE) return chooseClonedVoice();
+}
+
+/* ---------------- the answer, and the two fields it derives ----------------
+   ONE place writes the voice choice. It writes `selectedVoice` -- the answer --
+   and derives `voiceMode`/`aiVoiceId` from it, so the thing the flow routes on
+   and the thing the row is saved with can never disagree.
+
+   It is synchronous on purpose, and it repaints before it returns. A tap has to
+   light the card up in the same frame it happened in; anything that has to be
+   checked first (a plan, whether a clone exists) is checked by the caller, and
+   the caller repaints from state either way. */
+function setSelectedVoice(choice){
+  state.selectedVoice = choice;
+  if (choice === VOICE_RECORD_OWN){
+    state.voiceMode = 'own';
+    state.aiVoiceId = null;
+  } else if (choice === VOICE_SERENITY){
+    state.voiceMode = 'ai';
+    state.aiVoiceId = SERENITY_VOICE;
+  } else if (choice === VOICE_CLONE){
+    state.voiceMode = 'ai';
+    state.aiVoiceId = MY_CLONED_VOICE;
+  } else {
+    state.voiceMode = null;
+    state.aiVoiceId = null;
+  }
+  rememberVoiceChoice(choice);
+  paintVoiceCards();
+  const cta = document.getElementById('toStep5');
+  if (cta) cta.disabled = !choice;
+}
+
+/* The other direction: what a subliminal loaded out of the library, or reopened
+   mid-build, was built in. profile.js writes voiceMode/aiVoiceId straight from
+   the saved row and knows nothing about selectedVoice, so the picker reads the
+   answer back out of them rather than coming up blank and defaulting to
+   recording. */
+function selectedVoiceFromState(){
+  if (state.selectedVoice) return state.selectedVoice;
+  if (state.voiceMode === 'own') return VOICE_RECORD_OWN;
+  if (state.voiceMode === 'ai'){
+    if (state.aiVoiceId === MY_CLONED_VOICE) return VOICE_CLONE;
+    if (state.aiVoiceId === SERENITY_VOICE) return VOICE_SERENITY;
+  }
+  return null;
+}
+
+/* ---------------- remembering it across a refresh ----------------
+   The builder itself does not survive a reload -- a half-built subliminal is not
+   a thing worth restoring -- but the voice is a preference, not a step, and
+   coming back to the picker having silently forgotten it is how somebody ends up
+   in the recording flow they did not choose.
+
+   Stored against the account id, because the next person to sign in on this
+   device did not choose anything. 'record_own' is the exception and is kept for
+   a signed-out visitor too: it needs no account and no plan. */
+const VOICE_CHOICE_KEY = 'fthr_voice_choice';
+function voiceChoiceOwner(){ return (currentUser && currentUser.id) || 'anon'; }
+function rememberVoiceChoice(choice){
+  try {
+    if (!choice) localStorage.removeItem(VOICE_CHOICE_KEY);
+    else localStorage.setItem(VOICE_CHOICE_KEY, JSON.stringify({ choice, user: voiceChoiceOwner() }));
+  } catch(e){ /* private mode: the choice still works for this visit */ }
+}
+function rememberedVoiceChoice(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(VOICE_CHOICE_KEY) || 'null');
+    if (!raw || !VOICE_CHOICES.includes(raw.choice)) return null;
+    // Somebody else's choice is not a default to fall into.
+    if (raw.user !== voiceChoiceOwner() && raw.choice !== VOICE_RECORD_OWN) return null;
+    return raw.choice;
+  } catch(e){ return null; }
+}
+function forgetVoiceChoice(){ try { localStorage.removeItem(VOICE_CHOICE_KEY); } catch(e){} }
+
+/* Put the remembered answer back as the voice step opens, but only if it is
+   still true: a plan that lapsed, or a cloned voice that was deleted, must not
+   come back as a selected card that cannot be used. Nothing is restored over an
+   answer already made in this build. */
+async function restoreVoiceChoice(){
+  if (state.selectedVoice) return;
+  if (selectedVoiceFromState()) return;   // loaded from a saved subliminal
+  const choice = rememberedVoiceChoice();
+  if (!choice) return;
+  if (choice === VOICE_RECORD_OWN){ setSelectedVoice(VOICE_RECORD_OWN); return; }
+  if (!currentUser) return;
+  const tier = await getMyTier();
+  const feature = choice === VOICE_SERENITY ? 'studio_voice' : 'my_voice';
+  if (!tierHasFeature(tier, feature)){ forgetVoiceChoice(); return; }
+  if (choice === VOICE_CLONE && !(await myVoiceProfile())){ forgetVoiceChoice(); return; }
+  if (state.selectedVoice) return;        // they answered while we were asking
+  setSelectedVoice(choice);
 }
 
 function voicePickerMsgEl(){ return document.getElementById('voicePickerMsg'); }
@@ -895,15 +1066,31 @@ function sayInVoicePicker(text, kind){
 }
 
 /* The one answer that is recorded and moved on from. 'own' means this device
-   never asks the server for a voice at all. */
+   never asks the server for a voice at all -- no plan to check, so nothing to
+   await, so the card lights up in the frame the tap arrived in. */
 function chooseOwnVoice(){
   closeMyVoicePanel();
   sayInVoicePicker('');
-  state.voiceMode = 'own';
-  state.aiVoiceId = null;
-  renderVoiceCards();
-  document.getElementById('toStep5').disabled = false;
+  setSelectedVoice(VOICE_RECORD_OWN);
   advanceAfterPick();
+}
+
+/* ---------------- the highlight does not wait for the network ----------------
+   Serenity and Clone both have a plan to check first, and getMyTier() can be a
+   round trip. The old handlers awaited it before touching the screen, so on a
+   slow connection a tap did nothing at all for a moment -- which reads as a
+   broken button, and the obvious thing to do with a broken button is press it
+   again.
+
+   So the tap paints immediately, optimistically, and then the check either
+   commits the answer or repaints from the real state. `paintVoiceCards()` only
+   ever draws what `state` actually says, so the revert is not a second code
+   path that could disagree with the first -- it is the same render, run again
+   over unchanged state. A refused tap therefore cannot leave the screen showing
+   a voice the account does not have. */
+function previewVoicePick(choice){
+  sayInVoicePicker('');
+  paintVoiceCards(choice);
 }
 
 /* Tapping the Serenity CARD asks for Serenity to read the affirmations, which is
@@ -915,17 +1102,15 @@ async function chooseSerenity(){
     sayInVoicePicker('Create a free account first, then Serenity can read your affirmations.', 'err');
     return;
   }
+  previewVoicePick(VOICE_SERENITY);
   const tier = await getMyTier();
   if (!tierHasFeature(tier, 'studio_voice')){
+    paintVoiceCards();   // back to whatever is actually chosen
     openUpgradeModal('studio_voice', { tier, trigger: 'voice_card' });
     return;
   }
   closeMyVoicePanel();
-  sayInVoicePicker('');
-  state.voiceMode = 'ai';
-  state.aiVoiceId = SERENITY_VOICE;
-  renderVoiceCards();
-  document.getElementById('toStep5').disabled = false;
+  setSelectedVoice(VOICE_SERENITY);
   advanceAfterPick();
 }
 
@@ -937,19 +1122,37 @@ async function chooseClonedVoice(){
     sayInVoicePicker('Create a free account first, then your voice can be one of the voices here.', 'err');
     return;
   }
+  previewVoicePick(VOICE_CLONE);
   const tier = await getMyTier();
   if (!tierHasFeature(tier, 'my_voice')){
+    paintVoiceCards();
     openUpgradeModal('my_voice', { tier, trigger: 'voice_card' });
     return;
   }
   const mine = await myVoiceProfile();
-  if (!mine){ openMyVoicePanel(); return; }   // nothing is chosen until it exists
+  /* No voice of their own yet, so the setup comes first -- the passage to read,
+     the confirmation, the upload. What it is NOT is the affirmation-by-
+     affirmation recorder: cloning is one passage read once.
+
+     The card stays lit while the panel is open, because "clone my voice" is what
+     they asked for and the panel is the answer to it. The *voice* is still not
+     committed -- voiceMode/aiVoiceId stay untouched, so nothing can generate in
+     a voice that does not exist yet, and Continue stays disabled until
+     onMyVoiceReady() commits it. */
+  if (!mine){
+    /* The answer is recorded -- they asked for their own cloned voice -- but the
+       VOICE is not, because it does not exist yet. That split is deliberate:
+       selectedVoice is what the fork reads, so a Continue pressed from here is
+       sent back to finish the clone; voiceMode/aiVoiceId stay empty, so nothing
+       can try to generate in a voice that was never made. */
+    state.selectedVoice = VOICE_CLONE;
+    rememberVoiceChoice(VOICE_CLONE);
+    paintVoiceCards();
+    openMyVoicePanel();
+    return;
+  }
   closeMyVoicePanel();
-  sayInVoicePicker('');
-  state.voiceMode = 'ai';
-  state.aiVoiceId = MY_CLONED_VOICE;
-  renderVoiceCards();
-  document.getElementById('toStep5').disabled = false;
+  setSelectedVoice(VOICE_CLONE);
   advanceAfterPick();
 }
 
@@ -957,16 +1160,36 @@ async function chooseClonedVoice(){
    them this account has to pay for. Nothing is ever removed from a free
    account's screen — the same rule as every other premium control in the app —
    it is drawn with a lock and explains itself when tapped. */
+/* WHICH CARD IS LIT. Synchronous, derived entirely from `state`, and safe to run
+   as often as anything likes -- which is the point: it runs on the tap, on the
+   step opening, after a plan check, after a clone is created, and after a
+   restore, and every one of those produces the same answer for the same state.
+
+   `showing` is an optional override for the one frame between a tap and the plan
+   check coming back. It changes nothing in state; leaving it out means "draw the
+   truth", which is how every refusal path reverts. */
+function paintVoiceCards(showing){
+  const own = document.getElementById('voiceOwn');
+  const serenity = document.getElementById('voiceSerenity');
+  const clone = document.getElementById('voiceClone');
+  if (!own || !serenity || !clone) return;
+  const chosen = showing || selectedVoiceFromState();
+  setSelected(own, chosen === VOICE_RECORD_OWN);
+  setSelected(serenity, chosen === VOICE_SERENITY);
+  setSelected(clone, chosen === VOICE_CLONE);
+  /* The Serenity card is a div holding two buttons, so the face is what a
+     screen reader is actually on -- it carries the state, not the wrapper. */
+  const face = serenity.querySelector('.voice-card-face');
+  if (face) setSelected(face, chosen === VOICE_SERENITY);
+}
+
 async function renderVoiceCards(){
   const own = document.getElementById('voiceOwn');
   const serenity = document.getElementById('voiceSerenity');
   const clone = document.getElementById('voiceClone');
   if (!own || !serenity || !clone) return;
 
-  const chosen = state.voiceMode === 'own' ? 'own' : state.aiVoiceId;
-  own.classList.toggle('sel', chosen === 'own');
-  serenity.classList.toggle('sel', chosen === SERENITY_VOICE);
-  clone.classList.toggle('sel', chosen === MY_CLONED_VOICE);
+  paintVoiceCards();
 
   /* The lock and the RITUAL badge come off the same feature table as the rest.
      Both cards are locked on what the plan allows rather than on what exists, so
@@ -1115,12 +1338,12 @@ function closeMyVoicePanel(){
 async function onMyVoiceReady(){
   if (!document.getElementById('voiceClone')) return;
   closeMyVoicePanel();
-  state.voiceMode = 'ai';
-  state.aiVoiceId = MY_CLONED_VOICE;
   forgetVoiceCatalogue();
+  /* The clone now exists, so the choice they made when they tapped the card is
+     finally committable -- and from here Continue takes them to the next build
+     step, never to the affirmation-by-affirmation recorder. */
+  setSelectedVoice(VOICE_CLONE);
   await renderVoiceCards();
-  const cta = document.getElementById('toStep5');
-  if (cta) cta.disabled = false;
   await previewVoice(MY_CLONED_VOICE);
   // previewVoice says its own piece when something went wrong; don't talk over it.
   const msg = document.getElementById('voicePickerMsg');
@@ -1366,17 +1589,25 @@ async function prepareSessionVoice(){
 
 /* ---------------- step 5: background + mixer ---------------- */
 const bgGrid = document.getElementById('bgGrid');
+/* Which ambience is lit, straight off state.bg. Same rule as everywhere else. */
+function paintBgCards(){ syncSelectionByData('#bgGrid .bg-card', 'key', state.bg); }
 BACKGROUNDS.forEach(b=>{
-  const c = document.createElement('button'); c.className='bg-card'+(b.key==='none'?' sel':'');
+  const c = document.createElement('button'); c.className='bg-card';
+  c.dataset.key = b.key;
+  c.setAttribute('role', 'radio');
   c.innerHTML = `<span class="ic">${b.ic}</span>${b.label}`;
   c.onclick = ()=>{
-    document.querySelectorAll('.bg-card').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel'); state.bg = b.key;
-    // Same as the voice cards: the pick is the answer, so it moves on.
+    state.bg = b.key;
+    paintBgCards();
+    /* Same as the voice cards: the pick is the answer, so it moves on. Through
+       nextStep(), which from step 5 is the voice fork -- this used to be
+       `nextStep()` back when nextStep() meant step+1, and step+1 from here is
+       the manual recorder whether or not anybody asked to record. */
     setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
   };
   bgGrid.appendChild(c);
 });
+paintBgCards();
 
 /* ---------------- Ritual-only: second, layered voice ---------------- */
 let layerVoiceEnabled = false;
@@ -1396,10 +1627,12 @@ async function toggleLayerVoice(checked){
   layerVoiceEnabled = true;
   panel.classList.add('open');
 }
+function paintLayerVoiceOptions(){
+  syncSelectionByData('.layer-voice-options button', 'mode', layerVoiceMode);
+}
 function pickLayerVoiceMode(btn){
-  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
   layerVoiceMode = btn.dataset.mode;
+  paintLayerVoiceOptions();
   answered(btn);
 }
 
@@ -1417,22 +1650,64 @@ function startNextPhase(){
   if (layerVoiceEnabled && !state.layerAffirmations.length) state.layerAffirmations = state.affirmations.slice();
   state.layerVoiceMode = layerVoiceEnabled ? layerVoiceMode : null;
 
-  const needsPrimaryRecording = state.voiceMode === 'own';
+  /* ---------------- THE FORK ----------------
+     Read off the answer to the question on the voice screen, and nothing else.
+     Three answers, three routes, stated rather than inferred:
+
+       record_own   -> the affirmation-by-affirmation recorder (step 6)
+       serenity     -> straight to assembly; Serenity reads the lines (step 7)
+       clone_voice  -> straight to assembly in their own cloned voice (step 7),
+                       or back to the clone setup if the clone is not made yet
+
+     The layered second voice is a separate question with its own answer, and it
+     is the only other thing that can need the recorder. */
+  const voice = selectedVoiceFromState();
+
+  /* No answer at all. Continue is disabled until there is one, so this is only
+     reachable if something went wrong -- and the wrong thing to do about it is
+     guess. It used to fall through to a build with no voice; before that, to
+     the recorder. Neither is what anybody asked for, so ask. */
+  if (!voice){
+    showStep(4);
+    paintVoiceCards();
+    sayInVoicePicker('Choose whose voice reads your affirmations, and this is ready to build.', 'err');
+    return;
+  }
+
+  /* Chose their own voice as a clone but never finished making it. They are not
+     sent to the line-by-line recorder for it -- that is a different feature and
+     not what they asked for. Back to the picker, with the setup open. */
+  if (voice === VOICE_CLONE && state.aiVoiceId !== MY_CLONED_VOICE){
+    showStep(4);
+    paintVoiceCards(VOICE_CLONE);
+    sayInVoicePicker('One more step — read the passage below and your voice is ready.', 'err');
+    openMyVoicePanel();
+    return;
+  }
+
+  const needsPrimaryRecording = voice === VOICE_RECORD_OWN;
   const needsLayerRecording = layerVoiceEnabled && layerVoiceMode === 'own';
 
   if (needsPrimaryRecording){
-    recordTarget = 'primary';
-    recIndex = 0; recordings = new Array(state.affirmations.length).fill(null);
-    setRecordStepCopy('primary');
-    showRecordLine(); showStep(6);
+    beginRecordingPass('primary');
   } else if (needsLayerRecording){
-    recordTarget = 'layer';
-    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-    setRecordStepCopy('layer');
-    showRecordLine(); showStep(6);
+    beginRecordingPass('layer');
   } else {
     prepareFinal(); showStep(7);
   }
+}
+
+/* Opening the recorder is one operation: which pass, from the top, with an
+   answers-shaped array to record into and the copy that goes with it. Every
+   caller goes through here, so there is no way to arrive on step 6 with the
+   index, the array and the lines disagreeing. */
+function beginRecordingPass(target){
+  recordTarget = target;
+  recIndex = 0;
+  if (target === 'layer') layerRecordings = new Array(state.layerAffirmations.length).fill(null);
+  else recordings = new Array(state.affirmations.length).fill(null);
+  setRecordStepCopy(target);
+  showStep(6);   // showStep draws the line; see showRecordLine()
 }
 
 function setRecordStepCopy(target){
@@ -1471,14 +1746,54 @@ for (let i=0;i<20;i++){ const d=document.createElement('div'); d.style.height='4
 function activeRecordLines(){ return recordTarget === 'layer' ? state.layerAffirmations : state.affirmations; }
 function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings : recordings; }
 
+/* WHAT THE RECORD SCREEN SAYS, derived from the lines and the index and nothing
+   else -- the same rule as the voice cards. It runs whenever step 6 opens (see
+   showStep) as well as on every advance, so the screen cannot be reached in a
+   state it has not drawn.
+
+   The reported bug was the first line reading "..." under a correct "1 of 14".
+   Both of those strings are the placeholders in index.html: the screen had been
+   opened without this function ever running (see nextStep), so nothing had
+   replaced either. The counter looked right purely because the placeholder
+   happened to say the same thing the first line would have. Nothing here was
+   ever off by one -- recIndex starts at 0 and `lines[recIndex]` is line one --
+   it simply was not called.
+
+   The guard below is the other half: a line can only be drawn once there are
+   lines. Rather than printing "..." over missing data, it says what is actually
+   happening and leaves the controls alone until there is something to record. */
+function recordLinesReady(){
+  const lines = activeRecordLines();
+  return Array.isArray(lines) && lines.length > 0;
+}
 function showRecordLine(){
+  const counterEl = document.getElementById('recCounter');
+  const lineEl = document.getElementById('recLine');
+  if (!counterEl || !lineEl) return;
+
   const lines = activeRecordLines(); const arr = activeRecordArray();
+  if (!recordLinesReady()){
+    counterEl.textContent = '';
+    lineEl.textContent = 'Preparing your affirmations…';
+    lineEl.classList.add('record-line-loading');
+    document.getElementById('recTapHint').style.display = 'none';
+    document.getElementById('recStatus').textContent = 'one moment';
+    document.getElementById('nextLineBtn').disabled = true;
+    document.getElementById('skipBtn').disabled = true;
+    return;
+  }
+  lineEl.classList.remove('record-line-loading');
+  document.getElementById('skipBtn').disabled = false;
+  /* An index past the end is a bug somewhere upstream, but it must not show up
+     here as the word "undefined" in quotes. */
+  if (recIndex < 0 || recIndex >= lines.length) recIndex = 0;
+
   const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_LINE_POINTS[recIndex];
   const isScript = state.visualizationMode && recordTarget === 'primary';
-  document.getElementById('recCounter').textContent = isEftPoint
+  counterEl.textContent = isEftPoint
     ? `Line ${recIndex+1} of 11 — ${EFT_LINE_POINTS[recIndex].label}`
     : (isScript ? 'Your full script — one continuous take' : `${recIndex+1} of ${lines.length}`);
-  document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
+  lineEl.textContent = '"'+lines[recIndex]+'"';
   document.getElementById('recTapHint').textContent = isEftPoint
     ? (EFT_LINE_POINTS[recIndex].isSetup
         ? `Tap continuously: ${EFT_LINE_POINTS[recIndex].where}`
@@ -1497,10 +1812,7 @@ function advanceLine(){
   // Finished this pass. If we just finished the primary voice and a layer recording
   // is still needed, seamlessly continue into the layer pass instead of leaving step 6.
   if (recordTarget === 'primary' && layerVoiceEnabled && layerVoiceMode === 'own'){
-    recordTarget = 'layer';
-    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-    setRecordStepCopy('layer');
-    showRecordLine();
+    beginRecordingPass('layer');
     return;
   }
   prepareFinal(); showStep(7);
@@ -1829,7 +2141,6 @@ function rerecordVoice(){
     recordings = new Array(state.affirmations.length).fill(null);
   }
   setRecordStepCopy('primary');
-  showRecordLine();
   showStep(6);
 }
 /* Shows which tapping point (or the setup statement) the currently-playing line
@@ -1918,11 +2229,10 @@ document.addEventListener('DOMContentLoaded', () => {
 /* Binaural beats are just audio physics, so unlike the soothing layer/custom track/
    layered voice, this isn't gated to any tier — it's available to everyone. */
 function pickBinauralBand(btn){
-  document.querySelectorAll('#binauralChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
-  answered(btn);
   const band = btn.dataset.band;
   state.binauralBand = band === 'none' ? null : band;
+  syncSelectionByData('#binauralChips .length-chip', 'band', state.binauralBand || 'none');
+  answered(btn);
   const guideEl = document.getElementById('binauralGuideText');
   if (state.binauralBand){
     const b = BINAURAL_BANDS[state.binauralBand];
@@ -1945,10 +2255,9 @@ async function pickSoothingLayer(btn){
     }
   }
 
-  document.querySelectorAll('#soothingChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
-  answered(btn);
   state.soothingLayer = variant;
+  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
+  answered(btn);
   document.getElementById('soothingMixRow').style.display = variant === 'none' ? 'none' : 'flex';
   if (finalPlaying) restartSoothingLayer();
 }
@@ -2006,15 +2315,15 @@ function pickPace(btn){
   if (!p) return;
   affirmationPace = p.key;
   state.pace = p.key;
-  document.querySelectorAll('#paceChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
+  syncSelectionByData('#paceChips .length-chip', 'pace', state.pace);
   setAffirmationGap(p.gap);
 }
 function renderPaceChips(){
   const wrap = document.getElementById('paceChips');
   if (!wrap) return;
   wrap.innerHTML = AFFIRMATION_PACES.map(p =>
-    `<button type="button" class="length-chip${p.key === affirmationPace ? ' sel' : ''}"
+    `<button type="button" role="radio" class="length-chip${p.key === affirmationPace ? ' sel' : ''}"
+       aria-checked="${p.key === affirmationPace}"
        data-pace="${p.key}" onclick="pickPace(this)">${p.label}<span>${p.sub}</span></button>`).join('');
 }
 (function wireLineGap(){

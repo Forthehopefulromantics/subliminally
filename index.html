@@ -332,6 +332,11 @@
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
   .record-line{ font-family:var(--serif); font-style:italic; font-size:18px; color:var(--moonlight); max-width:440px; line-height:1.4; }
   .record-line-script{ font-size:15px; text-align:left; max-height:220px; overflow-y:auto; padding:14px 16px; background:rgba(255,255,255,0.03); border-radius:14px; }
+  /* Waiting on the lines. Not italic and not in quotes, so it cannot be read as
+     one of somebody's affirmations -- which is exactly what "..." managed to
+     look like. It is only ever on screen for the moment before the first line. */
+  .record-line-loading{ font-style:normal; color:var(--haze); font-size:15px; animation:recLinePulse 1.4s ease-in-out infinite; }
+  @keyframes recLinePulse{ 0%,100%{ opacity:.45; } 50%{ opacity:.85; } }
   .record-counter{ font-size:12px; color:var(--haze); }
   .rec-tap-hint{ font-size:12.5px; color:var(--candle); background:rgba(227,190,127,0.1); border-radius:999px; padding:6px 14px; margin-top:6px; }
   .rec-btn{ width:78px; height:78px; border-radius:50%; cursor:pointer; user-select:none; touch-action:none; background:var(--dusk); border:2px solid var(--candle); color:var(--candle); font-size:11px; letter-spacing:.05em; transition:all .2s; }
@@ -1225,6 +1230,23 @@
      back looking like nothing had ever been chosen. Said again here, after it. */
   body[data-sky="day"] .length-chip.sel{ background:rgba(122,79,181,.14); border-color:var(--lilac);
     box-shadow:inset 0 0 0 1px var(--lilac); }
+  /* ...and it was erasing every OTHER selectable in that list too, which is most
+     of the reason "it doesn't stay highlighted" was reported across so many
+     different screens rather than one. A voice card, a background, a chip, a
+     frequency and the layered-voice buttons are all in the repaint above, and
+     none of them had their .sel said again afterwards, so by day the chosen one
+     was painted the same cream as the three beside it. Said again here, in the
+     same colours their night rules use, in the same place, so the next component
+     added to that list has an obvious precedent to follow. */
+  body[data-sky="day"] .voice-card.sel, body[data-sky="day"] .chip.sel{
+    background:rgba(217,98,59,.12); border-color:var(--candle);
+    box-shadow:inset 0 0 0 1px var(--candle); }
+  body[data-sky="day"] .bg-card.sel, body[data-sky="day"] .freq-card3.sel,
+  body[data-sky="day"] .layer-voice-options button.sel{
+    background:rgba(122,79,181,.14); border-color:var(--lilac);
+    box-shadow:inset 0 0 0 1px var(--lilac); }
+  body[data-sky="day"] .avatar-opt.sel, body[data-sky="day"] .av-opt.sel{
+    border-color:var(--candle); box-shadow:0 0 0 3px rgba(217,98,59,.28); }
   body[data-sky="day"] .journal-tabs button.active{ background:rgba(122,79,181,.14); }
   body[data-sky="day"] input::placeholder, body[data-sky="day"] textarea::placeholder{ color:#9C8FA8; }
 
@@ -2060,6 +2082,127 @@
      stops the portrait from taking over a page that is not onboarding. */
   .locked-preview .hsd{ margin:18px 0 6px; }
   .locked-preview .hsd-portrait{ height:clamp(104px, 18vh, 152px); }
+
+  /* ================================================================
+     SELECTED, EVERYWHERE — the one visual standard
+     ================================================================
+     THE RULE: if an element represents a user selection, it must always
+     visually show whether it is currently selected. See js/selectable.js
+     for the state half of it; this is the appearance half.
+
+     The complaint that produced this block was the same on every screen:
+     "I tap it and nothing stays highlighted." Two different things were
+     being confused for each other. A button dips under your finger for as
+     long as you are touching it — that is PRESSED, and it is a property of
+     the finger, not of the answer. SELECTED is a property of the answer and
+     it has to outlive the finger, the next render, the next screen and the
+     refresh.
+
+     So they are drawn as two different things:
+
+       pressed   — momentary, a dip and a slight dim, no ring, gone on release
+       selected  — a tinted fill, a coloured border AND an inner ring, plus a
+                   little weight in the text
+
+     Colours are not invented here. Every one of these components already had
+     a .sel rule in its own house colour (candle or lilac, matching whatever
+     that screen uses) and those are untouched — this adds the ring and the
+     weight on top, which is the treatment .length-chip.sel already had and
+     the one that actually reads at a glance. Nothing is redesigned; the
+     difference is just made hard to miss without making it loud.
+
+     Kept to one class of specificity on purpose, so the day-theme repaints
+     further up this stylesheet still win on colour. The ring inherits
+     currentColor-ish tints via the border colour each component sets. */
+
+  .voice-card.sel, .freq-card3.sel, .bg-card.sel, .chip.sel,
+  .ob-chip.sel, .ho-card.sel, .ho-time.sel, .ask-chip.sel,
+  .layer-voice-options button.sel, .sess-card.sel{
+    box-shadow:inset 0 0 0 1px currentColor, 0 0 0 1px rgba(255,255,255,.04);
+    font-weight:600;
+  }
+  /* These three carry their tint on the border rather than the text, so the
+     ring is drawn from the border colour instead of currentColor. */
+  .freq-card3.sel, .bg-card.sel, .layer-voice-options button.sel,
+  .ho-card.sel, .ho-time.sel, .ob-chip.sel{
+    box-shadow:inset 0 0 0 1px var(--lilac);
+  }
+  .voice-card.sel, .chip.sel, .ask-chip.sel{
+    box-shadow:inset 0 0 0 1px var(--candle);
+  }
+  /* The avatar tiles are a picture in a frame: a heavier frame and a soft halo
+     is the whole vocabulary they have, and a ring inside would cut the face. */
+  .avatar-opt.sel, .av-opt.sel{
+    box-shadow:0 0 0 3px rgba(227,190,127,.28);
+  }
+
+  /* PRESSED — what a finger does, and nothing more. Deliberately not a tint or
+     a border change: those are what selected means, and a tap that briefly
+     looked selected and then went back is the exact illusion this whole block
+     exists to stop. */
+  .voice-card:active, .voice-card-face:active, .freq-card3:active, .bg-card:active,
+  .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
+  .ho-time:active, .ask-chip:active, .layer-voice-options button:active,
+  .sess-card:active, .avatar-opt:active, .av-opt:active{
+    transform:scale(.97);
+    filter:brightness(1.08);
+  }
+  /* A card mid-press that is already the answer keeps its ring — the press is
+     drawn on top of selected, never instead of it. */
+
+  /* FOCUS — visible for a keyboard, and drawn outside the box so it sits beside
+     the selected ring rather than replacing it. */
+  .voice-card:focus-visible, .voice-card-face:focus-visible, .freq-card3:focus-visible,
+  .bg-card:focus-visible, .chip:focus-visible, .length-chip:focus-visible,
+  .ob-chip:focus-visible, .ho-card:focus-visible, .ho-time:focus-visible,
+  .ask-chip:focus-visible, .layer-voice-options button:focus-visible,
+  .sess-card:focus-visible, .avatar-opt:focus-visible, .av-opt:focus-visible{
+    outline:2px solid var(--candle);
+    outline-offset:2px;
+  }
+
+  /* DISABLED — the third state the reusable pattern has to support. Muted and
+     inert, and a disabled thing that is nonetheless the current answer still
+     shows it: "you chose this and it is not available right now" is a different
+     sentence from "you chose nothing". */
+  .voice-card[disabled], .freq-card3[disabled], .bg-card[disabled], .chip[disabled],
+  .length-chip[disabled], .ob-chip[disabled], .ho-card[disabled], .ho-time[disabled],
+  .ask-chip[disabled], .layer-voice-options button[disabled], .sess-card[disabled]{
+    opacity:.45; cursor:default; transform:none; filter:none;
+  }
+
+  /* THE HIGHLIGHT DOES NOT FADE IN. These components carry `transition:all .2s`
+     from their own rules, which quietly included the ring and the weight -- so
+     the strongest part of the selected signal eased in over a fifth of a second
+     after the tap. A fifth of a second is exactly long enough for a thumb to be
+     moving away already.
+
+     The tint and the border keep their .2s, because that softness is the
+     existing design and it is not what anybody is waiting to see. The ring and
+     the weight snap, in the frame the tap landed in. */
+  .voice-card, .voice-card-face, .freq-card3, .bg-card, .chip, .length-chip,
+  .ob-chip, .ho-card, .ho-time, .ask-chip, .layer-voice-options button,
+  .sess-card, .avatar-opt, .av-opt{
+    transition:background-color .2s, border-color .2s, color .2s, opacity .2s, transform .1s;
+  }
+
+  /* Touch: stop the OS drawing its own grey flash over the top of all this, and
+     stop a hold on a card selecting the text inside it. */
+  .voice-card, .voice-card-face, .freq-card3, .bg-card, .chip, .length-chip,
+  .ob-chip, .ho-card, .ho-time, .ask-chip, .layer-voice-options button,
+  .sess-card, .avatar-opt, .av-opt{
+    -webkit-tap-highlight-color:transparent;
+    -webkit-user-select:none; user-select:none;
+    touch-action:manipulation;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .voice-card:active, .voice-card-face:active, .freq-card3:active, .bg-card:active,
+    .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
+    .ho-time:active, .ask-chip:active, .layer-voice-options button:active,
+    .sess-card:active, .avatar-opt:active, .av-opt:active{ transform:none; }
+    .record-line-loading{ animation:none; }
+  }
 </style>
 </head>
 <body>
@@ -2583,7 +2726,7 @@
         <div class="flow-title">Choose your frequency</div>
         <div class="flow-sub">The nine core Solfeggio tones used in sound healing.</div>
         <div class="flow-body">
-          <div class="freq-grid3" id="freqChips"></div>
+          <div class="freq-grid3" id="freqChips" role="radiogroup" aria-label="Carrier frequency"></div>
           <div class="freq-guide" id="freqGuideText">Tap a frequency to see what it's traditionally used for.</div>
           <div class="disclaimer"><span class="i">ⓘ</span><p>Frequency associations come from cultural and spiritual traditions. They are not medical treatment.</p></div>
         </div>
@@ -2640,11 +2783,11 @@
             <div class="more-options-body">
               <div class="quiz-q">
                 <label>Tone</label>
-                <div class="quiz-options" id="toneChips"></div>
+                <div class="quiz-options" id="toneChips" role="radiogroup" aria-label="Tone"></div>
               </div>
               <div class="quiz-q">
                 <label>Quick tag (optional, helps us focus)</label>
-                <div class="chip-grid" id="intentionChips"></div>
+                <div class="chip-grid" id="intentionChips" role="radiogroup" aria-label="What this is for"></div>
               </div>
               <div class="quiz-q" id="countRow">
                 <label>How many affirmations?</label>
@@ -2687,8 +2830,8 @@
         <div class="flow-title">Whose voice tonight?</div>
         <div class="flow-sub">Your own voice is stronger — hearing yourself say it matters.</div>
         <div class="flow-body">
-          <div class="voice-options">
-            <button class="voice-card" id="voiceOwn" onclick="chooseVoice('own')">
+          <div class="voice-options" role="radiogroup" aria-label="Whose voice reads your affirmations">
+            <button class="voice-card" id="voiceOwn" role="radio" aria-checked="false" onclick="chooseVoice('own')">
               <span class="badge">Recommended</span>
               <h4>Record your own voice</h4>
               <p>Use your real voice</p>
@@ -2698,7 +2841,7 @@
                  A free account may press the demo as often as it likes — it is one
                  pre-generated file and never reaches ElevenLabs. -->
             <div class="voice-card voice-card-split" id="voiceSerenity">
-              <button type="button" class="voice-card-face" onclick="chooseVoice('serenity')">
+              <button type="button" class="voice-card-face" role="radio" aria-checked="false" onclick="chooseVoice('serenity')">
                 <h4>Serenity</h4>
                 <p>Calm, warm AI voice</p>
               </button>
@@ -2706,7 +2849,7 @@
                       aria-label="Play a short Serenity preview"
                       onclick="toggleSerenityPreview(event)">▶ Preview</button>
             </div>
-            <button class="voice-card" id="voiceClone" onclick="chooseVoice('clone')">
+            <button class="voice-card" id="voiceClone" role="radio" aria-checked="false" onclick="chooseVoice('clone')">
               <h4>Clone your voice</h4>
               <p>Create an AI version of your voice</p>
             </button>
@@ -2725,7 +2868,7 @@
         <div class="flow-title">Layer your ambience</div>
         <div class="flow-sub">Generated live in your browser. You'll adjust every layer's volume on the final screen, once you can hear it.</div>
         <div class="flow-body">
-          <div class="bg-grid" id="bgGrid"></div>
+          <div class="bg-grid" id="bgGrid" role="radiogroup" aria-label="Background ambience"></div>
           <details class="more-options">
             <summary>Add more layers <em>soothing pad, your own track, a second voice, binaural beats</em></summary>
             <div class="more-options-body">
@@ -2786,8 +2929,14 @@
         <div class="breath-note" id="recordBreathNote">Before you start — take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</div>
         <div class="flow-body">
           <div class="record-panel">
-            <div class="record-counter" id="recCounter">1 of 14</div>
-            <div class="record-line" id="recLine">"..."</div>
+            <!-- Both of these are filled in by showRecordLine() as step 6 opens.
+                 They used to read "1 of 14" and "..." and, on the route that
+                 skipped the fork, that is exactly what stayed on the screen —
+                 a correct-looking counter over an affirmation that was never
+                 drawn. Neither says anything now that could be mistaken for
+                 somebody's actual line. -->
+            <div class="record-counter" id="recCounter"></div>
+            <div class="record-line record-line-loading" id="recLine">Preparing your affirmations…</div>
             <div class="rec-tap-hint" id="recTapHint" style="display:none;"></div>
             <button class="rec-btn" id="recBtn">HOLD</button>
             <div class="waveform" id="waveform"></div>
@@ -3289,6 +3438,7 @@
 <!-- The app, in load order. Plain scripts sharing one global scope, so the
      inline handlers above keep working and each file can see the ones
      before it. Moving one of these lines changes behaviour. -->
+<script src="js/selectable.js"></script>
 <script src="js/dates.js"></script>
 <script src="js/sky.js"></script>
 <script src="js/builder.js"></script>
