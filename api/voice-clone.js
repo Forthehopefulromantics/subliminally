@@ -25,7 +25,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY - Supabase -> Settings -> API -> service_role key
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
 import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
@@ -79,6 +79,15 @@ export default async function handler(req, res) {
   const user = await whoIsCalling(bearerToken(req));
   if (!user) { res.status(401).json({ error: 'not_signed_in' }); return; }
 
+  /* DELETE sits above the premium gate on purpose, and it is the one path here
+     that can reach ElevenLabs without a paid plan.
+
+     It removes a voice, it never creates one, so it cannot spend credits — and
+     gating it would strand the cloned voice of anybody whose subscription
+     lapsed, at the provider, with no way to remove it. The privacy policy says a
+     voice is deleted at ElevenLabs when its owner asks; a paywall in front of
+     that would make us wrong. It only does anything at all for somebody who
+     already has a voice, which means they were premium when it was created. */
   if (req.method === 'DELETE') {
     const existing = await getVoiceProfile(user.id);
     const voiceId = existing && existing.provider_voice_id;
@@ -95,10 +104,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Cloning your voice is the top of the range — it's the most expensive thing
-  // the app does per person.
+  /* Cloning your voice is the most expensive thing the app does per person, so
+     the gate is here — before the sample is read off the wire and before
+     anything reaches ElevenLabs. A free account cannot start a clone by calling
+     this route directly.
+
+     Same premium definition as /api/tts, from one place, so the two can never
+     drift into disagreeing about who may spend credits. */
   const tier = await tierForUser(user.id);
-  if (tier !== 'ritual') {
+  if (!hasPremiumAccess(tier)) {
     res.status(403).json({ error: 'upgrade_required', detail: 'Cloning your voice comes with Ritual.' });
     return;
   }
