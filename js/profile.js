@@ -225,6 +225,7 @@ async function loadSavedIntoBuilder(id, opts){
       }
     }
     state.voiceMode = 'own';
+    state.selectedVoice = VOICE_RECORD_OWN;
     if (recordingLoadErrors.length){
       console.warn('subliminal audio did not load:', recordingLoadErrors);
     }
@@ -234,6 +235,11 @@ async function loadSavedIntoBuilder(id, opts){
     // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
     state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
+    /* Reopening a saved subliminal has to put the voice picker back the way it
+       was built, or Continue would fork on a blank answer -- and a blank answer
+       used to mean the manual recorder. selectedVoiceFromState() reads it back
+       out of the two fields this row actually stores. */
+    state.selectedVoice = selectedVoiceFromState();
   }
 
   customTrackBlob = null;
@@ -259,7 +265,7 @@ async function loadSavedIntoBuilder(id, opts){
   document.getElementById('layerVoiceToggle').checked = layerVoiceEnabled;
   document.getElementById('layerVoicePanel').classList.toggle('open', layerVoiceEnabled);
   document.getElementById('layerAffText').value = state.layerAffirmations.join('\n');
-  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode===layerVoiceMode));
+  paintLayerVoiceOptions();
   layerRecordings = [];
   const hasLayerRecordings = Array.isArray(s.layer_recording_urls) && s.layer_recording_urls.some(p => p);
   if (hasLayerRecordings){
