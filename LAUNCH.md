@@ -28,18 +28,37 @@ routes reply 503 and the app falls back to the device voice, exactly as before.
 
 ### The V1 voice picker
 
-Three choices, and only three:
+Three cards, and only three:
 
-| Choice | Free | Premium | ElevenLabs? |
+| Card | Free | Premium | ElevenLabs? |
 | --- | --- | --- | --- |
 | Record your own voice | ✅ | ✅ | no — recorded in the browser |
-| **Serenity** (`PrH4gjaYIM8R16R889Vf`) | 🔒 | ✅ | yes |
+| **Serenity** (`PrH4gjaYIM8R16R889Vf`) — *use* | 🔒 | ✅ | yes, per line |
+| **Serenity** — *Play Preview* | ✅ | ✅ | **no** — one stored file |
 | Clone your voice | 🔒 | ✅ | yes |
 
 A free account **sees all three**, with a lock and a RITUAL badge on the two
 that are paid, and tapping a locked one opens the existing upgrade sheet rather
-than doing nothing or failing. "This device" stays in the list underneath as the
-free fallback — it is the browser's own speech synthesis and costs nothing.
+than doing nothing or failing. The device voice is no longer a card; it stays as
+the silent fallback whenever a generated voice cannot be used.
+
+**The Serenity demo is free, and is not the same thing as Serenity.** Two
+different routes, on purpose:
+
+- `/api/voice-preview` — one short pre-generated file of Serenity saying the
+  fixed line in `lib/voice-preview.js`. No sign-in, no parameters, no request
+  body: there is nothing to submit to it. It is generated **once, ever** (the
+  first request of the app's life), kept in the `tts-cache` bucket at
+  `_preview/<clip key>.mp3`, and read back after that. The response is
+  `public, max-age=31536000, immutable`, so in practice most presses are
+  answered by the browser or the CDN and never reach the function.
+- `/api/tts` — Serenity reading **your** affirmations, a request per line. This
+  is the premium one and the gate is unchanged: a 403 before a character
+  reaches the provider.
+
+Somebody deciding whether to pay for a voice has to be able to hear it; hearing
+it must not be a way to get it. That is the whole distinction, and
+`npm run test:voice` holds both halves of it.
 
 The six voices the picker used to offer — Sarah, Charlotte, Alice, Lily, Daniel
 and George — are **retired, not deleted**. They are in `LEGACY_PRESET_VOICES` in
@@ -61,6 +80,10 @@ What this costs, and what it does not:
   back. `tts_generations` is the ledger, and the rate limits (40 a minute, 150 an
   hour, 600 a day, per person) are counted off it — cache hits are free and are
   not counted.
+- **The demo is generated once, ever.** Not per press, per person or per page —
+  one file for the life of the app, at `_preview/<clip key>.mp3`. The path is
+  derived from the words, the voice, the pace and the model, so changing any of
+  them is a new file generated once rather than a stale one to invalidate.
 - **A voice is cloned once.** Building a subliminal never creates a clone;
   `user_voice_profiles` holds the one voice per person and it is reused. A clone
   is only ever created with the confirmation sentence in `lib/user-voices.js`,
@@ -76,7 +99,15 @@ Two things that will bite:
   and `api/voice-clone.js`, off the one definition in `hasPremiumAccess()`. A
   free account gets a 403 before anything reaches ElevenLabs. That includes
   Kyla's own account — testing Serenity needs a tier on it, or the gate needs a
-  test bypass.
+  test bypass. The Preview button is the exception and needs neither: it plays
+  the stored demo on any account, including none.
+
+- **The demo's first press is the only one that spends anything.** It has to
+  happen once on production, after `ELEVENLABS_API_KEY` is set, before anybody
+  can hear it — pressing Preview once (or opening
+  `https://subliminallybyfthr.com/api/voice-preview`) is enough, and every press
+  after that on every device is free. If the file is ever deleted from the
+  bucket, the next press regenerates it and stores it again.
 
 ### RevenueCat webhook
 

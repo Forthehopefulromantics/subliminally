@@ -273,19 +273,24 @@
   @keyframes loadPulse{ 0%,100%{ opacity:.25; transform:scale(0.8);} 50%{ opacity:1; transform:scale(1);} }
 
   .voice-options{ display:grid; gap:10px; }
-  .voice-picker{ margin-top:16px; padding-top:16px; border-top:1px solid var(--dusk); }
-  .voice-picker-label{ font-size:12px; color:var(--haze); margin-bottom:10px; }
-  .voice-chips{ display:flex; flex-wrap:wrap; gap:8px; }
-  .voice-chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; transition:border-color .2s, background .2s; }
-  .voice-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
-  .voice-chip .voice-chip-desc{ color:var(--haze); font-size:11px; }
-  .voice-chip.mine{ border-color:var(--candle); }
-  .voice-chip-play{ opacity:.6; }
   .voice-card{ text-align:left; cursor:pointer; padding:16px; border-radius:16px; background:var(--dusk); border:1px solid transparent; transition:all .2s; position:relative; }
   .voice-card.sel{ background:rgba(227,190,127,0.12); border-color:var(--candle); }
   .voice-card .badge{ position:absolute; top:12px; right:14px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--candle); background:rgba(227,190,127,0.14); padding:3px 9px; border-radius:999px; }
   .voice-card h4{ font-family:var(--serif); font-size:17px; color:var(--moonlight); }
   .voice-card p{ font-size:12.5px; color:var(--haze); margin-top:4px; }
+  .voice-chip-desc{ color:var(--haze); font-size:11px; }
+  /* Serenity: one card holding two controls. The face selects the voice, the
+     play button only plays the demo, so they cannot be pressed by accident for
+     each other -- see toggleSerenityPreview() in js/builder.js. */
+  .voice-card-split{ display:flex; align-items:center; gap:12px; padding:0; }
+  .voice-card-face{ flex:1; min-width:0; text-align:left; background:none; border:none; color:inherit; font-family:inherit; cursor:pointer; padding:16px; border-radius:16px 0 0 16px; }
+  .voice-preview-btn{ flex:none; align-self:stretch; display:flex; align-items:center; gap:6px; padding:0 16px; margin:0; border:none; border-left:1px solid rgba(255,255,255,0.07); border-radius:0 16px 16px 0; background:rgba(255,255,255,0.03); color:var(--moonlight); font-family:inherit; font-size:12px; letter-spacing:.02em; cursor:pointer; transition:background .2s, color .2s; }
+  .voice-preview-btn:hover{ background:rgba(185,167,232,0.14); }
+  .voice-preview-btn.is-playing{ background:rgba(185,167,232,0.2); color:var(--lilac); }
+  .voice-preview-btn:disabled{ opacity:.5; cursor:default; }
+  /* The lock lands inside the face (see renderVoiceCards), so the play button
+     never looks locked -- the demo is free. */
+  .voice-card-face .locked-tag{ margin:8px 0 0; }
 
   .bg-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .bg-card{ cursor:pointer; padding:12px 8px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; transition:all .2s; font-size:12px; }
@@ -1201,7 +1206,7 @@
      just looks grey, so every sunken surface is named once here and given the
      warm cream from the mock instead. */
   body[data-sky="day"] .quiz-q textarea, body[data-sky="day"] .aff-row,
-  body[data-sky="day"] .voice-chip, body[data-sky="day"] .voice-card,
+  body[data-sky="day"] .voice-card,
   body[data-sky="day"] .bg-card, body[data-sky="day"] .rec-btn,
   body[data-sky="day"] .mini-btn.micbtn, body[data-sky="day"] .voice-rec,
   body[data-sky="day"] .length-chip, body[data-sky="day"] .layer-voice-options button,
@@ -1212,6 +1217,9 @@
   body[data-sky="day"] .profile-field-card input, body[data-sky="day"] .profile-field-card textarea,
   body[data-sky="day"] .lib-title-input, body[data-sky="day"] .layer-voice-panel textarea{
     background:#FFF6EA; border-color:rgba(62,42,72,.12); }
+  /* The play button sits inside a card that has just been painted cream, so it
+     needs its own tint to still read as a separate control. */
+  body[data-sky="day"] .voice-preview-btn{ background:rgba(62,42,72,.05); border-left-color:rgba(62,42,72,.12); }
   /* The repaint above is more specific than .length-chip.sel, so by day it was
      quietly erasing the selected state: the faith saved in your profile came
      back looking like nothing had ever been chosen. Said again here, after it. */
@@ -2683,22 +2691,31 @@
             <button class="voice-card" id="voiceOwn" onclick="chooseVoice('own')">
               <span class="badge">Recommended</span>
               <h4>Record your own voice</h4>
-              <p>Hold to record each line yourself. Nothing is uploaded — it stays in this tab. Free on every account.</p>
+              <p>Use your real voice</p>
             </button>
-            <button class="voice-card" id="voiceAI" onclick="chooseVoice('ai')">
-              <h4>An AI voice</h4>
-              <p>Let Serenity read each line aloud, or use an AI version of your own voice, instead of recording it yourself.</p>
+            <!-- Serenity is two controls in one card on purpose: the card chooses
+                 the voice (premium), the small play button only plays the demo.
+                 A free account may press the demo as often as it likes — it is one
+                 pre-generated file and never reaches ElevenLabs. -->
+            <div class="voice-card voice-card-split" id="voiceSerenity">
+              <button type="button" class="voice-card-face" onclick="chooseVoice('serenity')">
+                <h4>Serenity</h4>
+                <p>Calm, warm AI voice</p>
+              </button>
+              <button type="button" class="voice-preview-btn" id="serenityPreviewBtn"
+                      aria-label="Play a short Serenity preview"
+                      onclick="toggleSerenityPreview(event)">▶ Preview</button>
+            </div>
+            <button class="voice-card" id="voiceClone" onclick="chooseVoice('clone')">
+              <h4>Clone your voice</h4>
+              <p>Create an AI version of your voice</p>
             </button>
           </div>
-          <div class="voice-picker" id="voicePicker" style="display:none;">
-            <div class="voice-picker-label">Which voice?</div>
-            <div class="voice-chips" id="voiceChips"></div>
-            <!-- Filled in by renderMyVoicePanel() the first time "Use my voice" is
-                 chosen: what a cloned voice is, the confirmation, and the recorder. -->
-            <div class="my-voice-panel" id="myVoicePanel" data-open="0"></div>
-            <audio id="voicePreview" style="display:none;"></audio>
-            <div class="save-msg" id="voicePickerMsg"></div>
-          </div>
+          <!-- Filled in by renderMyVoicePanel() the first time "Clone your voice" is
+               chosen: what a cloned voice is, the confirmation, and the recorder. -->
+          <div class="my-voice-panel" id="myVoicePanel" data-open="0"></div>
+          <audio id="voicePreview" preload="none" style="display:none;"></audio>
+          <div class="save-msg" id="voicePickerMsg"></div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="toStep5" disabled onclick="nextStep()">Continue</button></div>
       </div>

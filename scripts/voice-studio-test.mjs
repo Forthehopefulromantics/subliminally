@@ -145,6 +145,11 @@ globalThis.fetch = async (url, opts) => {
   if (u.includes('/storage/v1/object/tts-cache/')){
     const path = u.split('/storage/v1/object/tts-cache/')[1];
     if (method === 'POST'){ db.objects.set(path, o.body); return reply({ Key: path }); }
+    // Reading an object straight back is how the Serenity demo is served.
+    if (method === 'GET'){
+      if (!db.objects.has(path)) return reply({ error: 'not found' }, { status: 404 });
+      return reply('', { bytes: new Uint8Array(Buffer.from(db.objects.get(path))) });
+    }
   }
   if (u.includes('/object/sign/tts-cache/')){    // the signed link being read back
     return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
@@ -171,6 +176,8 @@ globalThis.fetch = async (url, opts) => {
 const { default: tts } = await import(new URL('../api/tts.js', import.meta.url).href);
 const { default: voiceClone } = await import(new URL('../api/voice-clone.js', import.meta.url).href);
 const { default: voices } = await import(new URL('../api/voices.js', import.meta.url).href);
+const { default: voicePreview } = await import(new URL('../api/voice-preview.js', import.meta.url).href);
+const { PREVIEW_TEXT, previewStoragePath } = await import(new URL('../lib/voice-preview.js', import.meta.url).href);
 
 function mockRes(){
   const r = { code: null, body: null, headers: {} };
@@ -365,6 +372,59 @@ check('  ...and never offers a retired voice', JSON.stringify(catRes.body).inclu
 check('  ...says a voice of their own exists', catRes.body.myVoice.key, 'mine');
 check('  ...without its id', JSON.stringify(catRes.body).includes(MY_CLONE), false);
 check('  ...and carries the confirmation the clone route checks', catRes.body.consentStatement, CONSENT);
+
+/* ---------------- the Serenity demo ----------------
+   The one place a voice is heard without paying for it. It has to be free to
+   play, open to somebody with no account at all, and it has to cost exactly one
+   generation for the life of the app — not one per press, per person or per
+   page. It also has to be useless as free text-to-speech. */
+reset();
+async function callPreview({ method = 'GET', token = null, body } = {}){
+  const res = mockRes();
+  const headers = {};
+  if (token) headers.authorization = 'Bearer ' + token;
+  await voicePreview({ method, headers, body }, res);
+  return res;
+}
+const PREVIEW_PATH = previewStoragePath();
+
+r = await callPreview();
+check('the demo plays for somebody with no account', r.code, 200);
+check('  ...as an mp3', r.headers['Content-Type'], 'audio/mpeg');
+check('  ...cached hard, so most presses never reach the server', r.headers['Cache-Control'], 'public, max-age=31536000, immutable');
+check('  ...generated once', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 1);
+check('  ...in Serenity', elevenCalls[0].url.includes(SERENITY), true);
+check('  ...saying the one line it is allowed to say', elevenCalls[0].body.text, PREVIEW_TEXT);
+check('  ...and kept', db.objects.has(PREVIEW_PATH), true);
+
+const afterFirstPreview = elevenCalls.length;
+await callPreview();
+await callPreview();
+await callPreview();
+check('pressing Preview again costs nothing', elevenCalls.length - afterFirstPreview, 0);
+
+/* A second serverless instance, cold, with the file already in the bucket: it
+   must read it back rather than pay for it again. Importing the route under a
+   different URL is how you get one in a single process. */
+const { default: coldPreview } = await import(new URL('../api/voice-preview.js?instance=2', import.meta.url).href);
+const coldRes = mockRes();
+await coldPreview({ method: 'GET', headers: {} }, coldRes);
+check('a cold server reads the file back', coldRes.code, 200);
+check('  ...without generating anything', elevenCalls.length - afterFirstPreview, 0);
+check('  ...the same audio everybody else got', Buffer.from(coldRes.body).equals(Buffer.from(db.objects.get(PREVIEW_PATH))), true);
+
+/* It is a demo, not an endpoint. There is nothing to submit to it. */
+const postRes = await callPreview({ method: 'POST', body: { text: 'read my affirmations for free' } });
+check('nothing can be submitted to the demo', [postRes.code, postRes.body.error], [405, 'method_not_allowed']);
+check('  ...and nothing was generated', elevenCalls.length - afterFirstPreview, 0);
+
+/* Hearing Serenity is free. Being read BY Serenity is not, and the demo does not
+   change that for a single caller. */
+reset();
+db.tier = null;
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('the demo does not unlock Serenity for a free account', [r.code, r.body.error], [403, 'upgrade_required']);
+check('  ...and nothing was generated', elevenCalls.length, 0);
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nall checks passed');
 process.exit(fails ? 1 : 0);
