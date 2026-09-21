@@ -233,7 +233,10 @@ async function loadSavedIntoBuilder(id, opts){
     // No recorded audio was saved for this one (or it was a studio voice
     // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
-    state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
+    /* A subliminal built when there were six studio voices names one of them.
+       They are retired, and the server reads any of them as Serenity, so the
+       builder agrees rather than showing no card selected. */
+    state.aiVoiceId = normalizeVoiceKey(s.ai_voice_id) || SERENITY_VOICE;
   }
 
   customTrackBlob = null;
@@ -253,7 +256,7 @@ async function loadSavedIntoBuilder(id, opts){
   // Ritual-only second voice layer, if this saved subliminal has one.
   state.layerAffirmations = Array.isArray(s.layer_affirmations) ? s.layer_affirmations.slice() : [];
   state.layerVoiceMode = s.layer_voice_mode || null;
-  state.layerAiVoiceId = s.layer_ai_voice_id || DEVICE_VOICE;
+  state.layerAiVoiceId = normalizeVoiceKey(s.layer_ai_voice_id) || DEVICE_VOICE;
   layerVoiceEnabled = !!(state.layerAffirmations.length && state.layerVoiceMode);
   layerVoiceMode = state.layerVoiceMode || 'ai';
   document.getElementById('layerVoiceToggle').checked = layerVoiceEnabled;
@@ -296,8 +299,18 @@ const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not some
 let voiceCloneRecorder = null, voiceCloneChunks = [], voiceCloneStream = null,
     voiceCloneTimer = null, voiceCloneStart = 0;
 /* Ticked in this session, for this attempt. Never remembered: a new voice is a
-   new confirmation, including when somebody records theirs again. */
+   new confirmation, including when somebody records theirs again.
+
+   Two of them, because two different things are being agreed to: that the voice
+   is theirs to clone, and that the recording may go to ElevenLabs to be turned
+   into one. /api/voice-clone checks both against its own copy of the sentences
+   and refuses the sample if either is missing. */
 let voiceCloneConsented = false;
+let voiceCloneProcessingConsented = false;
+/* The take that has been recorded but not sent. Nothing leaves the browser
+   while this is set: they hear it back first, and can record it again as many
+   times as they like. Only "Create my voice" uploads it. */
+let voiceCloneTake = null;      // { blob, url, seconds }
 /* True while replacing a voice that already exists, which is the only way a
    second clone is ever created. */
 let voiceCloneReplacing = false;
@@ -308,16 +321,29 @@ let voiceCloneReplacing = false;
 let voiceCloneHost = { bodyId: 'voiceCloneBody', msgId: 'voiceCloneMsg' };
 function mountVoiceClone(bodyId, msgId){
   voiceCloneHost = { bodyId, msgId };
-  voiceCloneConsented = false;
+  resetVoiceCloneConsent();
+  discardVoiceCloneTake();
   voiceCloneReplacing = false;
   renderVoiceClone();
 }
 function unmountVoiceClone(){
   if (voiceCloneRecorder) cancelVoiceClone();
   voiceCloneHost = { bodyId: 'voiceCloneBody', msgId: 'voiceCloneMsg' };
-  voiceCloneConsented = false;
+  resetVoiceCloneConsent();
+  discardVoiceCloneTake();
   voiceCloneReplacing = false;
 }
+function resetVoiceCloneConsent(){
+  voiceCloneConsented = false;
+  voiceCloneProcessingConsented = false;
+}
+/* A take that is not going to be sent is released rather than left holding a
+   blob URL for the rest of the session. */
+function discardVoiceCloneTake(){
+  if (voiceCloneTake && voiceCloneTake.url){ try { URL.revokeObjectURL(voiceCloneTake.url); } catch(e){} }
+  voiceCloneTake = null;
+}
+function voiceCloneReady(){ return voiceCloneConsented && voiceCloneProcessingConsented; }
 function voiceCloneBodyEl(){ return document.getElementById(voiceCloneHost.bodyId); }
 function voiceCloneMsgEl(){ return document.getElementById(voiceCloneHost.msgId); }
 
@@ -325,6 +351,8 @@ async function renderVoiceClone(){
   const body = voiceCloneBodyEl();
   if (!body) return;
   const mine = await myVoiceProfile();
+
+  // Mid-recording.
   if (voiceCloneRecorder){
     const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
     body.innerHTML = `
@@ -338,44 +366,102 @@ async function renderVoiceClone(){
       </div>`;
     return;
   }
-  if (mine && !voiceCloneReplacing){
+
+  /* Recorded, and still here. This is the step that used to be missing: the
+     sample went straight up the moment they stopped talking, so a cough or a
+     door closing halfway through became their voice. Now they hear it first,
+     and nothing has been sent yet — "Record it again" simply throws this take
+     away, and "Create my voice" is the only thing that uploads. */
+  if (voiceCloneTake){
     body.innerHTML = `
-      <div class="voice-clone-have">
-        <span>✦ Your voice is ready — pick <b>${mine.name || 'My voice'}</b> when you choose a voice.</span>
-        <button class="mini-btn ghostbtn" onclick="beginReplaceVoice()">Record it again</button>
-        <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
+      <div class="voice-clone-review">
+        <p class="voice-clone-intro" style="margin:0;">Listen back before you send it. Somewhere quiet, every word clear — if it isn't, record it again. Nothing has left this device yet.</p>
+        <audio controls src="${voiceCloneTake.url}"></audio>
+        <div class="voice-clone-actions">
+          <button class="mini-btn candlebtn" onclick="submitVoiceCloneTake()">Create my voice</button>
+          <button class="mini-btn ghostbtn" onclick="redoVoiceCloneTake()">Record it again</button>
+          <span class="voice-chip-desc">${voiceCloneTake.seconds}s recorded</span>
+        </div>
       </div>`;
     return;
   }
-  /* The confirmation. Creating a voice that sounds like a real person is only
-     ever theirs to ask for, so the button stays disabled until they say so — and
-     the sentence they tick is the one the server checks the sample against. */
-  const consent = await voiceConsentStatement();
+
+  // A voice already exists, and they are not in the middle of replacing it.
+  if (mine && !voiceCloneReplacing){
+    body.innerHTML = `
+      <div class="voice-clone-have">
+        <span>✦ Your AI Voice is ready — choose <b>${mine.name || 'Your AI Voice'}</b> when you build a subliminal.</span>
+        <button class="mini-btn ghostbtn" onclick="beginReplaceVoice()">Record it again</button>
+        <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Delete it</button>
+      </div>`;
+    return;
+  }
+
+  /* The confirmations. Creating a voice that sounds like a real person is only
+     ever theirs to ask for, and sending a recording to a third party is a
+     separate thing to agree to — so it is two boxes, not one, and the button
+     stays disabled until both are ticked. The sentences are the ones the server
+     checks the sample against. */
+  const [consent, processingConsent] = await Promise.all([
+    voiceConsentStatement(),
+    voiceProcessingConsentStatement(),
+  ]);
   body.innerHTML = `
     <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
     <label class="voice-clone-consent">
       <input type="checkbox" id="voiceCloneConsent" ${voiceCloneConsented ? 'checked' : ''} onchange="setVoiceCloneConsent(this.checked)">
       <span>${consent}</span>
     </label>
+    <label class="voice-clone-consent">
+      <input type="checkbox" id="voiceCloneProcessingConsent" ${voiceCloneProcessingConsented ? 'checked' : ''} onchange="setVoiceCloneProcessingConsent(this.checked)">
+      <span>${processingConsent}</span>
+    </label>
     <div class="voice-clone-actions">
-      <button class="mini-btn candlebtn" id="voiceCloneStartBtn" ${voiceCloneConsented ? '' : 'disabled'} onclick="startVoiceClone()">${voiceCloneReplacing ? 'Read this to record it again' : 'Read this to clone my voice'}</button>
+      <button class="mini-btn candlebtn" id="voiceCloneStartBtn" ${voiceCloneReady() ? '' : 'disabled'} onclick="startVoiceClone()">${voiceCloneReplacing ? 'Read this to record it again' : 'Read this to create my voice'}</button>
       <span class="voice-chip-desc">Somewhere quiet, normal speaking voice, about 30 seconds.</span>
     </div>`;
 }
 
+function refreshVoiceCloneStartBtn(){
+  const btn = document.getElementById('voiceCloneStartBtn');
+  if (btn) btn.disabled = !voiceCloneReady();
+  const msg = voiceCloneMsgEl();
+  if (msg && voiceCloneReady()){ msg.textContent = ''; msg.className = 'save-msg'; }
+}
 function setVoiceCloneConsent(checked){
   voiceCloneConsented = !!checked;
-  const btn = document.getElementById('voiceCloneStartBtn');
-  if (btn) btn.disabled = !voiceCloneConsented;
+  refreshVoiceCloneStartBtn();
+}
+function setVoiceCloneProcessingConsent(checked){
+  voiceCloneProcessingConsented = !!checked;
+  refreshVoiceCloneStartBtn();
+}
+
+/* Throw this take away and go back to the passage — not straight into another
+   recording, which starts the moment the microphone is already permitted and
+   catches people mid-thought. The confirmations stand: they are about whose
+   voice it is and where it may go, neither of which changed because the take
+   did. */
+function redoVoiceCloneTake(){
+  discardVoiceCloneTake();
+  renderVoiceClone();
   const msg = voiceCloneMsgEl();
-  if (msg && voiceCloneConsented){ msg.textContent = ''; msg.className = 'save-msg'; }
+  if (msg){ msg.textContent = 'That take is gone. Read it again whenever you are ready.'; msg.className = 'save-msg'; }
+}
+
+/* The only thing that uploads. */
+function submitVoiceCloneTake(){
+  if (!voiceCloneTake) return;
+  const blob = voiceCloneTake.blob;
+  uploadVoiceClone(blob);
 }
 
 /* Recording again replaces the voice at the provider, so it asks again rather
-   than reusing the confirmation from the first time. */
+   than reusing the confirmations from the first time. */
 function beginReplaceVoice(){
   voiceCloneReplacing = true;
-  voiceCloneConsented = false;
+  resetVoiceCloneConsent();
+  discardVoiceCloneTake();
   renderVoiceClone();
 }
 
@@ -383,10 +469,17 @@ async function startVoiceClone(){
   const msg = voiceCloneMsgEl();
   if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   if (!sb || !currentUser) return;
-  if (!voiceCloneConsented){
-    if (msg){ msg.textContent = 'Tick the confirmation first — a voice is only ever made from your own.'; msg.className = 'save-msg err'; }
+  if (!voiceCloneReady()){
+    if (msg){
+      msg.textContent = voiceCloneConsented
+        ? 'Tick the second box too — the recording has to go to ElevenLabs for the voice to be made.'
+        : 'Tick both confirmations first — a voice is only ever made from your own, and only with your say-so.';
+      msg.className = 'save-msg err';
+    }
     return;
   }
+  // A new take replaces any take waiting to be sent, rather than joining it.
+  discardVoiceCloneTake();
   if (!navigator.mediaDevices || !window.MediaRecorder){
     if (msg){ msg.textContent = "This browser can't record audio."; msg.className = 'save-msg err'; }
     return;
@@ -437,7 +530,10 @@ function finishVoiceClone(){
       renderVoiceClone();
       return;
     }
-    uploadVoiceClone(blob);
+    /* Kept here, not sent. The next screen plays it back and offers to record
+       it again; only "Create my voice" uploads it. */
+    voiceCloneTake = { blob, url: URL.createObjectURL(blob), seconds };
+    renderVoiceClone();
   };
   try { rec.stop(); } catch(e){ stopVoiceCloneStream(); renderVoiceClone(); }
 }
@@ -447,6 +543,7 @@ const VOICE_CLONE_MESSAGES = {
   upgrade_required: null,   // filled in below, it quotes the price
   not_configured:   "Voice cloning isn't switched on yet.",
   consent_required: 'Tick the confirmation first — a voice is only ever made from your own.',
+  processing_consent_required: 'Tick the second confirmation too — the recording has to go to ElevenLabs for the voice to be made.',
   sample_too_short: 'That recording was too short — read the sample paragraph all the way through.',
   sample_too_long:  'That recording is too long — about a minute is plenty.',
   quota_exceeded:   "The voice service is out of cloning credits this month — your recording wasn't used, and nothing was charged.",
@@ -472,20 +569,24 @@ async function uploadVoiceClone(blob){
     const headers = {
       'Content-Type': blob.type || 'audio/webm',
       Authorization: `Bearer ${token}`,
-      // The confirmation travels with the sample, and the route checks it against
-      // its own copy of the sentence before spending anything.
+      // Both confirmations travel with the sample, and the route checks each of
+      // them against its own copy of the sentence before spending anything.
       'X-Voice-Consent': await voiceConsentStatement(),
+      'X-Voice-Processing-Consent': await voiceProcessingConsentStatement(),
     };
     if (voiceCloneReplacing) headers['X-Voice-Replace'] = '1';
     const res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: blob });
     const out = await res.json().catch(() => ({}));
     if (!res.ok){
+      // The take is deliberately still here: whatever went wrong, it was not
+      // their reading, and being sent back to record it again would be a lie.
       if (msg){ msg.textContent = voiceCloneErrorText(out.error); msg.className = 'save-msg err'; }
       renderVoiceClone();
       return;
     }
     voiceCloneReplacing = false;
-    voiceCloneConsented = false;
+    resetVoiceCloneConsent();
+    discardVoiceCloneTake();         // it is a voice now; the recording is not kept
     forgetVoiceCatalogue();          // the picker asks again, and finds the voice
     await loadVoiceCatalogue();
     if (voiceCloneHost.bodyId === 'builderVoiceCloneBody' && typeof onMyVoiceReady === 'function'){
@@ -512,13 +613,17 @@ async function removeClonedVoice(){
     });
     if (!res.ok) throw new Error('remove failed');
     voiceCloneReplacing = false;
+    resetVoiceCloneConsent();
+    discardVoiceCloneTake();
     forgetVoiceCatalogue();
     await loadVoiceCatalogue();
-    // Any subliminal set to "My voice" now falls back to the device voice.
-    if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
+    /* Anything set to the cloned voice falls back to Serenity — there is a
+       voice for it to fall back to now, so it does not have to drop to the
+       robotic one built into the phone. */
+    if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = SERENITY_VOICE;
     if (msg){ msg.textContent = 'Removed.'; msg.className = 'save-msg ok'; }
     renderVoiceClone();
-    if (typeof renderVoiceChips === 'function' && document.getElementById('voiceChips')) renderVoiceChips();
+    if (typeof renderVoiceCards === 'function' && document.getElementById('voiceClone')) renderVoiceCards();
   } catch (e){
     if (msg){ msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err'; }
   }

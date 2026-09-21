@@ -59,9 +59,13 @@ const FEATURES = {
   custom_track:      { tier: 'ritual', name: 'Your own track', page: 'builder',
                        headline: 'Build it on your own music ✦',
                        why: 'Layer the melody you already fall asleep to underneath your affirmations, instead of choosing from ours.' },
-  my_voice:          { tier: 'ritual', name: 'Your own voice', page: 'builder',
-                       headline: 'Hear it in your own voice ✦',
-                       why: 'Read one passage once and every subliminal you build can be read in your voice — without recording line by line, on the nights you do not want to.' },
+  /* Cloning, not recording. Recording your own affirmations is free and always
+     has been — this is the AI voice made from a sample of yours, which can then
+     read anything you write later. The wording matters: a free account tapping
+     "Clone Your Voice" must not come away thinking recording is behind a plan. */
+  my_voice:          { tier: 'ritual', name: 'Your AI voice', page: 'builder',
+                       headline: 'An AI voice of your own ✦',
+                       why: 'Read one passage once and every subliminal you build can be read in an AI version of your voice — without recording line by line, on the nights you do not want to. Recording yourself stays free.' },
   layer_voice:       { tier: 'ritual', name: 'Second voice layer', page: 'builder',
                        headline: 'A second voice, quieter, underneath ✦',
                        why: 'A separate set of affirmations layered beneath the main ones — twice the repetition in the same session, without it ever feeling crowded.' },

@@ -7,6 +7,7 @@
    asks the questions this integration has to get right:
 
      * is a voice only ever one from the catalogue, or this person's own?
+     * is Serenity free, and is a cloned voice paid?
      * is the same line in the same voice generated once and then reused?
      * is a whole sequence refused before it is paid for, when the person is over
        their allowance?
@@ -19,7 +20,8 @@ process.env.ELEVENLABS_API_KEY = 'el_test_stub';
 process.env.SUPABASE_URL = 'https://stub.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service_stub';
 
-const SARAH = 'EXAVITQu4vr4xnSDxMaL';   // as in lib/voices.js
+const SERENITY = 'PrH4gjaYIM8R16R889Vf';   // as in lib/voices.js
+const SARAH = 'EXAVITQu4vr4xnSDxMaL';      // retired — a saved subliminal may still name it
 let MY_CLONE = 'voice_clone_of_kyla';
 let clonesMade = 0;
 
@@ -185,10 +187,11 @@ async function callTts(body, token = 'good-token'){
   await tts({ method: 'POST', headers: { authorization: token ? 'Bearer ' + token : '' }, body }, res);
   return res;
 }
-async function callClone({ method = 'POST', token = 'good-token', consent, replace, sample = 'x'.repeat(4096) } = {}){
+async function callClone({ method = 'POST', token = 'good-token', consent, processingConsent = PROCESSING_CONSENT, replace, sample = 'x'.repeat(4096) } = {}){
   const res = mockRes();
   const headers = { authorization: token ? 'Bearer ' + token : '', 'content-type': 'audio/webm' };
   if (consent) headers['x-voice-consent'] = consent;
+  if (processingConsent) headers['x-voice-processing-consent'] = processingConsent;
   if (replace) headers['x-voice-replace'] = '1';
   const req = {
     method, headers,
@@ -203,17 +206,33 @@ async function callClone({ method = 'POST', token = 'good-token', consent, repla
   return res;
 }
 const CONSENT = 'I confirm this is my voice and I have permission to create an AI voice clone from it.';
+const PROCESSING_CONSENT = 'I consent to my recording being sent to ElevenLabs and processed there to create my AI voice.';
 const LINES = ['I am safe.', 'I keep what I promised myself.', 'I am becoming who I said I would be.'];
 
 /* ---------------- who may generate ---------------- */
 reset();
-check('no token is refused', (await callTts({ voiceKey: 'sarah', lines: LINES }, null)).code, 401);
+check('no token is refused', (await callTts({ voiceKey: 'serenity', lines: LINES }, null)).code, 401);
 
+/* Serenity is the voice the app has — free accounts included. This is the rule
+   that changed: it used to be "any studio voice needs Ritual". */
 reset();
 db.tier = null;                       // a free account has no subscribers row
-let r = await callTts({ voiceKey: 'sarah', lines: LINES });
-check('a free account is asked to upgrade', [r.code, r.body.error], [403, 'upgrade_required']);
+let r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('a free account may use Serenity', [r.code, r.body.clips.length], [200, 3]);
+check('  ...read by Serenity', elevenCalls[0].url.includes(SERENITY), true);
+
+/* A cloned voice is the paid one, and the gate is on the voice, not the route. */
+reset();
+db.tier = null;
+db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'Your AI Voice' };
+r = await callTts({ voiceKey: 'mine', lines: LINES });
+check('a free account cannot use a cloned voice', [r.code, r.body.error], [403, 'upgrade_required']);
 check('  ...and nothing was generated', elevenCalls.length, 0);
+
+/* A subliminal saved when there were six voices still plays. */
+reset();
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('a retired voice is read by Serenity', [r.code, elevenCalls[0].url.includes(SERENITY)], [200, true]);
 
 reset();
 r = await callTts({ voiceKey: 'not-a-voice', lines: LINES });
@@ -222,38 +241,39 @@ check('  ...and nothing was generated', elevenCalls.length, 0);
 
 /* ---------------- generated once, then reused ---------------- */
 reset();
-r = await callTts({ voiceKey: 'sarah', speed: 0.92, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 0.92, lines: LINES });
 check('a sequence comes back one clip per line', [r.code, r.body.clips.length], [200, 3]);
 check('  ...every line playable', r.body.clips.every(c => !!c.url && !c.error), true);
 check('  ...one generation each', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 3);
-check('  ...read by the voice the key names', elevenCalls[0].url.includes(SARAH), true);
+check('  ...read by the voice the key names', elevenCalls[0].url.includes(SERENITY), true);
 check('  ...charged for what was said', r.body.characterCount, LINES.join('').length);
 check('the ledger has a row per line', db.generations.length, 3);
 check('  ...with the words hashed, not stored', db.generations.every(g => /^[0-9a-f]{64}$/.test(g.text_hash)), true);
 check('  ...and the character count', db.generations.map(g => g.character_count), LINES.map(l => l.length));
-check('no provider voice id in the response', JSON.stringify(r.body).includes(SARAH), false);
+check('no provider voice id in the response', JSON.stringify(r.body).includes(SERENITY), false);
 check('no API key in the response', JSON.stringify(r.body).includes('el_test_stub'), false);
 check('the key did reach the provider', elevenCalls[0].key, 'el_test_stub');
 
 const before = elevenCalls.length;
-r = await callTts({ voiceKey: 'sarah', speed: 0.92, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 0.92, lines: LINES });
 check('asking again generates nothing', elevenCalls.length - before, 0);
 check('  ...and is still playable', r.body.clips.every(c => c.url && c.cached), true);
 check('  ...and is charged nothing', r.body.characterCount, 0);
 check('  ...but is still on the ledger, as a reuse', db.generations.filter(g => g.cache_hit).length, 3);
 
-r = await callTts({ voiceKey: 'sarah', speed: 1.2, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 1.2, lines: LINES });
 check('a different pace is different audio', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 6);
 
 /* the same words in a different voice are not the same clip */
-r = await callTts({ voiceKey: 'daniel', speed: 0.92, lines: [LINES[0]] });
+db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'Your AI Voice' };
+r = await callTts({ voiceKey: 'mine', speed: 0.92, lines: [LINES[0]] });
 check('a different voice is different audio', r.body.clips[0].cached, false);
 
 /* ---------------- the cost ceiling ---------------- */
 reset();
 const halfAnHourAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 for (let i = 0; i < 149; i++) db.generations.push({ cache_hit: false, created_at: halfAnHourAgo });
-r = await callTts({ voiceKey: 'sarah', lines: LINES });
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('a sequence over the allowance is refused whole', [r.code, r.body.error], [429, 'hourly_limit']);
 check('  ...before a single line is paid for', elevenCalls.length, 0);
 check('  ...and says how much room is left', r.body.headroom, 1);
@@ -261,22 +281,22 @@ check('  ...and says how much room is left', r.body.headroom, 1);
 /* ---------------- when the provider says no ---------------- */
 reset();
 nextElevenResponse = { status: 402, body: 'quota exceeded' };
-r = await callTts({ voiceKey: 'sarah', lines: LINES });
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('out of credits is its own answer', [r.code, r.body.error], [429, 'quota_exceeded']);
 check('  ...and it stops after the first line', elevenCalls.length, 1);
 
 reset();
 nextElevenResponse = { status: 404, body: 'voice_not_found' };
-r = await callTts({ voiceKey: 'sarah', lines: [LINES[0]] });
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
 check('a voice missing at the provider is invalid_voice', r.body.error, 'invalid_voice');
 
 reset();
-r = await callTts({ voiceKey: 'sarah', lines: ['a'.repeat(500), LINES[0]] });
+r = await callTts({ voiceKey: 'serenity', lines: ['a'.repeat(500), LINES[0]] });
 check('an over-long line fails on its own', r.body.clips[0].error, 'too_long');
 check('  ...and the rest of the sequence still plays', !!r.body.clips[1].url, true);
 
 reset();
-r = await callTts({ voiceKey: 'sarah', lines: new Array(30).fill(LINES[0]) });
+r = await callTts({ voiceKey: 'serenity', lines: new Array(30).fill(LINES[0]) });
 check('more lines than a session can hold is refused', [r.code, r.body.error], [400, 'too_many_lines']);
 
 /* ---------------- a voice of their own ---------------- */
@@ -285,7 +305,7 @@ r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] });
 check('"mine" with no voice yet says so', [r.code, r.body.error], [409, 'no_cloned_voice']);
 
 reset();
-db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'Your AI Voice' };
 r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] });
 check('"mine" reads in their own cloned voice', elevenCalls[0].url.includes(MY_CLONE), true);
 check('  ...without naming it in the response', JSON.stringify(r.body).includes(MY_CLONE), false);
@@ -299,6 +319,17 @@ check('  ...and nothing reached the provider', elevenCalls.length, 0);
 reset();
 r = await callClone({ consent: 'I guess so' });
 check('the wrong words are not a confirmation', r.body.error, 'consent_required');
+
+/* Agreeing that it is your voice is not agreeing to it being sent anywhere.
+   Two questions, two headers, and the route wants both. */
+reset();
+r = await callClone({ consent: CONSENT, processingConsent: null });
+check('no ElevenLabs consent, no clone', [r.code, r.body.error], [400, 'processing_consent_required']);
+check('  ...and nothing reached the provider', elevenCalls.length, 0);
+
+reset();
+r = await callClone({ consent: CONSENT, processingConsent: 'sure, whatever' });
+check('the wrong words are not that confirmation either', r.body.error, 'processing_consent_required');
 
 reset();
 db.tier = null;
@@ -330,15 +361,18 @@ check('  ...and the mirror on the profile', db.clonedVoiceId, null);
 
 /* ---------------- the catalogue ---------------- */
 reset();
-db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'Your AI Voice' };
 const catRes = mockRes();
 await voices({ method: 'POST', headers: { authorization: 'Bearer good-token' } }, catRes);
-check('the catalogue lists the preset voices', catRes.body.presets.length, 6);
+check('the catalogue offers one built-in voice', catRes.body.presets.length, 1);
+check('  ...and it is Serenity', [catRes.body.presets[0].key, catRes.body.presets[0].name], ['serenity', 'Serenity']);
 check('  ...by key and name only', Object.keys(catRes.body.presets[0]).sort(), ['desc', 'key', 'name']);
-check('  ...never by provider id', JSON.stringify(catRes.body).includes(SARAH), false);
+check('  ...never by provider id', JSON.stringify(catRes.body).includes(SERENITY), false);
 check('  ...says a voice of their own exists', catRes.body.myVoice.key, 'mine');
 check('  ...without its id', JSON.stringify(catRes.body).includes(MY_CLONE), false);
-check('  ...and carries the confirmation the clone route checks', catRes.body.consentStatement, CONSENT);
+check('  ...and carries both confirmations the clone route checks',
+  [catRes.body.consentStatement, catRes.body.processingConsentStatement], [CONSENT, PROCESSING_CONSENT]);
+check('  ...and which plan cloning needs', catRes.body.cloneTier, 'ritual');
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nall checks passed');
 process.exit(fails ? 1 : 0);

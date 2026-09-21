@@ -11,9 +11,12 @@
 // it again, at the provider, in the table, and every clip already generated in it.
 //
 // Two things this route will not do:
-//   * clone without consent. The sample has to arrive with the confirmation
-//     sentence in x-voice-consent, matched exactly against the one the page was
-//     given. No sentence, no clone.
+//   * clone without consent. The sample has to arrive with BOTH confirmation
+//     sentences — x-voice-consent (this is my voice, and mine to use) and
+//     x-voice-processing-consent (I agree to it being sent to ElevenLabs and
+//     processed there) — matched exactly against the ones the page was given.
+//     They are two questions because they are two different things to agree to.
+//     Either one missing, no clone.
 //   * clone twice. Somebody who already has a voice gets that voice back, for
 //     free, unless they explicitly asked to replace it (x-voice-replace). Building
 //     a subliminal must never create a second clone.
@@ -25,9 +28,12 @@
 //   SUPABASE_SERVICE_ROLE_KEY - Supabase -> Settings -> API -> service_role key
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierAtLeast, tierForUser } from '../lib/supabase-auth.js';
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
-import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
+import {
+  consentGiven, deleteVoiceProfile, getVoiceProfile, processingConsentGiven, saveVoiceProfile,
+} from '../lib/user-voices.js';
+import { CLONE_TIER } from '../lib/voice-access.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
 
 // The sample arrives as raw audio, not JSON; cloning at the provider can take
@@ -96,18 +102,25 @@ export default async function handler(req, res) {
   }
 
   // Cloning your voice is the top of the range — it's the most expensive thing
-  // the app does per person.
+  // the app does per person. Serenity and recording yourself are free; this one
+  // is not, and lib/voice-access.js is where that is written down.
   const tier = await tierForUser(user.id);
-  if (tier !== 'ritual') {
+  if (!tierAtLeast(tier, CLONE_TIER)) {
     res.status(403).json({ error: 'upgrade_required', detail: 'Cloning your voice comes with Ritual.' });
     return;
   }
 
   /* A voice of somebody's own is not something to create on a shrug. The page
-     explains what it is and asks them to confirm it is their voice and theirs to
-     use; this is that confirmation arriving with the sample. */
+     explains what it is and asks two separate things: that it is their voice and
+     theirs to use, and that they agree to the recording going to ElevenLabs to
+     be turned into one. Both arrive with the sample, and both are checked here
+     against this server's own copy of the words. */
   if (!consentGiven(req.headers['x-voice-consent'])) {
     res.status(400).json({ error: 'consent_required' });
+    return;
+  }
+  if (!processingConsentGiven(req.headers['x-voice-processing-consent'])) {
+    res.status(400).json({ error: 'processing_consent_required' });
     return;
   }
 
@@ -117,7 +130,7 @@ export default async function handler(req, res) {
   const existing = await getVoiceProfile(user.id);
   const replacing = String(req.headers['x-voice-replace'] || '') === '1';
   if (existing && !replacing) {
-    res.status(200).json({ reused: true, displayName: existing.display_name || 'My voice' });
+    res.status(200).json({ reused: true, displayName: existing.display_name || 'Your AI Voice' });
     return;
   }
 
@@ -147,7 +160,7 @@ export default async function handler(req, res) {
       fileName: `sample.${ext}`,
     });
 
-    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice' });
+    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'Your AI Voice' });
 
     // Only bin the old one — and the audio read in it — once the new one is saved.
     if (previous && previous !== voiceId) {
@@ -155,7 +168,7 @@ export default async function handler(req, res) {
       await deleteClipsForVoice(user.id, previous);
     }
 
-    res.status(200).json({ created: true, displayName: 'My voice' });
+    res.status(200).json({ created: true, displayName: 'Your AI Voice' });
   } catch (err) {
     const code = err instanceof VoiceProviderError ? err.code : 'clone_failed';
     console.error('voice-clone error:', code, (err && err.detail) || (err && err.message) || err);

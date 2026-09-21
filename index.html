@@ -274,13 +274,7 @@
 
   .voice-options{ display:grid; gap:10px; }
   .voice-picker{ margin-top:16px; padding-top:16px; border-top:1px solid var(--dusk); }
-  .voice-picker-label{ font-size:12px; color:var(--haze); margin-bottom:10px; }
-  .voice-chips{ display:flex; flex-wrap:wrap; gap:8px; }
-  .voice-chip{ display:flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-family:inherit; font-size:12.5px; cursor:pointer; transition:border-color .2s, background .2s; }
-  .voice-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .voice-chip .voice-chip-desc{ color:var(--haze); font-size:11px; }
-  .voice-chip.mine{ border-color:var(--candle); }
-  .voice-chip-play{ opacity:.6; }
   .voice-card{ text-align:left; cursor:pointer; padding:16px; border-radius:16px; background:var(--dusk); border:1px solid transparent; transition:all .2s; position:relative; }
   .voice-card.sel{ background:rgba(227,190,127,0.12); border-color:var(--candle); }
   .voice-card .badge{ position:absolute; top:12px; right:14px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--candle); background:rgba(227,190,127,0.14); padding:3px 9px; border-radius:999px; }
@@ -743,6 +737,9 @@
   .profile-item button:hover{ color:#E39A9A; }
   .voice-clone-card{ background:var(--dusk); border-radius:16px; padding:20px; margin-bottom:8px; }
   .voice-clone-intro{ font-size:13px; color:var(--haze); line-height:1.6; margin:0 0 14px; }
+  .voice-clone-title{ font-family:var(--serif); font-size:18px; color:var(--moonlight); margin:0 0 10px; }
+  .voice-clone-review{ display:flex; flex-direction:column; gap:12px; }
+  .voice-clone-review audio{ width:100%; }
   /* The confirmation somebody ticks before a voice of theirs is created. */
   .voice-clone-consent{ display:flex; gap:9px; align-items:flex-start; margin:12px 0 14px;
     font-size:12.5px; color:var(--haze); line-height:1.55; cursor:pointer; }
@@ -1201,7 +1198,7 @@
      just looks grey, so every sunken surface is named once here and given the
      warm cream from the mock instead. */
   body[data-sky="day"] .quiz-q textarea, body[data-sky="day"] .aff-row,
-  body[data-sky="day"] .voice-chip, body[data-sky="day"] .voice-card,
+  body[data-sky="day"] .voice-card,
   body[data-sky="day"] .bg-card, body[data-sky="day"] .rec-btn,
   body[data-sky="day"] .mini-btn.micbtn, body[data-sky="day"] .voice-rec,
   body[data-sky="day"] .length-chip, body[data-sky="day"] .layer-voice-options button,
@@ -2674,27 +2671,35 @@
         </div>
       </div>
 
-      <!-- STEP 4: voice choice -->
+      <!-- STEP 4: voice choice — three answers, and only three.
+           Serenity reads the lines, your cloned AI voice reads the lines, or you
+           record yourself reading them. The last two are not the same thing:
+           cloning makes a voice at ElevenLabs that can read anything you write
+           later; recording uses the audio you actually recorded and never goes
+           near ElevenLabs. The cards are drawn by renderVoiceCards(). -->
       <div class="flow-step" data-step="4">
         <div class="flow-title">Whose voice tonight?</div>
         <div class="flow-sub">Your own voice is stronger — hearing yourself say it matters.</div>
         <div class="flow-body">
           <div class="voice-options">
+            <button class="voice-card" id="voiceSerenity" onclick="chooseVoice('serenity')">
+              <h4>Serenity</h4>
+              <p>Calm, warm AI voice</p>
+            </button>
+            <button class="voice-card" id="voiceClone" onclick="chooseVoice('clone')">
+              <h4 id="voiceCloneTitle">Clone Your Voice</h4>
+              <p id="voiceCloneDesc">Create an AI version of your own voice</p>
+            </button>
             <button class="voice-card" id="voiceOwn" onclick="chooseVoice('own')">
               <span class="badge">Recommended</span>
-              <h4>My own voice</h4>
-              <p>Hold to record each line yourself. Nothing is uploaded — it stays in this tab.</p>
-            </button>
-            <button class="voice-card" id="voiceAI" onclick="chooseVoice('ai')">
-              <h4>A studio voice</h4>
-              <p>Pick a voice to read each line aloud instead of recording it yourself.</p>
+              <h4>Record Your Own Voice</h4>
+              <p>Record yourself speaking your affirmations</p>
             </button>
           </div>
-          <div class="voice-picker" id="voicePicker" style="display:none;">
-            <div class="voice-picker-label">Which voice?</div>
-            <div class="voice-chips" id="voiceChips"></div>
-            <!-- Filled in by renderMyVoicePanel() the first time "Use my voice" is
-                 chosen: what a cloned voice is, the confirmation, and the recorder. -->
+          <div class="voice-picker" id="voicePicker">
+            <!-- Filled in by renderMyVoicePanel() when "Clone Your Voice" is
+                 chosen and there is no voice yet: what a cloned voice is, the two
+                 confirmations, and the recorder. -->
             <div class="my-voice-panel" id="myVoicePanel" data-open="0"></div>
             <audio id="voicePreview" style="display:none;"></audio>
             <div class="save-msg" id="voicePickerMsg"></div>
@@ -3064,9 +3069,10 @@
         <div class="save-msg" id="higherSelfMsg"></div>
       </div>
 
-      <h3 class="profile-subhead">Your voice</h3>
+      <h3 class="profile-subhead">Your AI voice</h3>
       <div class="voice-clone-card" id="voiceCloneCard">
-        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Read the passage below once and your voice becomes one of the voices you can choose when you build a subliminal.</p>
+        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Read the passage below once, hear it back, and your voice becomes one of the voices you can choose when you build a subliminal.</p>
+        <p class="voice-clone-intro">This is where you replace it or delete it. Deleting removes it from ElevenLabs as well as from your account, along with any audio already generated in it — recordings you made yourself are a separate thing and are not touched.</p>
         <div class="voice-clone-body" id="voiceCloneBody"></div>
         <div class="save-msg" id="voiceCloneMsg"></div>
       </div>

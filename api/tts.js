@@ -28,8 +28,9 @@
 // back to the device voice, exactly as it behaved before.
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierAtLeast, tierForUser } from '../lib/supabase-auth.js';
 import { MY_VOICE_KEY, resolvePresetVoice } from '../lib/voices.js';
+import { CLONE_TIER } from '../lib/voice-access.js';
 import { getVoiceProfile } from '../lib/user-voices.js';
 import {
   MODEL_ID, VoiceProviderError, clampSpeed, isConfigured, synthesizeSpeech,
@@ -140,11 +141,18 @@ export default async function handler(req, res) {
   const voice = await resolveVoice(user.id, requested);
   if (voice.error) { res.status(voice.error === 'invalid_voice' ? 400 : 409).json({ error: voice.error }); return; }
 
-  // Studio voices are a paid feature; a cloned voice is also only ever your own.
-  const tier = await tierForUser(user.id);
-  if (tier === 'none') {
-    res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Ritual.' });
-    return;
+  /* Serenity is the voice the app has, free account or not — it is what most
+     people will hear, so gating it behind a plan would have meant a free
+     account never hearing the app work. A *cloned* voice is the paid one, and
+     it is already only ever your own; this is the same rule /api/voice-clone
+     enforces when it creates one, read off lib/voice-access.js so the two
+     cannot drift. */
+  if (voice.isClone) {
+    const tier = await tierForUser(user.id);
+    if (!tierAtLeast(tier, CLONE_TIER)) {
+      res.status(403).json({ error: 'upgrade_required', detail: 'Your cloned voice comes with Ritual.' });
+      return;
+    }
   }
 
   /* One entry per line asked for, in the order they were asked for, so the player

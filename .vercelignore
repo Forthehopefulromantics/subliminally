@@ -4,3 +4,8 @@ www/
 node_modules/
 supabase/
 scripts/
+# Internal launch notes: switch-on steps, which migrations have been run, and at
+# least one webhook secret. Everything else in the repo root is served as a
+# static file, so without this line LAUNCH.md is fetchable at /LAUNCH.md by
+# anyone who guesses the name.
+LAUNCH.md
