@@ -5,22 +5,26 @@ Check this list before submitting to the App Store or announcing.
 
 ## Not switched on yet
 
-### ElevenLabs — studio voices and voice cloning
+### ElevenLabs — studio voices and voice cloning — switched on
 
-**Deliberately deferred until launch.** `api/tts.js`, `api/voices.js` and
-`api/voice-clone.js` are complete; with no key set the routes reply 503 and the
-app falls back to the device voice, which is what happens today.
+**Switched on 2026-09-21.** `api/tts.js`, `api/voices.js` and
+`api/voice-clone.js` were already complete; both things they were waiting on are
+now done:
 
-To switch on:
+1. `supabase/migrations/20261003_elevenlabs_voices.sql` — **run 2026-09-21.** It
+   created `user_voice_profiles`, `tts_clips`, `tts_generations` and the private
+   `tts-cache` bucket, all row-level-secured to their owner with read-only
+   policies. The backfill inserted no rows (no profile had a `cloned_voice_id`)
+   and the voice-key rewrites touched nothing (`subliminals` was empty).
+2. `ELEVENLABS_API_KEY` — **set in Vercel** (project `subliminally`, team
+   `fthr1`), all three environments, and a redeploy done. Environment variables
+   only reach new builds, so a redeploy is required after any change to it.
 
-1. Run `supabase/migrations/20261003_elevenlabs_voices.sql` in the Supabase SQL
-   editor. It creates `user_voice_profiles`, `tts_clips`, `tts_generations` and
-   the private `tts-cache` bucket. **Without it the routes reply 500** — the
-   cache and the cost ledger have nowhere to live.
-2. elevenlabs.io → avatar → **API Keys** → create one.
-3. Vercel → `subliminally` → **Settings → Environment Variables**.
-4. Add `ELEVENLABS_API_KEY`, all three environments.
-5. **Deployments → ⋯ → Redeploy.** Environment variables only reach new builds.
+The key is read in one place, `lib/elevenlabs.js`, and attached as the
+`xi-api-key` header by `callProvider()`; `api/delete-account.js` reads it too, to
+delete a cloned voice when an account goes. It is never sent to the browser —
+`isConfigured()` returns a boolean and nothing more. If it is ever unset the
+routes reply 503 and the app falls back to the device voice, exactly as before.
 
 Nothing else needs configuring at ElevenLabs: the preset voices are stock voices
 from the shared library, named by key in `lib/voices.js`, and a cloned voice is
@@ -54,8 +58,20 @@ Two things that will bite:
 
 ### RevenueCat webhook
 
-`REVENUECAT_WEBHOOK_AUTH` = `dhEdleK-okLF-HlqrfZLVGrU4O5S2szsBRYsxo7xFlo` in
-Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
+Set `REVENUECAT_WEBHOOK_AUTH` in Vercel → `subliminally` → Settings →
+Environment Variables, and give RevenueCat the same value when you point its
+webhook at `/api/revenuecat-webhook`. The two have to match — that shared value
+is the only thing proving a webhook call really came from RevenueCat.
+
+**The value does not belong in this file.** It was written out here in full until
+2026-09-21; read it from Vercel, or from the RevenueCat dashboard, when you need
+it.
+
+**Rotate it.** Removing it here does not unpublish it: it is still in this
+repository's git history, and until 2026-09-21 `LAUNCH.md` was not in
+`.vercelignore`, so it may also have been served as a static file from the site.
+Generate a new value, set it in Vercel, update the RevenueCat webhook to match,
+and redeploy. Until that is done, treat the old value as known.
 
 ### Higher Self emotion portraits — complete
 
@@ -166,7 +182,7 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260930_onboarding_slideshow.sql` | run |
 | `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
 | `20261002_drop_unused_habit_counters.sql` | run 2026-09-20 |
-| `20261003_elevenlabs_voices.sql` | **not run — run it before setting `ELEVENLABS_API_KEY`** |
+| `20261003_elevenlabs_voices.sql` | run 2026-09-21 — before `ELEVENLABS_API_KEY` was set, as it had to be |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`
