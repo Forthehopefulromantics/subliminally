@@ -5,6 +5,7 @@
   "description": "Subliminally by FTHR — web site plus the Capacitor wrapper that builds the iOS and Android apps from it.",
   "scripts": {
     "test:rituals": "node scripts/ritual-state-test.js",
+    "test:faith": "node scripts/faith-language-test.js",
     "test:checkout": "node scripts/checkout-session-test.mjs",
     "test:voice": "node scripts/voice-studio-test.mjs",
     "cap:sync": "node scripts/sync-web-assets.js && cap sync",

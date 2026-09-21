@@ -1,5 +1,6 @@
 // /api/generate-visualization-script.js
 import { applyCors } from '../lib/cors.js';
+import { faithFraming } from '../lib/faith-language.js';
 //
 // Generates a draft visualization script for "Visualization Script" mode
 // (Reverie & Ritual). This is meant purely as a starting point — the review step
@@ -16,7 +17,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { goal, toneLabel, freqLabel } = req.body || {};
+  const { goal, toneLabel, freqLabel, faith, faithWord } = req.body || {};
+  // Their saved answer in Settings, as framing rather than a word list. Null
+  // when unanswered or unrecognised, and then nothing is said about it at all.
+  const framing = faithFraming(faith, faithWord);
 
   if (!goal || !goal.trim()) {
     return res.status(400).json({ error: 'Missing goal' });
@@ -33,7 +37,7 @@ Rules for "script":
 - 4 to 7 short paragraphs, separated by a blank line (use \\n\\n between paragraphs in the JSON string).
 - Arc: settle into the moment -> move through it as it's actually unfolding -> land on the feeling of having done it, calm and certain.
 - Warm, ${toneLabel || 'grounded'} tone. No hype-speech clichés, no medical or performance-outcome guarantees, no second-guessing language ("maybe", "hopefully").
-- Do not reference the healing frequency directly.`;
+- Do not reference the healing frequency directly.${framing ? '\n\n' + framing : ''}`;
 
   const userPrompt = `What they want to visualize, in their own words: ${goal}
 Healing frequency context (tone only, don't name it directly): ${freqLabel || 'none'}`;

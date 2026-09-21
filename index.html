@@ -759,6 +759,24 @@
   .profile-field-card label{ display:block; font-size:12px; color:var(--haze); margin-bottom:8px; }
   .profile-field-card input{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:11px 13px; color:var(--moonlight); font-size:13.5px; outline:none; margin-bottom:10px; }
   .profile-field-card input:focus{ border-color:var(--candle); }
+  /* Faith & spiritual language. Same card, same tokens -- the panel is a
+     sunken surface rather than a second card, so opening it reads as part of
+     the field it belongs to and not as a new thing on the page. */
+  .faith-intro{ font-size:12.5px; color:var(--haze); line-height:1.65; margin:0 0 10px; }
+  .faith-disclose{ display:inline-flex; align-items:center; gap:5px; background:none; border:none; padding:0;
+    margin:0 0 12px; font-family:inherit; font-size:12.5px; color:var(--lilac); cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; }
+  .faith-disclose:hover{ color:var(--candle); }
+  .faith-disclose-arrow{ text-decoration:none; font-size:11px; }
+  .faith-details{ background:var(--sunk, rgba(255,255,255,.05)); border:1px solid var(--hairline, rgba(255,255,255,.08));
+    border-radius:13px; padding:14px 15px; margin:0 0 14px; }
+  .faith-details[hidden]{ display:none; }
+  .faith-details-head{ font-size:12.5px; color:var(--moonlight); margin:0 0 10px; }
+  .faith-details-item{ font-size:12.5px; color:var(--haze); line-height:1.65; margin:0 0 10px; }
+  .faith-details-item strong{ color:var(--moonlight); font-weight:500; }
+  .faith-details-item span{ color:var(--lilac); }
+  .faith-details-fine{ font-size:11.5px; color:var(--haze); line-height:1.6; opacity:.85; margin:12px 0 0;
+    padding-top:10px; border-top:1px solid var(--hairline, rgba(255,255,255,.08)); }
   .manage-sub{ text-align:center; margin-top:28px; font-size:12.5px; }
   .manage-sub a{ color:var(--haze); text-decoration:none; transition:color .2s; }
   .manage-sub a:hover{ color:var(--candle); }
@@ -3075,7 +3093,20 @@
       <div class="profile-settings-grid">
         <div class="profile-field-card">
           <label>Faith &amp; spiritual language</label>
-          <p style="font-size:12.5px;color:var(--haze);margin:0 0 12px;">Change this whenever you want. It personalizes the language used in guidance and the subliminals you create, never the features you can access.</p>
+          <p class="faith-intro">Choose the language that feels most natural to you. This changes how your Higher Self speaks to you, the wording of your subliminals, recommended practices, and the spiritual or psychological references used throughout Subliminally.</p>
+          <!-- Folded away on arrival. Four paragraphs open by default would make
+               a settings card into a page of reading before the chips are
+               reached, and most visits here are to change one answer. -->
+          <button type="button" class="faith-disclose" id="faithDetailsToggle"
+            aria-expanded="false" aria-controls="faithDetails" onclick="toggleFaithDetails()">What will change? <span class="faith-disclose-arrow" aria-hidden="true">&#8595;</span></button>
+          <div class="faith-details" id="faithDetails" hidden>
+            <p class="faith-details-head">Your selection personalizes:</p>
+            <p class="faith-details-item"><span aria-hidden="true">&#10022;</span> <strong>Words &amp; affirmations</strong><br>Example: &ldquo;God is guiding me&rdquo; vs. &ldquo;The Universe is guiding me&rdquo; vs. &ldquo;I trust myself and my direction.&rdquo;</p>
+            <p class="faith-details-item"><span aria-hidden="true">&#10022;</span> <strong>Practices</strong><br>Prayer, meditation, visualization, reflection, gratitude, and other practices may be recommended differently.</p>
+            <p class="faith-details-item"><span aria-hidden="true">&#10022;</span> <strong>Sacred texts &amp; teachings</strong><br>When relevant, guidance may reference traditions or texts aligned with your selection, such as the Bible, Qur&rsquo;an, Hindu teachings, spiritual concepts, or secular psychology.</p>
+            <p class="faith-details-item"><span aria-hidden="true">&#10022;</span> <strong>Your Higher Self</strong><br>Your Higher Self guide adapts its vocabulary and framing to your beliefs, without changing which features you can access.</p>
+            <p class="faith-details-fine">Your beliefs are personal. Subliminally uses this preference only to personalize your experience. You can change it anytime.</p>
+          </div>
           <div class="length-chip-grid" id="settingsFaithChips" style="grid-template-columns:repeat(2,1fr);"></div>
           <input type="text" id="settingsFaithOther" placeholder="In your own words" style="display:none;margin-top:9px;">
           <button class="mini-btn ghostbtn" onclick="saveFaithSettings()">Save preference</button>
