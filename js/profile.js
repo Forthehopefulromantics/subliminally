@@ -21,7 +21,9 @@ function renderProfileState(){
 async function loadProfile(){
   if (!sb || !currentUser) return;
   document.getElementById('settingsEmail').value = currentUser.email || '';
-  renderVoiceClone();
+  // Settings is one of the two places the voice card is drawn (the other is the
+  // builder's "Use my voice" panel), so say which one before rendering it.
+  mountVoiceClone('voiceCloneBody', 'voiceCloneMsg');
   if (typeof loadFaith === 'function') await loadFaith();
   if (typeof renderFaithSettings === 'function') renderFaithSettings();
 
@@ -293,11 +295,36 @@ async function deleteMySubliminal(id){
 const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not someday, and not once everything lines up — now, in the ordinary middle of things. I speak to myself the way I would speak to someone I love. I keep what I promised myself I would keep, on the days it is easy and on the days it is not.";
 let voiceCloneRecorder = null, voiceCloneChunks = [], voiceCloneStream = null,
     voiceCloneTimer = null, voiceCloneStart = 0;
+/* Ticked in this session, for this attempt. Never remembered: a new voice is a
+   new confirmation, including when somebody records theirs again. */
+let voiceCloneConsented = false;
+/* True while replacing a voice that already exists, which is the only way a
+   second clone is ever created. */
+let voiceCloneReplacing = false;
+
+/* Where this card is drawn. Settings is one mount point and the builder's
+   "Use my voice" panel is the other; the recorder, the confirmation and the
+   upload are the same code in both. */
+let voiceCloneHost = { bodyId: 'voiceCloneBody', msgId: 'voiceCloneMsg' };
+function mountVoiceClone(bodyId, msgId){
+  voiceCloneHost = { bodyId, msgId };
+  voiceCloneConsented = false;
+  voiceCloneReplacing = false;
+  renderVoiceClone();
+}
+function unmountVoiceClone(){
+  if (voiceCloneRecorder) cancelVoiceClone();
+  voiceCloneHost = { bodyId: 'voiceCloneBody', msgId: 'voiceCloneMsg' };
+  voiceCloneConsented = false;
+  voiceCloneReplacing = false;
+}
+function voiceCloneBodyEl(){ return document.getElementById(voiceCloneHost.bodyId); }
+function voiceCloneMsgEl(){ return document.getElementById(voiceCloneHost.msgId); }
 
 async function renderVoiceClone(){
-  const body = document.getElementById('voiceCloneBody');
+  const body = voiceCloneBodyEl();
   if (!body) return;
-  const cloned = await myClonedVoiceId();
+  const mine = await myVoiceProfile();
   if (voiceCloneRecorder){
     const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
     body.innerHTML = `
@@ -311,32 +338,61 @@ async function renderVoiceClone(){
       </div>`;
     return;
   }
-  if (cloned){
+  if (mine && !voiceCloneReplacing){
     body.innerHTML = `
       <div class="voice-clone-have">
-        <span>✦ Your voice is ready — pick <b>My voice</b> when you choose a voice.</span>
-        <button class="mini-btn ghostbtn" onclick="startVoiceClone()">Record it again</button>
+        <span>✦ Your voice is ready — pick <b>${mine.name || 'My voice'}</b> when you choose a voice.</span>
+        <button class="mini-btn ghostbtn" onclick="beginReplaceVoice()">Record it again</button>
         <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
       </div>`;
     return;
   }
+  /* The confirmation. Creating a voice that sounds like a real person is only
+     ever theirs to ask for, so the button stays disabled until they say so — and
+     the sentence they tick is the one the server checks the sample against. */
+  const consent = await voiceConsentStatement();
   body.innerHTML = `
     <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+    <label class="voice-clone-consent">
+      <input type="checkbox" id="voiceCloneConsent" ${voiceCloneConsented ? 'checked' : ''} onchange="setVoiceCloneConsent(this.checked)">
+      <span>${consent}</span>
+    </label>
     <div class="voice-clone-actions">
-      <button class="mini-btn candlebtn" onclick="startVoiceClone()">Read this to clone my voice</button>
+      <button class="mini-btn candlebtn" id="voiceCloneStartBtn" ${voiceCloneConsented ? '' : 'disabled'} onclick="startVoiceClone()">${voiceCloneReplacing ? 'Read this to record it again' : 'Read this to clone my voice'}</button>
       <span class="voice-chip-desc">Somewhere quiet, normal speaking voice, about 30 seconds.</span>
     </div>`;
 }
 
+function setVoiceCloneConsent(checked){
+  voiceCloneConsented = !!checked;
+  const btn = document.getElementById('voiceCloneStartBtn');
+  if (btn) btn.disabled = !voiceCloneConsented;
+  const msg = voiceCloneMsgEl();
+  if (msg && voiceCloneConsented){ msg.textContent = ''; msg.className = 'save-msg'; }
+}
+
+/* Recording again replaces the voice at the provider, so it asks again rather
+   than reusing the confirmation from the first time. */
+function beginReplaceVoice(){
+  voiceCloneReplacing = true;
+  voiceCloneConsented = false;
+  renderVoiceClone();
+}
+
 async function startVoiceClone(){
-  const msg = document.getElementById('voiceCloneMsg');
-  msg.textContent = ''; msg.className = 'save-msg';
+  const msg = voiceCloneMsgEl();
+  if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   if (!sb || !currentUser) return;
+  if (!voiceCloneConsented){
+    if (msg){ msg.textContent = 'Tick the confirmation first — a voice is only ever made from your own.'; msg.className = 'save-msg err'; }
+    return;
+  }
   if (!navigator.mediaDevices || !window.MediaRecorder){
-    msg.textContent = "This browser can't record audio."; msg.className = 'save-msg err'; return;
+    if (msg){ msg.textContent = "This browser can't record audio."; msg.className = 'save-msg err'; }
+    return;
   }
   try { voiceCloneStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch(e){ msg.textContent = 'Microphone access is needed to record the sample.'; msg.className = 'save-msg err'; return; }
+  catch(e){ if (msg){ msg.textContent = 'Microphone access is needed to record the sample.'; msg.className = 'save-msg err'; } return; }
   const mime = pickRecordingMime();
   voiceCloneChunks = [];
   voiceCloneRecorder = mime ? new MediaRecorder(voiceCloneStream, { mimeType: mime }) : new MediaRecorder(voiceCloneStream);
@@ -372,10 +428,12 @@ function finishVoiceClone(){
     const blob = new Blob(voiceCloneChunks, { type: rec.mimeType || 'audio/webm' });
     voiceCloneChunks = [];
     stopVoiceCloneStream();
-    const msg = document.getElementById('voiceCloneMsg');
+    const msg = voiceCloneMsgEl();
     if (seconds < 8){
-      msg.textContent = 'That was very short — read the whole passage so the voice has enough to work from.';
-      msg.className = 'save-msg err';
+      if (msg){
+        msg.textContent = 'That was very short — read the whole passage so the voice has enough to work from.';
+        msg.className = 'save-msg err';
+      }
       renderVoiceClone();
       return;
     }
@@ -383,55 +441,86 @@ function finishVoiceClone(){
   };
   try { rec.stop(); } catch(e){ stopVoiceCloneStream(); renderVoiceClone(); }
 }
+
+/* What the routes answer with, in our own words. Never the provider's. */
+const VOICE_CLONE_MESSAGES = {
+  upgrade_required: null,   // filled in below, it quotes the price
+  not_configured:   "Voice cloning isn't switched on yet.",
+  consent_required: 'Tick the confirmation first — a voice is only ever made from your own.',
+  sample_too_short: 'That recording was too short — read the sample paragraph all the way through.',
+  sample_too_long:  'That recording is too long — about a minute is plenty.',
+  quota_exceeded:   "The voice service is out of cloning credits this month — your recording wasn't used, and nothing was charged.",
+  rate_limited:     'The voice service is busy — try again in a minute.',
+  rejected:         "The voice service couldn't use that recording — try again somewhere quieter.",
+  invalid_voice:    "The voice service couldn't use that recording — try again somewhere quieter.",
+  timeout:          'The voice service took too long — try again in a moment.',
+  network:          "Couldn't reach the voice service — try again in a moment.",
+  not_signed_in:    'Sign in first.',
+};
+function voiceCloneErrorText(code){
+  if (code === 'upgrade_required') return `Cloning your voice comes with Ritual — ${tierPriceText('ritual')}.`;
+  return VOICE_CLONE_MESSAGES[code] || "Couldn't clone your voice — try again in a moment.";
+}
+
 async function uploadVoiceClone(blob){
-  const msg = document.getElementById('voiceCloneMsg');
-  const body = document.getElementById('voiceCloneBody');
-  body.innerHTML = '<div class="voice-clone-actions"><span class="voice-rec-label">Learning your voice — this takes a moment…</span></div>';
-  msg.textContent = ''; msg.className = 'save-msg';
+  const msg = voiceCloneMsgEl();
+  const body = voiceCloneBodyEl();
+  if (body) body.innerHTML = '<div class="voice-clone-actions"><span class="voice-rec-label">Learning your voice — this takes a moment…</span></div>';
+  if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   try {
     const token = (await sb.auth.getSession()).data.session?.access_token;
-    const res = await fetch(`${API_BASE}/api/voice-clone`, {
-      method: 'POST',
-      headers: { 'Content-Type': blob.type || 'audio/webm', Authorization: `Bearer ${token}` },
-      body: blob,
-    });
+    const headers = {
+      'Content-Type': blob.type || 'audio/webm',
+      Authorization: `Bearer ${token}`,
+      // The confirmation travels with the sample, and the route checks it against
+      // its own copy of the sentence before spending anything.
+      'X-Voice-Consent': await voiceConsentStatement(),
+    };
+    if (voiceCloneReplacing) headers['X-Voice-Replace'] = '1';
+    const res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: blob });
     const out = await res.json().catch(() => ({}));
     if (!res.ok){
-      msg.textContent = out.error === 'upgrade_required'
-        ? `Cloning your voice comes with Ritual — ${tierPriceText('ritual')}.`
-        : out.error === 'not_configured'
-          ? "Voice cloning isn't switched on yet."
-          : (out.error || "Couldn't clone your voice — try again in a moment.");
-      msg.className = 'save-msg err';
+      if (msg){ msg.textContent = voiceCloneErrorText(out.error); msg.className = 'save-msg err'; }
       renderVoiceClone();
       return;
     }
-    clonedVoiceCache = out.voiceId;   // the picker reads this straight away
-    msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok';
+    voiceCloneReplacing = false;
+    voiceCloneConsented = false;
+    forgetVoiceCatalogue();          // the picker asks again, and finds the voice
+    await loadVoiceCatalogue();
+    if (voiceCloneHost.bodyId === 'builderVoiceCloneBody' && typeof onMyVoiceReady === 'function'){
+      // Recorded from the builder: the panel closes and the voice they just made
+      // is the voice selected, which is what they were asking for.
+      onMyVoiceReady();
+      return;
+    }
+    if (msg){ msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok'; }
     renderVoiceClone();
   } catch (e){
     console.error('voice clone failed:', e);
-    msg.textContent = "Couldn't reach the voice service — try again in a moment.";
-    msg.className = 'save-msg err';
+    if (msg){ msg.textContent = "Couldn't reach the voice service — try again in a moment."; msg.className = 'save-msg err'; }
     renderVoiceClone();
   }
 }
 async function removeClonedVoice(){
-  const msg = document.getElementById('voiceCloneMsg');
-  msg.textContent = 'Removing…'; msg.className = 'save-msg';
+  const msg = voiceCloneMsgEl();
+  if (msg){ msg.textContent = 'Removing…'; msg.className = 'save-msg'; }
   try {
     const token = (await sb.auth.getSession()).data.session?.access_token;
     const res = await fetch(`${API_BASE}/api/voice-clone`, {
       method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error('remove failed');
-    clonedVoiceCache = null;
+    voiceCloneReplacing = false;
+    forgetVoiceCatalogue();
+    await loadVoiceCatalogue();
     // Any subliminal set to "My voice" now falls back to the device voice.
     if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
-    msg.textContent = 'Removed.'; msg.className = 'save-msg ok';
+    if (msg){ msg.textContent = 'Removed.'; msg.className = 'save-msg ok'; }
     renderVoiceClone();
+    if (typeof renderVoiceChips === 'function' && document.getElementById('voiceChips')) renderVoiceChips();
   } catch (e){
-    msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err';
+    if (msg){ msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err'; }
   }
 }
 

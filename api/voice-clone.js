@@ -6,10 +6,17 @@
 // Saying affirmations out loud is still the practice, and the app says so. This
 // is for the nights you want the session without the recording session.
 //
-// POST with a recorded sample -> creates the voice at the provider and stores
-// its id on the caller's profile. DELETE -> removes it again, at the provider
-// and on the profile. A person only ever has one cloned voice; cloning again
-// replaces it.
+// POST with a recorded sample -> creates the voice at the provider and stores its
+// id against the signed-in Supabase user in user_voice_profiles. DELETE -> removes
+// it again, at the provider, in the table, and every clip already generated in it.
+//
+// Two things this route will not do:
+//   * clone without consent. The sample has to arrive with the confirmation
+//     sentence in x-voice-consent, matched exactly against the one the page was
+//     given. No sentence, no clone.
+//   * clone twice. Somebody who already has a voice gets that voice back, for
+//     free, unless they explicitly asked to replace it (x-voice-replace). Building
+//     a subliminal must never create a second clone.
 //
 // Required environment variables (Vercel -> Project -> Settings -> Environment Variables):
 //   ELEVENLABS_API_KEY        - elevenlabs.io -> Profile -> API key (a paid plan
@@ -18,15 +25,30 @@
 //   SUPABASE_SERVICE_ROLE_KEY - Supabase -> Settings -> API -> service_role key
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, serviceHeaders, tierForUser } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js';
+import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
+import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
+import { deleteClipsForVoice } from '../lib/tts-store.js';
 
-export const config = { api: { bodyParser: false } };
+// The sample arrives as raw audio, not JSON; cloning at the provider can take
+// most of a minute, so the function is given room to finish.
+export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 // Enough for a minute or so of speech, which is all instant cloning needs.
 const MAX_SAMPLE_BYTES = 8 * 1024 * 1024;
+
+const HTTP_FOR_CODE = {
+  quota_exceeded: 429,
+  rate_limited: 429,
+  invalid_voice: 400,
+  timeout: 504,
+  network: 502,
+  rejected: 422,
+  provider_auth: 502,
+  provider_failed: 502,
+};
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -42,58 +64,33 @@ function readRawBody(req) {
   });
 }
 
-async function getProfileVoice(userId) {
-  const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=cloned_voice_id`,
-    { headers: serviceHeaders() },
-  );
-  if (!res.ok) return null;
-  const rows = await res.json();
-  return rows && rows[0] ? rows[0].cloned_voice_id : null;
-}
-
-async function setProfileVoice(userId, voiceId) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
-    method: 'PATCH',
-    headers: serviceHeaders({ Prefer: 'return=minimal' }),
-    body: JSON.stringify({ cloned_voice_id: voiceId }),
-  });
-  if (!res.ok) throw new Error(`Could not save the voice to the profile (${res.status}): ${await res.text()}`);
-}
-
-async function deleteRemoteVoice(voiceId) {
-  if (!voiceId) return;
-  try {
-    await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
-      method: 'DELETE',
-      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
-    });
-  } catch (e) {
-    // Best effort — a leftover voice at the provider shouldn't fail the request.
-    console.error('could not delete remote voice', voiceId, e);
-  }
-}
-
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST' && req.method !== 'DELETE') {
-    res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({ error: 'method_not_allowed' });
     return;
   }
-  if (!ELEVENLABS_API_KEY) {
+  if (!isConfigured()) {
     res.status(503).json({ error: 'not_configured', detail: 'Voice cloning is not switched on yet.' });
     return;
   }
-  if (!SUPABASE_URL) { res.status(500).json({ error: 'Server is missing SUPABASE_URL.' }); return; }
+  if (!SUPABASE_URL) { res.status(500).json({ error: 'server_misconfigured' }); return; }
 
   const user = await whoIsCalling(bearerToken(req));
-  if (!user) { res.status(401).json({ error: 'Sign in first.' }); return; }
+  if (!user) { res.status(401).json({ error: 'not_signed_in' }); return; }
 
   if (req.method === 'DELETE') {
-    const existing = await getProfileVoice(user.id);
-    await deleteRemoteVoice(existing);
-    try { await setProfileVoice(user.id, null); }
-    catch (e) { console.error(e); res.status(500).json({ error: "Couldn't remove your voice." }); return; }
+    const existing = await getVoiceProfile(user.id);
+    const voiceId = existing && existing.provider_voice_id;
+    await deleteVoice(voiceId);
+    try {
+      await deleteVoiceProfile(user.id);
+      await deleteClipsForVoice(user.id, voiceId);
+    } catch (e) {
+      console.error('voice profile removal failed:', e);
+      res.status(500).json({ error: 'removal_failed' });
+      return;
+    }
     res.status(200).json({ removed: true });
     return;
   }
@@ -106,14 +103,32 @@ export default async function handler(req, res) {
     return;
   }
 
+  /* A voice of somebody's own is not something to create on a shrug. The page
+     explains what it is and asks them to confirm it is their voice and theirs to
+     use; this is that confirmation arriving with the sample. */
+  if (!consentGiven(req.headers['x-voice-consent'])) {
+    res.status(400).json({ error: 'consent_required' });
+    return;
+  }
+
+  /* Already have one? Then that is the voice, and nothing is generated. Replacing
+     it is a deliberate act ("Record it again"), not a side effect of building
+     another subliminal. */
+  const existing = await getVoiceProfile(user.id);
+  const replacing = String(req.headers['x-voice-replace'] || '') === '1';
+  if (existing && !replacing) {
+    res.status(200).json({ reused: true, displayName: existing.display_name || 'My voice' });
+    return;
+  }
+
   let sample;
   try { sample = await readRawBody(req); }
   catch (e) {
-    res.status(413).json({ error: 'That recording is too long — about a minute is plenty.' });
+    res.status(413).json({ error: 'sample_too_long' });
     return;
   }
   if (!sample || sample.length < 2048) {
-    res.status(400).json({ error: 'That recording was too short — read the sample paragraph all the way through.' });
+    res.status(400).json({ error: 'sample_too_short' });
     return;
   }
 
@@ -122,37 +137,28 @@ export default async function handler(req, res) {
 
   try {
     // Replace rather than accumulate: one voice per person, always the latest.
-    const previous = await getProfileVoice(user.id);
+    const previous = existing && existing.provider_voice_id;
 
-    const form = new FormData();
-    form.append('name', `subliminally-${user.id}`);
-    form.append('files', new Blob([sample], { type: contentType }), `sample.${ext}`);
-    form.append('description', 'Cloned from a Subliminally voice sample.');
-
-    const el = await fetch('https://api.elevenlabs.io/v1/voices/add', {
-      method: 'POST',
-      headers: { 'xi-api-key': ELEVENLABS_API_KEY },
-      body: form,
+    const voiceId = await createInstantVoiceClone({
+      name: `subliminally-${user.id}`,
+      description: 'Cloned from a Subliminally voice sample, with the speaker\'s confirmation.',
+      sample,
+      contentType,
+      fileName: `sample.${ext}`,
     });
-    if (!el.ok) {
-      const detail = await el.text();
-      console.error('ElevenLabs clone failed:', el.status, detail);
-      res.status(502).json({ error: "The voice service couldn't use that recording — try again somewhere quieter." });
-      return;
-    }
-    const created = await el.json();
-    if (!created || !created.voice_id) {
-      res.status(502).json({ error: 'The voice service returned an unexpected response.' });
-      return;
+
+    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice' });
+
+    // Only bin the old one — and the audio read in it — once the new one is saved.
+    if (previous && previous !== voiceId) {
+      await deleteVoice(previous);
+      await deleteClipsForVoice(user.id, previous);
     }
 
-    await setProfileVoice(user.id, created.voice_id);
-    // Only bin the old one once the new one is safely saved.
-    if (previous && previous !== created.voice_id) await deleteRemoteVoice(previous);
-
-    res.status(200).json({ voiceId: created.voice_id });
+    res.status(200).json({ created: true, displayName: 'My voice' });
   } catch (err) {
-    console.error('voice-clone error:', err);
-    res.status(500).json({ error: "Couldn't finish cloning your voice — try again in a moment." });
+    const code = err instanceof VoiceProviderError ? err.code : 'clone_failed';
+    console.error('voice-clone error:', code, (err && err.detail) || (err && err.message) || err);
+    res.status(HTTP_FOR_CODE[code] || 500).json({ error: code });
   }
 }

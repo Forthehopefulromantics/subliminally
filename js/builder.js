@@ -724,16 +724,62 @@ function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); 
    /api/tts; when that isn't configured (or the person isn't on a paid plan) the
    app falls back to the device's own speech synthesis, which is how it has
    always worked, so nothing breaks. */
-const AI_VOICES = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah',     desc: 'warm, calm' },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', desc: 'soft, low' },
-  { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice',     desc: 'clear, steady' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily',      desc: 'bright' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel',    desc: 'deep, grounding' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George',    desc: 'measured' },
+/* What the picker offers is a *key* — 'sarah', 'daniel', 'mine', 'device' — and
+   never a provider voice id. The ids live on the server (lib/voices.js), which is
+   also the only place that decides whether a requested voice exists, so the page
+   cannot ask for a voice nobody is paying for and nobody reading the page source
+   learns which voices we use.
+
+   The names come from /api/voices for anybody signed in, so a voice added to the
+   catalogue later appears here without this file changing. The list below is the
+   fallback for a visitor who has not signed in yet: names only, because without
+   an account there is nothing to generate with anyway and every preview is read
+   by the device. */
+const FALLBACK_PRESET_VOICES = [
+  { key: 'sarah',     name: 'Sarah',     desc: 'warm, calm' },
+  { key: 'charlotte', name: 'Charlotte', desc: 'soft, low' },
+  { key: 'alice',     name: 'Alice',     desc: 'clear, steady' },
+  { key: 'lily',      name: 'Lily',      desc: 'bright' },
+  { key: 'daniel',    name: 'Daniel',    desc: 'deep, grounding' },
+  { key: 'george',    name: 'George',    desc: 'measured' },
 ];
 const DEVICE_VOICE = 'device';   // the browser's own speechSynthesis
-const MY_CLONED_VOICE = 'mine';  // resolved to the profile's cloned_voice_id at play time
+const MY_CLONED_VOICE = 'mine';  // resolved to this person's own voice, server-side
+/* Shown if the catalogue cannot be reached. The server holds the real one and
+   accepts nothing else, so a stale copy here fails the clone rather than cloning
+   on the wrong words. */
+const VOICE_CONSENT_FALLBACK = 'I confirm this is my voice and I have permission to create an AI voice clone from it.';
+
+let voiceCatalogue = { presets: FALLBACK_PRESET_VOICES, myVoice: null, consentStatement: VOICE_CONSENT_FALLBACK, provider: null, loaded: false };
+let voiceCataloguePromise = null;
+async function loadVoiceCatalogue(){
+  if (voiceCataloguePromise) return voiceCataloguePromise;
+  voiceCataloguePromise = (async () => {
+    if (!sb || !currentUser) return voiceCatalogue;
+    try {
+      const token = (await sb.auth.getSession()).data.session?.access_token;
+      if (!token) return voiceCatalogue;
+      // POST rather than GET so the native app's cross-origin preflight is the
+      // same shape as every other call it makes.
+      const res = await fetch(`${API_BASE}/api/voices`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return voiceCatalogue;
+      const out = await res.json();
+      voiceCatalogue = {
+        presets: (out.presets && out.presets.length) ? out.presets : FALLBACK_PRESET_VOICES,
+        myVoice: out.myVoice || null,
+        consentStatement: out.consentStatement || VOICE_CONSENT_FALLBACK,
+        provider: out.provider || null,
+        loaded: true,
+      };
+    } catch (e){ /* keep the fallback names; previews read on the device */ }
+    return voiceCatalogue;
+  })();
+  return voiceCataloguePromise;
+}
+/* Called after a voice is cloned or removed, so the picker stops being wrong. */
+function forgetVoiceCatalogue(){ voiceCataloguePromise = null; }
+async function myVoiceProfile(){ return (await loadVoiceCatalogue()).myVoice; }
+async function voiceConsentStatement(){ return (await loadVoiceCatalogue()).consentStatement; }
 
 /* Choosing is the answer to the question on the screen, so it moves on. It used
    to only light the card up and enable a Continue button further down, which
@@ -810,45 +856,125 @@ function chooseVoice(mode){
   if (mode === 'own') advanceAfterPick();
 }
 
-function pickAiVoice(id){
-  const first = state.aiVoiceId !== id;
-  state.aiVoiceId = id;
+async function renderVoiceChips(){
+  const wrap = document.getElementById('voiceChips');
+  if (!wrap) return;
+  const cat = await loadVoiceCatalogue();
+  if (!state.aiVoiceId) state.aiVoiceId = cat.presets[0].key;
+  const tier = currentUser ? await getMyTier() : 'none';
+
+  /* "Use my voice" is first and always drawn, cloned or not — the same rule as
+     every other premium control in the app: nothing is removed from a free
+     account's screen, it is drawn with a lock and explains itself when tapped. */
+  const chips = [{
+    key: MY_CLONED_VOICE,
+    name: cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Use my voice',
+    desc: cat.myVoice ? 'your voice' : 'read one passage',
+    mine: true,
+  }];
+  cat.presets.forEach(v => chips.push({ key: v.key, name: v.name, desc: v.desc, mine: false }));
+  chips.push({ key: DEVICE_VOICE, name: 'This device', desc: 'built-in', mine: false });
+
+  wrap.innerHTML = chips.map(c => `
+    <button type="button" class="voice-chip${state.aiVoiceId === c.key ? ' sel' : ''}${c.mine ? ' mine' : ''}"
+      data-voice-key="${c.key}" onclick="pickAiVoice('${c.key}')">
+      ${c.name} <span class="voice-chip-desc">${c.desc}</span>
+    </button>`).join('');
+
+  // The lock and the RITUAL badge come off the same feature table as the rest.
+  if (!cat.myVoice) lockedControl(wrap.querySelector(`[data-voice-key="${MY_CLONED_VOICE}"]`), 'my_voice', tier);
+  renderMyVoicePanel();
+}
+
+/* ---------------- "Use my voice" ----------------
+   A personal AI version of someone's own voice is not a setting to flip past, so
+   the first time it is chosen this panel says what it is and asks them to confirm
+   it is their voice and theirs to use. The recorder itself is the one in Settings
+   (js/profile.js) mounted here, so there is one recording flow, one consent
+   checkbox and one upload — not a second copy of all three. */
+function myVoicePanelOpen(){
+  const panel = document.getElementById('myVoicePanel');
+  return !!(panel && panel.dataset.open === '1');
+}
+function renderMyVoicePanel(){
+  const panel = document.getElementById('myVoicePanel');
+  if (!panel || panel.dataset.open !== '1') return;
+  panel.innerHTML = `
+    <div class="voice-clone-card">
+      <p class="voice-clone-intro">Your own voice, as one of the voices you can choose. Read the passage below once and a personal AI version of your voice is created for your account — after that every subliminal you build can be read in it, without recording line by line. The recording is used to create the voice and is never kept.</p>
+      <div class="voice-clone-body" id="builderVoiceCloneBody"></div>
+      <div class="save-msg" id="builderVoiceCloneMsg"></div>
+    </div>`;
+  mountVoiceClone('builderVoiceCloneBody', 'builderVoiceCloneMsg');
+}
+function closeMyVoicePanel(){
+  const panel = document.getElementById('myVoicePanel');
+  if (!panel) return;
+  panel.dataset.open = '0';
+  panel.innerHTML = '';
+  if (typeof unmountVoiceClone === 'function') unmountVoiceClone();
+}
+/* Called by the recorder once a voice exists. The person asked for their voice by
+   tapping the chip, so the chip is what they get back — selected, panel closed,
+   rather than a message telling them to tap it again. */
+async function onMyVoiceReady(){
+  if (!document.getElementById('voiceChips')) return;
+  closeMyVoicePanel();
+  state.aiVoiceId = MY_CLONED_VOICE;
+  await renderVoiceChips();
+  await previewVoice(MY_CLONED_VOICE);
+  // previewVoice says its own piece when something went wrong; don't talk over it.
+  const msg = document.getElementById('voicePickerMsg');
+  if (msg && !msg.textContent){ msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok'; }
+}
+async function openMyVoicePanel(){
+  const panel = document.getElementById('myVoicePanel');
+  if (!panel) return;
+  panel.dataset.open = '1';
+  renderMyVoicePanel();
+  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* Picking a voice. Everything except "Use my voice" is a preview and a move on;
+   "Use my voice" is a plan check, then either the voice they already have or the
+   panel that explains how to make one. */
+async function pickAiVoice(key){
+  const msg = document.getElementById('voicePickerMsg');
+  if (key === MY_CLONED_VOICE){
+    const mine = await myVoiceProfile();
+    if (!mine){
+      if (!currentUser){
+        if (msg){ msg.textContent = 'Create a free account first, then your voice can be one of the voices here.'; msg.className = 'save-msg err'; }
+        return;
+      }
+      const tier = await getMyTier();
+      if (!tierHasFeature(tier, 'my_voice')){
+        openUpgradeModal('my_voice', { tier, trigger: 'voice_chip' });
+        return;
+      }
+      openMyVoicePanel();
+      return;
+    }
+    closeMyVoicePanel();
+  } else if (myVoicePanelOpen()){
+    closeMyVoicePanel();
+  }
+  const first = state.aiVoiceId !== key;
+  state.aiVoiceId = key;
   renderVoiceChips();
-  previewVoice(id);
+  previewVoice(key);
   // Moving on the first pick only: tapping through voices to hear them should
   // not throw you off the screen you are comparing them on.
   if (first && !pickAiVoice._moved){ pickAiVoice._moved = true; advanceAfterPick(); }
 }
 
-async function renderVoiceChips(){
-  const wrap = document.getElementById('voiceChips');
-  if (!state.aiVoiceId) state.aiVoiceId = AI_VOICES[0].id;
-  const cloned = await myClonedVoiceId();
-  const chips = AI_VOICES.map(v => ({ id: v.id, name: v.name, desc: v.desc, mine: false }));
-  if (cloned) chips.unshift({ id: MY_CLONED_VOICE, name: 'My voice', desc: 'cloned', mine: true });
-  chips.push({ id: DEVICE_VOICE, name: 'This device', desc: 'built-in', mine: false });
-  wrap.innerHTML = chips.map(c => `
-    <button type="button" class="voice-chip${state.aiVoiceId === c.id ? ' sel' : ''}${c.mine ? ' mine' : ''}" onclick="pickAiVoice('${c.id}')">
-      ${c.name} <span class="voice-chip-desc">${c.desc}</span>
-    </button>`).join('');
-}
-
-/* The cloned voice id lives on the profile; cached so the picker doesn't refetch
-   it every repaint. */
-let clonedVoiceCache;
-async function myClonedVoiceId(){
-  if (clonedVoiceCache !== undefined) return clonedVoiceCache;
-  if (!sb || !currentUser){ clonedVoiceCache = null; return null; }
-  const data = await myProfile();
-  clonedVoiceCache = (data && data.cloned_voice_id) || null;
-  return clonedVoiceCache;
-}
-
-/* Resolve what the picker stores into the id the API actually wants. Returns
-   null when the line should be spoken by the device instead. */
-async function resolveVoiceId(picked){
+/* Resolve what the picker stores into the key the API wants. Returns null when
+   the line should be read by this device instead — no account, no voice of their
+   own yet, or the device voice chosen on purpose. */
+async function resolveVoiceKey(picked){
   if (!picked || picked === DEVICE_VOICE) return null;
-  if (picked === MY_CLONED_VOICE) return await myClonedVoiceId();
+  if (!currentUser) return null;
+  if (picked === MY_CLONED_VOICE) return (await myVoiceProfile()) ? MY_CLONED_VOICE : null;
   return picked;
 }
 
@@ -856,11 +982,17 @@ async function previewVoice(picked){
   const msg = document.getElementById('voicePickerMsg');
   msg.textContent = ''; msg.className = 'save-msg';
   const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
-  const voiceId = await resolveVoiceId(picked);
-  if (!voiceId){ speakWithDeviceVoice(line); return; }
+  const voiceKey = await resolveVoiceKey(picked);
+  if (!voiceKey){
+    if (picked !== DEVICE_VOICE && !currentUser){
+      msg.textContent = 'Sign in to hear the studio voices — this device reads it for now.';
+    }
+    speakWithDeviceVoice(line);
+    return;
+  }
   msg.textContent = 'Loading the voice…';
   try {
-    const url = await synthesizeLine(line, voiceId);
+    const url = await synthesizeLine(line, voiceKey);
     msg.textContent = '';
     const el = document.getElementById('voicePreview');
     el.src = url; el.play().catch(()=>{});
@@ -876,17 +1008,47 @@ function speakWithDeviceVoice(line){
   u.rate = 0.92; u.pitch = 1.0;
   window.speechSynthesis.speak(u);
 }
+
+/* ---------------- what went wrong, in our own words ----------------
+   The routes answer with a code, never a provider message: "voice_not_found" or a
+   quota object with our account in it is no use to somebody trying to fall asleep.
+   This is the one place those codes become something a person can read, and every
+   one of them ends the same way — the session still plays, in this device's voice. */
+const TTS_MESSAGES = {
+  not_signed_in:    'Sign in to use the studio voices — this device reads it for now.',
+  upgrade_required: 'Studio voices come with Ritual — using this device\'s voice for now.',
+  not_configured:   'Studio voices aren\'t switched on yet — using this device\'s voice.',
+  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Use my voice" to read the passage once.',
+  invalid_voice:    'That voice isn\'t available any more — choose another one, or this device reads it.',
+  consent_required: 'Tick the confirmation first, then your voice can be created.',
+  quota_exceeded:   'The studio voices have run out of time this month — this device reads it for now, and they\'ll be back.',
+  rate_limited:     'The voice service is busy — give it a minute and try again. This device reads it for now.',
+  too_fast:         'That\'s a lot of generating at once — give it a minute. This device reads it for now.',
+  hourly_limit:     'You\'ve built a lot this hour. The studio voices come back shortly; this device reads it until then.',
+  daily_limit:      'You\'ve built a lot today. The studio voices come back tomorrow; this device reads it until then.',
+  timeout:          'The voice service took too long — this device reads it for now.',
+  network:          'Couldn\'t reach the voice service — this device reads it for now.',
+  too_long:         'That line is too long to read as one clip — shorten it, or this device reads it.',
+  too_many_lines:   'That\'s more lines than one session can hold — trim a few.',
+};
 function ttsErrorText(e){
-  const m = (e && e.message) || '';
-  if (m === 'upgrade_required') return 'Studio voices come with Ritual — using this device\'s voice for now.';
-  if (m === 'not_configured') return 'Studio voices aren\'t switched on yet — using this device\'s voice.';
-  return 'That voice is unavailable right now — using this device\'s voice.';
+  const code = (e && e.message) || '';
+  return TTS_MESSAGES[code] || 'That voice is unavailable right now — using this device\'s voice.';
 }
 
-/* Generate one spoken line and hand back an object URL. Each line is only ever
-   generated once per session: the same words in the same voice always sound the
-   same, and every repeat after that is free. */
-const ttsCache = new Map();
+/* ---------------- generated speech, once ----------------
+   THE COST RULE, in one place: a subliminal's affirmations are generated exactly
+   once, at their natural length, however long the session is set to run. Twenty
+   minutes, an hour, four, eight or a custom length are all the *same* audio; the
+   player loops it locally (see the loop in playFinal) and nothing is generated per
+   minute of playback.
+
+   On top of that, nothing is generated twice. The server keeps every clip against
+   the person, the voice and the words, so rebuilding the same subliminal tomorrow
+   — or opening it on a phone instead of a laptop — reads back what already exists.
+   This map is the same saving one step nearer: within a session, the URL for a line
+   is fetched once and the decoded audio is reused for every repeat. */
+const ttsCache = new Map();          // "voiceKey|speed|line" -> Promise<url>
 /* loadClip caches its decoded audio on the object it's handed, so each generated
    line needs one stable handle rather than a fresh literal per repeat. */
 const studioClipHandles = new Map();
@@ -894,30 +1056,127 @@ function studioClipHandle(url){
   if (!studioClipHandles.has(url)) studioClipHandles.set(url, { url });
   return studioClipHandles.get(url);
 }
-async function synthesizeLine(text, voiceId){
-  // The speed is baked into the audio, so it is part of what identifies a clip.
-  const key = voiceId + '|' + paceNow().speed + '|' + text;
+/* How many lines one request carries. The route accepts up to 25, but a serverless
+   function has a wall-clock limit and a line takes a second or two to generate, so
+   a twenty-line subliminal goes as four short requests rather than one long one
+   that might be cut off. They run one after another, so the total wait is the same
+   — and a batch that did land is kept, so a failure part-way costs nothing twice. */
+const TTS_LINES_PER_REQUEST = 6;
+/* Has to match normalizeLine() in lib/tts-store.js: the server answers with the
+   line as *it* normalized it, and that is the key the player looks up. */
+function ttsLineText(text){ return String(text == null ? '' : text).replace(/\s+/g, ' ').trim(); }
+function ttsLineKey(voiceKey, speed, text){ return voiceKey + '|' + speed + '|' + ttsLineText(text); }
+
+async function ttsRequest(lines, voiceKey, speed){
+  const token = sb && (await sb.auth.getSession()).data.session?.access_token;
+  if (!token) throw new Error('not_signed_in');
+  const res = await fetch(`${API_BASE}/api/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    // The pace is part of the reading, not just the gap after it, so it is part
+    // of what identifies a clip.
+    body: JSON.stringify({ voiceKey, speed, lines }),
+  });
+  let out = {};
+  try { out = await res.json(); } catch(e){}
+  if (!res.ok) throw new Error(out.error || `tts_failed_${res.status}`);
+  return out;
+}
+
+/* One line, on its own. Used by the voice preview and as the safety net for a
+   line the sequence request did not cover. */
+async function synthesizeLine(text, voiceKey){
+  const speed = paceNow().speed;
+  const key = ttsLineKey(voiceKey, speed, text);
   if (ttsCache.has(key)) return ttsCache.get(key);
   const promise = (async () => {
-    const token = sb && (await sb.auth.getSession()).data.session?.access_token;
-    if (!token) throw new Error('not_signed_in');
-    const res = await fetch(`${API_BASE}/api/tts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      // The pace is part of the reading, not just the gap after it.
-      body: JSON.stringify({ text, voiceId, speed: paceNow().speed }),
-    });
-    if (!res.ok){
-      let body = {};
-      try { body = await res.json(); } catch(e){}
-      throw new Error(body.error || `tts_failed_${res.status}`);
-    }
-    return URL.createObjectURL(await res.blob());
+    const out = await ttsRequest([ttsLineText(text)], voiceKey, speed);
+    const clip = (out.clips || [])[0];
+    if (!clip || !clip.url) throw new Error((clip && clip.error) || out.warning || 'generation_failed');
+    return clip.url;
   })();
   ttsCache.set(key, promise);
   // A failed line shouldn't be cached as permanently broken.
   promise.catch(() => ttsCache.delete(key));
   return promise;
+}
+
+/* Every line of a sequence, in as few requests as possible. Lines already in hand
+   are not asked for again, and the request is skipped entirely when there is
+   nothing new — which is what makes pressing Generate twice cost nothing. */
+async function fetchSequenceAudio(lines, voiceKey){
+  const speed = paceNow().speed;
+  const wanted = [];
+  (lines || []).forEach(l => {
+    const line = ttsLineText(l);
+    if (line && !wanted.includes(line) && !ttsCache.has(ttsLineKey(voiceKey, speed, line))) wanted.push(line);
+  });
+  if (!wanted.length) return { ok: true, code: null };
+  let failure = null;
+  for (let i = 0; i < wanted.length; i += TTS_LINES_PER_REQUEST){
+    const batch = wanted.slice(i, i + TTS_LINES_PER_REQUEST);
+    try {
+      const out = await ttsRequest(batch, voiceKey, speed);
+      (out.clips || []).forEach(c => {
+        if (c.url) ttsCache.set(ttsLineKey(voiceKey, speed, c.text), Promise.resolve(c.url));
+        else if (c.error && c.error !== 'empty') failure = failure || c.error;
+      });
+      if (out.warning) failure = failure || out.warning;
+    } catch (e){
+      failure = (e && e.message) || 'generation_failed';
+      break;   // quota, or no signal: the rest of the batches would fail the same way
+    }
+  }
+  return { ok: !failure, code: failure };
+}
+
+/* One prepare per sequence, however many times it is asked for. This is what a
+   second tap on Generate lands on: the promise already running, not a second run
+   of it. */
+const sequencePrepares = new Map();
+function prepareSequenceAudio(lines, voiceKey){
+  const key = voiceKey + '|' + paceNow().speed + '|' + (lines || []).map(ttsLineText).join('\u0001');
+  if (sequencePrepares.has(key)) return sequencePrepares.get(key);
+  const promise = fetchSequenceAudio(lines, voiceKey);
+  sequencePrepares.set(key, promise);
+  // Only a run that worked is worth remembering; a failed one should be retryable.
+  promise.then(r => { if (!r.ok) sequencePrepares.delete(key); }).catch(() => sequencePrepares.delete(key));
+  return promise;
+}
+
+/* Called as the final screen opens, for a freshly built subliminal and for one
+   loaded out of the library. The session's voice is generated here, once, before
+   anybody presses play — so the first loop doesn't stutter while it waits, and the
+   loops after it are free. */
+let preparingSessionVoice = false;
+async function prepareSessionVoice(){
+  if (preparingSessionVoice) return;
+  if (state.voiceMode !== 'ai') return;
+  const voiceKey = await resolveVoiceKey(state.aiVoiceId);
+  if (!voiceKey) return;                       // device voice: nothing to generate
+  const lineEl = document.getElementById('finalLine');
+  const playBtn = document.getElementById('finalPlayBtn');
+  const wasSaying = lineEl ? lineEl.textContent : '';
+  preparingSessionVoice = true;
+  if (playBtn) playBtn.disabled = true;
+  if (lineEl) lineEl.textContent = 'Recording your affirmations in that voice — this happens once, then it loops for as long as you set.';
+  try {
+    const main = await prepareSequenceAudio(state.affirmations, voiceKey);
+    let layer = { ok: true };
+    if (layerVoiceEnabled && state.layerVoiceMode === 'ai' && state.layerAffirmations && state.layerAffirmations.length){
+      const layerKey = await resolveVoiceKey(state.layerAiVoiceId);
+      if (layerKey) layer = await prepareSequenceAudio(state.layerAffirmations, layerKey);
+    }
+    if (lineEl){
+      const failure = !main.ok ? main.code : (!layer.ok ? layer.code : null);
+      lineEl.textContent = failure ? ttsErrorText(new Error(failure)) : wasSaying;
+    }
+  } catch (e){
+    if (lineEl) lineEl.textContent = ttsErrorText(e);
+  } finally {
+    preparingSessionVoice = false;
+    if (playBtn) playBtn.disabled = false;
+  }
 }
 
 /* ---------------- step 5: background + mixer ---------------- */
@@ -1367,6 +1626,11 @@ function prepareFinal(){
     titleInput.value = '';
     titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
   }
+
+  /* The one place the session's voice is generated: as this screen opens, for a
+     subliminal just built and for one loaded out of the library. Not per play, and
+     not per minute of the length they chose. */
+  prepareSessionVoice();
 }
 /* Sends you back to the recording step to redo your voice on this subliminal.
    Existing recordings come along, so lines you don't touch stay exactly as they
@@ -1957,10 +2221,10 @@ function playFinal(){
           utter.onend = advance;
           window.speechSynthesis.speak(utter);
         };
-        resolveVoiceId(state.layerAiVoiceId).catch(()=>null).then(voiceId => {
+        resolveVoiceKey(state.layerAiVoiceId).catch(()=>null).then(voiceKey => {
           if (!finalPlaying) return;
-          if (!voiceId){ deviceSpeak(); return; }
-          return synthesizeLine(line, voiceId)
+          if (!voiceKey){ deviceSpeak(); return; }
+          return synthesizeLine(line, voiceKey)
             .then(url => loadClip(finalCtx, studioClipHandle(url)))
             .then(clip => {
               if (!finalPlaying) return;
@@ -2012,10 +2276,10 @@ function playFinal(){
     } else {
       const lines = state.affirmations;
       let idx = 0;
-      // Resolved once per session: a studio voice id, or null to use the voice
+      // Resolved once per session: a studio voice key, or null to use the voice
       // built into this device. Anything that goes wrong with a studio voice
       // falls back to the device rather than leaving the session silent.
-      const voicePromise = resolveVoiceId(state.aiVoiceId).catch(() => null);
+      const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
         if (idx >= lines.length){ onDone(lines.length > 0); return; }
@@ -2082,10 +2346,10 @@ function playFinal(){
         function speakOnce(){
           if (!finalPlaying) return;
           const line = lines[idx];
-          voicePromise.then(voiceId => {
+          voicePromise.then(voiceKey => {
             if (!finalPlaying) return;
-            if (!voiceId){ deviceSpeak(); return; }
-            return synthesizeLine(line, voiceId)
+            if (!voiceKey){ deviceSpeak(); return; }
+            return synthesizeLine(line, voiceKey)
               .then(url => loadClip(finalCtx, studioClipHandle(url)))
               .then(clip => {
                 if (!finalPlaying) return;
