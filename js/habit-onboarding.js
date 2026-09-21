@@ -61,7 +61,11 @@ const HO_CTA = {
 function hoStarterCards(){
   const practice = (typeof faithPracticeHabit === 'function') ? faithPracticeHabit() : 'Meditation';
   return [
-    { key:'journal',    name:'Journaling', icon:'📓', note:'A page a day, by hand.' },
+    /* Said in full, because "Journaling" in an app reads as typing into the
+       app, and this one never is: the page is written by hand and photographed.
+       See habitIsJournaling() in habits.js for the completion itself. */
+    { key:'journal',    name:'Journaling', icon:'📓',
+      note:'Write in your physical journal, then upload a photo of your entry to complete it.' },
     { key:'practice',   name:practice,     icon:practice === 'Prayer' ? '🙏' : '🧘',
       note: practice === 'Prayer' ? 'A few quiet minutes with it.' : 'A few quiet minutes with yourself.' },
     { key:'subliminal', name:'Subliminals', icon:'🎧', note:'One session, whenever it fits.' },

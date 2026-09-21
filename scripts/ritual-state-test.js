@@ -126,9 +126,10 @@ const weekdays = Object.assign({}, morning, { id:'w1', created_at: new Date(2026
 setUp([weekdays], { w1:['2026-09-17','2026-09-18'] }, new Date(2026, 8, 21, 9, 0, 0));  // Mon
 check('Sat (not a scheduled day) missed?', ctx.routineMissed('morning', SAT), false);
 check('Sun (not a scheduled day) missed?', ctx.routineMissed('morning', SUN), false);
-// Thu + Fri kept, and the Wednesday before is won back by Thursday's full
-// ritual (the tracker's existing redemption rule), so the run reads 3.
-check('streak survives the weekend', ctx.routineStreak('morning'), 3);
+// Thu + Fri kept. The Wednesday before is won back by Thursday's full ritual,
+// which holds the run together without being a day anybody practised -- so the
+// run reads 2, the number of days actually kept.
+check('streak survives the weekend', ctx.routineStreak('morning'), 2);
 check('reflection due on Monday?', ctx.reflectionDue(), null);
 
 // 9. An explicit tick always wins, even on a day the window had gone.
@@ -144,9 +145,9 @@ setUp([oldMorning], { o1:['2026-09-18'] }, new Date(2026, 8, 20, 9, 0, 0));   //
 check('long-time user — Saturday really was missed', ctx.routineMissed('morning', SAT), true);
 check('long-time user — reflection due', ctx.reflectionDue(), { time:'morning', date: SAT });
 ctx.__set = () => {}; vm.runInContext('graceDays = 1;', ctx);
-// Friday was kept, and Thursday is won back by Friday's full ritual, so the
-// run a grace day would hold reads 2 — the tracker's existing redemption rule.
-check('long-time user — grace offered for Saturday', ctx.graceOffer('morning'), { time:'morning', date: SAT, saves: 2 });
+// Friday was kept; Thursday is only held by Friday's full ritual, so the run a
+// grace day would save is the one day that was practised.
+check('long-time user — grace offered for Saturday', ctx.graceOffer('morning'), { time:'morning', date: SAT, saves: 1 });
 
 // 11. Day one: no grace day and no comeback offered for a day that never was.
 setUp([morning], {}, new Date(2026, 8, 20, 9, 0, 0));
@@ -159,8 +160,9 @@ const legacy = { id:'l1', time_of_day:'morning', is_core:false };
 setUp([legacy], {}, new Date(2026, 8, 20, 9, 0, 0));
 check('legacy row — Saturday missed?', ctx.routineMissed('morning', SAT), true);
 setUp([legacy], { l1:[SAT, '2026-09-18'] }, new Date(2026, 8, 20, 9, 0, 0));
-// Sat + Fri kept, plus the Thursday Friday's full ritual wins back.
-check('legacy row — streak still counts', ctx.routineStreak('morning'), 3);
+// Sat + Fri kept. Thursday is held by Friday's full ritual but was not
+// practised, so it does not add to the count.
+check('legacy row — streak still counts', ctx.routineStreak('morning'), 2);
 
 // 13. The 21-day cycle starts at the first real occurrence and skips nothing.
 setUp([morning], { m1:[SUN, MON] }, new Date(2026, 8, 21, 21, 0, 0));
@@ -183,6 +185,40 @@ check('setup 7:03pm — anytime starts today',
   ctx.ritualFirstOccurrenceFrom('anytime', new Date(2026, 8, 19, 19, 3, 0)), SAT);
 check('setup 6:00am — morning starts today',
   ctx.ritualFirstOccurrenceFrom('morning', new Date(2026, 8, 19, 6, 0, 0)), SAT);
+
+// 15. A tracker nobody has used yet counts nothing.
+//     The bug: finishing one day showed "2 days", because the day before it --
+//     never practised, only *held* by that full ritual through the redemption
+//     rule -- was counted as a day of practice too.
+setUp([morning], {}, new Date(2026, 8, 21, 9, 0, 0));          // Monday, nothing ticked
+vm.runInContext(`habitCycleStart = '${SUN}';`, ctx);
+check('new tracker — streak', ctx.routineStreak('morning'), 0);
+check('new tracker — practise days', ctx.habitPractiseDays(), 0);
+check('new tracker — cycle day', ctx.habitCycleDay(), 1);
+check('new tracker — spaces', ctx.habitSpacesTotal(), 3);
+// Reading it again changes nothing: it is derived from check-ins, never from
+// how long ago the habit was created or how many times the page was opened.
+check('new tracker — still 0 on a second read', ctx.routineStreak('morning'), 0);
+
+// One day practised is one day. The Sunday before it was missed outright.
+setUp([morning], { m1:[MON] }, new Date(2026, 8, 21, 21, 0, 0));
+vm.runInContext(`habitCycleStart = '${SUN}';`, ctx);
+check('first completed day — streak', ctx.routineStreak('morning'), 1);
+check('first completed day — practise days', ctx.habitPractiseDays(), 1);
+
+// Two days practised back to back is two.
+setUp([morning], { m1:[SUN, MON] }, new Date(2026, 8, 21, 21, 0, 0));
+vm.runInContext(`habitCycleStart = '${SUN}';`, ctx);
+check('two days practised — streak', ctx.routineStreak('morning'), 2);
+
+// A bridged day still holds the run together — it just isn't a day of practice.
+// Someone who has had the ritual for weeks: Saturday and Monday practised, and
+// the Sunday between them missed and won back by Monday's full ritual. The run
+// stays whole, and reads as the two days that were actually practised.
+setUp([oldMorning], { o1:[SAT, MON] }, new Date(2026, 8, 21, 21, 0, 0));
+vm.runInContext(`habitCycleStart = '${SAT}';`, ctx);
+check('a bridged day holds the run', ctx.routineStreak('morning'), 2);
+check('a bridged day is not a day practised', ctx.habitPractiseDays(), 2);
 
 console.log(failures ? `\n${failures} FAILED\n` : '\nall passed\n');
 process.exit(failures ? 1 : 0);

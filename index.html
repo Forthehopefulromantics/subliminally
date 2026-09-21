@@ -248,6 +248,7 @@
   .chip.sel{ background:rgba(227,190,127,0.14); border-color:var(--candle); color:var(--candle); }
 
   .quiz-q label{ display:block; font-size:12.5px; color:var(--haze); margin-bottom:7px; }
+  .quiz-help{ font-size:11.5px; color:var(--haze); line-height:1.6; margin:6px 0 0; }
   .quiz-q textarea{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:12px 14px; color:var(--moonlight); font-size:14px; resize:none; outline:none; transition:border-color .2s; }
   .quiz-q textarea:focus{ border-color:var(--candle); }
   .quiz-q{ margin-bottom:14px; }
@@ -397,7 +398,11 @@
   .length-chip-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
   .length-chip{ cursor:pointer; padding:12px 6px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; color:var(--moonlight); font-size:13px; font-family:inherit; transition:all .2s; }
   .length-chip span{ display:block; font-size:10px; color:var(--lilac); margin-top:3px; }
-  .length-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  /* Selected has to read as selected at a glance -- a saved answer you come
+     back to in Settings is the whole reason this state exists. Border, tint
+     and an inner ring, so it survives a repaint that only changes one of them. */
+  .length-chip.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac);
+    box-shadow:inset 0 0 0 1px var(--lilac); font-weight:600; }
   .length-chip.locked{ opacity:.55; }
   .length-chip.locked span{ color:var(--candle); }
   /* tier-name captions under session-length chips only show for free/logged-out accounts */
@@ -629,6 +634,25 @@
   .profile-subhead{ font-family:var(--serif); font-size:17px; color:var(--moonlight); margin:32px 0 14px; }
   .profile-list{ display:flex; flex-direction:column; gap:10px; }
   .mylibrary-section{ padding:80px 0; }
+
+  /* ---- the danger zone ----
+     The one part of Settings that is allowed to look like a warning. Warm red
+     rather than alarm red: these are ordinary things somebody may genuinely
+     want to do, they just cannot be taken back. */
+  .danger-subhead{ color:#E39A9A; }
+  .danger-zone{ max-width:520px; border:1px solid rgba(227,154,154,.42); border-radius:18px;
+    background:rgba(227,154,154,.05); padding:4px 18px 18px; }
+  body[data-sky="day"] .danger-zone{ background:rgba(199,90,90,.05); border-color:rgba(199,90,90,.3); }
+  .danger-intro{ font-size:12.5px; color:var(--haze); margin:16px 0 4px; }
+  .danger-item{ padding:16px 0; border-top:1px solid rgba(227,154,154,.22); }
+  .danger-item h4{ font-family:var(--serif); font-size:15px; color:var(--moonlight); margin:0 0 6px; font-weight:500; }
+  .danger-copy{ font-size:12.5px; color:var(--haze); line-height:1.6; margin:0 0 10px; }
+  .danger-note{ font-size:11.5px; color:var(--haze); line-height:1.6; margin:10px 0 0; }
+  .danger-note-loud{ color:#E39A9A; }
+  body[data-sky="day"] .danger-note-loud{ color:#B4545C; }
+  .danger-item a.mini-btn{ display:inline-block; text-decoration:none; }
+  .mini-btn.danger-btn{ color:#E39A9A; border-color:rgba(227,154,154,.5); }
+  body[data-sky="day"] .mini-btn.danger-btn{ color:#B4545C; border-color:rgba(180,84,92,.42); }
 
 
   /* the cover picker */
@@ -939,6 +963,13 @@
   .habit-core-toggle:hover{ color:var(--candle); transform:scale(1.15); }
   .habit-core-toggle.on{ color:var(--candle); }
   .habit-core-toggle:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; border-radius:6px; }
+  /* The way a journalling habit is completed: a photograph of the page you
+     wrote by hand. Same weight as the ✦ next to it — it is an action on the
+     habit, not a second delete button. */
+  .habit-page-btn{ background:none; border:none; cursor:pointer; line-height:0; padding:4px;
+    color:rgba(156,147,184,0.55); transition:color .2s, transform .15s; }
+  .habit-page-btn:hover{ color:var(--lilac); transform:scale(1.12); }
+  .habit-page-btn:focus-visible{ outline:2px solid var(--lilac); outline-offset:2px; border-radius:6px; }
   .habit-core-hint{ font-size:12px; color:var(--haze); line-height:1.6; margin:0 0 10px; }
   /* A non-negotiable reads as the load-bearing one, without shouting. */
   .day-habit.core{ border-color:rgba(224,196,138,0.28); }
@@ -1174,6 +1205,11 @@
   body[data-sky="day"] .profile-field-card input, body[data-sky="day"] .profile-field-card textarea,
   body[data-sky="day"] .lib-title-input, body[data-sky="day"] .layer-voice-panel textarea{
     background:#FFF6EA; border-color:rgba(62,42,72,.12); }
+  /* The repaint above is more specific than .length-chip.sel, so by day it was
+     quietly erasing the selected state: the faith saved in your profile came
+     back looking like nothing had ever been chosen. Said again here, after it. */
+  body[data-sky="day"] .length-chip.sel{ background:rgba(122,79,181,.14); border-color:var(--lilac);
+    box-shadow:inset 0 0 0 1px var(--lilac); }
   body[data-sky="day"] .journal-tabs button.active{ background:rgba(122,79,181,.14); }
   body[data-sky="day"] input::placeholder, body[data-sky="day"] textarea::placeholder{ color:#9C8FA8; }
 
@@ -1397,6 +1433,16 @@
     100%{ opacity:0; transform:translate(-50%,-152%) scale(1); }
   }
   @media (prefers-reduced-motion:reduce){ .light-mark{ display:none; } }
+
+  /* Said once, at the bottom of whatever page you are on. The only thing that
+     uses it is coming back from checkout — the page you land on is Today, and
+     the message about what just happened has nowhere else to be. */
+  .app-toast{ position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:420;
+    max-width:min(460px, calc(100vw - 32px)); padding:12px 16px; border-radius:14px;
+    background:rgba(20,16,38,.96); border:1px solid var(--lilac); color:var(--moonlight);
+    font-size:13.5px; line-height:1.5; text-align:center; box-shadow:0 10px 34px rgba(0,0,0,.42); }
+  .app-toast.err{ border-color:#E39A9A; }
+  body[data-sky="day"] .app-toast{ background:#FFF6EA; box-shadow:0 10px 34px rgba(62,42,72,.18); }
 
   /* ---- today's journey ----
      Four things, the state of each, and one of them raised as the next thing
@@ -2587,7 +2633,8 @@
               </div>
               <div class="quiz-q" id="countRow">
                 <label>How many affirmations?</label>
-                <div class="count-row"><input type="range" id="countRange" min="10" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
+                <div class="count-row"><input type="range" id="countRange" min="5" max="20" value="14"><span class="count-val" id="countVal">14</span></div>
+                <p class="quiz-help">Five is the fewest a subliminal is built from; twenty is the most.</p>
               </div>
             </div>
           </details>
@@ -2609,6 +2656,7 @@
         <div class="flow-body">
           <div class="aff-list" id="affList"></div>
           <button class="aff-add" id="addAffBtn" onclick="addAffirmation()">+ add your own line</button>
+          <div class="save-msg" id="affListMsg"></div>
         </div>
         <div class="flow-nav">
           <button class="flow-back" onclick="prevStep()">← Back</button>
@@ -2996,8 +3044,13 @@
         <input type="text" id="higherSelfNameInput" placeholder="e.g. Aurelia" maxlength="24">
         <button class="mini-btn ghostbtn" onclick="updateHigherSelfName()">Save name</button>
         <label style="display:block; margin-top:18px;">How they look</label>
+        <!-- The pair you have chosen, and a button. Nineteen faces used to be
+             laid out here on arrival, which made a settings page mostly a
+             gallery of people you are not. -->
         <div class="hs-preview" id="higherSelfPreview"></div>
-        <div class="av-maker" id="higherSelfMaker"></div>
+        <button class="mini-btn ghostbtn" id="avatarPickerToggle" onclick="toggleAvatarPicker()"
+          aria-expanded="false" aria-controls="higherSelfMaker">Change avatar</button>
+        <div class="av-maker" id="higherSelfMaker" style="display:none;"></div>
         <div class="save-msg" id="higherSelfMsg"></div>
       </div>
 
@@ -3037,8 +3090,6 @@
           <div class="save-msg" id="passwordSettingsMsg"></div>
         </div>
       </div>
-      <div class="manage-sub"><a href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" id="profileManageSubLink">Manage your subscription →</a></div>
-
       <h3 class="profile-subhead">Get in touch</h3>
       <div class="journal-tabs" style="max-width:340px;">
         <button class="active" data-fbtab="support" onclick="setFeedbackTab('support')">Contact support</button>
@@ -3053,23 +3104,43 @@
       </div>
 
       <h3 class="profile-subhead">Your account</h3>
-      <div class="profile-field-card" style="max-width:520px;">
-        <div id="profileRestoreRow" style="display:none; margin-bottom:18px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,0.06);">
-          <label>Subscribed on another device?</label>
-          <button class="mini-btn ghostbtn" onclick="restorePurchases()">Restore purchases</button>
-          <div class="save-msg" id="restoreMsg"></div>
+      <div class="profile-field-card" style="max-width:520px; display:none;" id="profileRestoreRow">
+        <label>Subscribed on another device?</label>
+        <p style="font-size:12.5px; color:var(--haze); margin-bottom:10px;">If you subscribed in the app on another device, bring it back here.</p>
+        <button class="mini-btn ghostbtn" onclick="restorePurchases()">Restore purchases</button>
+        <div class="save-msg" id="restoreMsg"></div>
+      </div>
+
+      <!-- Two things live down here, and the whole point of the section is
+           that they are not the same thing: cancelling stops the billing and
+           keeps everything you have made, and deleting throws it all away and
+           does not stop the billing. They used to sit in one card, where the
+           only way to cancel was a link further up the page. -->
+      <h3 class="profile-subhead danger-subhead">Danger zone</h3>
+      <div class="danger-zone">
+        <p class="danger-intro">These change your subscription or remove your account. Nothing here happens without a second tap.</p>
+
+        <div class="danger-item">
+          <h4>Manage or cancel your subscription</h4>
+          <p class="danger-copy" id="dangerSubText">Checking your membership…</p>
+          <a class="mini-btn ghostbtn" id="dangerManageSubLink" href="https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00" target="_blank" rel="noopener" style="display:none;">Manage your subscription →</a>
+          <p class="danger-note">Cancelling keeps your account and everything in it — your subliminals, recordings, journal and habits all stay where they are.</p>
         </div>
-        <label>Delete your account</label>
-        <p style="font-size:12.5px; color:var(--haze); margin-bottom:10px;">Permanently removes your account, saved subliminals, recordings, journal entries, photos, and habits. If you have an active subscription, cancel it first — deleting your account doesn't stop the billing.</p>
-        <button class="mini-btn ghostbtn" id="deleteAccountBtn" onclick="document.getElementById('deleteAccountConfirm').style.display='block'">Delete my account</button>
-        <div id="deleteAccountConfirm" style="display:none; margin-top:12px;">
-          <p style="font-size:13px; color:#E39A9A; margin-bottom:10px;">This can't be undone. Delete everything?</p>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="mini-btn candlebtn" onclick="deleteMyAccount()">Yes, delete my account</button>
-            <button class="mini-btn ghostbtn" onclick="document.getElementById('deleteAccountConfirm').style.display='none'">Keep it</button>
+
+        <div class="danger-item">
+          <h4>Delete your account</h4>
+          <p class="danger-copy">Permanently removes your account, saved subliminals, recordings, journal entries, photos, and habits. <b>This is irreversible — there is no undo and nothing can be restored afterwards.</b></p>
+          <p class="danger-note danger-note-loud">Deleting your account is <b>not</b> how you cancel a subscription. Billing is handled by <span id="dangerBillingProvider">your billing provider</span>, and it keeps charging a deleted account — cancel above first, then delete.</p>
+          <button class="mini-btn ghostbtn danger-btn" id="deleteAccountBtn" onclick="document.getElementById('deleteAccountConfirm').style.display='block'">Delete my account</button>
+          <div id="deleteAccountConfirm" style="display:none; margin-top:12px;">
+            <p style="font-size:13px; color:#E39A9A; margin-bottom:10px;">This can't be undone, and it won't cancel any subscription. Delete everything?</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="mini-btn candlebtn" onclick="deleteMyAccount()">Yes, delete my account</button>
+              <button class="mini-btn ghostbtn" onclick="document.getElementById('deleteAccountConfirm').style.display='none'">Keep it</button>
+            </div>
           </div>
+          <div class="save-msg" id="deleteAccountMsg"></div>
         </div>
-        <div class="save-msg" id="deleteAccountMsg"></div>
       </div>
     </div>
   </div>

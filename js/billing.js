@@ -189,8 +189,136 @@ function goToCheckout(evt, tier){
     return false;
   }
   if (typeof trackPaywall === 'function') trackPaywall('checkout_started', { page: currentPageName(), feature: null, required_tier: tier, current_tier: lastKnownTier(), period: billingPeriod, via: 'stripe' });
-  window.open(row.link + '?client_reference_id=' + encodeURIComponent(checkoutReference(currentUser.id, tier, billingPeriod)), '_blank');
+  openStripeCheckout(tier, billingPeriod, row);
   return false;
+}
+
+/* ---------------- WEB CHECKOUT, AND THE WAY BACK ----------------
+   A Payment Link has no way to say where to go afterwards — its confirmation
+   page is set once, in the dashboard, for everybody — so paying used to leave
+   people on a Stripe receipt with no route back into the app. So the web
+   checkout asks the server for a Checkout Session built from that same link
+   (api/create-checkout-session.js): same price, same free trial, same
+   client_reference_id, and a success_url that lands back on Today.
+
+   It happens in this tab rather than a new one, because the whole point is
+   coming back. If the server can't build a session for any reason, the raw
+   Payment Link still opens exactly as it did before — a checkout that works
+   without the trip home beats no checkout at all. */
+async function openStripeCheckout(tier, period, row){
+  const msg = document.getElementById('pricingPurchaseMsg');
+  const reference = checkoutReference(currentUser.id, tier, period);
+  const fallback = () => {
+    window.open(row.link + '?client_reference_id=' + encodeURIComponent(reference), '_blank');
+    if (msg){ msg.textContent = 'Checkout opened in a new tab.'; msg.className = 'save-msg'; }
+  };
+  if (msg){ msg.textContent = 'Opening secure checkout…'; msg.className = 'save-msg'; }
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if (!token){ fallback(); return; }
+    const res = await fetch(API_BASE + '/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ link: row.link, tier, period }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.url){
+      console.warn('checkout session unavailable, opening the Payment Link instead:', body.error || res.status);
+      fallback();
+      return;
+    }
+    window.location.assign(body.url);
+  } catch (e){
+    console.warn('checkout session failed, opening the Payment Link instead:', e);
+    fallback();
+  }
+}
+
+/* ---------------- BACK FROM STRIPE ----------------
+   Checkout returns to /?checkout=success. Two things have to happen here, and
+   the second is the one people notice: the webhook writes the `subscribers`
+   row a moment *after* the browser gets back, so asking once and believing the
+   answer is how somebody ends up being told they are still on the free plan
+   seconds after paying — and signing out and back in became the folk remedy.
+
+   So the plan is re-read, not once but until it changes, for as long as a
+   webhook plausibly takes. Everything that draws a plan is repainted each
+   time it is asked, so the moment the row lands the app is already showing it. */
+const CHECKOUT_TIER_POLL_MS = [0, 1500, 3000, 5000, 8000, 12000, 18000];
+
+/* One line at the bottom of the screen, replaced rather than stacked. It stays
+   until it is replaced or its time is up, because the thing it reports on --
+   a payment -- is worth reading twice. */
+let appToastTimer = null;
+function showAppToast(text, cls, ms){
+  let el = document.getElementById('appToast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'appToast';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    document.body.appendChild(el);
+  }
+  el.className = 'app-toast' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+  clearTimeout(appToastTimer);
+  appToastTimer = setTimeout(() => { el.remove(); }, ms || 9000);
+}
+
+async function refreshPlanEverywhere(){
+  forgetFetch('tier');
+  if (typeof applyPricingVisibility === 'function') await applyPricingVisibility();
+  if (typeof renderProfileState === 'function') renderProfileState();
+  if (document.body.getAttribute('data-view') === 'today' && typeof renderTodayPage === 'function'){
+    /* Today may already be refreshing from the page load, and that pass read
+       the plan before the payment landed. Let it finish, drop what it cached,
+       and run one that starts after -- otherwise the screen keeps the answer
+       from a second before the subscription existed, which is the "log out and
+       back in" this whole path exists to avoid. */
+    if (todayRefreshing) await todayRefreshing;
+    forgetFetch('tier');
+    renderTodayPage();
+    if (todayRefreshing) await todayRefreshing;
+  }
+}
+
+async function handleCheckoutReturn(){
+  const params = new URLSearchParams(location.search);
+  const outcome = params.get('checkout');
+  if (!outcome) return;
+  // Take it out of the address bar straight away, so a refresh — or a shared
+  // link — doesn't replay any of this.
+  params.delete('checkout'); params.delete('session_id');
+  const rest = params.toString();
+  history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+  if (outcome !== 'success') return;
+  if (!sb || !currentUser) return;
+
+  const msg = document.getElementById('pricingPurchaseMsg');
+  /* On both: the pricing block is where this message has always gone, and the
+     page somebody actually lands on is Today, where that block is hidden. */
+  const say = (text, cls) => {
+    if (msg){ msg.textContent = text; msg.className = 'save-msg' + (cls ? ' ' + cls : ''); }
+    showAppToast(text, cls);
+  };
+  say('Thank you — setting up your membership…');
+
+  for (const wait of CHECKOUT_TIER_POLL_MS){
+    if (wait) await new Promise(r => setTimeout(r, wait));
+    forgetFetch('tier');
+    const tier = await getMyTier();
+    if (tier !== 'none'){
+      if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: billingPeriod, via: 'stripe' });
+      await refreshPlanEverywhere();
+      say(`You're in — welcome to ${TIER_LABEL[tier]}.`, 'ok');
+      return;
+    }
+  }
+  // Paid, but the webhook hasn't landed yet. Say so plainly rather than
+  // showing the free plan as though nothing happened.
+  await refreshPlanEverywhere();
+  say("Payment received — your membership is taking a moment to activate. Refresh in a minute, and email hello@subliminallybyfthr.com if it's still not here.", 'err');
 }
 
 /* ---------------- REVENUECAT (native subscription purchases) ----------------
@@ -232,7 +360,7 @@ async function restorePurchases(){
        honoured as Ritual rather than left unrecognised. */
     if (hasRitualEntitlement(active)){
       say(`Restored — ${TIER_LABEL.ritual} is back on this device.`, 'ok');
-      setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
+      setTimeout(refreshPlanEverywhere, 1500);
     } else {
       say('No active subscription found for this Apple ID / Google account.');
     }
@@ -273,9 +401,11 @@ async function purchaseTier(tier, period){
       msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
       msg.className = 'save-msg ok';
       if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: period, via: 'revenuecat' });
-      // The RevenueCat webhook updates the subscribers table server-side;
-      // give it a moment to land, then refresh what the pricing page shows.
-      setTimeout(() => { forgetFetch('tier'); applyPricingVisibility(); }, 1500);
+      /* The RevenueCat webhook updates the subscribers table server-side; give
+         it a moment to land, then repaint everything that draws a plan -- the
+         same refresh the web checkout comes back to, so a purchase never needs
+         a sign-out to show up. */
+      setTimeout(refreshPlanEverywhere, 1500);
     } else {
       msg.textContent = 'Purchase completed, but the plan is taking a moment to activate — check back shortly.';
       msg.className = 'save-msg';
@@ -288,15 +418,37 @@ async function purchaseTier(tier, period){
   }
 }
 
-// Stripe's billing portal only knows about web subscriptions; App Store /
-// Play Store subscriptions are managed in the platform's own screen instead.
+/* ---------------- WHERE A SUBSCRIPTION IS CANCELLED ----------------
+   Never here. A subscription is cancelled with whoever is charging for it, and
+   nothing in this app may delete a `subscribers` row to fake it — a row that
+   says nothing while a card is still being charged is the worst version of
+   this screen. So both of these are links out to the billing provider's own
+   cancel flow, and which one somebody gets is decided by who took their money.
+
+   Stripe's billing portal only knows about web subscriptions. An App Store or
+   Play subscription can only be cancelled in the platform's own screen —
+   Apple does not let anyone else do it, and pointing an Apple subscriber at
+   Stripe would show them an empty portal. */
+const STRIPE_BILLING_PORTAL_URL = 'https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00';
+const STORE_SUBSCRIPTION_URL = {
+  ios: 'https://apps.apple.com/account/subscriptions',
+  android: 'https://play.google.com/store/account/subscriptions',
+};
+function storeSubscriptionTarget(){
+  const platform = (isNativeApp() && window.Capacitor.getPlatform() === 'android') ? 'android' : 'ios';
+  return {
+    url: STORE_SUBSCRIPTION_URL[platform],
+    label: platform === 'android' ? 'Manage in Google Play →' : 'Manage in the App Store →',
+    store: platform === 'android' ? 'Google Play' : 'the App Store',
+  };
+}
+
 function updateManageSubscriptionLinks(){
-  let url = 'https://billing.stripe.com/p/login/28EdR8eyacFlczB6uFgYU00';
+  let url = STRIPE_BILLING_PORTAL_URL;
   let label = 'Manage your subscription →';
   if (isNativeApp()){
-    const platform = window.Capacitor.getPlatform();
-    url = platform === 'ios' ? 'https://apps.apple.com/account/subscriptions' : 'https://play.google.com/store/account/subscriptions';
-    label = platform === 'ios' ? 'Manage in the App Store →' : 'Manage in Google Play →';
+    const target = storeSubscriptionTarget();
+    url = target.url; label = target.label;
   }
   ['pricingManageSubLink', 'profileManageSubLink'].forEach(id => {
     const el = document.getElementById(id);
@@ -304,6 +456,54 @@ function updateManageSubscriptionLinks(){
     el.href = url;
     el.textContent = label;
   });
+}
+
+/* The Danger Zone's first half. Which provider is charging you is read off
+   your own `subscribers` row rather than guessed from the device: a Stripe
+   customer id is only ever written by the Stripe webhook, so a row that has
+   one was bought on the web and a row that does not was bought in a store.
+   Somebody who subscribed on their iPhone and opened Settings in a browser is
+   still an App Store subscriber, and is told so instead of being sent to a
+   Stripe portal that has never heard of them. */
+async function renderSubscriptionManagement(){
+  const text = document.getElementById('dangerSubText');
+  const link = document.getElementById('dangerManageSubLink');
+  const provider = document.getElementById('dangerBillingProvider');
+  if (!text || !link) return;
+  const row = await getMySubscriberRow();
+  const active = !!(row && ['active', 'trialing', 'past_due'].includes(row.status));
+  const viaStripe = !!(row && row.stripe_customer_id);
+  const store = storeSubscriptionTarget();
+
+  if (!active && !viaStripe){
+    /* Also where a subscriber lands if their row could not be read at all --
+       the two look identical from here. So this never dead-ends: the way to
+       the provider stays on screen, and it is the provider that has the last
+       word on whether there is anything to cancel. */
+    text.textContent = isNativeApp()
+      ? `You're on the free plan — there's no subscription to cancel here. If you subscribed on this device and it hasn't appeared yet, ${store.store} has the record.`
+      : "You're on the free plan — there's no subscription to cancel here. If you subscribed and it hasn't appeared yet, the Stripe billing portal has the record.";
+    link.style.display = '';
+    link.href = isNativeApp() ? store.url : STRIPE_BILLING_PORTAL_URL;
+    link.textContent = isNativeApp() ? store.label : 'Open the billing portal →';
+    if (provider) provider.textContent = isNativeApp() ? store.store : 'Stripe';
+    return;
+  }
+  link.style.display = '';
+  if (viaStripe){
+    link.href = STRIPE_BILLING_PORTAL_URL;
+    link.textContent = active ? 'Manage or cancel in the billing portal →' : 'Open the billing portal →';
+    text.textContent = active
+      ? 'Your membership is billed through Stripe. The billing portal is where you update your card, see your invoices, or cancel — cancelling there stops the next charge and keeps your access until the period you have paid for runs out.'
+      : 'Your membership is no longer active. Past invoices and your card are still in the Stripe billing portal.';
+    if (provider) provider.textContent = 'Stripe';
+    return;
+  }
+  // Active, with no Stripe customer: bought through a store.
+  link.href = store.url;
+  link.textContent = store.label;
+  text.textContent = `Your membership was bought through ${store.store}, so it is managed and cancelled there — ${store.store === 'the App Store' ? 'Apple' : 'Google'} does not let this app cancel it for you.`;
+  if (provider) provider.textContent = store.store;
 }
 
 /* ---------------- ACCOUNT-GATED SAVE ---------------- */

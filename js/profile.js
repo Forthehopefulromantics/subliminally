@@ -32,6 +32,8 @@ async function loadProfile(){
     higherSelf = { name: prof.higher_self_name || '', avatar: avatarId(prof.higher_self_avatar) };
     higherSelfLoaded = true;
     document.getElementById('higherSelfNameInput').value = higherSelf.name;
+    // Settings always opens showing the avatar you have, not the roster.
+    if (typeof avatarPickerOpen !== 'undefined') avatarPickerOpen = false;
     renderHigherSelfMaker();
     document.getElementById('profileAvatarDisplay').innerHTML = avatarMarkup(higherSelf, { state:'hero', cut:'face' });
   }
@@ -44,6 +46,10 @@ async function loadProfile(){
   badge.textContent = myTier === 'none' ? 'Free account' : (tierMark(myTier) + ' ' + TIER_LABEL[myTier] + ' member');
   const ladder = document.getElementById('profilePlanLadder');
   if (ladder) ladder.innerHTML = planLadderMarkup(myTier);
+
+  // The Danger Zone's subscription half: which provider is charging, and the
+  // link out to their cancel flow. Never a delete of the row here.
+  if (typeof renderSubscriptionManagement === 'function') await renderSubscriptionManagement();
 }
 
 /* ---------- change your username ---------- */

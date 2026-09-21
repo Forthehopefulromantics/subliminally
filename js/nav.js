@@ -12,6 +12,12 @@ function showProfilePage(){
   document.body.setAttribute('data-view', 'profile');
   window.scrollTo(0,0);
   history.pushState({ page:'profile' }, '', '#profile');
+  /* Settings used to be drawn once, when the session settled, and never again.
+     Anything answered after that -- a faith chosen in onboarding, a plan bought
+     ten seconds ago -- was still showing the state of the page at sign-in when
+     somebody came here to check it. It is a cached read in every case that
+     matters, so redrawing on open costs nothing and is never stale. */
+  renderProfileState();
 }
 function showLibraryPage(){
   document.body.setAttribute('data-view', 'library');
