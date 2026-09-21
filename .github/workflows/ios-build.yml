@@ -1,0 +1,76 @@
+name: iOS Build
+
+# Verifies the existing Capacitor iOS project still compiles. Simulator-only and
+# unsigned, so it never touches Apple signing settings or the App Store pipeline.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build for iPhone Simulator
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Create log directory
+        run: mkdir -p build-logs
+
+      - name: Install dependencies
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee build-logs/npm-ci.log
+
+      - name: Sync web assets into the native projects
+        run: |
+          set -o pipefail
+          npm run cap:sync 2>&1 | tee build-logs/cap-sync.log
+
+      - name: List available Xcode schemes
+        run: |
+          set -o pipefail
+          xcodebuild -list -project ios/App/App.xcodeproj 2>&1 | tee build-logs/xcodebuild-list.log
+
+      # Simulator build with signing switched off on the command line only; the
+      # project's own signing configuration is left exactly as it is in the repo.
+      - name: Build App scheme (unsigned, iPhone Simulator)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-output \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            build 2>&1 | tee build-logs/xcodebuild.log
+
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build-logs/
+          if-no-files-found: warn
+          retention-days: 14
