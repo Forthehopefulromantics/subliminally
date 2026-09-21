@@ -466,11 +466,19 @@ async function hoSubmit(){
     hoInsertedIds = (data || []).map(r => r.id);
   }
 
-  const today = localDateStr();
+  /* Day one of the cycle is the first day one of these rituals is really due,
+     not the moment the form was submitted. Somebody who sets up a morning
+     ritual at seven in the evening starts tomorrow morning; somebody who sets
+     up a night ritual at the same moment starts tonight, because tonight is
+     still theirs to keep. A cycle that began on a day nothing could have
+     happened would spend its first day already behind. */
+  const firstDay = picks
+    .map(p => ritualFirstOccurrenceFrom(p.time))
+    .sort()[0] || localDateStr();
   const error = await saveProfile({
     habit_onboarding_completed: true,
     habit_onboarding_completed_at: new Date().toISOString(),
-    habit_cycle_started_on: today,
+    habit_cycle_started_on: firstDay,
   });
   if (error){
     console.error('habit onboarding profile save:', error);
@@ -484,7 +492,7 @@ async function hoSubmit(){
   if (!saved || saved.habit_onboarding_completed !== true)
     return fail("Saved, but we couldn't confirm it — tap again.");
 
-  habitCycleStart = saved.habit_cycle_started_on || today;
+  habitCycleStart = saved.habit_cycle_started_on || firstDay;
   hoSaving = false;
   closeHabitOnboarding();
   forgetFetch('habits');

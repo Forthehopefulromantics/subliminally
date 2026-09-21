@@ -4,6 +4,7 @@
   "private": true,
   "description": "Subliminally by FTHR — web site plus the Capacitor wrapper that builds the iOS and Android apps from it.",
   "scripts": {
+    "test:rituals": "node scripts/ritual-state-test.js",
     "cap:sync": "node scripts/sync-web-assets.js && cap sync",
     "cap:ios": "npm run cap:sync && cap open ios",
     "cap:android": "npm run cap:sync && cap open android"
