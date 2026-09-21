@@ -565,11 +565,16 @@ function shiftPhotoMonth(delta){
 function dayRecord(dateStr){
   const done = habitDoneByDate[dateStr] || new Set();
   const sources = (typeof lightByDate !== 'undefined' && lightByDate[dateStr]) || new Set();
+  /* `null` means this ritual had no occurrence on this day -- it did not exist
+     yet, or the day is not one of its days. A null ritual is left out of the
+     day's score and out of the week's counts rather than counted as a nought,
+     so days before the ritual existed can't drag a percentage down. */
   const ritual = t => {
-    const rows = habitsCache.filter(h => h.time_of_day === t);
+    const rows = ritualRowsFor(t, dateStr);
     if (!rows.length) return null;
     const st = routineStatusFor(t, dateStr);
-    return { kept: st.state === 'full' || st.state === 'essentials', done: st.done, total: st.total };
+    return { kept: st.state === 'full' || st.state === 'essentials', done: st.done,
+             total: st.total, state: st.state };
   };
   const rec = {
     date: dateStr,
@@ -578,7 +583,7 @@ function dayRecord(dateStr){
     journal: !!journalPhotosByDate[dateStr],
     subliminal: sources.has(typeof LIGHT_SOURCES !== 'undefined' ? LIGHT_SOURCES.subliminal : 'subliminal'),
     habitsDone: done.size,
-    habitsTotal: habitsCache.length,
+    habitsTotal: habitsOnDate(dateStr).length,
   };
   // Aligned is the average of whatever that day actually had to offer. A ritual
   // scores how much of it you kept; journal and a session are yes or no. Days
@@ -720,11 +725,14 @@ function renderDailyLogReward(){
   const habitLine = document.getElementById('logRewardHabits');
   const pct = habitCompletionFor(localDateStr());
   if (pct === null){ habitLine.style.display = 'none'; return; }
-  const done = (habitDoneByDate[localDateStr()] || new Set()).size;
+  const todayRows = habitsOnDate(localDateStr());
+  const ticks = habitDoneByDate[localDateStr()] || new Set();
+  const done = todayRows.filter(h => ticks.has(h.id)).length;
+  const total = todayRows.length;
   habitLine.style.display = 'block';
   habitLine.textContent = pct === 1
-    ? `Every habit kept today — all ${habitsCache.length}.`
-    : `${done} of ${habitsCache.length} habits kept today · ${Math.round(pct * 100)}%`;
+    ? `Every habit kept today — all ${total}.`
+    : `${done} of ${total} habits kept today · ${Math.round(pct * 100)}%`;
 }
 
 function dayLabel(dateStr){
@@ -770,10 +778,15 @@ function dayModalContent(dateStr){
 /* The day's habits, checkable right from the calendar — so a day you forgot
    to tick off can be filled in later, same as a page you photograph late. */
 function dayHabitsHtml(dateStr){
-  if (!habitsCache.length) return '';
+  const dayRows = habitsOnDate(dateStr);
+  const dayTotal = dayRows.length;
+  if (!dayTotal) return '';
   const done = habitDoneByDate[dateStr] || new Set();
+  const dayDone = dayRows.filter(h => done.has(h.id)).length;
   const block = (time, label) => {
-    const rows = habitsCache.filter(h => h.time_of_day === time);
+    // Only the habits that day actually had, so an older day isn't listed with
+    // habits that were created after it.
+    const rows = ritualRowsFor(time, dateStr);
     if (!rows.length) return '';
     const st = routineStatusFor(time, dateStr);
     const verdict = st.state === 'full' ? ' · full routine'
@@ -788,7 +801,7 @@ function dayHabitsHtml(dateStr){
   };
   const pct = habitCompletionFor(dateStr);
   return `<div class="day-modal-section">
-    <label class="day-modal-label">Habits kept — ${done.size} of ${habitsCache.length}${pct !== null ? ` (${Math.round(pct * 100)}%)` : ''}</label>
+    <label class="day-modal-label">Habits kept — ${dayDone} of ${dayTotal}${pct !== null ? ` (${Math.round(pct * 100)}%)` : ''}</label>
     ${block('morning','Morning')}${block('night','Night')}
   </div>`;
 }

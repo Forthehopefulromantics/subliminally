@@ -50,11 +50,29 @@ const HABIT_SPACES_AT_START = 3;
 const HABIT_SPACES_PER_CYCLE = 3;
 let habitCycleStart = null;        // 'YYYY-MM-DD', or null for everyone before this
 
-/* Days with at least one habit checked, on or after the cycle start. */
+/* Where the counting starts. The cycle is dated from the first day a ritual is
+   really due -- see the habit tracker's setup -- which can be tomorrow, for a
+   morning ritual built in the evening. A habit ticked tonight is still practice
+   and still counts, so the count runs from whichever came first: the cycle's
+   own start, or the day the habits were created. It never reaches back before
+   the tracker existed. */
+function habitCountingStart(){
+  if (!habitCycleStart) return null;
+  let first = null;
+  for (const h of habitsCache){
+    const d = habitStartDateStr(h);
+    if (d && (!first || d < first)) first = d;
+  }
+  return first && first < habitCycleStart ? first : habitCycleStart;
+}
+/* Days with at least one habit checked, on or after the cycle start. A day with
+   nothing on it is simply not counted -- it is never subtracted, and a day
+   before the ritual existed is not one of these days at all. */
 function habitPractiseDays(){
-  if (!habitCycleStart) return 0;
+  const start = habitCountingStart();
+  if (!start) return 0;
   return Object.keys(habitDoneByDate)
-    .filter(d => d >= habitCycleStart && habitDoneByDate[d] && habitDoneByDate[d].size)
+    .filter(d => d >= start && habitDoneByDate[d] && habitDoneByDate[d].size)
     .length;
 }
 function habitCyclesDone(){
@@ -204,23 +222,190 @@ function weekStartStr(dateStr){
   return shiftDateStr(dateStr, -dow);
 }
 
+/* ---------- occurrences: did this ritual exist on this day at all ----------
+   A ritual you set up this evening was never going to happen this morning, and
+   a day with no check-in on it is not the same thing as a day you let go. The
+   tracker used to treat them as the same: every date was measured against the
+   habits you hold *now*, so the morning after somebody built their first
+   routine -- and, on the very first evening, the morning that had already
+   passed before they signed up -- came back as a missed ritual, complete with
+   the reflection asking what got in the way of something that did not exist.
+
+   So an occurrence is worked out before anything is judged. For one ritual on
+   one day it can be:
+
+     not applicable - the ritual did not exist yet on that day, or the day is
+                      not one of its days. Nothing to keep and nothing to miss
+     upcoming       - the day has not arrived
+     open           - the day is here and the window is still open
+     missed         - the window closed and nothing was checked off
+     kept           - something was checked off (partial, essentials or full)
+
+   Everything below reads a day in the person's own timezone. Timestamps are
+   stored as they always were; it is only the question "which local day was
+   that, and had its window closed yet" that is answered here. */
+
+/* When a ritual's window closes, as an hour of its own local day. Morning ends
+   at midday -- a morning ritual is not still open at four in the afternoon --
+   and the other two run to the end of the day. 24 is midnight at the end of
+   this day, which is what `new Date(y, m, d, 24)` means.
+
+   Nothing here decides when a habit may be *ticked*. A day can always be filled
+   in later, from the calendar or from Today; the window only decides when an
+   untouched occurrence has definitely gone by. */
+const RITUAL_WINDOW_END_HOUR = { morning: 12, night: 24, anytime: 24 };
+
+function ritualWindowEnd(time, dateStr){
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const h = RITUAL_WINDOW_END_HOUR[time] == null ? 24 : RITUAL_WINDOW_END_HOUR[time];
+  return new Date(y, m - 1, d, h, 0, 0, 0);
+}
+/* Has this occurrence's window closed for good? Local clock against a local
+   window -- never UTC, or somebody west of Greenwich loses their evening. */
+function ritualWindowPassed(time, dateStr){
+  return new Date() >= ritualWindowEnd(time, dateStr);
+}
+
+/* The local calendar day a habit came into existence. `created_at` is stored in
+   UTC; `new Date(...)` reads it back in whatever zone the person is in, which
+   is the zone their morning actually happened in. Rows with no timestamp are
+   from before this column existed and are treated as having always been there,
+   so nobody's history is rewritten by this change. */
+function habitCreatedAt(h){
+  if (!h || !h.created_at) return null;
+  const t = new Date(h.created_at);
+  return isNaN(t.getTime()) ? null : t;
+}
+function habitStartDateStr(h){
+  const t = habitCreatedAt(h);
+  return t ? localDateStr(t) : null;
+}
+/* Is this one of the habit's days? `days_of_week` is 0=Sunday..6=Saturday and
+   defaults to every day, so this is a no-op for everyone who has never edited
+   a schedule -- and correct for anyone who has. */
+function habitScheduledOn(h, dateStr){
+  const days = h && h.days_of_week;
+  if (!Array.isArray(days) || !days.length) return true;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return days.map(Number).includes(new Date(y, m - 1, d).getDay());
+}
+/* Did this habit exist for this day's occurrence?
+
+   The day it was created is the only interesting case. If the window was still
+   open when it was created, that day counts -- a night ritual built at seven in
+   the evening still has its evening. If the window had already closed, it does
+   not: the first occurrence is the next one. */
+function habitExistedFor(h, dateStr){
+  const start = habitStartDateStr(h);
+  if (!start) return true;
+  if (dateStr < start) return false;
+  if (dateStr > start) return true;
+  return habitCreatedAt(h) < ritualWindowEnd(h.time_of_day, dateStr);
+}
+function habitCheckedOn(h, dateStr){
+  const days = habitCheckins[h.id];
+  return !!(days && days.has(dateStr));
+}
+/* A habit is part of a day's ritual if it existed for that day and that day is
+   one of its days. */
+function habitAppliesOn(h, dateStr){
+  return habitExistedFor(h, dateStr) && habitScheduledOn(h, dateStr);
+}
+
+/* The habits one ritual was made of on one day.
+
+   Today is always the full list: the day is in front of you and anything on it
+   can still be done, including a habit added ten minutes ago whose window has
+   technically gone. A tick always counts too, whatever day it is on -- somebody
+   who checked something off has said what happened, and no rule here gets to
+   overrule them. */
+function ritualRowsFor(time, dateStr){
+  const today = localDateStr();
+  return habitsCache.filter(h => {
+    if (h.time_of_day !== time) return false;
+    if (habitCheckedOn(h, dateStr)) return true;
+    if (dateStr === today) return habitScheduledOn(h, dateStr);
+    return habitAppliesOn(h, dateStr);
+  });
+}
+/* Was there a real occurrence of this ritual on this day -- something that
+   could have been kept or missed? This is the question the whole bug turned
+   on, and it is asked before any day is called missed. */
+function ritualApplies(time, dateStr){
+  return habitsCache.some(h => h.time_of_day === time && habitAppliesOn(h, dateStr));
+}
+
+/* The first day a habit can really be asked about: the day it was created if
+   its window was still open, otherwise the next one, and then forward to the
+   next day the schedule allows. */
+function ritualFirstOccurrenceFrom(time, at){
+  const when = at || new Date();
+  const day = localDateStr(when);
+  return when < ritualWindowEnd(time, day) ? day : shiftDateStr(day, 1);
+}
+function habitFirstOccurrence(h){
+  const created = habitCreatedAt(h);
+  if (!created) return null;
+  let d = ritualFirstOccurrenceFrom(h.time_of_day, created);
+  for (let i = 0; i < 7 && !habitScheduledOn(h, d); i++) d = shiftDateStr(d, 1);
+  return d;
+}
+/* The first day this ritual -- or the tracker as a whole -- was ever due.
+   Nothing before it is counted, offered, or asked about. */
+function ritualStartDate(time){
+  let first = null;
+  for (const h of habitsCache){
+    if (time && h.time_of_day !== time) continue;
+    const d = habitFirstOccurrence(h);
+    if (d && (!first || d < first)) first = d;
+  }
+  return first;
+}
+function habitTrackerStart(){ return ritualStartDate(null); }
+
 /* How one routine went on one day:
+     none       - nothing on this list at all
+     na         - no occurrence: the ritual did not exist yet, or it is not one
+                  of its days. Not kept, not missed, not counted
+     upcoming   - the day has not arrived
      full       - everything on the list
      essentials - every non-negotiable, but not the whole list
      partial    - something, but not all the non-negotiables
-     missed     - nothing                                        */
+     open       - nothing yet, and the window has not closed
+     missed     - nothing, and the window has closed
+
+   `missed` is now the end of a chain rather than the default: it is only
+   reached once the ritual existed for this day, this day was one of its days,
+   and its window has gone by. A missing check-in on its own says nothing. */
 function routineStatusFor(time, dateStr){
-  const rows = habitsCache.filter(h => h.time_of_day === time);
+  const rows = ritualRowsFor(time, dateStr);
   const done = habitDoneByDate[dateStr] || new Set();
   const core = rows.filter(h => h.is_core);
   const coreDone = core.filter(h => done.has(h.id)).length;
   const allDone = rows.filter(h => done.has(h.id)).length;
-  let state = 'missed';
-  if (!rows.length) state = 'none';
+  const applies = ritualApplies(time, dateStr);
+  const windowPassed = ritualWindowPassed(time, dateStr);
+  let state;
+  if (!rows.length) state = habitsCache.some(h => h.time_of_day === time) ? 'na' : 'none';
   else if (allDone === rows.length) state = 'full';
   else if (core.length && coreDone === core.length) state = 'essentials';
   else if (allDone > 0) state = 'partial';
-  return { state, done: allDone, total: rows.length, coreDone, coreTotal: core.length };
+  else if (dateStr > localDateStr()) state = 'upcoming';
+  else if (!applies) state = 'na';
+  else if (!windowPassed) state = 'open';
+  else state = 'missed';
+  return { state, done: allDone, total: rows.length, coreDone, coreTotal: core.length,
+           applies, windowPassed };
+}
+
+/* The one question everything else asks: was this a real occurrence that went
+   by unkept? Four things have to be true, and "there is no check-in" is only
+   the last of them. */
+function routineMissed(time, dateStr){
+  if (dateStr > localDateStr()) return false;          // has not happened yet
+  if (!ritualApplies(time, dateStr)) return false;     // the ritual did not exist for this day
+  if (!ritualWindowPassed(time, dateStr)) return false;// still open
+  return !routineHeld(time, dateStr);                  // kept, bridged or won back?
 }
 
 /* Short routines already spent in the week containing dateStr, counting up to
@@ -251,7 +436,8 @@ function shortRoutinesLeft(time, dateStr){
    nothing else it could be. */
 function routineKept(time, dateStr){
   const st = routineStatusFor(time, dateStr);
-  if (st.state === 'none') return false;
+  if (st.state === 'none' || st.state === 'na') return false;   // nothing was due
+  if (st.state === 'upcoming') return false;
   if (!st.coreTotal) return st.state === 'full';
   return st.coreDone === st.coreTotal;
 }
@@ -269,15 +455,36 @@ function redeemedByFullRitual(time, dateStr){
   if (next > localDateStr()) return false;              // tomorrow has not happened
   return routineStatusFor(time, next).state === 'full';
 }
+
+/* Days kept in a row, walking back from `dateStr`. A day with no occurrence on
+   it -- before the ritual existed, or a day the schedule leaves out -- is
+   stepped over rather than ending the count: there was nothing there to break.
+   The walk stops at the first day the ritual was ever due, so it always ends. */
+function runBehind(time, dateStr){
+  /* Rows saved before `created_at` was recorded have no first day to stop at,
+     so the walk is bounded by the check-ins that are loaded at all (400 days).
+     Without a floor this would run backwards forever. */
+  const start = ritualStartDate(time) || shiftDateStr(localDateStr(), -400);
+  let n = 0, cursor = dateStr;
+  while (start && cursor >= start){
+    if (!ritualApplies(time, cursor)){ cursor = shiftDateStr(cursor, -1); continue; }
+    if (!routineHeld(time, cursor)) break;              // a real occurrence, not kept
+    n++;
+    cursor = shiftDateStr(cursor, -1);
+  }
+  return n;
+}
 /* What you would have to do today to get yesterday back, or null if there is
    nothing to get back. */
 function comebackOffer(time){
   const yesterday = shiftDateStr(localDateStr(), -1);
+  // Only a day that was really missed can be won back. A day the ritual did not
+  // exist for is not a debt, so there is nothing to offer.
+  if (!routineMissed(time, yesterday) && !routineKept(time, yesterday)) return null;
   if (routineKept(time, yesterday) || graceBridged(time, yesterday)) return null;
   const st = routineStatusFor(time, localDateStr());
-  if (st.state === 'none') return null;                 // no ritual to complete
-  let behind = 0, cursor = shiftDateStr(yesterday, -1);
-  while (routineHeld(time, cursor)){ behind++; cursor = shiftDateStr(cursor, -1); }
+  if (st.state === 'none' || st.state === 'na') return null;   // no ritual to complete today
+  const behind = runBehind(time, shiftDateStr(yesterday, -1));
   if (!behind) return null;                             // nothing behind it to save
   return { time, date: yesterday, saves: behind, done: st.done, total: st.total,
            alreadyBack: st.state === 'full' };
@@ -329,9 +536,9 @@ function routineStreak(time){
   let cursor = localDateStr();
   // Today not being done yet shouldn't read as the streak already being over.
   if (!routineHeld(time, cursor)) cursor = shiftDateStr(cursor, -1);
-  let n = 0;
-  while (routineHeld(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
-  return n;
+  // runBehind steps over the days that had no occurrence on them, so a run
+  // cannot be ended by a day the ritual was never due.
+  return runBehind(time, cursor);
 }
 
 /* Whether yesterday is the one thing standing between you and your old streak.
@@ -340,11 +547,9 @@ function routineStreak(time){
 function graceOffer(time){
   if (graceDays < 1) return null;
   const yesterday = shiftDateStr(localDateStr(), -1);
-  if (routineHeld(time, yesterday)) return null;          // nothing to bridge
-  const before = shiftDateStr(yesterday, -1);
-  if (!routineHeld(time, before)) return null;            // nothing behind it to save
-  let n = 0, cursor = before;
-  while (routineHeld(time, cursor)){ n++; cursor = shiftDateStr(cursor, -1); }
+  if (!routineMissed(time, yesterday)) return null;        // nothing to bridge
+  const n = runBehind(time, shiftDateStr(yesterday, -1));
+  if (!n) return null;                                     // nothing behind it to save
   return { time, date: yesterday, saves: n };
 }
 
@@ -357,7 +562,17 @@ function practisedOn(dateStr){
   return !!(typeof journalPhotosByDate !== 'undefined' && journalPhotosByDate[dateStr]);
 }
 function consistency(days){
-  const span = days || 30;
+  const asked = days || 30;
+  /* Only days the tracker was actually here for. Counting somebody's first
+     week against thirty days shows them 23% for a week they kept perfectly --
+     the days before they arrived are not days they let go. */
+  const start = habitTrackerStart();
+  let span = asked;
+  if (start){
+    let back = 0;
+    while (back < asked && shiftDateStr(localDateStr(), -back) >= start) back++;
+    span = Math.max(1, back);
+  }
   let n = 0;
   for (let i = 0; i < span; i++) if (practisedOn(shiftDateStr(localDateStr(), -i))) n++;
   return { days: n, of: span, pct: Math.round(n / span * 100) };
@@ -392,13 +607,26 @@ async function toggleCoreHabit(habitId){
   }
 }
 
-/* Share of that day's habits that got checked off, 0–1. Measured against the
-   habits you keep now, so the calendar reads as "how much of my ritual did I
-   keep" rather than a moving target. */
+/* Share of that day's habits that got checked off, 0–1, measured against the
+   habits that day actually had. `null` means the day had none -- which is not
+   the same as nought per cent, and is drawn as nothing rather than as a failure.
+
+   It used to be measured against the habits you keep now, which quietly
+   rewrote history in both directions: a day kept perfectly slid to two-thirds
+   the moment a fourth habit was added weeks later, and every day before the
+   tracker existed read as 0%. */
 function habitCompletionFor(dateStr){
-  if (!habitsCache.length) return null;
-  const done = habitDoneByDate[dateStr];
-  return (done ? done.size : 0) / habitsCache.length;
+  const rows = habitsOnDate(dateStr);
+  if (!rows.length) return null;           // nothing was due — not 0%
+  const done = habitDoneByDate[dateStr] || new Set();
+  return rows.filter(h => done.has(h.id)).length / rows.length;
+}
+/* Every habit that belonged to a day, across all three lists. The denominator
+   for that day's percentage, and the count the calendar and the day modal read,
+   so a day before the ritual existed is never scored out of habits it never
+   had. */
+function habitsOnDate(dateStr){
+  return HABIT_TIMES.reduce((rows, t) => rows.concat(ritualRowsFor(t, dateStr)), []);
 }
 /* The three lists were two when the markup was written, so the ids read
    habitListMorning and habitListNight rather than being indexed by the value
@@ -528,9 +756,12 @@ function renderHabits(){
   const streakText = kept.length ? ` · ${kept.join(' · ')}`
     : practiceStreak > 1 ? ` · ${practiceStreak}-day practice streak` : '';
   stat.style.display = 'block';
-  stat.textContent = doneToday === habitsCache.length
+  // Measured against what today actually asks for, which is the whole list
+  // unless a habit's schedule leaves today out.
+  const dueToday = habitsOnDate(localDateStr()).length;
+  stat.textContent = dueToday && doneToday === dueToday
     ? `✦ Every ritual done today${streakText}`
-    : `${doneToday} of ${habitsCache.length} done today${streakText}`;
+    : `${doneToday} of ${dueToday} done today${streakText}`;
 }
 async function addHabit(time, name){
   if (!sb || !currentUser) return;
@@ -569,7 +800,7 @@ function toggleHabitToday(habitId){ return toggleHabitOnDate(habitId, localDateS
 async function awardLightForDay(dateStr, near){
   if (dateStr !== localDateStr()) return;              // only today pays
   for (const time of ['morning','night']){
-    const rows = habitsCache.filter(h => h.time_of_day === time);
+    const rows = ritualRowsFor(time, dateStr);
     if (!rows.length) continue;
     const st = routineStatusFor(time, dateStr);
     if (st.state === 'full'){
@@ -580,7 +811,7 @@ async function awardLightForDay(dateStr, near){
     }
   }
   const bothFull = ['morning','night'].every(t => {
-    const rows = habitsCache.filter(h => h.time_of_day === t);
+    const rows = ritualRowsFor(t, dateStr);
     return rows.length && routineStatusFor(t, dateStr).state === 'full';
   });
   if (bothFull) await awardLight(LIGHT_SOURCES.perfectDay, '', null);
@@ -1166,9 +1397,13 @@ async function loadReflections(){
 function reflectionDue(){
   const y = shiftDateStr(localDateStr(), -1);
   for (const time of ['morning', 'night']){
-    if (!habitsCache.some(h => h.time_of_day === time)) continue;
     if (reflectionsSeen[`${y}|${time}`]) continue;
-    if (routineHeld(time, y)) continue;          // kept, or bridged by a grace day
+    /* One question, and it is not "is there a check-in". A day is only asked
+       about once it was a real occurrence -- the ritual existed for it, it was
+       one of its days, and its window has closed -- and was not kept, bridged
+       by a grace day, or won back. Somebody who set their ritual up last night
+       is asked nothing this morning, because nothing of theirs went by. */
+    if (!routineMissed(time, y)) continue;
     return { time, date: y };
   }
   return null;

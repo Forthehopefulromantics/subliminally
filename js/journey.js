@@ -12,7 +12,7 @@
 function journeyQuests(){
   const today = localDateStr();
   const ritual = t => {
-    const rows = habitsCache.filter(h => h.time_of_day === t);
+    const rows = ritualRowsFor(t, today);
     if (!rows.length) return null;
     const st = routineStatusFor(t, today);
     return { done: st.state === 'full' || st.state === 'essentials', st, rows };
@@ -214,8 +214,8 @@ function renderTodayRitual(){
   }
   const time = currentRitualTime();
   const other = time === 'morning' ? 'night' : 'morning';
-  const rows = habitsCache.filter(h => h.time_of_day === time);
   const today = localDateStr();
+  const rows = ritualRowsFor(time, today);
   const done = habitDoneByDate[today] || new Set();
   const doneCount = rows.filter(h => done.has(h.id)).length;
   const core = rows.filter(h => h.is_core);

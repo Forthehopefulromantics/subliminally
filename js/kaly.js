@@ -153,8 +153,11 @@ function kalyState(){
     journalled: !!(typeof journalPhotosByDate !== 'undefined' && journalPhotosByDate[today]),
     listened: (typeof lightToday !== 'undefined') && lightToday.has(LIGHT_SOURCES.subliminal),
     grace: (typeof graceOffer === 'function') ? graceOffer(time) : null,
-    yesterdayMissed: (typeof routineHeld === 'function')
-      && !routineHeld(time, shiftDateStr(today, -1)),
+    /* A day that was really missed -- not simply a day with no check-in on
+       it. Before the ritual existed there was nothing to miss, and she should
+       never say otherwise. */
+    yesterdayMissed: (typeof routineMissed === 'function')
+      && routineMissed(time, shiftDateStr(today, -1)),
   };
 }
 
