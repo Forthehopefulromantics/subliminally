@@ -4,7 +4,11 @@
 // The picker in the builder used to hold the ElevenLabs ids itself, which meant
 // the list could drift from the list the server would accept, and anyone reading
 // the page source could see our voice ids. Now the page asks, and what comes back
-// is names and keys: 'sarah', 'daniel', 'mine'. The ids stay on the server.
+// is names and keys: 'serenity', 'mine'. The ids stay on the server.
+//
+// What comes back is what may be *chosen*, which in V1 is one AI voice. The six
+// retired voices are deliberately absent: /api/tts still resolves them so saved
+// subliminals keep playing, but nothing offers them as a new choice.
 //
 // A GET, because it is a list and it changes only when someone clones a voice.
 // Signed in only: the answer includes whether *you* have a voice of your own.

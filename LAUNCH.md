@@ -26,11 +26,31 @@ delete a cloned voice when an account goes. It is never sent to the browser —
 `isConfigured()` returns a boolean and nothing more. If it is ever unset the
 routes reply 503 and the app falls back to the device voice, exactly as before.
 
-Nothing else needs configuring at ElevenLabs: the preset voices are stock voices
-from the shared library, named by key in `lib/voices.js`, and a cloned voice is
-created through the API rather than in the dashboard. Adding a voice later is one
-row in that file — the picker asks the server what exists, so the page does not
-change.
+### The V1 voice picker
+
+Three choices, and only three:
+
+| Choice | Free | Premium | ElevenLabs? |
+| --- | --- | --- | --- |
+| Record your own voice | ✅ | ✅ | no — recorded in the browser |
+| **Serenity** (`PrH4gjaYIM8R16R889Vf`) | 🔒 | ✅ | yes |
+| Clone your voice | 🔒 | ✅ | yes |
+
+A free account **sees all three**, with a lock and a RITUAL badge on the two
+that are paid, and tapping a locked one opens the existing upgrade sheet rather
+than doing nothing or failing. "This device" stays in the list underneath as the
+free fallback — it is the browser's own speech synthesis and costs nothing.
+
+The six voices the picker used to offer — Sarah, Charlotte, Alice, Lily, Daniel
+and George — are **retired, not deleted**. They are in `LEGACY_PRESET_VOICES` in
+`lib/voices.js`: `/api/voices` no longer lists them and nothing can pick one, but
+`/api/tts` still resolves them, so a subliminal saved with one plays in the voice
+it was saved with and off the clips already cached. No stored row was rewritten.
+
+Nothing else needs configuring at ElevenLabs: Serenity is a voice created in the
+dashboard and named by key in `lib/voices.js`, and a cloned voice is created
+through the API. Adding a voice later is one row in that file — the picker asks
+the server what exists, so the page does not change.
 
 What this costs, and what it does not:
 
@@ -52,9 +72,11 @@ Two things that will bite:
 - **A paid plan is required.** The free tier forbids commercial API use and
   gives about one subliminal's worth of characters a month. Creator (~$22/mo)
   is the realistic floor, and voice cloning needs Creator or above.
-- **Studio voices are gated to any paid plan** in `api/tts.js`. A free account
-  gets "Studio voices come with Ritual" even once the key is set. Kyla's own
-  account needs a tier, or the gate needs a test bypass.
+- **Every generated voice is gated to a paid plan**, at the top of `api/tts.js`
+  and `api/voice-clone.js`, off the one definition in `hasPremiumAccess()`. A
+  free account gets a 403 before anything reaches ElevenLabs. That includes
+  Kyla's own account — testing Serenity needs a tier on it, or the gate needs a
+  test bypass.
 
 ### RevenueCat webhook
 

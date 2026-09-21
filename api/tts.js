@@ -28,7 +28,7 @@
 // back to the device voice, exactly as it behaved before.
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
 import { MY_VOICE_KEY, resolvePresetVoice } from '../lib/voices.js';
 import { getVoiceProfile } from '../lib/user-voices.js';
 import {
@@ -123,6 +123,25 @@ export default async function handler(req, res) {
   const user = await whoIsCalling(bearerToken(req));
   if (!user) { res.status(401).json({ error: 'not_signed_in' }); return; }
 
+  /* THE PAYWALL, and it is the first thing that happens after we know who is
+     asking — before the body is read, before a voice is resolved, and a long
+     way before anything is sent to ElevenLabs.
+
+     Every voice this route can generate costs money: Serenity, the retired
+     voices a saved subliminal may still name, and somebody's cloned voice. So
+     the check is on the route rather than per voice — there is no path through
+     here that a free account may take. Hiding the chip in the builder is the
+     courtesy; this is the enforcement, and it is what holds when somebody calls
+     the endpoint directly with a token of their own.
+
+     Reading your own recording never arrives here at all: 'device' and a
+     recorded line are played by the browser. */
+  const tier = await tierForUser(user.id);
+  if (!hasPremiumAccess(tier)) {
+    res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Ritual.' });
+    return;
+  }
+
   const body = await readJsonBody(req);
   // `voiceId` is what the previous build sent; a tab open across the deploy still works.
   const requested = typeof body.voiceKey === 'string' ? body.voiceKey : body.voiceId;
@@ -137,15 +156,10 @@ export default async function handler(req, res) {
 
   const speed = clampSpeed(body.speed);
 
+  // A cloned voice is also only ever your own — resolveVoice looks 'mine' up
+  // against this caller's profile and nobody else's.
   const voice = await resolveVoice(user.id, requested);
   if (voice.error) { res.status(voice.error === 'invalid_voice' ? 400 : 409).json({ error: voice.error }); return; }
-
-  // Studio voices are a paid feature; a cloned voice is also only ever your own.
-  const tier = await tierForUser(user.id);
-  if (tier === 'none') {
-    res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Ritual.' });
-    return;
-  }
 
   /* One entry per line asked for, in the order they were asked for, so the player
      can line the audio up against the affirmations on screen. */
