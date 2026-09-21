@@ -7,16 +7,41 @@ Check this list before submitting to the App Store or announcing.
 
 ### ElevenLabs — studio voices and voice cloning
 
-**Deliberately deferred until launch.** `api/tts.js` and `api/voice-clone.js` are
-complete; with no key set the route replies 503 and the app falls back to the
-device voice, which is what happens today.
+**Deliberately deferred until launch.** `api/tts.js`, `api/voices.js` and
+`api/voice-clone.js` are complete; with no key set the routes reply 503 and the
+app falls back to the device voice, which is what happens today.
 
 To switch on:
 
-1. elevenlabs.io → avatar → **API Keys** → create one.
-2. Vercel → `subliminally` → **Settings → Environment Variables**.
-3. Add `ELEVENLABS_API_KEY`, all three environments.
-4. **Deployments → ⋯ → Redeploy.** Environment variables only reach new builds.
+1. Run `supabase/migrations/20261003_elevenlabs_voices.sql` in the Supabase SQL
+   editor. It creates `user_voice_profiles`, `tts_clips`, `tts_generations` and
+   the private `tts-cache` bucket. **Without it the routes reply 500** — the
+   cache and the cost ledger have nowhere to live.
+2. elevenlabs.io → avatar → **API Keys** → create one.
+3. Vercel → `subliminally` → **Settings → Environment Variables**.
+4. Add `ELEVENLABS_API_KEY`, all three environments.
+5. **Deployments → ⋯ → Redeploy.** Environment variables only reach new builds.
+
+Nothing else needs configuring at ElevenLabs: the preset voices are stock voices
+from the shared library, named by key in `lib/voices.js`, and a cloned voice is
+created through the API rather than in the dashboard. Adding a voice later is one
+row in that file — the picker asks the server what exists, so the page does not
+change.
+
+What this costs, and what it does not:
+
+- **A sequence is generated once.** Twenty minutes and eight hours are the same
+  audio; the player loops it in the browser. Length never multiplies the bill.
+- **Nothing is generated twice.** Every clip is kept in `tts-cache` against the
+  person, the voice, the words and the pace, so rebuilding or replaying reads it
+  back. `tts_generations` is the ledger, and the rate limits (40 a minute, 150 an
+  hour, 600 a day, per person) are counted off it — cache hits are free and are
+  not counted.
+- **A voice is cloned once.** Building a subliminal never creates a clone;
+  `user_voice_profiles` holds the one voice per person and it is reused. A clone
+  is only ever created with the confirmation sentence in `lib/user-voices.js`,
+  which the page shows and the route checks.
+- `npm run test:voice` exercises all of the above against stubbed services.
 
 Two things that will bite:
 
@@ -141,6 +166,7 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260930_onboarding_slideshow.sql` | run |
 | `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
 | `20261002_drop_unused_habit_counters.sql` | run 2026-09-20 |
+| `20261003_elevenlabs_voices.sql` | **not run — run it before setting `ELEVENLABS_API_KEY`** |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`

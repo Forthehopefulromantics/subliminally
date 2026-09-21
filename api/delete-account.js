@@ -23,7 +23,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
-const STORAGE_BUCKETS = ['recordings', 'avatars', 'custom-tracks', 'journal-photos', 'voice-notes'];
+const STORAGE_BUCKETS = ['recordings', 'avatars', 'custom-tracks', 'journal-photos', 'voice-notes', 'tts-cache'];
 // [table, column that holds the user's id]
 const USER_TABLES = [
   ['habit_checkins', 'user_id'],
@@ -31,6 +31,9 @@ const USER_TABLES = [
   ['journal_photos', 'user_id'],
   ['journal_entries', 'user_id'],
   ['subliminals', 'user_id'],
+  ['tts_generations', 'user_id'],
+  ['tts_clips', 'user_id'],
+  ['user_voice_profiles', 'user_id'],
   ['push_tokens', 'user_id'],
   ['subscribers', 'user_id'],
   ['profiles', 'id'],
