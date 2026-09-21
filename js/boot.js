@@ -76,6 +76,10 @@ if (sb){
     // Session restored: now, and only now, ask the database whether this
     // account still owes us onboarding.
     if (currentUser) await routeAfterAuth();
+    /* Coming back from Stripe. After onboarding routing, so nothing it opens
+       lands on top of the "welcome to Ritual" this is about to show, and only
+       once the session is in hand -- the plan belongs to an account. */
+    handleCheckoutReturn();
   });
 } else {
   document.body.setAttribute('data-auth', 'out');

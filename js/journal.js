@@ -813,10 +813,32 @@ function openDayDetail(dateStr){
 function closeDayDetail(){ document.getElementById('dayModalOverlay').classList.remove('open'); }
 function triggerCheckIn(dateStr){
   pendingCheckInDate = dateStr;
+  pendingPhotoHabitId = null;      // a calendar check-in is not a habit's page
   document.getElementById('photoFile').click();
 }
+
+/* ---------- a journalling habit's page ----------
+   Journalling here means a physical journal: you write the page by hand and
+   photograph it. That photo is the completion, and it is the same photo the
+   daily log already keeps -- one per day, in the private per-user bucket with
+   the storage policy that only lets somebody touch their own folder (see
+   20260912_habits_and_journal_photos.sql). Nothing new is stored and nothing
+   is typed into the app, so there is no second, weaker place a journal entry
+   could end up. */
+let pendingPhotoHabitId = null;
+function triggerHabitPageUpload(habitId){
+  pendingCheckInDate = localDateStr();
+  pendingPhotoHabitId = habitId;
+  document.getElementById('photoFile').click();
+}
+
 async function uploadJournalPhoto(file, dateStr){
-  const msg = document.getElementById('dayModalMsg');
+  /* Taken now, not read later: the next upload from anywhere else must not
+     inherit this one's habit. */
+  const habitId = pendingPhotoHabitId;
+  pendingPhotoHabitId = null;
+  // The day modal's line is nowhere near the habit list the tap came from.
+  const msg = document.getElementById(habitId ? 'habitsMsg' : 'dayModalMsg');
   if (!sb || !currentUser || !dateStr) return;
   if (file.size > 15 * 1024 * 1024){ if (msg){ msg.textContent = 'That photo is over 15 MB — try a smaller one.'; msg.className = 'save-msg err'; } return; }
   if (msg){ msg.textContent = 'Uploading your page…'; msg.className = 'save-msg'; }
@@ -830,6 +852,13 @@ async function uploadJournalPhoto(file, dateStr){
   if (error){ console.error('journal_photos upsert error:', error); if (msg){ msg.textContent = "Uploaded, but couldn't save — try again."; msg.className = 'save-msg err'; } return; }
   await loadJournalPhotos({ force: true });
   if (dateStr === localDateStr()) await awardLight(LIGHT_SOURCES.journal, dateStr, null);
+  /* The page is the habit's completion, so the tick follows the upload. Only
+     if it isn't already ticked -- toggling would take it back off. */
+  if (habitId && typeof toggleHabitOnDate === 'function'){
+    const already = (typeof habitCheckins !== 'undefined' && habitCheckins[habitId] && habitCheckins[habitId].has(dateStr));
+    if (!already) await toggleHabitOnDate(habitId, dateStr);
+    if (msg){ msg.textContent = "Page saved — that's today's journalling done."; msg.className = 'save-msg ok'; }
+  }
   if (document.body.getAttribute('data-view') === 'today') renderTodayJourney();
   if (document.getElementById('dayModalOverlay').classList.contains('open')) dayModalContent(dateStr);
 }

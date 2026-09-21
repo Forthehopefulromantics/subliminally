@@ -248,6 +248,11 @@ function editHigherSelf(){
    drawing -- that is the one you are deciding looks like you. The preview above
    it shows both, because the pair is the point: this is who you are, and this
    is the same person further along. */
+/* The roster is a decision, not furniture: it opens when somebody says they
+   want to change who she is, and closes again the moment they have. Settings
+   otherwise shows the one thing that is true -- the identity already saved. */
+let avatarPickerOpen = false;
+
 function renderHigherSelfMaker(){
   const wrap = document.getElementById('higherSelfMaker');
   if (!wrap) return;
@@ -257,10 +262,28 @@ function renderHigherSelfMaker(){
       <figure><span class="hs-pair-art">${avatarMarkup(higherSelf, { state:'hero' })}</span><figcaption>You now</figcaption></figure>
       <figure><span class="hs-pair-art">${avatarMarkup(higherSelf, { state:'keeper' })}</span><figcaption>${(higherSelf.name || '').trim() || 'Your higher self'}</figcaption></figure>
     </div>`;
-  wrap.innerHTML = `<div class="av-roster">${AVATAR_PACK.map(a =>
-    `<button type="button" class="av-opt${a.id === higherSelf.avatar ? ' sel' : ''}" onclick="pickAvatar('${a.id}')"
-       aria-pressed="${a.id === higherSelf.avatar}" title="${a.label}"
-       aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('')}</div>`;
+  const toggle = document.getElementById('avatarPickerToggle');
+  if (toggle){
+    toggle.textContent = avatarPickerOpen ? 'Done' : 'Change avatar';
+    toggle.setAttribute('aria-expanded', avatarPickerOpen ? 'true' : 'false');
+  }
+  wrap.style.display = avatarPickerOpen ? '' : 'none';
+  // Nineteen drawings are not fetched, decoded or laid out until they are
+  // actually asked for.
+  wrap.innerHTML = avatarPickerOpen
+    ? `<div class="av-roster">${AVATAR_PACK.map(a =>
+        `<button type="button" class="av-opt${a.id === higherSelf.avatar ? ' sel' : ''}" onclick="pickAvatar('${a.id}')"
+           aria-pressed="${a.id === higherSelf.avatar}" title="${a.label}"
+           aria-label="${a.label} — ${a.look}">${avatarMarkup({ avatar:a.id }, { state:'hero', cut:'thumb', alt:false })}</button>`).join('')}</div>`
+    : '';
+}
+
+function toggleAvatarPicker(){
+  avatarPickerOpen = !avatarPickerOpen;
+  renderHigherSelfMaker();
+  if (!avatarPickerOpen) return;
+  const wrap = document.getElementById('higherSelfMaker');
+  if (wrap && wrap.scrollIntoView) setTimeout(() => wrap.scrollIntoView({ behavior:'smooth', block:'nearest' }), 40);
 }
 
 /* Everywhere she appears, repainted together. Choosing used to move the roster,
@@ -277,14 +300,25 @@ function repaintAvatars(){
 /* Paint first, save after: choosing should feel instant, and a slow round trip
    to the database shouldn't sit between the tap and the change. */
 async function pickAvatar(id){
+  const previous = higherSelf.avatar;
   higherSelf.avatar = avatarId(id);
+  // Chosen is chosen: the roster folds away and what is left on screen is the
+  // pair you just picked, everywhere she appears.
+  avatarPickerOpen = false;
   repaintAvatars();
   if (!sb || !currentUser) return;
   const msg = document.getElementById('higherSelfMsg');
   if (msg){ msg.textContent = 'Saving…'; msg.className = 'save-msg'; }
   const error = await saveProfile({ higher_self_avatar: higherSelf.avatar });
+  if (error){
+    /* Put back the one that is actually saved. A picture that survives this
+       screen and not a refresh is worse than one that never changed. */
+    higherSelf.avatar = previous;
+    repaintAvatars();
+    if (msg){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; }
+    return;
+  }
   if (!msg) return;
-  if (error){ msg.textContent = describeSaveError(error); msg.className = 'save-msg err'; return; }
   msg.textContent = 'Saved.'; msg.className = 'save-msg ok';
 }
 

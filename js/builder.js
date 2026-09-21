@@ -227,7 +227,36 @@ function pickCustomDuration(){
   document.querySelectorAll('#durationChips .length-chip').forEach(c => c.classList.toggle('sel', !!c.dataset.custom));
   document.getElementById('sessionLengthSlider').focus({ preventScroll: true });
 }
-function nextStep(){ showStep(step+1); }
+/* The fewest lines a subliminal is built from. Five is enough for a loop to
+   read as a practice rather than one sentence on repeat, and few enough that
+   somebody who has five true things to say is not padding to reach a number.
+   Two places have to agree with this and both do: the "how many affirmations"
+   slider in index.html starts here, and this is the check for the review step,
+   where lines can still be deleted after they have been generated. */
+const MIN_AFFIRMATIONS = 5;
+function affirmationShortfall(){
+  /* EFT is a fixed round of lines, one per tapping point, and a visualization
+     is a single script. Neither is a list anybody adds to, so neither is
+     measured against this. */
+  if (state.eftMode || state.visualizationMode) return 0;
+  const have = state.affirmations.filter(a => String(a).trim().length > 0).length;
+  return Math.max(0, MIN_AFFIRMATIONS - have);
+}
+function nextStep(){
+  if (step === 3){
+    const msg = document.getElementById('affListMsg');
+    const short = affirmationShortfall();
+    if (short){
+      if (msg){
+        msg.textContent = `A subliminal is built from at least ${MIN_AFFIRMATIONS} affirmations — add ${short} more line${short === 1 ? '' : 's'}, or regenerate.`;
+        msg.className = 'save-msg err';
+      }
+      return;
+    }
+    if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
+  }
+  showStep(step+1);
+}
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
@@ -683,6 +712,9 @@ function renderAffList(){
     list.appendChild(row);
   });
   document.getElementById('addAffBtn').style.display = (state.eftMode || state.visualizationMode) ? 'none' : '';
+  // Once there are enough lines again, stop saying there aren't.
+  const listMsg = document.getElementById('affListMsg');
+  if (listMsg && !affirmationShortfall()){ listMsg.textContent = ''; listMsg.className = 'save-msg'; }
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
@@ -1121,12 +1153,33 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
+/* True from the instant a press lands until the release, which is not the same
+   as "the button is showing as recording": the microphone has to be opened
+   first, and that is an await.
+
+   The gap mattered. A press on a phone fires touchstart and, on plenty of
+   browsers, a mouse event behind it; a double tap does the same. Both landed
+   inside that await, so two MediaRecorders started on two microphone streams
+   and both pushed into the one `audioChunks` array -- one line recorded twice,
+   overlapping, which is what came back doubled on playback. A flag set
+   synchronously closes the gap: the second press has nothing to start. */
+let recPressed = false;
 const recBtn = document.getElementById('recBtn');
 async function startRec(e){
   if (e && e.preventDefault) e.preventDefault();
-  if (recBtn.classList.contains('recording')) return;
+  if (recPressed || recBtn.classList.contains('recording')) return;
+  recPressed = true;
   try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(err){ document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
+  catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
+  /* Let go while the microphone was still opening. Nothing was recorded, so
+     the stream is handed straight back rather than left running. */
+  if (!recPressed){
+    micStream.getTracks().forEach(t=>t.stop());
+    document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
+    return;
+  }
+  // Timed from when the microphone is actually live, so the wait for a
+  // permission prompt is never mistaken for a long recording.
   holdStart = Date.now(); audioChunks=[];
   const recMime = pickRecordingMime();
   mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
@@ -1159,18 +1212,34 @@ function animateBars(){
   animId = requestAnimationFrame(animateBars);
 }
 function stopRec(){
+  // Released, whether or not the microphone ever opened -- startRec checks
+  // this after its await and gives the stream back if it did not.
+  if (!recPressed) return;
+  recPressed = false;
   if (!recBtn.classList.contains('recording')) return;
   recBtn.classList.remove('recording'); recBtn.textContent='HOLD';
   cancelAnimationFrame(animId);
   bars.forEach(b=>{ b.style.height='4px'; b.classList.remove('live'); });
   if (mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-  if (recCtx) recCtx.close();
+  if (recCtx){ try{ recCtx.close(); }catch(e){} recCtx = null; }
 }
-recBtn.addEventListener('mousedown', startRec);
-recBtn.addEventListener('mouseup', stopRec);
-recBtn.addEventListener('mouseleave', stopRec);
-recBtn.addEventListener('touchstart', startRec);
-recBtn.addEventListener('touchend', stopRec);
+/* Pointer events where they exist, which is one event per press however the
+   press was made. The mouse/touch pair below is the fallback, and only one of
+   the two sets is ever attached -- a browser that has both used to report a
+   single tap as a touch and a mouse press. */
+if (window.PointerEvent){
+  recBtn.addEventListener('pointerdown', startRec);
+  recBtn.addEventListener('pointerup', stopRec);
+  recBtn.addEventListener('pointercancel', stopRec);
+  recBtn.addEventListener('pointerleave', stopRec);
+} else {
+  recBtn.addEventListener('mousedown', startRec);
+  recBtn.addEventListener('mouseup', stopRec);
+  recBtn.addEventListener('mouseleave', stopRec);
+  recBtn.addEventListener('touchstart', startRec);
+  recBtn.addEventListener('touchend', stopRec);
+  recBtn.addEventListener('touchcancel', stopRec);
+}
 
 /* ---------------- AMBIENCE ENGINE (synthesized, no audio files) ---------------- */
 function makeNoiseBuffer(ctx, seconds, color){
@@ -1688,36 +1757,70 @@ function stopSilentKeeper(){
    itself now leaves through a media element: one bus, into a
    MediaStreamDestination, into an <audio> that is genuinely playing.
 
-   It also still connects to ctx.destination. On a desktop, on Android, and
-   anywhere MediaStream capture is not supported, that is the path that works,
-   and hearing it twice is not a risk -- the same stream cannot play louder for
-   being routed two ways, and where both work the element is the one iOS
-   honours. If createMediaStreamDestination throws, the bus is exactly what
-   ctx.destination was before, so nothing regresses. */
+   That route used to run *alongside* ctx.destination, on the theory that the
+   same sound cannot play louder for leaving two ways. It does not play louder
+   — it plays twice. A MediaStream element is a buffered pipeline and starts
+   tens of milliseconds behind the direct path, so every voice, every line and
+   every layer arrived once dry and once late: the echo and the doubling people
+   heard on their own recordings and on the finished subliminal. Lowering a
+   volume would have hidden it; there is only ever one route out of here now.
+
+   Which route depends on the device, because only one of them has a problem to
+   solve. On iOS the element is the one that survives the ringer switch, so iOS
+   gets the element and the direct path is let go the moment the element is
+   genuinely playing — if it never plays, the direct path is still there and
+   nothing is lost. Everywhere else ctx.destination is exactly right and no
+   element is created at all. */
+function needsMediaElementOutput(){
+  // iPhones and iPads, in the browser and inside the wrapped app. iPadOS 13+
+  // reports itself as a Mac, so a Mac with a touchscreen counts as one too.
+  if (typeof isNativeApp === 'function' && isNativeApp() && window.Capacitor.getPlatform() === 'ios') return true;
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return /Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1;
+}
+
 function audioOut(ctx){
   if (!ctx) return null;
   if (ctx.__outBus) return ctx.__outBus;
   const bus = ctx.createGain();
   bus.gain.value = 1;
   bus.connect(ctx.destination);
+  ctx.__outDirect = true;
+  ctx.__outBus = bus;
+  if (!needsMediaElementOutput()) return bus;
   try {
     const md = ctx.createMediaStreamDestination();
-    bus.connect(md);
     const el = new Audio();
     el.srcObject = md.stream;
     el.setAttribute('playsinline', '');
     el.autoplay = true;
+    /* The handover, at the only moment it can be made safely: the element is
+       making sound, so letting the direct path go cannot leave silence — and
+       keeping it would be the second copy. */
+    el.addEventListener('playing', () => {
+      if (!ctx.__outDirect) return;
+      try { bus.disconnect(ctx.destination); ctx.__outDirect = false; } catch(e){}
+    });
+    bus.connect(md);
     const p = el.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p && p.catch) p.catch(() => {});   // refused: the direct path still carries it
     ctx.__outEl = el;
+    ctx.__outMd = md;
   } catch(e){ /* not supported here; the direct connection above still carries it */ }
-  ctx.__outBus = bus;
   return bus;
 }
 function closeAudioOut(ctx){
   if (!ctx || !ctx.__outEl) return;
   try { ctx.__outEl.pause(); ctx.__outEl.srcObject = null; } catch(e){}
   ctx.__outEl = null;
+  if (ctx.__outMd){ try { ctx.__outBus.disconnect(ctx.__outMd); } catch(e){} ctx.__outMd = null; }
+  /* The element was carrying the sound; with it gone the direct path is the
+     only way out again. Contexts are normally closed right after this, but a
+     reused one must not come back mute. */
+  if (ctx.__outBus && !ctx.__outDirect){
+    try { ctx.__outBus.connect(ctx.destination); ctx.__outDirect = true; } catch(e){}
+  }
 }
 
 function primeAudio(){

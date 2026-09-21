@@ -127,16 +127,39 @@ const NIGHT_HABIT_SUGGESTIONS = ['Turn off your phone','Shower','Red light thera
    day. Kept separate rather than merging the two lists above, which would
    offer "set an alarm" to somebody filling in their afternoon. */
 const ANYTIME_HABIT_SUGGESTIONS = ['Drink water','Go on a walk','Listen to a subliminal','Move your body','Read a page','Step outside','Eat something green','Text someone you love','Ten deep breaths','Tidy one surface'];
-/* Whatever the faith offers goes first: it is the most specific thing we know
-   about what this person's morning already looks like. */
+/* Two names for one habit -- "Meditate" from the shared list and "Meditation"
+   from the faith answer -- read as two different suggestions and were offered
+   side by side. Matched on a stem so the one the person's own answer chose is
+   the one that shows. */
+const HABIT_NAME_STEMS = [['meditat', 'meditation'], ['pray', 'prayer'], ['journal', 'journal']];
+function habitSuggestionKey(name){
+  const k = String(name).toLowerCase().replace(/[^a-z]/g, '');
+  const stem = HABIT_NAME_STEMS.find(([s]) => k.includes(s));
+  return stem ? stem[1] : k;
+}
+/* Journalling here means a physical journal, written by hand. The habit is
+   completed by photographing the page -- see triggerHabitPageUpload() in
+   journal.js, which puts it in the same private, per-user daily-log bucket the
+   calendar already uses. Nobody is asked to type their journal into the app,
+   and nothing about it is stored anywhere less private than that. */
+function habitIsJournaling(h){
+  return !!h && habitSuggestionKey(h.name) === 'journal';
+}
+/* Whatever the person's own answer offers goes first: it is the most specific
+   thing we know about what their morning already looks like. */
 function habitSuggestionsFor(time){
   const base = time === 'morning' ? MORNING_HABIT_SUGGESTIONS
              : time === 'anytime' ? ANYTIME_HABIT_SUGGESTIONS
              : NIGHT_HABIT_SUGGESTIONS;
   const faith = (typeof faithHabitIdeas === 'function') ? faithHabitIdeas(time) : [];
+  /* The one habit that changes with the saved faith answer -- Prayer for a
+     religion, Meditation for everyone else -- offered first, in the same words
+     the tracker's own setup offers it in. Not guessed from anything else the
+     person answered: see faithPrefersPrayer() in faith.js. */
+  const practice = (typeof faithPracticeHabit === 'function' && time !== 'anytime') ? [faithPracticeHabit()] : [];
   const seen = new Set();
-  return [...faith, ...base].filter(s => {
-    const k = s.toLowerCase();
+  return [...practice, ...faith, ...base].filter(s => {
+    const k = habitSuggestionKey(s);
     if (seen.has(k)) return false;
     seen.add(k); return true;
   });
@@ -453,13 +476,23 @@ function routineKept(time, dateStr){
 function redeemedByFullRitual(time, dateStr){
   const next = shiftDateStr(dateStr, 1);
   if (next > localDateStr()) return false;              // tomorrow has not happened
+  if (!ritualApplies(time, dateStr)) return false;      // nothing was due: nothing to win back
   return routineStatusFor(time, next).state === 'full';
 }
 
 /* Days kept in a row, walking back from `dateStr`. A day with no occurrence on
    it -- before the ritual existed, or a day the schedule leaves out -- is
    stepped over rather than ending the count: there was nothing there to break.
-   The walk stops at the first day the ritual was ever due, so it always ends. */
+   The walk stops at the first day the ritual was ever due, so it always ends.
+
+   Kept is the only thing that counts. A bridged day -- one a Grace Day covered,
+   or one won back by doing the whole ritual the next morning -- keeps the run
+   alive without being a day of practice, because nothing was practised on it.
+   Counting it was where the tracker's phantom day came from: finish your first
+   full morning and the day before it, which you had never done anything on,
+   was counted alongside it, so one day of practice read as "2 days" on Today.
+   Nobody's record changes here -- every check-in is exactly where it was; only
+   a day nothing happened on has stopped being counted as one that did. */
 function runBehind(time, dateStr){
   /* Rows saved before `created_at` was recorded have no first day to stop at,
      so the walk is bounded by the check-ins that are loaded at all (400 days).
@@ -469,7 +502,7 @@ function runBehind(time, dateStr){
   while (start && cursor >= start){
     if (!ritualApplies(time, cursor)){ cursor = shiftDateStr(cursor, -1); continue; }
     if (!routineHeld(time, cursor)) break;              // a real occurrence, not kept
-    n++;
+    if (routineKept(time, cursor)) n++;                 // bridged days hold the run, they don't add to it
     cursor = shiftDateStr(cursor, -1);
   }
   return n;
@@ -693,6 +726,11 @@ function renderHabits(){
               onkeydown="if(event.key==='Enter') this.blur();"
               onblur="setHabitDuration('${h.id}', this.value)"><span aria-hidden="true">m</span>
           </label>
+          ${habitIsJournaling(h) ? `<button class="habit-page-btn" onclick="triggerHabitPageUpload('${h.id}')"
+            title="Write in your physical journal, then upload a photo of your entry to complete this habit"
+            aria-label="Upload a photo of today's journal page for ${safeName}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>` : ''}
           ${habitTimeHasCore(time) ? `<button class="habit-core-toggle${h.is_core ? ' on' : ''}" onclick="toggleCoreHabit('${h.id}')"
             aria-pressed="${h.is_core ? 'true' : 'false'}"
             title="${h.is_core ? 'A non-negotiable — tap to unmark' : 'Mark as non-negotiable'}"
@@ -704,8 +742,10 @@ function renderHabits(){
       </div>`;
     }).join('');
 
-    const already = new Set(rows.map(h => h.name.toLowerCase()));
-    const pool = habitSuggestionsFor(time).filter(s => !already.has(s.toLowerCase()));
+    // Matched the same way the suggestions are de-duplicated, so a list that
+    // already has "Meditate" on it is not offered "Meditation" underneath.
+    const already = new Set(rows.map(h => habitSuggestionKey(h.name)));
+    const pool = habitSuggestionsFor(time).filter(s => !already.has(habitSuggestionKey(s)));
     // All 15 slots are there, but showing 15 empty boxes at once reads as a
     // chore list. Offer a few at a time and let people ask for the rest.
     const remaining = Math.max(0, cap - rows.length);
@@ -729,7 +769,12 @@ function renderHabits(){
     const coreHint = habitTimeHasCore(time) && rows.length && !rows.some(h => h.is_core)
       ? `<p class="habit-core-hint">Tap ✦ on the few you'd still do on your worst day. Doing just those counts as keeping the ritual — twice a week.</p>`
       : '';
-    list.innerHTML = coreHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
+    /* Said where the habit is, because "journal" on its own reads as something
+       you type into the app, and it isn't. */
+    const journalHint = rows.some(habitIsJournaling)
+      ? `<p class="habit-core-hint">Journal — write in your physical journal, then upload a photo of your entry to complete this habit. Nothing is typed in here.</p>`
+      : '';
+    list.innerHTML = coreHint + journalHint + realRowsHtml + blankRowsHtml + moreSlotsHtml;
 
     if (suggestWrap){
       suggestWrap.innerHTML = rows.length >= cap

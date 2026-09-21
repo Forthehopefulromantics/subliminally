@@ -203,6 +203,22 @@ function pickSettingsFaith(btn){
   const id = btn.dataset.faith;
   myFaith = { id, own: id === 'other' ? myFaith.own : '' };
   renderFaithSettings();
+  /* Saved on the tap that made the choice, rather than on a second tap on a
+     button underneath it. A chip that lights up and a row in the database were
+     two different events, and the one in between was easy to walk away from --
+     which is how somebody chooses Christianity, comes back a day later, and
+     finds nothing selected at all.
+
+     'Something else' is the one answer that still needs the button, because
+     the word that goes with it is typed after the chip is tapped. */
+  const msg = document.getElementById('faithSettingsMsg');
+  if (id === 'other'){
+    if (msg){ msg.textContent = 'Type what you call it, then tap Save preference.'; msg.className = 'save-msg'; }
+    const other = document.getElementById('settingsFaithOther');
+    if (other) other.focus();
+    return;
+  }
+  saveFaithSettings();
 }
 async function saveFaithSettings(){
   const msg = document.getElementById('faithSettingsMsg');
@@ -215,5 +231,12 @@ async function saveFaithSettings(){
     faith_other: myFaith.id === 'other' ? (myFaith.own || null) : null,
   });
   if (error){ if(msg){ msg.textContent=describeSaveError(error); msg.className='save-msg err'; } return; }
-  if(msg){ msg.textContent='Saved. New subliminals and guidance will use these words.'; msg.className='save-msg ok'; }
+  /* The habit tracker offers Prayer or Meditation off this answer, so say what
+     changed rather than leaving it to be discovered. */
+  const practice = (typeof faithPracticeHabit === 'function') ? faithPracticeHabit() : null;
+  if(msg){
+    msg.textContent = 'Saved.'
+      + (practice ? ` Your habit tracker will suggest ${practice}, and new subliminals and guidance will use these words.` : ' New subliminals and guidance will use these words.');
+    msg.className='save-msg ok';
+  }
 }
