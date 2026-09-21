@@ -518,7 +518,7 @@ async function removeClonedVoice(){
     if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
     if (msg){ msg.textContent = 'Removed.'; msg.className = 'save-msg ok'; }
     renderVoiceClone();
-    if (typeof renderVoiceChips === 'function' && document.getElementById('voiceChips')) renderVoiceChips();
+    if (typeof renderVoiceCards === 'function' && document.getElementById('voiceClone')) renderVoiceCards();
   } catch (e){
     if (msg){ msg.textContent = "Couldn't remove it — try again in a moment."; msg.className = 'save-msg err'; }
   }
