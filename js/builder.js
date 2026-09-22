@@ -34,13 +34,10 @@ const FALLBACK_BANK = {
   selfworth: ["I am allowed to take up space.","My worth is not up for debate.","I treat myself as someone I love.","I am whole as I am.","I belong to myself."],
   creativity: ["Ideas visit me easily.","I make things without judging them.","My imagination rests and refills.","I trust the first draft.","Creation is my natural state."],
 };
-const BACKGROUNDS = [
-  { key:'none', label:'None', ic:'—' }, { key:'rain', label:'Rain', ic:'🌧' },
-  { key:'ocean', label:'Ocean', ic:'🌊' }, { key:'waterfall', label:'Waterfall', ic:'💧' },
-  { key:'forest', label:'Wind & forest', ic:'🌲' }, { key:'birds', label:'Birds', ic:'🐦' },
-  { key:'thunder', label:'Distant storm', ic:'⛈' },
-  { key:'brown', label:'Brown noise', ic:'▮' },
-];
+/* The ambience library — its names, its categories, where its audio lives and
+   the one object allowed to play it — is js/ambience.js, loaded before this
+   file. Nothing about a background lives here any more except how to build the
+   generated ones (buildAmbience, further down) and how to draw the picker. */
 /* Binaural beats: a slightly different pure tone in each ear, which the brain perceives
    as a single pulsing "beat" at the difference between the two frequencies. That part is
    real, measurable audio physics. Which beat speed does what to your mental state is far
@@ -145,12 +142,22 @@ function showStep(n){
     restoreVoiceChoice();
   }
   else stopSerenityPreview();   // the demo does not follow you to the next screen
+  /* Opening the ambience step: draw both states from scratch — what is chosen
+     and what, if anything, is being auditioned — and start the download of the
+     chosen track so pressing play later does not wait on it. Leaving it stops
+     the preview, for the same reason the voice demo does not follow you. */
+  if (n === 5){
+    ambienceCandidate = state.bg;
+    paintBgCards();
+    warmAmbience(state.bg);
+  }
+  else stopAmbiencePreview();
   if (n === 1 && pendingRitualMode){
     const chip = document.querySelector(`#ritualModeChips .length-chip[data-mode="${pendingRitualMode}"]`);
     pendingRitualMode = null;
     if (chip) pickRitualMode(chip);
   }
-  if (n === 7) renderFinalFreqPicker();
+  if (n === 7){ renderFinalFreqPicker(); renderFinalAmbiencePicker(); }
 }
 /* The session-length slider runs from 5 minutes to 8 hours with no restriction on
    dragging — nothing is gated until they try to actually generate/save a session
@@ -332,6 +339,8 @@ function resetFlow(){
   syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
   state.binauralBand = null;
   syncSelectionByData('#binauralChips .length-chip', 'band', 'none');
+  stopAmbiencePreview();
+  ambienceCandidate = null;
   paintBgCards();
   document.getElementById('binauralGuideText').style.display = 'none';
   document.getElementById('soothingMixRow').style.display = 'none';
@@ -1593,41 +1602,218 @@ async function prepareSessionVoice(){
   }
 }
 
-/* ---------------- step 5: background + mixer ---------------- */
+/* ---------------- step 5: ambience + mixer ----------------
+
+   AUDITIONING IS NOT CHOOSING. Every other picker in this app answers its
+   question on the tap, because every other picker can be judged by looking at
+   it. Ambience cannot: the only way to know whether Ocean Escape is the one is
+   to hear it, and hearing five of them in a row used to mean answering the
+   question five times and being marched to the next step by the last one.
+
+   So this screen has two states rather than one, and they are kept strictly
+   apart:
+
+     state.bg            THE ANSWER. What gets saved, what the session plays,
+                         and the only thing the persistent highlight is
+                         derived from. Nothing but confirmAmbience() writes it.
+     ambienceCandidate   WHAT IS BEING LISTENED TO. Never saved, never played
+                         by a session, and drawn as a different thing entirely.
+
+   Tapping a card auditions it. The card that is *chosen* keeps its ring the
+   whole time, so at no point is the screen unable to say what the answer
+   currently is — which is the rule in js/selectable.js, and the reason the
+   preview had to be built as a second state instead of as a tap that gets
+   undone. The confirm button is the only thing that moves one into the
+   other. */
 const bgGrid = document.getElementById('bgGrid');
-function soundArtwork(key){
-  const paths={
-    none:'<path d="M10 24h28"/><path d="M32 9l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/>',
-    rain:'<path d="M12 25a7 7 0 010-14 10 10 0 0119-1 7 7 0 015 14H12M15 30l-2 6m12-6-2 6m12-6-2 6"/>',
-    ocean:'<path d="M5 22c8-12 15 10 23-2s13-1 15 0M5 31c8-12 15 10 23-2s13-1 15 0M32 7l1 4 4 1-4 1-1 4-1-4-4-1 4-1z"/>',
-    waterfall:'<path d="M8 10h12v18c0 9 12 9 12 0V10h8M24 7v20M6 39c8-5 12 5 20 0s12 3 16 0"/>',
-    forest:'<path d="M24 6L12 24h8l-9 11h26l-9-11h8L24 6zm0 29v8M6 14h6m24 4h7"/>',
-    birds:'<path d="M7 27c6-9 12-9 17 0 5-9 11-9 17 0M17 15c3-5 7-5 10 0M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1z"/>',
-    thunder:'<path d="M12 25a7 7 0 010-14 10 10 0 0119-1 7 7 0 015 14M25 23l-8 11h8l-4 10 14-15h-9l4-6"/>',
-    brown:'<path d="M8 20v8m8-14v20m8-25v30m8-25v20m8-14v8"/>',
-    serenity:'<path d="M12 21v6m8-13v20m8-17v14m8-10v6M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1zM10 38c8 5 20 5 28 0"/>'
-  };
-  return '<span class="sound-art" aria-hidden="true"><svg viewBox="0 0 48 48">'+(paths[key]||paths.serenity)+'</svg></span>';
+/* Its own bed, its own context: a preview must not be able to disturb a
+   session, and the one-at-a-time rule in ambience.js means it cannot layer
+   over one either. */
+const previewBed = new AmbienceBed('preview');
+let previewCtx = null;
+let previewTimer = null;
+let ambienceCandidate = null;   // null means "nothing is being auditioned"
+/* Previews end on their own. Somebody who taps one and then wanders off to
+   read the copy underneath should not still be listening to rain ten minutes
+   later. */
+const AMBIENCE_PREVIEW_MS = 25000;
+
+/* THE ONE PAINT. Both states, re-derived from scratch, every time anything
+   about either of them changes.
+
+   The chosen card gets .sel and the ARIA, off state.bg, exactly as before.
+   The card being auditioned gets data-auditioning, which is a different mark
+   in a different colour — it is deliberately not .sel, because a second card
+   wearing the chosen treatment is the bug the whole selectable system exists
+   to stop. */
+function paintBgCards(){
+  syncSelectionByData('#bgGrid .bg-card', 'key', state.bg);
+  /* The card is a wrapper holding two buttons, so the face is what a screen
+     reader is on: it carries the state, not the div around it. */
+  syncSelectionByData('#bgGrid .bg-card-face', 'key', state.bg);
+  document.querySelectorAll('#bgGrid .bg-card').forEach(card => {
+    const auditioning = !!ambienceCandidate && card.dataset.key === ambienceCandidate;
+    card.toggleAttribute('data-auditioning', auditioning);
+  });
+  document.querySelectorAll('#bgGrid .bg-preview-btn').forEach(btn => {
+    const live = previewBed.playing() && btn.dataset.key === previewBed.key;
+    btn.classList.toggle('is-playing', live);
+    btn.setAttribute('aria-label', `${live ? 'Stop' : 'Play'} a preview of ${ambienceName(btn.dataset.key)}`);
+    btn.textContent = live ? '❙❙' : '▶';
+  });
+  paintAmbienceConfirm();
 }
-/* Which ambience is lit, straight off state.bg. Same rule as everywhere else. */
-function paintBgCards(){ syncSelectionByData('#bgGrid .bg-card', 'key', state.bg); }
-BACKGROUNDS.forEach(b=>{
-  const c = document.createElement('button'); c.className='bg-card';
-  c.dataset.key = b.key;
-  c.setAttribute('role', 'radio');
-  c.innerHTML = `${soundArtwork(b.key)}<span>${b.label}</span>`;
-  c.onclick = ()=>{
-    state.bg = b.key;
-    paintBgCards();
-    /* Same as the voice cards: the pick is the answer, so it moves on. Through
-       nextStep(), which from step 5 is the voice fork -- this used to be
-       `nextStep()` back when nextStep() meant step+1, and step+1 from here is
-       the manual recorder whether or not anybody asked to record. */
-    setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
-  };
-  bgGrid.appendChild(c);
-});
-paintBgCards();
+
+/* The confirm button says what pressing it would do, and is inert when it
+   would do nothing. "Use Ocean Escape" is a sentence; "Confirm" is a dare. */
+function paintAmbienceConfirm(){
+  const btn = document.getElementById('ambienceConfirmBtn');
+  const note = document.getElementById('ambienceConfirmNote');
+  if (!btn) return;
+  const pending = ambienceCandidate && ambienceCandidate !== state.bg;
+  btn.disabled = !pending;
+  btn.textContent = pending ? `Use ${ambienceName(ambienceCandidate)}` : `Using ${ambienceName(state.bg)}`;
+  if (note){
+    note.textContent = pending
+      ? `Listening to ${ambienceName(ambienceCandidate)} — your session is still set to ${ambienceName(state.bg)}.`
+      : '';
+  }
+}
+
+function renderBgGrid(){
+  if (!bgGrid) return;
+  bgGrid.innerHTML = '';
+  ambienceSections().forEach(section => {
+    const heading = document.createElement('div');
+    heading.className = 'bg-section-label';
+    heading.textContent = section.category;
+    bgGrid.appendChild(heading);
+    const row = document.createElement('div');
+    row.className = 'bg-row';
+    section.tracks.forEach(track => row.appendChild(bgCard(track)));
+    bgGrid.appendChild(row);
+  });
+  paintBgCards();
+}
+
+function bgCard(track){
+  const card = document.createElement('div');
+  card.className = 'bg-card bg-card-split';
+  card.dataset.key = track.key;
+
+  const face = document.createElement('button');
+  face.type = 'button';
+  face.className = 'bg-card-face';
+  face.dataset.key = track.key;
+  face.setAttribute('role', 'radio');
+  /* Built as nodes rather than a template string: the name and the icon are
+     data, and data does not go through innerHTML. */
+  const ic = document.createElement('span');
+  ic.className = 'ic'; ic.textContent = track.ic;
+  const label = document.createElement('span');
+  label.className = 'bg-name'; label.textContent = track.name;
+  face.appendChild(ic); face.appendChild(label);
+  if (track.blurb) face.setAttribute('title', track.blurb);
+  face.onclick = () => auditionAmbience(track.key);
+  card.appendChild(face);
+
+  /* None has nothing to hear, and the generated backgrounds are made on the
+     spot rather than downloaded, so they are auditioned by the card itself —
+     there is no file to press play on. */
+  if (isRecordedAmbience(track.key)){
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'bg-preview-btn';
+    play.dataset.key = track.key;
+    play.textContent = '▶';
+    play.onclick = (ev) => toggleAmbiencePreview(ev, track.key);
+    card.appendChild(play);
+  }
+  return card;
+}
+
+/* Tapping a card. Writes the candidate, repaints, and starts listening — in
+   that order, and the first two synchronously, so the mark lands in the frame
+   the tap happened in rather than whenever the mp3 arrives. */
+function auditionAmbience(key){
+  ambienceCandidate = key;
+  paintBgCards();
+  if (key === 'none' || !isRecordedAmbience(key)){ stopAmbiencePreview(); return; }
+  startAmbiencePreview(key);
+}
+
+function toggleAmbiencePreview(ev, key){
+  if (ev){ ev.stopPropagation(); ev.preventDefault(); }
+  if (previewBed.playing() && previewBed.key === key){ stopAmbiencePreview(); return; }
+  ambienceCandidate = key;
+  paintBgCards();
+  startAmbiencePreview(key);
+}
+
+/* A preview needs a context, and on iOS a context may only be opened and
+   unlocked inside the gesture that asked for it — so this is deliberately not
+   async before the context exists. audioOut() and the silent keeper are the
+   same ones the session uses: on a phone with the ringer switch off, Web Audio
+   is silenced and a media element is not, and a preview that cannot be heard
+   is worse than no preview at all. */
+function startAmbiencePreview(key){
+  const msg = document.getElementById('ambienceMsg');
+  if (msg) msg.textContent = '';
+  if (finalPlaying){
+    // A session is running. Auditioning would have to stop its ambience to
+    // honour one-track-at-a-time, and silently pulling the bed out from under
+    // a session nobody asked to interrupt is not a preview.
+    if (msg) msg.textContent = 'Stop the session first — ambience previews and a running session share the speaker.';
+    return;
+  }
+  try {
+    if (!previewCtx || previewCtx.state === 'closed'){
+      previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+      previewBed.attach(previewCtx, audioOut(previewCtx));
+    }
+    if (previewCtx.state === 'suspended') previewCtx.resume().catch(()=>{});
+    startSilentKeeper();
+  } catch(e){
+    if (msg) msg.textContent = 'This device would not open the speaker for a preview.';
+    return;
+  }
+  previewBed.setLevel(0.85);
+  previewBed.to(key).then(() => paintBgCards());
+  paintBgCards();
+
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => stopAmbiencePreview(), AMBIENCE_PREVIEW_MS);
+}
+
+function stopAmbiencePreview(){
+  if (!previewCtx && !previewBed.playing()) return;   // nothing is listening
+  clearTimeout(previewTimer); previewTimer = null;
+  previewBed.stop({ fade: 0.5 });
+  paintBgCards();
+  /* Let the fade finish before the context goes, or the last half second is
+     cut off rather than faded. */
+  setTimeout(() => {
+    if (previewBed.playing()) return;
+    previewBed.detach();
+    if (previewCtx){ closeAudioOut(previewCtx); try { previewCtx.close(); } catch(e){} previewCtx = null; }
+    stopSilentKeeper();
+  }, 700);
+}
+
+/* THE ONLY WRITE TO state.bg FROM THIS SCREEN. */
+function confirmAmbience(){
+  if (!ambienceCandidate || ambienceCandidate === state.bg) return;
+  state.bg = ambienceCandidate;      // the answer, written first
+  paintBgCards();                    // then the screen, derived from it
+  stopAmbiencePreview();
+  warmAmbience(state.bg);
+  /* Same as the voice cards: an answered question moves on. Through
+     nextStep(), which from step 5 is the voice fork — step+1 from here is the
+     manual recorder, whether or not anybody asked to record. */
+  setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
+}
+
+renderBgGrid();
 
 /* ---------------- Ritual-only: second, layered voice ---------------- */
 let layerVoiceEnabled = false;
@@ -2031,27 +2217,16 @@ function makeNoiseBuffer(ctx, seconds, color){
   }
   return buffer;
 }
+/* The generated backgrounds, and only those. A recorded track never reaches
+   this function — it is fetched, decoded, level-matched and looped by the bed
+   in js/ambience.js, which is also what fades between them. This used to carry
+   a branch that played a recorded file if one existed for the key, with no
+   fade, no level matching and a loop that ticked once per pass; the bed
+   replaced all of it. */
 function buildAmbience(ctx, key, destination){
   const nodes = []; const timers = [];
-  if (key === 'none') return { stop(){} };
+  if (key === 'none' || isRecordedAmbience(key)) return { stop(){} };
   const master = ctx.createGain(); master.gain.value = 1; master.connect(destination); nodes.push(master);
-
-  // If a real recorded track has been uploaded for this key (see Supabase ambience_tracks
-  // table), use it instead of the synthesized version below.
-  if (window.AMBIENCE_URLS && window.AMBIENCE_URLS[key]){
-    let stopped = false;
-    let src = null;
-    fetch(window.AMBIENCE_URLS[key])
-      .then(r => r.arrayBuffer())
-      .then(buf => ctx.decodeAudioData(buf))
-      .then(audioBuf => {
-        if (stopped) return;
-        src = ctx.createBufferSource(); src.buffer = audioBuf; src.loop = true;
-        src.connect(master); src.start();
-      })
-      .catch(e => console.error('ambience track failed to load, no fallback for this key:', key, e));
-    return { stop(){ stopped = true; if (src){ try{ src.stop(); }catch(e){} } } };
-  }
 
   function noiseLayer(color, hp, lp, gainVal){
     const src = ctx.createBufferSource(); src.buffer = makeNoiseBuffer(ctx, 4, color); src.loop = true;
@@ -2129,6 +2304,10 @@ function prepareFinal(){
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
   document.getElementById('rerecordBtn').style.display = (state.voiceMode === 'own') ? 'inline-flex' : 'none';
   renderFinalFreqPicker();
+  renderFinalAmbiencePicker();
+  /* Start the ambience download now, while somebody is reading this screen and
+     naming their subliminal, rather than in the second after they press play. */
+  warmAmbience(state.bg);
   updateFinalPointTag(0);
 
   const titleInput = document.getElementById('finalTitleInput');
@@ -2180,6 +2359,35 @@ function updateFinalPointTag(index){
   }
 }
 
+/* ---------------- THE THREE LAYERS, AND WHY THEY NEVER TOUCH ----------------
+
+   A finished session is three things playing at once, and all three can be
+   changed on this screen without the other two noticing:
+
+     the affirmation voice   generated once, per person, and cached — the one
+                             expensive thing in the app
+     the ambience            a shared recording, looped by sessionBed
+     the frequency layer     two oscillators, free, retuned in place
+
+   The rule this screen exists to hold: CHANGING THE AMBIENCE, THE FREQUENCY
+   OR THE SESSION LENGTH MUST NEVER REGENERATE THE VOICE. Not "should rarely" —
+   never. Somebody who decides at 11pm that they want the ocean instead of the
+   pad is changing the background of a recording that already exists; if that
+   cost them another pass through the speech provider it would be slow, it
+   would cost money, and on a metered plan it could fail outright and leave
+   them with silence where their affirmations were.
+
+   Which is why the three functions below are the whole of it. None of them
+   calls prepareFinal(), prepareSessionVoice(), or anything that leads there:
+
+     changeFinalFrequency    retunes the live oscillators
+     changeSessionAmbience   crossfades the bed
+     pickDuration / the length slider   move a number and a label
+
+   prepareSessionVoice() is called from exactly one place — prepareFinal(),
+   when this screen opens — and that is the only place it should ever be
+   called from. */
+
 /* You can change the frequency right on the finished/loaded subliminal — no need to
    rebuild the whole thing from scratch. Works for a freshly-built one and for anything
    reloaded via "Load & adjust" in My Library. */
@@ -2207,12 +2415,59 @@ function changeFinalFrequency(hzStr){
   }
 }
 
-let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+/* The same idea for the ambience: a second picker on the finished subliminal,
+   so the background can be changed on the way to sleep without rebuilding
+   anything. Both ways round are handled here and there is nothing else to it:
+
+     playing    the bed crossfades — out, in, one track audible at any moment
+     not playing  the key is recorded and the next play starts on it
+
+   Drawn as a select for the same reason the frequency picker is: it is a
+   small change to a finished thing, not the choosing screen again. */
+function renderFinalAmbiencePicker(){
+  const wrap = document.getElementById('finalAmbiencePicker');
+  const sel = document.getElementById('finalAmbienceSelect');
+  if (!wrap || !sel) return;
+  sel.innerHTML = ambienceSections().map(section =>
+    `<optgroup label="${section.category}">` +
+    section.tracks.map(t => `<option value="${t.key}">${t.name}</option>`).join('') +
+    `</optgroup>`
+  ).join('');
+  sel.value = state.bg;
+  wrap.style.display = 'block';
+}
+
+function changeSessionAmbience(key){
+  if (!ambienceTrack(key)) return;
+  state.bg = key;                       // the answer, written first
+  /* The ambience step is behind this screen and will be seen again. Moving its
+     candidate with the answer is what stops it reopening with a confirm button
+     offering to choose something they have already moved on from. */
+  ambienceCandidate = key;
+  paintBgCards();                       // the ambience step, still derived from it
+  const sel = document.getElementById('finalAmbienceSelect');
+  if (sel && sel.value !== key) sel.value = key;
+  warmAmbience(key);
+  /* Mid-session: the bed fades the old one out, starts the new one and fades
+     it in, and guarantees the two are never both up. Not playing: nothing to
+     fade, and the next play will pick this up off state.bg. */
+  if (finalPlaying) sessionBed.to(key);
+}
+
+let finalCtx=null, finalTone=null, finalToneLayer2=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+/* The session's ambience. One object, for the whole life of the page: it
+   outlives the AudioContext, which is opened per play and closed after, so the
+   ambience somebody chose is still the ambience when they press play again.
+   See js/ambience.js for why exactly one of these is allowed to be audible. */
+const sessionBed = new AmbienceBed('session');
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
+/* No liveBgGain among these: the ambience level lives on sessionBed, because a
+   handle on the gain node of whichever track happens to be playing is lost the
+   moment the bed swaps it for another one. */
 let finalPaused=false, finalPauseStarted=null, finalPausedTotal=0, finalFadeEnding=false;
 let finalAffirmationIndex=0, finalRequestedIndex=null;
 let finalPauseWaiters=[];
-let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
+let liveToneGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 /* Every gain node a voice line is currently playing through. A line is its own
    node that dies when the line ends, so unlike the tone and the background
    there is no single handle to hold — the set is what is live right now, and
@@ -2441,7 +2696,10 @@ function applyLiveMixGain(id, value){
   if (typeof queueMixSave === 'function') queueMixSave();
   if (!finalPlaying) return;
   if (id==='mixTone') setLiveGain(liveToneGain, value/100 * 0.10);
-  if (id==='mixBg') setLiveGain(liveBgGain, value/100);
+  /* The ambience level is the bed's, not a node's: it has to survive the bed
+     swapping one track for another underneath it, which a handle on the gain
+     node of the track that is currently playing does not. */
+  if (id==='mixBg') sessionBed.setLevel(value/100);
   if (id==='mixSoothing') setLiveGain(liveSoothingGain, value/100 * 0.4);
   if (id==='mixCustom') setLiveGain(liveCustomGain, value/100 * 0.6);
   if (id==='mixLayerVoice') setLiveGain(liveLayerVoiceGain, value/100);
@@ -2738,10 +2996,15 @@ function playFinal(){
   }
   liveToneGain = toneGain;
 
-  const bgGain = finalCtx.createGain(); bgGain.gain.value = document.getElementById('mixBg').value/100;
-  bgGain.connect(audioOut(finalCtx));
-  finalAmbience = buildAmbience(finalCtx, state.bg, bgGain);
-  liveBgGain = bgGain;
+  /* The ambience, on its own graph with its own lifetime. It is started here
+     and never rebuilt for the rest of the session: changing the frequency,
+     dragging a slider or letting the loop come round again does not touch it,
+     and switching to a different track (changeSessionAmbience) crossfades this
+     same bed rather than restarting anything. */
+  sessionBed.attach(finalCtx, audioOut(finalCtx));
+  sessionBed.setLevel(document.getElementById('mixBg').value/100);
+  sessionBed.to(state.bg, { fade: 2.5 });   // in with the tone, not on top of it
+  const bgGain = sessionBed.out;
 
   // The soothing layer only plays if the person actually chose one in the ambience step
   // (and their tier allows it — see pickSoothingLayer). Not automatic.
@@ -3109,10 +3372,17 @@ function finishFinal(){
   if (finalTone){ try{ finalTone.stop(); }catch(e){} }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
-  if (finalAmbience){ finalAmbience.stop(); }
+  /* A session reaching its own end is the one case worth fading rather than
+     cutting: the last thing somebody hears at the end of eight hours should
+     not be the ambience stopping dead. The context close waits for it. */
+  const bedFade = 1.2;
+  sessionBed.stop({ fade: bedFade });
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
-  if (finalCtx){ const closingCtx=finalCtx; finalCtx=null; setTimeout(()=>{ try{ closingCtx.close(); }catch(e){} }, 300); }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  if (finalCtx){
+    const closing = finalCtx;
+    setTimeout(()=>{ sessionBed.detach(); try{ closing.close(); }catch(e){} }, (bedFade + 0.3) * 1000);
+  }
+  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
   liveVoiceElements.clear();
@@ -3134,14 +3404,18 @@ function stopFinal(){
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
-  if (finalAmbience){ finalAmbience.stop(); finalAmbience=null; }
+  /* Stop means stop: the context closes on the next line, so there is nothing
+     to fade into and nothing that could still be running afterwards. The key
+     the bed is on survives, which is what makes pressing play again come back
+     on the same ambience. */
+  sessionBed.detach();
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalRecorder && finalRecorder.state !== 'inactive'){
     finalRecorder.onstop = ()=>{ window._subliminallyDownloadBlob = new Blob(finalChunks, {type:'audio/webm'}); };
     finalRecorder.stop();
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
   liveVoiceElements.clear();

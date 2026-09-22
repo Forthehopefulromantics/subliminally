@@ -61,6 +61,9 @@ class El {
   setAttribute(k, v){ this.attrs[k] = String(v); }
   getAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }
   removeAttribute(k){ delete this.attrs[k]; }
+  toggleAttribute(k, on){ const v = on === undefined ? !(k in this.attrs) : !!on;
+                          if (v) this.attrs[k] = ''; else delete this.attrs[k]; return v; }
+  hasAttribute(k){ return Object.prototype.hasOwnProperty.call(this.attrs, k); }
   appendChild(c){ c.parentElement = this; this.children.push(c); doc._register(c); return c; }
   querySelector(sel){ return this.querySelectorAll(sel)[0] || null; }
   querySelectorAll(sel){ return doc._match(sel, this._descendants()); }
@@ -154,7 +157,9 @@ const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange
   'serenityPreviewBtn','recCounter','recLine','recTapHint','recStatus','nextLineBtn','skipBtn',
   'finalTitle','finalLine','finalNote','rerecordBtn','finalTitleInput','finalTitleMsg',
   'finalPointTag','sessionTarget','reviewSub','lockSoothing','lockCustomTrack','lockLayerVoice',
-  'finalFreqPicker','flowSteps','recordFlowTitle','recordFlowSub','recordBreathNote'];
+  'finalFreqPicker','flowSteps','recordFlowTitle','recordFlowSub','recordBreathNote',
+  'finalAmbiencePicker','finalAmbienceSelect','ambienceConfirmBtn','ambienceConfirmNote',
+  'ambienceMsg','mixBg','mixBgVal'];
 IDS.forEach(id => mk(id));
 
 /* The eight flow-step panels, so showStep() has something to switch between. */
@@ -258,7 +263,7 @@ vm.runInContext(`
   var MediaRecorder = undefined;
 `, ctx);
 
-for (const f of ['js/selectable.js', 'js/builder.js'])
+for (const f of ['js/selectable.js', 'js/ambience.js', 'js/builder.js'])
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 
 /* The voice catalogue is asked over the network on the real page; here it is a
@@ -275,6 +280,15 @@ vm.runInContext(`
 `, ctx);
 
 const run = (src) => vm.runInContext(src, ctx);
+/* Choosing an ambience takes two presses now, and that is the point of the
+   change: tapping a card auditions it and nothing else, and the confirm
+   button is the only thing that answers the question. 'rain' is one of the
+   generated backgrounds, so nothing here has to open a speaker.
+
+   What these tests are still about is the fork out of step 5 — and the fork
+   now hangs off the confirm rather than off the card. */
+const pickAmbience = (key) => vm.runInContext(
+  `document.querySelector('#bgGrid .bg-card-face[data-key="${key}"]').onclick(); confirmAmbience();`, ctx);
 const get = (expr) => vm.runInContext(`(${expr})`, ctx);
 async function settle(){
   // let the awaits inside the handlers resolve, then fire the 260ms advance
@@ -327,7 +341,7 @@ check('Continue is enabled', get(`!document.getElementById('toStep5').disabled`)
 await settle();
 check('a pick moves on to ambience', step(), 5);
 
-run(`document.querySelectorAll('#bgGrid .bg-card')[1].onclick()`);
+pickAmbience('rain');
 await settle();
 check('picking a background reaches the recorder', step(), 6);
 check('the counter is drawn, not the placeholder', recCounter(), '1 of 10');
@@ -364,7 +378,7 @@ check('selectedVoice', get('state.selectedVoice'), 'serenity');
 check('voiceMode / aiVoiceId', [get('state.voiceMode'), get('state.aiVoiceId')], ['ai', 'serenity']);
 check('moved on to ambience', step(), 5);
 
-run(`document.querySelectorAll('#bgGrid .bg-card')[2].onclick()`);
+pickAmbience('rain');
 await settle();
 check('THE BUG: a background tap must not open the recorder', step(), 7);
 check('nothing was queued for recording', get('recordings.length'), 0);
@@ -399,7 +413,7 @@ check('it stays highlighted', selected('voiceClone'), true);
 check('selectedVoice', get('state.selectedVoice'), 'clone_voice');
 check('built with the clone', [get('state.voiceMode'), get('state.aiVoiceId')], ['ai', 'mine']);
 check('moved on to ambience', step(), 5);
-run(`document.querySelectorAll('#bgGrid .bg-card')[1].onclick()`);
+pickAmbience('rain');
 await settle();
 check('THE BUG: no manual recorder for a cloned voice', step(), 7);
 check('nothing queued for recording', get('recordings.length'), 0);

@@ -294,11 +294,33 @@
      never looks locked -- the demo is free. */
   .voice-card-face .locked-tag{ margin:8px 0 0; }
 
-  .bg-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-  .bg-card{ cursor:pointer; padding:12px 8px; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; transition:all .2s; font-size:12px; }
+  /* The ambience library: one row of cards per category, built by
+     renderBgGrid() in js/builder.js off the catalogue in js/ambience.js. */
+  .bg-grid{ display:flex; flex-direction:column; gap:14px; }
+  .bg-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .bg-section-label{ font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--haze); margin-bottom:-6px; }
+  .bg-card{ cursor:pointer; border-radius:13px; text-align:center; background:var(--dusk); border:1px solid transparent; transition:all .2s; font-size:12px; }
   .bg-card.sel{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
   .bg-card .ic{ font-size:18px; display:block; margin-bottom:4px; }
-  @media (max-width:560px){ .bg-grid{ grid-template-columns:repeat(2,1fr); } }
+  /* A card is two controls: the face chooses what to listen to, the play
+     button auditions it. Same split as the Serenity voice card. */
+  .bg-card-split{ display:flex; align-items:stretch; padding:0; overflow:hidden; }
+  /* The face is transparent — the card behind it draws the tint and clips the
+     corners — so its own radius only ever shows as the shape of its focus
+     ring, which is exactly why it has one. */
+  .bg-card-face{ flex:1; min-width:0; padding:12px 8px; background:none; border:none; border-radius:12px; color:inherit; font-family:inherit; font-size:12px; cursor:pointer; }
+  .bg-name{ display:block; line-height:1.3; }
+  .bg-preview-btn{ flex:none; width:38px; display:flex; align-items:center; justify-content:center; padding:0; border:none; border-left:1px solid rgba(255,255,255,0.07); border-radius:0 12px 12px 0; background:rgba(255,255,255,0.03); color:var(--moonlight); font-family:inherit; font-size:11px; cursor:pointer; transition:background .2s, color .2s; }
+  .bg-preview-btn:hover{ background:rgba(185,167,232,0.14); }
+  .bg-preview-btn.is-playing{ background:rgba(185,167,232,0.2); color:var(--lilac); }
+  /* AUDITIONING IS NOT CHOSEN, so it is not drawn as chosen: the candle tint
+     says "this is what you are hearing", the lilac ring on .sel still says
+     "this is what your session is set to", and while you are comparing two
+     tracks both sentences are on the screen at once. */
+  .bg-card[data-auditioning]{ border-color:var(--candle); box-shadow:inset 0 0 0 1px var(--candle); }
+  .ambience-confirm-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:14px; }
+  .ambience-confirm-note{ font-size:12px; color:var(--haze); flex:1; min-width:180px; }
+  @media (max-width:560px){ .bg-row{ grid-template-columns:repeat(2,1fr); } }
   /* Where a tap just took you. Same idea as the card glow on Today. */
   .q-next{ animation:qNext 1.3s ease-out 1; border-radius:14px; }
   @keyframes qNext{
@@ -1226,7 +1248,8 @@
     background:#FFF6EA; border-color:rgba(62,42,72,.12); }
   /* The play button sits inside a card that has just been painted cream, so it
      needs its own tint to still read as a separate control. */
-  body[data-sky="day"] .voice-preview-btn{ background:rgba(62,42,72,.05); border-left-color:rgba(62,42,72,.12); }
+  body[data-sky="day"] .voice-preview-btn,
+  body[data-sky="day"] .bg-preview-btn{ background:rgba(62,42,72,.05); border-left-color:rgba(62,42,72,.12); }
   /* The repaint above is more specific than .length-chip.sel, so by day it was
      quietly erasing the selected state: the faith saved in your profile came
      back looking like nothing had ever been chosen. Said again here, after it. */
@@ -2143,7 +2166,7 @@
      looked selected and then went back is the exact illusion this whole block
      exists to stop. */
   .voice-card:active, .voice-card-face:active, .freq-card3:active, .bg-card:active,
-  .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
+  .bg-card-face:active, .bg-preview-btn:active, .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
   .ho-time:active, .ask-chip:active, .layer-voice-options button:active,
   .sess-card:active, .avatar-opt:active, .av-opt:active{
     transform:scale(.97);
@@ -2155,7 +2178,8 @@
   /* FOCUS — visible for a keyboard, and drawn outside the box so it sits beside
      the selected ring rather than replacing it. */
   .voice-card:focus-visible, .voice-card-face:focus-visible, .freq-card3:focus-visible,
-  .bg-card:focus-visible, .chip:focus-visible, .length-chip:focus-visible,
+  .bg-card:focus-visible, .bg-card-face:focus-visible, .bg-preview-btn:focus-visible,
+  .chip:focus-visible, .length-chip:focus-visible,
   .ob-chip:focus-visible, .ho-card:focus-visible, .ho-time:focus-visible,
   .ask-chip:focus-visible, .layer-voice-options button:focus-visible,
   .sess-card:focus-visible, .avatar-opt:focus-visible, .av-opt:focus-visible{
@@ -2167,7 +2191,8 @@
      inert, and a disabled thing that is nonetheless the current answer still
      shows it: "you chose this and it is not available right now" is a different
      sentence from "you chose nothing". */
-  .voice-card[disabled], .freq-card3[disabled], .bg-card[disabled], .chip[disabled],
+  .voice-card[disabled], .freq-card3[disabled], .bg-card[disabled],
+  .bg-card-face[disabled], .bg-preview-btn[disabled], .chip[disabled],
   .length-chip[disabled], .ob-chip[disabled], .ho-card[disabled], .ho-time[disabled],
   .ask-chip[disabled], .layer-voice-options button[disabled], .sess-card[disabled]{
     opacity:.45; cursor:default; transform:none; filter:none;
@@ -2182,7 +2207,8 @@
      The tint and the border keep their .2s, because that softness is the
      existing design and it is not what anybody is waiting to see. The ring and
      the weight snap, in the frame the tap landed in. */
-  .voice-card, .voice-card-face, .freq-card3, .bg-card, .chip, .length-chip,
+  .voice-card, .voice-card-face, .freq-card3, .bg-card, .bg-card-face,
+  .bg-preview-btn, .chip, .length-chip,
   .ob-chip, .ho-card, .ho-time, .ask-chip, .layer-voice-options button,
   .sess-card, .avatar-opt, .av-opt{
     transition:background-color .2s, border-color .2s, color .2s, opacity .2s, transform .1s;
@@ -2190,7 +2216,8 @@
 
   /* Touch: stop the OS drawing its own grey flash over the top of all this, and
      stop a hold on a card selecting the text inside it. */
-  .voice-card, .voice-card-face, .freq-card3, .bg-card, .chip, .length-chip,
+  .voice-card, .voice-card-face, .freq-card3, .bg-card, .bg-card-face,
+  .bg-preview-btn, .chip, .length-chip,
   .ob-chip, .ho-card, .ho-time, .ask-chip, .layer-voice-options button,
   .sess-card, .avatar-opt, .av-opt{
     -webkit-tap-highlight-color:transparent;
@@ -2200,7 +2227,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .voice-card:active, .voice-card-face:active, .freq-card3:active, .bg-card:active,
-    .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
+    .bg-card-face:active, .bg-preview-btn:active, .chip:active, .length-chip:active, .ob-chip:active, .ho-card:active,
     .ho-time:active, .ask-chip:active, .layer-voice-options button:active,
     .sess-card:active, .avatar-opt:active, .av-opt:active{ transform:none; }
     .record-line-loading{ animation:none; }
@@ -2868,9 +2895,18 @@
       <!-- STEP 5: background ambience + mixer -->
       <div class="flow-step" data-step="5">
         <div class="flow-title">Layer your ambience</div>
-        <div class="flow-sub">Generated live in your browser. You'll adjust every layer's volume on the final screen, once you can hear it.</div>
+        <div class="flow-sub">Tap one to hear it — nothing changes until you press the button underneath. You'll adjust every layer's volume on the final screen, once you can hear it all together.</div>
         <div class="flow-body">
+          <!-- Two states live in here at once, and they are not the same state:
+               the card with the lilac ring is what this session is SET to, and
+               the card with the candle edge is what is PLAYING right now. See
+               the long note above renderBgGrid() in js/builder.js. -->
           <div class="bg-grid" id="bgGrid" role="radiogroup" aria-label="Background ambience"></div>
+          <div class="ambience-confirm-row">
+            <button type="button" class="mini-btn candlebtn" id="ambienceConfirmBtn" disabled onclick="confirmAmbience()">Using None</button>
+            <span class="ambience-confirm-note" id="ambienceConfirmNote"></span>
+          </div>
+          <div class="length-msg" id="ambienceMsg"></div>
           <details class="more-options">
             <summary>Add more layers <em>soothing pad, your own track, a second voice, binaural beats</em></summary>
             <div class="more-options-body">
@@ -2972,6 +3008,14 @@
             </div>
             <div class="final-freq-picker" id="finalFreqPicker" style="display:none;">
               <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
+            </div>
+            <!-- Change the background without rebuilding anything. While the
+                 session is playing this crossfades the ambience bed in place;
+                 the affirmations carry straight on, and are never regenerated
+                 for it. -->
+            <div class="final-freq-picker" id="finalAmbiencePicker" style="display:none;">
+              <select id="finalAmbienceSelect" aria-label="Ambience"
+                      onchange="changeSessionAmbience(this.value)"></select>
             </div>
             <div class="final-line" id="finalLine">"…"</div>
             <div id="soundCheckMsg"></div>
@@ -3445,6 +3489,9 @@
 <script src="js/selectable.js"></script>
 <script src="js/dates.js"></script>
 <script src="js/sky.js"></script>
+<!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
+     library's names and categories to draw the picker. -->
+<script src="js/ambience.js"></script>
 <script src="js/builder.js?v=20260922b"></script>
 <script src="js/billing.js?v=20260922b"></script>
 <script src="js/entitlements.js"></script>
