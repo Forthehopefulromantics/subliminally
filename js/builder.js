@@ -117,7 +117,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -304,7 +304,7 @@ function nextStep(){
      So somebody who chose Serenity tapped "Rain" and landed in the manual
      recorder. And because nothing routed them there, nothing had *prepared*
      them there either: showRecordLine() never ran, so the panel still held the
-     literal "..." and "1 of 14" that sit in index.html as placeholders, and
+     literal "..." and a hard-coded count that sit in index.html as placeholders, and
      `recordings` was never sized to the affirmations. One missing fork, two
      bugs.
 
@@ -316,7 +316,7 @@ function nextStep(){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   /* Clearing through the one helper rather than stripping the class by hand:
      that left every chip on the page still announcing itself as pressed. */
   clearSelection('.sel');
@@ -325,7 +325,7 @@ function resetFlow(){
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
-  document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
+  document.getElementById('countRange').value = 10; document.getElementById('countVal').textContent = 10;
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
   renderDurationChips();
@@ -563,12 +563,12 @@ function applyModeCopy(mode){
   const reviewTitle = document.getElementById('reviewTitle');
   const reviewSub = document.getElementById('reviewSub');
   if (mode === 'visualization'){
-    goalLabel.textContent = 'Describe what you want to happen, in as much detail as you can';
-    document.getElementById('quizGoal').placeholder = 'e.g. I\'m walking out onto the court for the championship game. The crowd is loud, I can feel my heartbeat, but my hands are steady...';
+    goalLabel.textContent = 'Describe your desire — and the moment you would know it had become real';
+    document.getElementById('quizGoal').placeholder = 'e.g. I receive the message that the opportunity is mine. My sister is beside me, I read it twice, and I finally feel the relief of knowing the work mattered...';
     generateBtn.textContent = 'Continue to my script ✦';
     regenerateBtn.textContent = '↻ Get a new draft';
-    loadingTitle.textContent = 'Setting up your script…';
-    loadingSub.textContent = 'One moment.';
+    loadingTitle.textContent = 'Turning your desire into a scene…';
+    loadingSub.textContent = 'Writing a future memory you can step inside.';
     reviewTitle.textContent = 'Your visualization script';
     reviewSub.textContent = 'Write it yourself, edit the draft, or both — this is entirely yours.';
   } else if (mode === 'eft'){
@@ -1751,7 +1751,7 @@ function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings 
    showStep) as well as on every advance, so the screen cannot be reached in a
    state it has not drawn.
 
-   The reported bug was the first line reading "..." under a correct "1 of 14".
+   The reported bug was the first line reading "..." under a correct dynamic count.
    Both of those strings are the placeholders in index.html: the screen had been
    opened without this function ever running (see nextStep), so nothing had
    replaced either. The counter looked right purely because the placeholder
