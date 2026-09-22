@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#0D0B18" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="stylesheet" href="/css/player.css" />
+<link rel="stylesheet" href="/css/listening-fixes.css?v=20260922b" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
@@ -2843,7 +2844,7 @@
                  pre-generated file and never reaches ElevenLabs. -->
             <div class="voice-card voice-card-split" id="voiceSerenity">
               <button type="button" class="voice-card-face" role="radio" aria-checked="false" onclick="chooseVoice('serenity')">
-                <h4>Serenity</h4>
+                <span class="sound-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M12 21v6m8-13v20m8-17v14m8-10v6M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1zM10 38c8 5 20 5 28 0"/></svg></span><h4>Serenity</h4>
                 <p>Calm, warm AI voice</p>
               </button>
               <button type="button" class="voice-preview-btn" id="serenityPreviewBtn"
@@ -2996,14 +2997,16 @@
             <label class="final-toggle"><input type="checkbox" id="loopToggle"> keep looping past my chosen length</label>
             <div class="record-actions">
               <button type="button" class="mini-btn" id="soundCheckBtn" onclick="runSoundCheck()">Sound check</button>
-              <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="playFinal()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
-              <button class="mini-btn ghostbtn" id="stopBtn" onclick="stopFinal()">Stop</button>
+              <button class="mini-btn candlebtn" id="finalPlayBtn" onclick="toggleImmersivePlayback()"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal</button>
+              <button class="mini-btn ghostbtn" id="stopBtn" onclick="restartListening()">Start over</button>
               <button class="mini-btn ghostbtn" id="rerecordBtn" onclick="rerecordVoice()" style="display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>Re-record
               </button>
               <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save to my library</button>
-              <button class="mini-btn ghostbtn" onclick="resetFlow()">Start over</button>
+              <button class="mini-btn ghostbtn" onclick="saveMixAdjustments()">Save adjustments</button>
+              <button class="mini-btn ghostbtn" onclick="chooseListeningCover()">Choose cover photo</button>
             </div>
+            <p data-mix-status role="status"></p>
             <div class="save-msg" id="saveMsg"></div>
             <div class="demo-note" id="finalNote">Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.</div>
           </div>
@@ -3442,8 +3445,8 @@
 <script src="js/selectable.js"></script>
 <script src="js/dates.js"></script>
 <script src="js/sky.js"></script>
-<script src="js/builder.js"></script>
-<script src="js/billing.js"></script>
+<script src="js/builder.js?v=20260922b"></script>
+<script src="js/billing.js?v=20260922b"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
@@ -3452,9 +3455,10 @@
 <script src="js/avatar-emotions.js"></script>
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
-<script src="js/journey.js"></script>
-<script src="js/profile.js"></script>
-<script src="js/player.js"></script>
+<script src="js/journey.js?v=20260922b"></script>
+<script src="js/profile.js?v=20260922b"></script>
+<script src="js/mix-settings.js?v=20260922b"></script>
+<script src="js/player.js?v=20260922b"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>

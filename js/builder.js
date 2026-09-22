@@ -366,6 +366,7 @@ function resetFlow(){
   const lengthQ = document.getElementById('sessionLengthRow');
   if (lengthQ) lengthQ.style.display = '';
   editingExistingId = null;
+  restoreMixSettings(null, null);
   contentAlreadySaved = false;
   document.getElementById('finalTitleInput').value = '';
   document.getElementById('finalTitleMsg').textContent = '';
@@ -1246,10 +1247,15 @@ function stopSerenityPreview(){
   return wasPlaying;
 }
 
+/* The same two marks the player uses, drawn here rather than borrowed from
+   player.js: the builder must stand up on its own, and it is loaded first. */
+const PREVIEW_PLAY_MARK  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
+const PREVIEW_PAUSE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
+
 function setSerenityPreviewLabel(playing){
   const btn = document.getElementById('serenityPreviewBtn');
   if (!btn) return;
-  btn.textContent = playing ? '■ Stop' : '▶ Preview';
+  btn.innerHTML = (playing ? PREVIEW_PAUSE_MARK : PREVIEW_PLAY_MARK) + (playing ? ' Pause preview' : ' Preview');
   btn.classList.toggle('is-playing', !!playing);
   btn.setAttribute('aria-label', playing ? 'Stop the Serenity preview' : 'Play a short Serenity preview');
 }
@@ -1589,13 +1595,27 @@ async function prepareSessionVoice(){
 
 /* ---------------- step 5: background + mixer ---------------- */
 const bgGrid = document.getElementById('bgGrid');
+function soundArtwork(key){
+  const paths={
+    none:'<path d="M10 24h28"/><path d="M32 9l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/>',
+    rain:'<path d="M12 25a7 7 0 010-14 10 10 0 0119-1 7 7 0 015 14H12M15 30l-2 6m12-6-2 6m12-6-2 6"/>',
+    ocean:'<path d="M5 22c8-12 15 10 23-2s13-1 15 0M5 31c8-12 15 10 23-2s13-1 15 0M32 7l1 4 4 1-4 1-1 4-1-4-4-1 4-1z"/>',
+    waterfall:'<path d="M8 10h12v18c0 9 12 9 12 0V10h8M24 7v20M6 39c8-5 12 5 20 0s12 3 16 0"/>',
+    forest:'<path d="M24 6L12 24h8l-9 11h26l-9-11h8L24 6zm0 29v8M6 14h6m24 4h7"/>',
+    birds:'<path d="M7 27c6-9 12-9 17 0 5-9 11-9 17 0M17 15c3-5 7-5 10 0M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1z"/>',
+    thunder:'<path d="M12 25a7 7 0 010-14 10 10 0 0119-1 7 7 0 015 14M25 23l-8 11h8l-4 10 14-15h-9l4-6"/>',
+    brown:'<path d="M8 20v8m8-14v20m8-25v30m8-25v20m8-14v8"/>',
+    serenity:'<path d="M12 21v6m8-13v20m8-17v14m8-10v6M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1zM10 38c8 5 20 5 28 0"/>'
+  };
+  return '<span class="sound-art" aria-hidden="true"><svg viewBox="0 0 48 48">'+(paths[key]||paths.serenity)+'</svg></span>';
+}
 /* Which ambience is lit, straight off state.bg. Same rule as everywhere else. */
 function paintBgCards(){ syncSelectionByData('#bgGrid .bg-card', 'key', state.bg); }
 BACKGROUNDS.forEach(b=>{
   const c = document.createElement('button'); c.className='bg-card';
   c.dataset.key = b.key;
   c.setAttribute('role', 'radio');
-  c.innerHTML = `<span class="ic">${b.ic}</span>${b.label}`;
+  c.innerHTML = `${soundArtwork(b.key)}<span>${b.label}</span>`;
   c.onclick = ()=>{
     state.bg = b.key;
     paintBgCards();
@@ -2418,6 +2438,7 @@ function setLiveGain(node, v){
   try { node.gain.setValueAtTime(v, t); } catch(e){ node.gain.value = v; }
 }
 function applyLiveMixGain(id, value){
+  if (typeof queueMixSave === 'function') queueMixSave();
   if (!finalPlaying) return;
   if (id==='mixTone') setLiveGain(liveToneGain, value/100 * 0.10);
   if (id==='mixBg') setLiveGain(liveBgGain, value/100);
@@ -2673,7 +2694,7 @@ function playFinal(){
   finalAffirmationIndex = 0; finalRequestedIndex = null;
   deviceSpeechFailures = 0;
   deviceVoiceSilent = false;
-  document.getElementById('finalPlayBtn').disabled = true;
+  document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
