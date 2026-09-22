@@ -7,6 +7,7 @@ const status={textContent:''},rows=new Map(),writes=[];
 let fail=false;
 const context=vm.createContext({
   console:{error(){}},setTimeout,clearTimeout,Promise,
+  window:{addEventListener(){}},
   document:{getElementById:id=>elements[id],querySelectorAll:s=>s==='[data-mix-status]'?[status]:[],addEventListener(){}},
   currentUser:{id:'user-a'},forgetFetch(){},applyLiveMixGain(){},
   sb:{from(){return {update(value){const filters={};return {eq(k,v){filters[k]=v;return this;},select(){return this;},async single(){
@@ -45,6 +46,41 @@ const run=source=>vm.runInContext(source,context);
   assert.match(bar,/toggleImmersivePlayback/);assert.match(bar,/restartListening/);
   const player=fs.readFileSync('js/player.js','utf8');
   const prefs=player.slice(player.indexOf('function applyPlayerPrefs(){'),player.indexOf('function openImmersivePlayer(){'));
-  assert.ok(!prefs.includes('setPlayerBalance('));
-  console.log('PASS: all six volumes, mute, track isolation, reopen, switching during save, save failures, controls, preference override');
+  assert.ok(!prefs.includes('setPlayerBalance('),'preferences must not drive the levels');
+  assert.ok(!player.includes('function setPlayerBalance('),'the balance slider and its handler are gone');
+
+  // The control row is Play/Pause and Start over, and nothing else.
+  const controls=player.slice(player.indexOf('<div class="ip-controls">'),player.indexOf('</div>',player.indexOf('ip-main-play')+200));
+  assert.match(controls,/id="ipPlay" onclick="toggleImmersivePlayback\(\)"/);
+  assert.match(controls,/onclick="restartListening\(\)"/);
+  ['toggleCurrentSubliminalFavorite','seekFinalAffirmation','openLoopSheet','openTimerSheet','shareCurrentSubliminal']
+    .forEach(fn=>assert.ok(!controls.includes(fn),fn+' must not be a play control'));
+  assert.equal((controls.match(/<button/g)||[]).length,2,'exactly two play controls');
+
+  // Choosing a cover happens in the player, on the artwork itself.
+  assert.match(player,/id="listeningCoverBtn" onclick="chooseListeningCover\(\)"/);
+  assert.match(player,/id="listeningCover"/);
+
+  // Nothing points at the four controls that were deleted.
+  ['ipFavorite','ipLoop','ipTimer','ipBalance'].forEach(id=>
+    assert.ok(!player.includes("'"+id+"'"),id+' is gone and must not be looked up'));
+
+  // The bar keeps no second mixer, and its title is the way back in.
+  ['nowMixerRows','toggleNowMixer','syncNowMixer','setNowMix']
+    .forEach(fn=>assert.ok(!profile.includes(fn),fn+' is gone with the bar mixer'));
+  assert.match(bar,/class="nb-txt" onclick="openImmersivePlayer\(\)"/);
+
+  // The journey's levels button opens the panel that saves, not a dead one.
+  const journey=fs.readFileSync('js/journey.js','utf8');
+  const levels=journey.slice(journey.indexOf('function openSoundLevels(){'),journey.indexOf('function journeyGo('));
+  assert.ok(!levels.includes('nbMixer'),'the bar mixer no longer exists');
+  assert.match(levels,/listening-mix/);
+  assert.ok(!journey.includes('STOP_MARK'),"today's card pauses rather than stops");
+
+  // The six layers are the ones the builder actually renders.
+  const html=fs.readFileSync('index.html','utf8');
+  keys.forEach(k=>assert.ok(html.includes('id="'+k+'"')&&html.includes('id="'+k+'Val"'),k+' must exist in the builder'));
+  assert.ok(html.includes('css/listening-fixes.css?v='),'the branded stylesheet is linked');
+
+  console.log('PASS: all six volumes, mute, track isolation, reopen, switching during save, save failures, two play controls, cover selection, no dead wiring, preference override');
 })().catch(e=>{console.error(e);process.exitCode=1});

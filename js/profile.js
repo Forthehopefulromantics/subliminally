@@ -854,12 +854,12 @@ function renderNowBar(){
     bar.innerHTML = `
       <div class="now-bar-in">
         <span class="nb-pulse" aria-hidden="true"></span>
-        <span class="nb-txt">
+        <button type="button" class="nb-txt" onclick="openImmersivePlayer()" aria-label="Open the full-screen player">
           <b id="nbTitle"></b>
           <span id="nbLine"></span>
-        </span>
-        <button type="button" class="nb-mix" id="nbPlay" onclick="toggleImmersivePlayback()">Pause</button>
-        <button type="button" class="nb-stop" onclick="restartListening()">Start over</button>
+        </button>
+        <button type="button" class="nb-play" id="nbPlay" onclick="toggleImmersivePlayback()" aria-label="Pause"></button>
+        <button type="button" class="nb-restart" onclick="restartListening()" aria-label="Start over">${svgIcon('restart')}<span>Start over</span></button>
       </div>`;
     bar.dataset.built = '1';
   }
@@ -867,10 +867,18 @@ function renderNowBar(){
   const lEl = document.getElementById('nbLine');
   if (tEl) tEl.textContent = title;
   if (lEl) lEl.textContent = String(line).slice(0, 90);
+  /* One word for the state you are in, on both buttons, with the same mark the
+     full-screen player shows. Never "Playing…", which named the state you were
+     already in and left nothing to press. */
+  const paused = !!finalPaused;
   const playButton = document.getElementById('nbPlay');
-  if(playButton)playButton.textContent=finalPaused?'Play':'Pause';
+  if(playButton){playButton.innerHTML=svgIcon(paused?'play':'pause');playButton.setAttribute('aria-label',paused?'Play':'Pause');}
   const finalButton = document.getElementById('finalPlayBtn');
-  if(finalButton){finalButton.disabled=false;finalButton.textContent=finalPaused?'Play':'Pause';}
+  if(finalButton){
+    finalButton.disabled=false;
+    finalButton.innerHTML=svgIcon(paused?'play':'pause')+'<span>'+(paused?'Play':'Pause')+'</span>';
+    finalButton.classList.add('play-control');
+  }
   bar.classList.add('on');
   document.body.classList.add('has-now-bar');
 }
@@ -889,69 +897,3 @@ function currentSubliminalTitle(){
 setInterval(renderNowBar, 1000);
 
 
-/* ---------- the mixer, where you are ----------
-   The sliders live on the build page. Playing from the library gave you a
-   session and no way to touch it: no affirmation volume, no nature sound, no
-   frequency. This is the same four controls, in the bar, wherever you played
-   from.
-
-   They drive the originals rather than duplicating them — one source of truth,
-   so the build page and the bar can never show different numbers, and
-   applyLiveMixGain stays the only thing that talks to the audio graph. */
-const NOW_MIX_ROWS = [
-  { id:'mixVoice',    label:'Affirmations' },
-  { id:'mixBg',       label:'Nature sound' },
-  { id:'mixTone',     label:'Frequency' },
-  { id:'mixSoothing', label:'Soothing' },
-];
-
-function nowMixerRows(){
-  return NOW_MIX_ROWS.map(r => {
-    const src = document.getElementById(r.id);
-    if (!src) return '';
-    return `<label class="nb-row">
-      <span class="nb-row-name">${r.label}</span>
-      <input type="range" min="0" max="100" id="nb-${r.id}" value="${src.value}"
-        oninput="setNowMix('${r.id}', this.value)" aria-label="${r.label} volume">
-      <span class="nb-row-val" id="nbv-${r.id}">${src.value}</span>
-    </label>`;
-  }).join('');
-}
-
-/* Moving one here moves the real control and the audio together. */
-function setNowMix(id, value){
-  const src = document.getElementById(id);
-  if (src){
-    src.value = value;
-    const readout = document.getElementById(id + 'Val');
-    if (readout) readout.value = value;
-  }
-  const mine = document.getElementById('nbv-' + id);
-  if (mine) mine.textContent = value;
-  applyLiveMixGain(id, value);
-}
-
-/* Keep the bar's sliders showing the truth if they were changed elsewhere —
-   but never while one is being dragged. */
-function syncNowMixer(){
-  NOW_MIX_ROWS.forEach(r => {
-    const mine = document.getElementById('nb-' + r.id);
-    const src  = document.getElementById(r.id);
-    if (!mine || !src || document.activeElement === mine) return;
-    if (mine.value !== src.value){
-      mine.value = src.value;
-      const v = document.getElementById('nbv-' + r.id);
-      if (v) v.textContent = src.value;
-    }
-  });
-}
-
-function toggleNowMixer(){
-  const panel = document.getElementById('nbMixer');
-  const btn = document.querySelector('.nb-mix');
-  if (!panel) return;
-  const open = panel.hasAttribute('hidden');
-  if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
-  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  document.body.classList.toggle('has-now-mixer', open);
-}

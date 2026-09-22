@@ -4,10 +4,19 @@ let activeMixId = null, restoringMix = false, mixSaveTimer = null;
 let mixWriteQueue = Promise.resolve(), mixRevision = 0;
 let activeCoverPath = null;
 let pendingMixSave = null;
+/* The cover the player is wearing. A built-in ships with the app and needs no
+   round trip; an upload needs a signed link, which expires, so it is fetched
+   each time the player opens. The placeholder is what you press when there is
+   no cover yet, so choosing one is never a hidden feature. */
+function showListeningCover(url){
+  const img=document.getElementById('listeningCover'),empty=document.getElementById('listeningCoverEmpty');
+  if(img){ if(url){img.src=url;img.hidden=false;} else {img.removeAttribute('src');img.hidden=true;} }
+  if(empty)empty.hidden=!!url;
+}
 async function refreshListeningCover(){
-  const img=document.getElementById('listeningCover'),path=activeCoverPath,id=activeMixId;
-  if(!img)return;
-  img.hidden=true;
+  const path=activeCoverPath,id=activeMixId;
+  if(!document.getElementById('listeningCover'))return;
+  showListeningCover(null);
   if(!path)return;
   let url=builtinCoverUrl(path);
   if(!url && sb){
@@ -16,7 +25,7 @@ async function refreshListeningCover(){
     url=data.signedUrl;
   }
   if(id!==activeMixId || path!==activeCoverPath)return;
-  if(url){img.src=url;img.hidden=false;}
+  if(url)showListeningCover(url);
 }
 function readMixSettings(){
   const mix = {};
@@ -33,7 +42,7 @@ function mixMessage(text){
 function restoreMixSettings(id, settings){
   flushMixSave();
   activeMixId = id || null;
-  if(!id)activeCoverPath=null;
+  if(!id){ activeCoverPath=null; refreshListeningCover(); }
   mixRevision++;
   restoringMix = true;
   Object.entries(MIX_DEFAULTS).forEach(([key,fallback]) => {
@@ -115,4 +124,8 @@ function chooseListeningCover(){
   if(activeMixId) pickCoverFor(activeMixId);
   else mixMessage('Save this subliminal to your library first, then choose a cover.');
 }
+/* A refresh, a close, or a swipe away must not lose the fader you just moved:
+   both events flush the pending write, and flushMixSave is a no-op when there
+   is nothing pending, so firing twice costs nothing. */
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushMixSave();});
+window.addEventListener('pagehide',()=>flushMixSave());

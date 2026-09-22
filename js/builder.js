@@ -1247,10 +1247,15 @@ function stopSerenityPreview(){
   return wasPlaying;
 }
 
+/* The same two marks the player uses, drawn here rather than borrowed from
+   player.js: the builder must stand up on its own, and it is loaded first. */
+const PREVIEW_PLAY_MARK  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
+const PREVIEW_PAUSE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
+
 function setSerenityPreviewLabel(playing){
   const btn = document.getElementById('serenityPreviewBtn');
   if (!btn) return;
-  btn.innerHTML = svgIcon(playing ? 'pause' : 'play') + (playing ? ' Pause preview' : ' Preview');
+  btn.innerHTML = (playing ? PREVIEW_PAUSE_MARK : PREVIEW_PLAY_MARK) + (playing ? ' Pause preview' : ' Preview');
   btn.classList.toggle('is-playing', !!playing);
   btn.setAttribute('aria-label', playing ? 'Stop the Serenity preview' : 'Play a short Serenity preview');
 }

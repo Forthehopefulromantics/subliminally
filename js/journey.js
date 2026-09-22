@@ -102,8 +102,8 @@ function openRitualOnToday(time){
    card to hit. Each carries a mark cut to match the play triangle on the cover
    art above it. */
 const PLAY_MARK  = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.87l10.4-6.4a1 1 0 0 0 0-1.74L9.5 4.73A1 1 0 0 0 8 5.6Z"/></svg>';
-// A square, because the button says Stop. Two bars would be promising a pause.
-const STOP_MARK  = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2.6"/></svg>';
+// Two bars, because the button says Pause: your place is kept.
+const PAUSE_MARK = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.4"/><rect x="14" y="4" width="4" height="16" rx="1.4"/></svg>';
 const PLUS_MARK  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
 const STACK_MARK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="13" height="13" rx="2.5"/><path d="M7 4h11a3 3 0 0 1 3 3v11"/></svg>';
 
@@ -114,14 +114,17 @@ const MIXER_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" 
   <path d="M6 20v-7M6 9V4M12 20v-10M12 6V4M18 20v-4M18 12V4"/>
   <circle cx="6" cy="11" r="2"/><circle cx="12" cy="8" r="2"/><circle cx="18" cy="14" r="2"/></svg>`;
 
-/* Opens the levels from wherever you are, rather than only from the bar at the
-   bottom -- which is the one place you are not looking when you are halfway
-   down your morning list. Already open, it scrolls you to it instead of
-   closing it under you. */
+/* Opens the levels from wherever you are, rather than only from the player --
+   which is the one place you are not looking when you are halfway down your
+   morning list. The six faders now live in the player's Sound adjustments
+   panel, because that is where they save with the subliminal, so this raises
+   the player and opens that panel rather than a second copy of the sliders. */
 function openSoundLevels(){
-  const panel = document.getElementById('nbMixer');
+  if (typeof openImmersivePlayer === 'function') openImmersivePlayer();
+  const panel = document.querySelector('#immersivePlayer .listening-mix');
   if (!panel) return;
-  if (panel.hasAttribute('hidden')) toggleNowMixer();
+  panel.open = true;
+  if (typeof syncListeningMix === 'function') syncListeningMix();
   panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
 function journeyGo(key){
@@ -176,9 +179,9 @@ function renderTodaySession(lastSub){
     </div>
     <div class="sess-actions">
       <button class="btn btn-primary" onclick="playTodaySubliminal()">
-        <span class="sess-btn-mark" aria-hidden="true">${finalPlaying ? STOP_MARK : PLAY_MARK}</span>
-        ${finalPlaying ? 'Stop' : 'Play it'}</button>
-      <button class="btn btn-ghost" onclick="showBuildPage()">
+        <span class="sess-btn-mark" aria-hidden="true">${finalPlaying && !finalPaused ? PAUSE_MARK : PLAY_MARK}</span>
+        ${finalPlaying ? (finalPaused ? 'Resume' : 'Pause') : 'Play it'}</button>
+      <button class="btn btn-ghost" onclick="resetFlow(); showBuildPage(); showStep(0);">
         <span class="sess-btn-mark" aria-hidden="true">${PLUS_MARK}</span>Build a new one</button>
       <button class="btn btn-ghost" onclick="showLibraryPage(); setLibraryTab('mine');">
         <span class="sess-btn-mark" aria-hidden="true">${STACK_MARK}</span>All my subliminals</button>
@@ -405,7 +408,10 @@ function chooseTodaySub(id){
    light_ledger like every other quest — playing it is what checks it off, and
    awardLight already refuses to pay twice in a day. */
 function playTodaySubliminal(){
-  if (finalPlaying){ stopFinal(); renderTodaySession(null); renderTodayJourney(); return; }
+  /* Pause, not stop. Everywhere else in the app the second press on a playing
+     session pauses it and keeps your place; this card used to be the one
+     button that threw the session away. */
+  if (finalPlaying){ toggleImmersivePlayback(); renderTodaySession(null); renderTodayJourney(); return; }
   if (typeof primeAudio === 'function') primeAudio();   // inside the tap
   const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
   if (!id){ showBuildPage(); return; }

@@ -71,7 +71,14 @@ function svgIcon(name){
     back:'<path d="M15 18l-6-6 6-6"/><path d="M5 5v14"/>', next:'<path d="M9 18l6-6-6-6"/><path d="M19 5v14"/>',
     loop:'<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
     clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', share:'<circle cx="18" cy="5" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="19" r="2"/><path d="M8 11l8-5M8 13l8 5"/>',
-    play:'<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>', pause:'<path d="M8 5v14M16 5v14"/>', sound:'<path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M17 9c1.4 1.6 1.4 4.4 0 6"/>'
+    play:'<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>', pause:'<path d="M8 5v14M16 5v14"/>', sound:'<path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M17 9c1.4 1.6 1.4 4.4 0 6"/>',
+    // Start over is a circle turned back on itself, not a skip-to-previous arrow:
+    // it restarts the session rather than stepping to another affirmation.
+    restart:'<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4h4"/>',
+    // The cover affordance: a framed picture with a small star, the same
+    // celestial mark the ambience artwork uses.
+    image:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 16l5-4 4 3 3-2 6 4"/><circle cx="9" cy="9" r="1.3"/>',
+    star:'<path d="M12 3l1.9 5.4L19 10l-5.1 1.6L12 17l-1.9-5.4L5 10l5.1-1.6z"/>'
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||''}</svg>`;
 }
@@ -84,14 +91,20 @@ function mountImmersivePlayer(){
         <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker">Sanctuary at night</span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
         <div class="ip-hero" id="ipAffirmationViewport" aria-live="polite" aria-atomic="true"><div class="ip-affirmation-stream" id="ipAffirmationStream"></div></div>
         <div class="ip-lower">
-          <div class="ip-track-copy"><img id="listeningCover" alt="Subliminal cover" hidden><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></div>
+          <div class="ip-track-copy">
+            <button class="ip-cover" id="listeningCoverBtn" onclick="chooseListeningCover()" aria-label="Choose a cover photo" title="Choose a cover photo">
+              <img id="listeningCover" alt="" hidden>
+              <span class="ip-cover-empty" id="listeningCoverEmpty">${svgIcon('image')}</span>
+              <span class="ip-cover-edit" aria-hidden="true">${svgIcon('star')}</span>
+            </button>
+            <span class="ip-track-text"><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></span>
+          </div>
           <button class="ip-ambience-card" onclick="openAmbienceLibrary()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
           <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup()}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
-          <button class="ip-control" onclick="chooseListeningCover()">Choose cover photo</button>
           <div><div class="ip-progress-track"><div class="ip-progress-fill" id="ipProgress"></div></div><div class="ip-times"><span id="ipElapsed">0:00</span><span id="ipRemaining">−20:00</span></div></div>
           <div class="ip-controls">
             <button class="ip-main-play" id="ipPlay" onclick="toggleImmersivePlayback()" aria-label="Pause">${svgIcon('pause')}</button>
-            <button class="ip-control" onclick="restartListening()">${svgIcon('back')}<span>Start over</span></button>
+            <button class="ip-control" onclick="restartListening()">${svgIcon('restart')}<span>Start over</span></button>
           </div>
         </div>
       </div>
@@ -101,6 +114,7 @@ function mountImmersivePlayer(){
       <div class="ps-categories" id="ambienceCategories"></div><div class="ps-list" id="ambienceList"></div>
       <div class="ps-confirm"><div class="ps-selected"><small>Selected</small><b id="ambiencePending">Rain</b></div><button class="ps-use" onclick="usePendingAmbience()">Use this ambience</button></div>
     </div></div>
+    <div class="player-sheet" id="playerMenuSheet" role="dialog" aria-modal="true" aria-label="Player options"><div class="ps-panel"><div class="ps-head"><h3>Player options</h3><button class="ps-close" onclick="closePlayerSheets()" aria-label="Close">✕</button></div><div class="ps-simple"><button class="ps-option" onclick="closePlayerSheets();openLoopSheet()"><span>Loop mode</span><span>›</span></button><button class="ps-option" onclick="closePlayerSheets();openTimerSheet()"><span>Session timer</span><span>›</span></button></div></div></div>
     <div class="player-sheet" id="loopSheet" role="dialog" aria-modal="true" aria-label="Loop mode"><div class="ps-panel"><div class="ps-head"><h3>Loop mode</h3><button class="ps-close" onclick="closePlayerSheets()">✕</button></div><div class="ps-simple" id="loopOptions"></div></div></div>
     <div class="player-sheet" id="timerSheet" role="dialog" aria-modal="true" aria-label="Session timer"><div class="ps-panel"><div class="ps-head"><h3>Session timer</h3><button class="ps-close" onclick="closePlayerSheets()">✕</button></div><div class="ps-simple" id="timerOptions"></div></div></div>
   `);
@@ -110,9 +124,9 @@ function mountImmersivePlayer(){
   hydratePlayerPrefs();
 }
 function applyPlayerPrefs(){
-  const balance = document.getElementById('ipBalance'); if (balance) balance.value = playerPrefs.balance;
-  // Per-subliminal levels, ambience and duration are authoritative.
-  // Global preferences must never overwrite a loaded or edited mix.
+  // Per-subliminal levels, ambience and duration are authoritative. The global
+  // Voice/Ambience balance is gone: it moved two of the six faders behind one
+  // slider and overwrote a loaded mix. Preferences must never touch the levels.
   renderPlayerSelectionState();
 }
 function openImmersivePlayer(){
@@ -162,20 +176,8 @@ function updateImmersivePlayer(){
 }
 function renderPlayerSelectionState(){
   const amb=document.getElementById('ipAmbience'); if(amb)amb.textContent=currentAmbienceLabel();
-  const timer=document.querySelector('#ipTimer span'); if(timer)timer.textContent=playerPrefs.duration>=60?(playerPrefs.duration/60)+' hr':playerPrefs.duration+' min';
-  const loop=document.getElementById('ipLoop'); if(loop){const labels={entire:'Entire',current:'Current',none:'Loop off'};loop.classList.toggle('sel',playerPrefs.loopMode!=='none');loop.title=({entire:'Loop entire subliminal',current:'Loop current affirmation',none:'No loop'})[playerPrefs.loopMode];const label=loop.querySelector('span');if(label)label.textContent=labels[playerPrefs.loopMode]||'Loop';}
-  const fav=document.getElementById('ipFavorite'); if(fav)fav.classList.toggle('sel',playerPrefs.favoriteSubliminals.includes(currentPlayerKey()));
 }
 function currentPlayerKey(){ return editingExistingId || currentPlayerTitle(); }
-function setPlayerBalance(value, save=true){
-  const n=Math.max(0,Math.min(100,Number(value)||0)); playerPrefs.balance=n;
-  const voice=Math.max(3,100-n), ambience=Math.max(3,n);
-  const v=document.getElementById('mixVoice'),b=document.getElementById('mixBg');
-  if(v){v.value=voice; const r=document.getElementById('mixVoiceVal');if(r)r.value=voice;applyLiveMixGain('mixVoice',voice);}
-  if(b){b.value=ambience;const r=document.getElementById('mixBgVal');if(r)r.value=ambience;applyLiveMixGain('mixBg',ambience);}
-  if(save)persistPlayerPrefs();
-}
-function toggleCurrentSubliminalFavorite(){ const k=currentPlayerKey(),set=new Set(playerPrefs.favoriteSubliminals);set.has(k)?set.delete(k):set.add(k);playerPrefs.favoriteSubliminals=[...set];persistPlayerPrefs();renderPlayerSelectionState(); }
 function toggleImmersivePlayback(){ if(!finalPlaying){playFinal();return;} finalPaused?resumeFinal():pauseFinal(); updateImmersivePlayer(); renderNowBar(); }
 
 function renderAmbienceLibrary(){
@@ -220,7 +222,7 @@ function setPlayerLoopMode(mode){playerPrefs.loopMode=mode;persistPlayerPrefs();
 function openTimerSheet(){const choices=[[20,'20 min'],[60,'1 hour'],[240,'4 hours'],[480,'8 hours'],['custom','Custom']];document.getElementById('timerOptions').innerHTML=choices.map(([v,l])=>`<button class="ps-option${playerPrefs.duration===v?' sel':''}" onclick="${v==='custom'?'showCustomTimer()':`setPlayerDuration(${v})`}"><span>${l}</span><span>${playerPrefs.duration===v?'✓':''}</span></button>`).join('')+`<div class="ps-custom" id="customTimer"><input type="number" min="1" max="720" id="customTimerMinutes" placeholder="Minutes"><button class="ps-use" onclick="setPlayerDuration(document.getElementById('customTimerMinutes').value)">Set timer</button></div>`;document.getElementById('timerSheet').classList.add('open');}
 function showCustomTimer(){document.getElementById('customTimer').classList.add('open');document.getElementById('customTimerMinutes').focus();}
 function setPlayerDuration(minutes){minutes=Math.max(1,Math.min(720,Number(minutes)||20));playerPrefs.duration=minutes;state.targetLengthMinutes=minutes;persistPlayerPrefs();renderPlayerSelectionState();closePlayerSheets();}
-function openPlayerMenu(){openLoopSheet();}
+function openPlayerMenu(){closePlayerSheets();document.getElementById('playerMenuSheet').classList.add('open');}
 async function shareCurrentSubliminal(){const data={title:currentPlayerTitle(),text:`I’m listening to “${currentPlayerTitle()}” in Subliminally.`,url:'https://www.subliminallybyfthr.com/'};try{if(navigator.share)await navigator.share(data);else await navigator.clipboard.writeText(`${data.text} ${data.url}`);}catch(e){} }
 async function recordPlayerSession(completed,elapsedSeconds){
   if(playerSessionSaved||!elapsedSeconds)return;playerSessionSaved=true;
