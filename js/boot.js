@@ -55,6 +55,7 @@ if (sb){
     const isNewPerson = wasId !== (currentUser && currentUser.id);
     if (authSettled && isNewPerson && currentUser && event === 'SIGNED_IN') routeAfterAuth({ landOnToday: true });
     if (currentUser) savePushToken();
+    if (currentUser && typeof hydratePlayerPrefs === 'function') hydratePlayerPrefs();
     syncRevenueCatIdentity();
   });
 
@@ -63,6 +64,7 @@ if (sb){
     authSettled = true;
     document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     renderAccountArea();
+    if (currentUser && typeof hydratePlayerPrefs === 'function') await hydratePlayerPrefs();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
