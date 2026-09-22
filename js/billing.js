@@ -699,7 +699,8 @@ async function saveSubliminal(){
   }
 
   forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
-  const { error } = await sb.from('subliminals').insert({
+  const { data: savedSubliminal, error } = await sb.from('subliminals').insert({
+    mix_settings: readMixSettings(),
     user_id: currentUser.id,
     title: title,
     frequency_hz: state.freq ? state.freq.hz : null,
@@ -718,7 +719,7 @@ async function saveSubliminal(){
     // Remember which voice built this one, so reopening it sounds the same.
     ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
     layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
-  });
+  }).select('id').single();
   if (error){
     console.error('saveSubliminal error:', error);
     msg.textContent = `Couldn't save: ${error.message}`;
@@ -733,7 +734,9 @@ async function saveSubliminal(){
   }
   // This is now its own saved subliminal — if they keep tweaking and save again,
   // treat it as a fresh save rather than an edit of the thing they just made.
-  editingExistingId = null;
+  editingExistingId = savedSubliminal.id;
+  activeMixId = savedSubliminal.id;
   contentAlreadySaved = true;
+  pickCoverFor(savedSubliminal.id);
 }
 

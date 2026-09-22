@@ -16,7 +16,9 @@ export default async function handler(req, res) {
   }
 
   const { count, freqLabel, toneLabel, goal } = req.body || {};
-  const safeCount = Math.min(Math.max(parseInt(count, 10) || 14, 5), 20);
+  // Standard subliminals contain at most ten affirmations. EFT keeps its own
+  // separate 11-line structure and never calls this route.
+  const safeCount = Math.min(Math.max(parseInt(count, 10) || 10, 5), 10);
 
   const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
 Frequency association (mood only, not medical): ${freqLabel || 'none'}
