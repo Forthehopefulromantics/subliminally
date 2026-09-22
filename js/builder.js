@@ -117,7 +117,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -316,7 +316,7 @@ function nextStep(){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   /* Clearing through the one helper rather than stripping the class by hand:
      that left every chip on the page still announcing itself as pressed. */
   clearSelection('.sel');
@@ -1901,7 +1901,8 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   }
   clip.gain.gain.value = gainValue;
   liveVoiceGains.add(clip.gain);
-  const done = () => { liveVoiceGains.delete(clip.gain); if (onended) onended(); };
+  liveVoiceElements.add(clip.el);
+  const done = () => { liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el); if (onended) onended(); };
   clip.el.onended = done;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
@@ -2188,6 +2189,9 @@ function changeFinalFrequency(hzStr){
 
 let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
+let finalPaused=false, finalPauseStarted=null, finalPausedTotal=0, finalFadeEnding=false;
+let finalAffirmationIndex=0, finalRequestedIndex=null;
+let finalPauseWaiters=[];
 let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 /* Every gain node a voice line is currently playing through. A line is its own
    node that dies when the line ends, so unlike the tone and the background
@@ -2196,9 +2200,60 @@ let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=nu
    volume did nothing until the *next* line started, which on a long line with
    gaps between repeats is indistinguishable from a broken slider. */
 let liveVoiceGains = new Set();
+let liveVoiceElements = new Set();
 function voiceMixValue(){
   const el = document.getElementById('mixVoice');
   return el ? el.value/100 : 1;
+}
+
+/* Player time excludes pauses so the UI, completion record and timer agree. */
+function getFinalElapsedMs(){
+  if (!finalStartTime) return 0;
+  const pendingPause = finalPaused && finalPauseStarted ? Date.now() - finalPauseStarted : 0;
+  return Math.max(0, Date.now() - finalStartTime - finalPausedTotal - pendingPause);
+}
+function waitWhileFinalPaused(resume){
+  if (!finalPaused) return false;
+  if (!finalPauseWaiters.includes(resume)) finalPauseWaiters.push(resume);
+  return true;
+}
+function pauseFinal(){
+  if (!finalPlaying || finalPaused) return;
+  finalPaused = true; finalPauseStarted = Date.now();
+  try { if (finalCtx && finalCtx.state === 'running') finalCtx.suspend(); } catch(e){}
+  try { window.speechSynthesis.pause(); } catch(e){}
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+}
+function resumeFinal(){
+  if (!finalPlaying || !finalPaused) return;
+  if (finalPauseStarted) finalPausedTotal += Date.now() - finalPauseStarted;
+  finalPauseStarted = null; finalPaused = false;
+  try { if (finalCtx && finalCtx.state === 'suspended') finalCtx.resume(); } catch(e){}
+  try { window.speechSynthesis.resume(); } catch(e){}
+  liveVoiceElements.forEach(el => { try { const p=el.play(); if(p&&p.catch)p.catch(()=>{}); } catch(e){} });
+  const waiters = finalPauseWaiters.splice(0);
+  waiters.forEach(fn => { const t=setTimeout(fn,0); finalTimeouts.push(t); });
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+}
+function seekFinalAffirmation(delta){
+  const lines = state.affirmations || [];
+  if (!lines.length) return;
+  finalRequestedIndex = (finalAffirmationIndex + delta + lines.length) % lines.length;
+}
+function showFinalAffirmation(text, index){
+  finalAffirmationIndex = Number.isInteger(index) ? index : finalAffirmationIndex;
+  const el = document.getElementById('finalLine');
+  if (el) el.textContent = '"'+(text || '')+'"';
+  updateFinalPointTag(finalAffirmationIndex);
+  if (typeof showImmersiveAffirmation === 'function') showImmersiveAffirmation(text || '');
+}
+/* Swap only the ambience graph. Voice clips and the TTS cache are untouched. */
+function changeFinalAmbience(key){
+  state.bg = key || 'none';
+  if (!finalPlaying || !finalCtx || !liveBgGain) return;
+  if (finalAmbience) finalAmbience.stop();
+  finalAmbience = buildAmbience(finalCtx, state.bg, liveBgGain);
 }
 
 /* ---------- soothing layer picker ---------- */
@@ -2611,14 +2666,19 @@ function playFinal(){
     return;
   }
 
+  if (typeof openImmersivePlayer === 'function') openImmersivePlayer();
   finalPlaying = true;
   finalStartTime = Date.now();
+  finalPaused = false; finalPauseStarted = null; finalPausedTotal = 0; finalFadeEnding = false;
+  finalAffirmationIndex = 0; finalRequestedIndex = null;
   deviceSpeechFailures = 0;
   deviceVoiceSilent = false;
   document.getElementById('finalPlayBtn').disabled = true;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
+  if (typeof setupMediaSession === 'function') setupMediaSession();
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 
   // Reuses the context opened by the tap when there is one, rather than making
   // a fresh suspended one that will never be allowed to start.
@@ -2689,6 +2749,7 @@ function playFinal(){
     const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
     function playNextLayerLine(){
       if (!finalPlaying) return;
+      if (waitWhileFinalPaused(playNextLayerLine)) return;
       const lines = state.layerAffirmations;
       if (useOwn){
         const recorded = layerRecordings.map((r,i)=>({r,i})).filter(x=>x.r);
@@ -2739,22 +2800,30 @@ function playFinal(){
       let idx = 0;
       function playNext(){
         if (!finalPlaying) return;
+        if (waitWhileFinalPaused(playNext)) return;
+        if (finalRequestedIndex !== null){
+          const requestedRecorded = recorded.findIndex(x => x.i === finalRequestedIndex);
+          finalRequestedIndex = null;
+          if (requestedRecorded >= 0) idx = requestedRecorded;
+        }
         if (idx >= recorded.length){ onDone(recorded.length > 0); return; }
         const { r, i } = recorded[idx];
-        document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
+        showFinalAffirmation(state.affirmations[i], i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
         loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
           let rep = 0;
           function playOnce(){
             if (!finalPlaying) return;
+            if (waitWhileFinalPaused(playOnce)) return;
             playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, ()=>{
               rep++;
               if (rep < repeatsForThisLine){
                 // Short beat between repeats of the same line, timed to a single tap.
                 const t = setTimeout(playOnce, 700); finalTimeouts.push(t);
               } else {
-                idx++; const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
+                if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+                const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
               }
             });
           }
@@ -2776,8 +2845,10 @@ function playFinal(){
       const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
+        if (waitWhileFinalPaused(speakNext)) return;
+        if (finalRequestedIndex !== null){ idx = finalRequestedIndex; finalRequestedIndex = null; }
         if (idx >= lines.length){ onDone(lines.length > 0); return; }
-        document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
+        showFinalAffirmation(lines[idx], idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
         function advance(){
@@ -2785,7 +2856,8 @@ function playFinal(){
           if (rep < repeatsForThisLine){
             const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
           } else {
-            idx++; const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
+            if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+            const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
           }
         }
         /* The device's own voice is the one thing here that can fail without
@@ -2802,6 +2874,7 @@ function playFinal(){
            outcome this code can produce, and it was the likeliest one. */
         function deviceSpeak(){
           if (!finalPlaying) return;
+          if (waitWhileFinalPaused(deviceSpeak)) return;
           if (deviceVoiceSilent){
             // Known not to speak here: keep the lines moving with the music
             // rather than stalling four seconds on each one.
@@ -2839,6 +2912,7 @@ function playFinal(){
         }
         function speakOnce(){
           if (!finalPlaying) return;
+          if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
           voicePromise.then(voiceKey => {
             if (!finalPlaying) return;
@@ -2885,11 +2959,12 @@ function playFinal(){
   let passesWithNoAudio = 0;
   runSequence(function loopCheck(playedSomething){
     const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
-    const elapsed = Date.now() - finalStartTime;
+    const elapsed = getFinalElapsedMs();
     const stillBuildingTowardTarget = targetMs && elapsed < targetMs;
     /* Tapping has no set length, so it keeps coming back round until you stop
        it. That is the whole point of not asking how long first. */
-    const manualLoop = document.getElementById('loopToggle').checked || state.eftMode;
+    const selectedLoopMode = typeof getPlayerLoopMode === 'function' ? getPlayerLoopMode() : (document.getElementById('loopToggle').checked ? 'entire' : 'none');
+    const manualLoop = selectedLoopMode === 'entire' || state.eftMode;
     if (playedSomething) passesWithNoAudio = 0; else passesWithNoAudio++;
     if (passesWithNoAudio >= 1){
       const why = state.voiceMode === 'own'
@@ -2899,7 +2974,7 @@ function playFinal(){
       document.getElementById('finalLine').textContent = why;  // after, or finishFinal overwrites it
       return;
     }
-    if (finalPlaying && (stillBuildingTowardTarget || manualLoop)){
+    if (finalPlaying && selectedLoopMode !== 'none' && (stillBuildingTowardTarget || manualLoop)){
       const t = setTimeout(() => runSequence(loopCheck), 0); finalTimeouts.push(t);
     } else {
       finishFinal();
@@ -2953,7 +3028,7 @@ function updateSessionTimerLabel(){
     if (progressWrap) progressWrap.style.display = 'none';
     return;
   }
-  const elapsedSec = Math.floor((Date.now() - finalStartTime)/1000);
+  const elapsedSec = Math.floor(getFinalElapsedMs()/1000);
   const targetSec = targetMin * 60;
   const remaining = Math.max(0, targetSec - elapsedSec);
   const mm = Math.floor(remaining/60), ss = remaining%60;
@@ -2966,18 +3041,40 @@ function updateSessionTimerLabel(){
     elapsedEl.textContent = fmtClock(elapsedSec);
     remainingEl.textContent = remaining > 0 ? '-' + fmtClock(remaining) : (document.getElementById('loopToggle').checked ? 'looping' : '-0:00:00');
   }
+  if (remaining <= 0 && !finalFadeEnding) fadeOutAndFinishFinal();
+}
+
+function fadeOutAndFinishFinal(){
+  if (!finalPlaying || finalFadeEnding) return;
+  finalFadeEnding = true;
+  const now = finalCtx ? finalCtx.currentTime : 0;
+  [liveToneGain,liveBgGain,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
+    if (!node || !node.gain || !finalCtx) return;
+    try {
+      node.gain.cancelScheduledValues(now);
+      node.gain.setValueAtTime(Math.max(.0001,node.gain.value),now);
+      node.gain.exponentialRampToValueAtTime(.0001,now+1.5);
+    } catch(e){}
+  });
+  const t = setTimeout(finishFinal, 1600); finalTimeouts.push(t);
 }
 
 function finishFinal(){
   // A session only counts once it has actually run for a while; starting and
   // stopping shouldn't pay, and the database won't pay twice in a day anyway.
-  if (finalPlaying && finalStartTime && Date.now() - finalStartTime > 60000){
+  const listenedSeconds = Math.floor(getFinalElapsedMs()/1000);
+  if (finalPlaying && finalStartTime && listenedSeconds > 60){
     awardLight(LIGHT_SOURCES.subliminal, '', document.getElementById('finalPlayBtn'));
   }
   finalPlaying = false;
+  finalPaused = false; finalPauseStarted = null;
+  finalPauseWaiters = [];
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  if (typeof recordPlayerSession === 'function') recordPlayerSession(true, listenedSeconds);
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal';
@@ -2993,13 +3090,20 @@ function finishFinal(){
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   if (finalAmbience){ finalAmbience.stop(); }
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
-  if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
+  if (finalCtx){ const closingCtx=finalCtx; finalCtx=null; setTimeout(()=>{ try{ closingCtx.close(); }catch(e){} }, 300); }
   liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
+  liveVoiceElements.clear();
 }
 
 function stopFinal(){
+  const listenedSeconds = Math.floor(getFinalElapsedMs()/1000);
   finalPlaying = false;
+  finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
+  finalPauseWaiters = [];
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  if (typeof recordPlayerSession === 'function') recordPlayerSession(false, listenedSeconds);
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
@@ -3017,7 +3121,9 @@ function stopFinal(){
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
   liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
+  liveVoiceElements.clear();
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
