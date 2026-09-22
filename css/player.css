@@ -31,12 +31,18 @@ body.player-open{ overflow:hidden; }
 .ip-icon-btn:hover,.ip-icon-btn:focus-visible{ border-color:#e8c989; color:#f8dca2; transform:translateY(-1px); }
 .ip-icon-btn.sel{ color:#f7d893; border-color:rgba(247,216,147,.72); background:rgba(239,188,109,.14); }
 .ip-kicker{ font-size:10px; font-weight:500; letter-spacing:.24em; text-transform:uppercase; color:#d3b9ed; }
-.ip-hero{ align-self:center; text-align:center; padding:4vh 8px 1vh; min-height:190px;
-  display:flex; align-items:center; justify-content:center; }
-.ip-affirmation{ max-width:620px; font-family:var(--serif); font-size:clamp(29px,7vw,48px); line-height:1.24;
+.ip-hero{ position:relative; align-self:stretch; min-height:240px; overflow:hidden; text-align:center;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,#000 16%,#000 84%,transparent 100%);
+  mask-image:linear-gradient(180deg,transparent 0%,#000 16%,#000 84%,transparent 100%); }
+.ip-affirmation-stream{ position:absolute; inset:0; overflow:hidden; }
+.ip-affirmation{ position:absolute; top:50%; left:0; right:0; width:100%; max-width:620px; margin:0 auto;
+  padding:0 8px; font-family:var(--serif); font-size:clamp(29px,7vw,48px); line-height:1.24;
   font-weight:400; letter-spacing:-.025em; text-wrap:balance; color:#fff9f3;
-  text-shadow:0 3px 30px rgba(17,8,42,.55); transition:opacity .35s ease,transform .35s ease; }
-.ip-affirmation.changing{ opacity:0; transform:translateY(-10px); }
+  text-shadow:0 3px 30px rgba(17,8,42,.55); transform:translateY(-50%); opacity:1;
+  transition:opacity .9s ease,transform .9s cubic-bezier(.22,.72,.16,1); will-change:transform,opacity; }
+.ip-affirmation.entering{ opacity:0; transform:translateY(70%); }
+.ip-affirmation.departing{ opacity:.16; transform:translateY(-165%); }
+.ip-affirmation.leaving{ opacity:0; transform:translateY(-275%); }
 .ip-lower{ display:flex; flex-direction:column; gap:13px; }
 .ip-track-copy{text-align:center;}
 .ip-track-copy small{ display:block; color:#c8b9df; font-size:11px; letter-spacing:.12em; text-transform:uppercase; }
@@ -108,4 +114,9 @@ body.player-open{ overflow:hidden; }
 .ps-custom input{ min-width:0; border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:11px 12px;
   color:#fff; background:rgba(0,0,0,.16); font:inherit; }
 @media (min-width:721px){ .immersive-player{ background:rgba(6,4,18,.94); } .ip-shell{ box-shadow:0 0 90px rgba(8,4,25,.48); } }
-@media (prefers-reduced-motion:reduce){ .ip-cloud{ animation:none!important; } .ip-affirmation{ transition:none; } }
+@media (prefers-reduced-motion:reduce){
+  .ip-cloud{ animation:none!important; }
+  .ip-affirmation{ transition:none; }
+  .ip-affirmation.entering{ opacity:1; transform:translateY(-50%); }
+  .ip-affirmation.departing,.ip-affirmation.leaving{ display:none; }
+}
