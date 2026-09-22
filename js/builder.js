@@ -1357,20 +1357,14 @@ async function openMyVoicePanel(){
   panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-/* Resolve what the picker stores into the key the API wants. Returns null when
-   the line should be read by this device instead — no account, no voice of their
-   own yet, or the device voice chosen on purpose. */
+/* Only an explicitly saved device voice may use browser speech. Studio voice
+   failures must preserve the selected voice and surface an actionable error. */
 async function resolveVoiceKey(picked){
-  if (!picked || picked === DEVICE_VOICE) return null;
-  if (!currentUser) return null;
-  /* Every voice past this point is generated, which means it is premium — this
-     one included when it is a subliminal saved on Ritual being opened by an
-     account that has since lapsed, or one of the retired voices that is still
-     named in an older row. The server would refuse it anyway; returning null
-     here means this device reads the session instead of a round trip that ends
-     in an error message over somebody's affirmations. */
-  if (!tierHasFeature(await getMyTier(), 'studio_voice')) return null;
-  if (picked === MY_CLONED_VOICE) return (await myVoiceProfile()) ? MY_CLONED_VOICE : null;
+  if (picked === DEVICE_VOICE) return null;
+  if (!picked) throw new Error('invalid_voice');
+  if (!currentUser) throw new Error('not_signed_in');
+  if (!tierHasFeature(await getMyTier(), 'studio_voice')) throw new Error('upgrade_required');
+  if (picked === MY_CLONED_VOICE && !(await myVoiceProfile())) throw new Error('no_cloned_voice');
   return picked;
 }
 
@@ -1384,17 +1378,11 @@ async function previewVoice(picked){
   const msg = document.getElementById('voicePickerMsg');
   if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
-  const voiceKey = await resolveVoiceKey(picked);
-  if (!voiceKey){
-    if (msg && picked !== DEVICE_VOICE && !currentUser){
-      msg.textContent = 'Sign in to hear Serenity — this device reads it for now.';
-    }
-    speakWithDeviceVoice(line);
-    return;
-  }
   if (msg) msg.textContent = 'Loading the voice…';
   try {
-    const url = await synthesizeLine(line, voiceKey);
+    const voiceKey = await resolveVoiceKey(picked);
+    if (!voiceKey){ if (msg) msg.textContent = ''; speakWithDeviceVoice(line); return; }
+    const url = await synthesizeLine(splitSpeechText(line)[0], voiceKey);
     if (msg) msg.textContent = '';
     const el = document.getElementById('voicePreview');
     if (!el) return;
@@ -1404,10 +1392,9 @@ async function previewVoice(picked){
     el.dataset.kind = 'generated';
     el.onended = null;
     setSerenityPreviewLabel(false);
-    el.src = url; el.play().catch(()=>{});
+    el.src = url; await el.play();
   } catch (e){
     if (msg){ msg.textContent = ttsErrorText(e); msg.className = 'save-msg'; }
-    speakWithDeviceVoice(line);
   }
 }
 function speakWithDeviceVoice(line){
@@ -1417,31 +1404,35 @@ function speakWithDeviceVoice(line){
   window.speechSynthesis.speak(u);
 }
 
-/* ---------------- what went wrong, in our own words ----------------
-   The routes answer with a code, never a provider message: "voice_not_found" or a
-   quota object with our account in it is no use to somebody trying to fall asleep.
-   This is the one place those codes become something a person can read, and every
-   one of them ends the same way — the session still plays, in this device's voice. */
+/* Provider errors never change the voice the listener selected. */
 const TTS_MESSAGES = {
-  not_signed_in:    'Sign in to use Serenity — this device reads it for now.',
-  upgrade_required: 'Serenity comes with Ritual — using this device\'s voice for now.',
-  not_configured:   'Serenity isn\'t switched on yet — using this device\'s voice.',
-  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Clone your voice" to read the passage once.',
-  invalid_voice:    'That voice isn\'t available any more — choose another one, or this device reads it.',
-  consent_required: 'Tick the confirmation first, then your voice can be created.',
-  quota_exceeded:   'Serenity has run out of time this month — this device reads it for now, and it\'ll be back.',
-  rate_limited:     'The voice service is busy — give it a minute and try again. This device reads it for now.',
-  too_fast:         'That\'s a lot of generating at once — give it a minute. This device reads it for now.',
-  hourly_limit:     'You\'ve built a lot this hour. Serenity comes back shortly; this device reads it until then.',
-  daily_limit:      'You\'ve built a lot today. Serenity comes back tomorrow; this device reads it until then.',
-  timeout:          'The voice service took too long — this device reads it for now.',
-  network:          'Couldn\'t reach the voice service — this device reads it for now.',
-  too_long:         'That line is too long to read as one clip — shorten it, or this device reads it.',
-  too_many_lines:   'That\'s more lines than one session can hold — trim a few.',
+  not_signed_in: 'Sign in again to play your selected voice.',
+  upgrade_required: 'Your selected voice requires an active Ritual subscription.',
+  not_configured: 'The voice service is not configured. Please contact support.',
+  no_cloned_voice: 'Your cloned voice is unavailable. Open Clone your voice to set it up.',
+  invalid_voice: 'Your selected voice is unavailable. Choose a voice again.',
+  consent_required: 'Confirm your consent before creating your voice.',
+  quota_exceeded: 'The voice service has reached its usage limit. Please try again later.',
+  rate_limited: 'The voice service is busy. Wait a minute, then tap play to retry.',
+  too_fast: 'Please wait a minute, then tap play to retry.',
+  hourly_limit: 'The hourly voice limit has been reached. Please try again later.',
+  daily_limit: 'The daily voice limit has been reached. Please try again tomorrow.',
+  timeout: 'The voice service took too long. Tap play to retry.',
+  network: 'Check your connection, then tap play to retry.',
+  too_long: 'This voice clip is too long. Please try creating the session again.',
+  too_many_lines: 'There are too many voice clips in this request.',
 };
 function ttsErrorText(e){
-  const code = (e && e.message) || '';
-  return TTS_MESSAGES[code] || 'That voice is unavailable right now — using this device\'s voice.';
+  return TTS_MESSAGES[(e && e.message) || ''] || 'Your selected voice could not load. Tap play to retry.';
+}
+function reportStudioVoiceError(e){
+  if (!finalPlaying) return;
+  stopFinal();
+  const message = ttsErrorText(e);
+  const el = document.getElementById('finalLine');
+  if (el) el.textContent = message;
+  if (typeof showImmersiveAffirmation === 'function') showImmersiveAffirmation(message);
+  if (typeof updateImmersivePlayer === 'function') updateImmersivePlayer();
 }
 
 /* ---------------- generated speech, once ----------------
@@ -1474,6 +1465,49 @@ const TTS_LINES_PER_REQUEST = 6;
    line as *it* normalized it, and that is the key the player looks up. */
 function ttsLineText(text){ return String(text == null ? '' : text).replace(/\s+/g, ' ').trim(); }
 function ttsLineKey(voiceKey, speed, text){ return voiceKey + '|' + speed + '|' + ttsLineText(text); }
+
+/* The API accepts 400 characters per clip. Visualization stories remain one
+   visible passage, but are voiced as cached, ordered clips within that limit. */
+function splitSpeechText(text){
+  let remaining = ttsLineText(text);
+  const chunks = [];
+  while (remaining.length > 400){
+    const window = remaining.slice(0, 400);
+    const sentences = [...window.matchAll(/[.!?](?=\s)/g)];
+    let end = sentences.length ? sentences[sentences.length - 1].index + 1 : window.lastIndexOf(' ');
+    if (end < 1) end = 400;
+    chunks.push(remaining.slice(0, end));
+    remaining = remaining.slice(end).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}
+function playStudioLine(text, voiceKey, gainValue, extraDest, onended){
+  const chunks = splitSpeechText(text);
+  const sessionContext = finalCtx;
+  let index = 0;
+  const active = () => finalPlaying && finalCtx === sessionContext;
+  const fail = e => { if (active()) reportStudioVoiceError(e); };
+  async function next(){
+    if (!active()) return;
+    if (waitWhileFinalPaused(next)) return;
+    if (index >= chunks.length){ onended(); return; }
+    try {
+      const url = await synthesizeLine(chunks[index], voiceKey);
+      if (!active()) return;
+      const clip = await loadClip(sessionContext, studioClipHandle(url));
+      if (!active()) return;
+      const play = () => {
+        if (!active()) return;
+        if (waitWhileFinalPaused(play)) return;
+        try { playClip(sessionContext, clip, gainValue(), extraDest, () => { index++; next(); }, fail); }
+        catch(e){ fail(e); }
+      };
+      play();
+    } catch(e){ fail(e); }
+  }
+  next();
+}
 
 async function ttsRequest(lines, voiceKey, speed){
   const token = sb && (await sb.auth.getSession()).data.session?.access_token;
@@ -1515,7 +1549,7 @@ async function synthesizeLine(text, voiceKey){
 async function fetchSequenceAudio(lines, voiceKey){
   const speed = paceNow().speed;
   const wanted = [];
-  (lines || []).forEach(l => {
+  (lines || []).flatMap(splitSpeechText).forEach(l => {
     const line = ttsLineText(l);
     if (line && !wanted.includes(line) && !ttsCache.has(ttsLineKey(voiceKey, speed, line))) wanted.push(line);
   });
@@ -1560,8 +1594,6 @@ let preparingSessionVoice = false;
 async function prepareSessionVoice(){
   if (preparingSessionVoice) return;
   if (state.voiceMode !== 'ai') return;
-  const voiceKey = await resolveVoiceKey(state.aiVoiceId);
-  if (!voiceKey) return;                       // device voice: nothing to generate
   const lineEl = document.getElementById('finalLine');
   const playBtn = document.getElementById('finalPlayBtn');
   const wasSaying = lineEl ? lineEl.textContent : '';
@@ -1569,6 +1601,8 @@ async function prepareSessionVoice(){
   if (playBtn) playBtn.disabled = true;
   if (lineEl) lineEl.textContent = 'Recording your affirmations in that voice — this happens once, then it loops for as long as you set.';
   try {
+    const voiceKey = await resolveVoiceKey(state.aiVoiceId);
+    if (!voiceKey){ if (lineEl) lineEl.textContent = wasSaying; return; }
     const main = await prepareSequenceAudio(state.affirmations, voiceKey);
     let layer = { ok: true };
     if (layerVoiceEnabled && state.layerVoiceMode === 'ai' && state.layerAffirmations && state.layerAffirmations.length){
@@ -1879,7 +1913,7 @@ async function loadClip(ctx, rec){
 }
 
 /* Play one loaded clip through `gainValue`, calling onended when it finishes. */
-function playClip(ctx, clip, gainValue, extraDest, onended){
+function playClip(ctx, clip, gainValue, extraDest, onended, onerror){
   if (clip.kind === 'buffer'){
     const g = ctx.createGain(); g.gain.value = gainValue;
     g.connect(audioOut(ctx));
@@ -1903,10 +1937,15 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   liveVoiceGains.add(clip.gain);
   liveVoiceElements.add(clip.el);
   const done = () => { liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el); if (onended) onended(); };
+  const failed = e => {
+    liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el);
+    if (onerror) onerror(e); else if (onended) onended();
+  };
   clip.el.onended = done;
+  clip.el.onerror = failed;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
-  if (p && p.catch) p.catch(done);
+  if (p && p.catch) p.catch(failed);
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
@@ -2776,17 +2815,12 @@ function playFinal(){
           utter.onend = advance;
           window.speechSynthesis.speak(utter);
         };
-        resolveVoiceKey(state.layerAiVoiceId).catch(()=>null).then(voiceKey => {
-          if (!finalPlaying) return;
+        const sessionContext = finalCtx;
+        resolveVoiceKey(state.layerAiVoiceId).then(voiceKey => {
+          if (!finalPlaying || finalCtx !== sessionContext) return;
           if (!voiceKey){ deviceSpeak(); return; }
-          return synthesizeLine(line, voiceKey)
-            .then(url => loadClip(finalCtx, studioClipHandle(url)))
-            .then(clip => {
-              if (!finalPlaying) return;
-              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, advance);
-            })
-            .catch(deviceSpeak);
-        }).catch(deviceSpeak);
+          playStudioLine(line, voiceKey, () => liveLayerVoiceGain.gain.value, null, advance);
+        }).catch(e => { if (finalCtx === sessionContext) reportStudioVoiceError(e); });
       }
     }
     // Starts a beat after the main voice so the two voices don't land on top of each other.
@@ -2839,10 +2873,10 @@ function playFinal(){
     } else {
       const lines = state.affirmations;
       let idx = 0;
-      // Resolved once per session: a studio voice key, or null to use the voice
-      // built into this device. Anything that goes wrong with a studio voice
-      // falls back to the device rather than leaving the session silent.
-      const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
+      const sessionContext = finalCtx;
+      const voicePromise = resolveVoiceKey(state.aiVoiceId);
+      // Attach immediately so a rejected plan check is never unhandled.
+      voicePromise.catch(e => { if (finalCtx === sessionContext) reportStudioVoiceError(e); });
       function speakNext(){
         if (!finalPlaying){ return; }
         if (waitWhileFinalPaused(speakNext)) return;
@@ -2915,16 +2949,10 @@ function playFinal(){
           if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
           voicePromise.then(voiceKey => {
-            if (!finalPlaying) return;
+            if (!finalPlaying || finalCtx !== sessionContext) return;
             if (!voiceKey){ deviceSpeak(); return; }
-            return synthesizeLine(line, voiceKey)
-              .then(url => loadClip(finalCtx, studioClipHandle(url)))
-              .then(clip => {
-                if (!finalPlaying) return;
-                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
-              })
-              .catch(() => deviceSpeak());
-          }).catch(deviceSpeak);
+            playStudioLine(line, voiceKey, () => document.getElementById('mixVoice').value/100, destForRecording, advance);
+          }).catch(e => { if (finalCtx === sessionContext) reportStudioVoiceError(e); });
         }
         speakOnce();
       }
