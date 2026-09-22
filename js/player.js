@@ -84,18 +84,14 @@ function mountImmersivePlayer(){
         <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker">Sanctuary at night</span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
         <div class="ip-hero" id="ipAffirmationViewport" aria-live="polite" aria-atomic="true"><div class="ip-affirmation-stream" id="ipAffirmationStream"></div></div>
         <div class="ip-lower">
-          <div class="ip-track-copy"><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></div>
+          <div class="ip-track-copy"><img id="listeningCover" alt="Subliminal cover" hidden><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></div>
           <button class="ip-ambience-card" onclick="openAmbienceLibrary()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
-          <label class="ip-balance"><span>Voice</span><input id="ipBalance" type="range" min="0" max="100" value="58" oninput="setPlayerBalance(this.value)"><span>Ambience</span></label>
+          <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup()}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
+          <button class="ip-control" onclick="chooseListeningCover()">Choose cover photo</button>
           <div><div class="ip-progress-track"><div class="ip-progress-fill" id="ipProgress"></div></div><div class="ip-times"><span id="ipElapsed">0:00</span><span id="ipRemaining">−20:00</span></div></div>
           <div class="ip-controls">
-            <button class="ip-control" id="ipFavorite" onclick="toggleCurrentSubliminalFavorite()">${svgIcon('heart')}<span>Favorite</span></button>
-            <button class="ip-control" onclick="seekFinalAffirmation(-1)">${svgIcon('back')}<span>Previous</span></button>
-            <button class="ip-main-play" id="ipPlay" onclick="toggleImmersivePlayback()" aria-label="Play or pause">${svgIcon('pause')}</button>
-            <button class="ip-control" onclick="seekFinalAffirmation(1)">${svgIcon('next')}<span>Next</span></button>
-            <button class="ip-control" id="ipLoop" onclick="openLoopSheet()">${svgIcon('loop')}<span>Loop</span></button>
-            <button class="ip-control" id="ipTimer" onclick="openTimerSheet()">${svgIcon('clock')}<span>20 min</span></button>
-            <button class="ip-control" onclick="shareCurrentSubliminal()">${svgIcon('share')}<span>Share</span></button>
+            <button class="ip-main-play" id="ipPlay" onclick="toggleImmersivePlayback()" aria-label="Pause">${svgIcon('pause')}</button>
+            <button class="ip-control" onclick="restartListening()">${svgIcon('back')}<span>Start over</span></button>
           </div>
         </div>
       </div>
@@ -115,9 +111,8 @@ function mountImmersivePlayer(){
 }
 function applyPlayerPrefs(){
   const balance = document.getElementById('ipBalance'); if (balance) balance.value = playerPrefs.balance;
-  setPlayerBalance(playerPrefs.balance, false);
-  if (state && (!state.bg || state.bg === 'none')) state.bg = playerPrefs.ambience || 'rain';
-  if (state && playerPrefs.duration) state.targetLengthMinutes = playerPrefs.duration;
+  // Per-subliminal levels, ambience and duration are authoritative.
+  // Global preferences must never overwrite a loaded or edited mix.
   renderPlayerSelectionState();
 }
 function openImmersivePlayer(){
@@ -129,7 +124,7 @@ function openImmersivePlayer(){
   document.body.classList.add('player-open');
   document.getElementById('ipTitle').textContent = currentPlayerTitle();
   showImmersiveAffirmation((document.getElementById('finalLine')||{}).textContent || (state.affirmations||[])[0] || 'Breathe in. Your session is beginning.');
-  renderPlayerSelectionState(); updateImmersivePlayer();
+  refreshListeningCover(); syncListeningMix(); renderPlayerSelectionState(); updateImmersivePlayer();
   clearInterval(playerUiTimer); playerUiTimer = setInterval(updateImmersivePlayer,500);
 }
 function closeImmersivePlayer(){
@@ -162,7 +157,7 @@ function updateImmersivePlayer(){
   const elapsed=playerElapsedSeconds(), total=Math.max(60,(state.targetLengthMinutes||playerPrefs.duration||20)*60), rem=Math.max(0,total-elapsed);
   document.getElementById('ipElapsed').textContent=fmtPlayerTime(elapsed); document.getElementById('ipRemaining').textContent='−'+fmtPlayerTime(rem);
   document.getElementById('ipProgress').style.width=Math.min(100,elapsed/total*100)+'%';
-  const play=document.getElementById('ipPlay'); if(play) play.innerHTML=svgIcon(finalPlaying&&!finalPaused?'pause':'play');
+  const play=document.getElementById('ipPlay'); if(play){play.innerHTML=svgIcon(finalPlaying&&!finalPaused?'pause':'play');play.setAttribute('aria-label',finalPlaying&&!finalPaused?'Pause':'Play');}
   if ('mediaSession' in navigator && state && state.affirmations){ try { navigator.mediaSession.setPositionState({duration:total,playbackRate:1,position:Math.min(total,elapsed)}); } catch(e){} }
 }
 function renderPlayerSelectionState(){
@@ -181,7 +176,7 @@ function setPlayerBalance(value, save=true){
   if(save)persistPlayerPrefs();
 }
 function toggleCurrentSubliminalFavorite(){ const k=currentPlayerKey(),set=new Set(playerPrefs.favoriteSubliminals);set.has(k)?set.delete(k):set.add(k);playerPrefs.favoriteSubliminals=[...set];persistPlayerPrefs();renderPlayerSelectionState(); }
-function toggleImmersivePlayback(){ if(!finalPlaying){playFinal();return;} finalPaused?resumeFinal():pauseFinal(); updateImmersivePlayer(); }
+function toggleImmersivePlayback(){ if(!finalPlaying){playFinal();return;} finalPaused?resumeFinal():pauseFinal(); updateImmersivePlayer(); renderNowBar(); }
 
 function renderAmbienceLibrary(){
   const cats=document.getElementById('ambienceCategories'); if(!cats)return;

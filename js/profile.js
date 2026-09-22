@@ -178,8 +178,10 @@ async function renameLibraryItem(id){
    loader, not two. */
 async function loadSavedIntoBuilder(id, opts){
   if (!sb || !currentUser) return;
+  await flushMixSave();
   const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
-  if (error || !s) return;
+  if (error || !s) throw error || new Error('This subliminal could not be loaded.');
+  if (finalPlaying) stopFinal();
   editingExistingId = id;
   state.playerTitle = s.title || 'Your Subliminal';
   const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
@@ -283,6 +285,9 @@ async function loadSavedIntoBuilder(id, opts){
   }
 
   prepareFinal();
+  restoreMixSettings(id, s.mix_settings);
+  activeCoverPath = s.cover_path || null;
+  refreshListeningCover();
   if (!(opts && opts.stayHere)){
     showBuildPage();
     showStep(7);
@@ -604,7 +609,7 @@ async function playFromLibrary(id){
   const now = document.getElementById('libNow-' + id);
 
   // Pressing play on the one already playing stops it, the way a playlist does.
-  if (finalPlaying && libraryNowPlayingId === id){ stopFinal(); return; }
+  if (finalPlaying && libraryNowPlayingId === id){ toggleImmersivePlayback(); openImmersivePlayer(); return; }
   if (finalPlaying) stopFinal();
 
   libraryNowPlayingId = id;
@@ -647,68 +652,6 @@ setInterval(() => { if (libraryNowPlayingId) reflectLibraryPlaying(); }, 1000);
    It is one bar, driven off finalPlaying, and it renders nothing when nothing
    is playing. Not a second player: the stop button calls the same stopFinal()
    every other control does. */
-function ensureNowBar(){
-  let bar = document.getElementById('nowBar');
-  if (bar) return bar;
-  bar = document.createElement('div');
-  bar.id = 'nowBar';
-  bar.className = 'now-bar';
-  bar.setAttribute('role', 'status');
-  bar.setAttribute('aria-live', 'polite');
-  document.body.appendChild(bar);
-  return bar;
-}
-
-function renderNowBar(){
-  const bar = ensureNowBar();
-  if (!finalPlaying){
-    bar.classList.remove('on');
-    bar.innerHTML = '';
-    document.body.classList.remove('has-now-bar');
-    return;
-  }
-  const title = (typeof currentPlayerTitle === 'function' && currentPlayerTitle()) || currentSubliminalTitle() || 'Your subliminal';
-  const line  = (document.getElementById('finalLine') || {}).textContent || '';
-  /* Rebuilt every second, so a slider mid-drag must not be torn out from under
-     the finger. Only the text changes on a tick; the controls are built once. */
-  if (!bar.dataset.built){
-    bar.innerHTML = `
-      <div class="now-bar-in">
-        <span class="nb-pulse" aria-hidden="true"></span>
-        <span class="nb-txt">
-          <b id="nbTitle"></b>
-          <span id="nbLine"></span>
-        </span>
-        <button type="button" class="nb-mix" onclick="openImmersivePlayer()" aria-label="Open full-screen player">Open</button>
-        <button type="button" class="nb-mix" onclick="toggleNowMixer()"
-          aria-expanded="false" aria-controls="nbMixer" aria-label="Sound levels">Levels</button>
-        <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
-      </div>
-      <div class="nb-mixer" id="nbMixer" hidden>${nowMixerRows()}</div>`;
-    bar.dataset.built = '1';
-  }
-  const tEl = document.getElementById('nbTitle');
-  const lEl = document.getElementById('nbLine');
-  if (tEl) tEl.textContent = title;
-  if (lEl) lEl.textContent = String(line).slice(0, 90);
-  syncNowMixer();
-  bar.classList.add('on');
-  document.body.classList.add('has-now-bar');
-}
-
-/* The title of whatever is playing, wherever it was started from. */
-function currentSubliminalTitle(){
-  if (libraryNowPlayingId){
-    const el = document.querySelector(`#libItem-${libraryNowPlayingId} .lib-title-text`);
-    if (el) return el.textContent;
-  }
-  const t = document.getElementById('finalTitle');
-  return t ? t.textContent : '';
-}
-
-/* One beat, cheap, and it stops mattering the moment nothing is playing. */
-setInterval(renderNowBar, 1000);
-
 /* ---------- cover art ----------
    Eight covers that ship with the app, cut from artwork Kyla already owns, and
    an upload for anyone who wants their own picture.
@@ -754,8 +697,7 @@ function pickCoverFor(id){
       <button type="button" onclick="pickCoverUpload('${id}')">Use my own picture…</button>
       <button type="button" onclick="closeCoverPicker()">Cancel</button>
     </div>`;
-  const item = document.getElementById('libItem-' + id);
-  (item || document.body).appendChild(pop);
+  document.body.appendChild(pop);
   const first = pop.querySelector('button'); if (first) first.focus();
   setTimeout(() => document.addEventListener('click', coverPopOutside), 0);
 }
@@ -772,11 +714,13 @@ function closeCoverPicker(){
 async function setBuiltinCover(id, key){
   closeCoverPicker();
   const msg = document.getElementById('libTitleMsg-' + id);
-  showCover(id, 'builtin:' + key, true);          // instantly, before the write
   if (!sb || !currentUser) return;
   const { error } = await sb.from('subliminals')
     .update({ cover_path: 'builtin:' + key }).eq('id', id).eq('user_id', currentUser.id);
-  if (error && msg) msg.textContent = describeCoverError(error);
+  if (error){ mixMessage(describeCoverError(error)); if(msg)msg.textContent=describeCoverError(error); return; }
+  showCover(id, 'builtin:' + key, true);
+  ['todaySubs','todaySubCovers','myLibrary'].forEach(forgetFetch);
+  mixMessage('Cover saved');
 }
 
 /* The one error anyone actually hits, said in words that name the fix. */
@@ -833,7 +777,7 @@ function squareCover(file){
 async function uploadCover(id, file){
   if (!sb || !currentUser) return;
   const msg = document.getElementById('libTitleMsg-' + id);
-  const say = t => { if (msg) msg.textContent = t; };
+  const say = t => { if (msg) msg.textContent = t; mixMessage(t); };
   say('Adding the cover…');
   try {
     const blob = await squareCover(file);
@@ -844,7 +788,8 @@ async function uploadCover(id, file){
     const { error: dbErr } = await sb.from('subliminals')
       .update({ cover_path: path }).eq('id', id).eq('user_id', currentUser.id);
     if (dbErr) throw dbErr;
-    say('');
+    say('Cover saved');
+    ['todaySubs','todaySubCovers','myLibrary'].forEach(forgetFetch);
     await showCover(id, path, true);
   } catch (e){
     say(describeCoverError(e));
@@ -854,6 +799,7 @@ async function uploadCover(id, file){
 /* A built-in is a file that ships with the app, so it needs no round trip. An
    upload needs a signed link, which expires, so it is fetched at render time. */
 async function showCover(id, path, bust){
+  if(id===activeMixId){activeCoverPath=path;refreshListeningCover();}
   const img = document.getElementById('libCoverImg-' + id);
   if (!path || !img) return;
   const builtin = builtinCoverUrl(path);
@@ -896,6 +842,7 @@ function renderNowBar(){
   if (!finalPlaying){
     bar.classList.remove('on');
     bar.innerHTML = '';
+    delete bar.dataset.built;
     document.body.classList.remove('has-now-bar');
     return;
   }
@@ -911,19 +858,19 @@ function renderNowBar(){
           <b id="nbTitle"></b>
           <span id="nbLine"></span>
         </span>
-        <button type="button" class="nb-mix" onclick="openImmersivePlayer()" aria-label="Open full-screen player">Open</button>
-        <button type="button" class="nb-mix" onclick="toggleNowMixer()"
-          aria-expanded="false" aria-controls="nbMixer" aria-label="Sound levels">Levels</button>
-        <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
-      </div>
-      <div class="nb-mixer" id="nbMixer" hidden>${nowMixerRows()}</div>`;
+        <button type="button" class="nb-mix" id="nbPlay" onclick="toggleImmersivePlayback()">Pause</button>
+        <button type="button" class="nb-stop" onclick="restartListening()">Start over</button>
+      </div>`;
     bar.dataset.built = '1';
   }
   const tEl = document.getElementById('nbTitle');
   const lEl = document.getElementById('nbLine');
   if (tEl) tEl.textContent = title;
   if (lEl) lEl.textContent = String(line).slice(0, 90);
-  syncNowMixer();
+  const playButton = document.getElementById('nbPlay');
+  if(playButton)playButton.textContent=finalPaused?'Play':'Pause';
+  const finalButton = document.getElementById('finalPlayBtn');
+  if(finalButton){finalButton.disabled=false;finalButton.textContent=finalPaused?'Play':'Pause';}
   bar.classList.add('on');
   document.body.classList.add('has-now-bar');
 }
