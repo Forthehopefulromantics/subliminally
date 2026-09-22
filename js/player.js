@@ -82,7 +82,7 @@ function mountImmersivePlayer(){
       <div class="ip-sky"><div class="ip-stars"></div><div class="ip-moon"></div><div class="ip-cloud one"></div><div class="ip-cloud two"></div></div>
       <div class="ip-shell">
         <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker">Sanctuary at night</span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
-        <div class="ip-hero"><div class="ip-affirmation" id="ipAffirmation">Your affirmation will appear here.</div></div>
+        <div class="ip-hero" id="ipAffirmationViewport" aria-live="polite" aria-atomic="true"><div class="ip-affirmation-stream" id="ipAffirmationStream"></div></div>
         <div class="ip-lower">
           <div class="ip-track-copy"><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></div>
           <button class="ip-ambience-card" onclick="openAmbienceLibrary()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
@@ -137,10 +137,24 @@ function closeImmersivePlayer(){
   document.body.classList.remove('player-open'); closePlayerSheets(); stopAmbiencePreview(); clearInterval(playerUiTimer); playerUiTimer=null;
 }
 function showImmersiveAffirmation(text){
-  const el=document.getElementById('ipAffirmation'); if(!el) return;
-  text=String(text||'').replace(/^['“"]|['”"]$/g,'').trim(); if(!text||text===playerAffirmationText)return;
-  playerAffirmationText=text; el.classList.add('changing');
-  setTimeout(()=>{ el.textContent=text; el.classList.remove('changing'); },180);
+  const stream=document.getElementById('ipAffirmationStream'); if(!stream) return;
+  text=String(text||'').replace(/^['“"]|['”"]$/g,'').trim();
+  if(!text||(text===playerAffirmationText&&stream.querySelector('.ip-affirmation.current')))return;
+  playerAffirmationText=text;
+
+  const departing=stream.querySelector('.ip-affirmation.departing');
+  if(departing){ departing.classList.replace('departing','leaving'); setTimeout(()=>departing.remove(),950); }
+  const current=stream.querySelector('.ip-affirmation.current');
+  if(current){ current.classList.replace('current','departing'); current.setAttribute('aria-hidden','true'); }
+
+  const next=document.createElement('div');
+  next.className='ip-affirmation entering'; next.textContent=text;
+  stream.appendChild(next);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ next.classList.remove('entering'); next.classList.add('current'); }));
+  setTimeout(()=>{
+    stream.querySelectorAll('.ip-affirmation.leaving').forEach(el=>el.remove());
+    [...stream.querySelectorAll('.ip-affirmation')].slice(0,-2).forEach(el=>el.remove());
+  },1000);
 }
 function fmtPlayerTime(sec){ sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function updateImmersivePlayer(){
