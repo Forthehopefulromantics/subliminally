@@ -181,6 +181,7 @@ async function loadSavedIntoBuilder(id, opts){
   const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
   if (error || !s) return;
   editingExistingId = id;
+  state.playerTitle = s.title || 'Your Subliminal';
   const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
   state.freq = matchedFreq;
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
@@ -666,7 +667,7 @@ function renderNowBar(){
     document.body.classList.remove('has-now-bar');
     return;
   }
-  const title = (typeof state !== 'undefined' && state.title) || currentSubliminalTitle() || 'Your subliminal';
+  const title = (typeof currentPlayerTitle === 'function' && currentPlayerTitle()) || currentSubliminalTitle() || 'Your subliminal';
   const line  = (document.getElementById('finalLine') || {}).textContent || '';
   /* Rebuilt every second, so a slider mid-drag must not be torn out from under
      the finger. Only the text changes on a tick; the controls are built once. */
@@ -678,6 +679,7 @@ function renderNowBar(){
           <b id="nbTitle"></b>
           <span id="nbLine"></span>
         </span>
+        <button type="button" class="nb-mix" onclick="openImmersivePlayer()" aria-label="Open full-screen player">Open</button>
         <button type="button" class="nb-mix" onclick="toggleNowMixer()"
           aria-expanded="false" aria-controls="nbMixer" aria-label="Sound levels">Levels</button>
         <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
@@ -897,7 +899,7 @@ function renderNowBar(){
     document.body.classList.remove('has-now-bar');
     return;
   }
-  const title = (typeof state !== 'undefined' && state.title) || currentSubliminalTitle() || 'Your subliminal';
+  const title = (typeof currentPlayerTitle === 'function' && currentPlayerTitle()) || currentSubliminalTitle() || 'Your subliminal';
   const line  = (document.getElementById('finalLine') || {}).textContent || '';
   /* Rebuilt every second, so a slider mid-drag must not be torn out from under
      the finger. Only the text changes on a tick; the controls are built once. */
@@ -909,6 +911,7 @@ function renderNowBar(){
           <b id="nbTitle"></b>
           <span id="nbLine"></span>
         </span>
+        <button type="button" class="nb-mix" onclick="openImmersivePlayer()" aria-label="Open full-screen player">Open</button>
         <button type="button" class="nb-mix" onclick="toggleNowMixer()"
           aria-expanded="false" aria-controls="nbMixer" aria-label="Sound levels">Levels</button>
         <button type="button" class="nb-stop" onclick="stopFinal()" aria-label="Stop the session">Stop</button>
