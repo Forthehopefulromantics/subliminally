@@ -15,7 +15,7 @@
        from the ambience step is the recorder, for everybody.
 
      * On that screen the first affirmation read "..." under a correct-looking
-       "1 of 14". Both were the placeholders in index.html: arriving without
+       a hard-coded count. Both were placeholders in index.html: arriving without
        going through the fork meant showRecordLine() never ran, so nothing was
        ever drawn over them. Never an off-by-one — recIndex is 0 and lines[0] is
        line one — simply never called.
@@ -186,7 +186,7 @@ const previewEl = doc.getElementById('voicePreview');
 previewEl.paused = true; previewEl.ended = true; previewEl.currentTime = 0;
 previewEl.pause = () => { previewEl.paused = true; };
 previewEl.play = () => Promise.resolve();
-doc.getElementById('countRange').value = '14';
+doc.getElementById('countRange').value = '10';
 doc.getElementById('sessionLengthSlider').value = '5';
 
 /* showStep looks the panel up with a [data-step="n"] selector. */
@@ -294,8 +294,8 @@ const step = () => get('step');
 const recLine = () => get(`document.getElementById('recLine').textContent`);
 const recCounter = () => get(`document.getElementById('recCounter').textContent`);
 
-/* A build sitting on the voice step with 14 real affirmations behind it. */
-const LINES = Array.from({ length: 14 }, (_, i) => `Affirmation number ${i + 1}.`);
+/* A build sitting on the voice step with all 10 affirmations behind it. */
+const LINES = Array.from({ length: 10 }, (_, i) => `Affirmation number ${i + 1}.`);
 function freshBuild(){
   run(`
     state.affirmations = ${JSON.stringify(LINES)};
@@ -330,19 +330,19 @@ check('a pick moves on to ambience', step(), 5);
 run(`document.querySelectorAll('#bgGrid .bg-card')[1].onclick()`);
 await settle();
 check('picking a background reaches the recorder', step(), 6);
-check('the counter is drawn, not the placeholder', recCounter(), '1 of 14');
+check('the counter is drawn, not the placeholder', recCounter(), '1 of 10');
 check('affirmation #1 is on screen immediately', recLine(), '"Affirmation number 1."');
 check('no "..." anywhere', recLine().includes('...'), false);
-check('recordings are sized to the lines', get('recordings.length'), 14);
+check('recordings are sized to the lines', get('recordings.length'), 10);
 check('index starts at zero', get('recIndex'), 0);
 check('Next line is not available until something is recorded', get(`document.getElementById('nextLineBtn').disabled`), true);
 
 run(`recordings[0] = { url:'blob:1' }; showRecordLine();`);
 check('once recorded, Next line opens', get(`document.getElementById('nextLineBtn').disabled`), false);
 run(`advanceLine()`);
-check('line two is line two', [recCounter(), recLine()], ['2 of 14', '"Affirmation number 2."']);
-run(`for (let i = 1; i < 14; i++) advanceLine();`);
-check('after the fourteenth, on to assembly', step(), 7);
+check('line two is line two', [recCounter(), recLine()], ['2 of 10', '"Affirmation number 2."']);
+run(`for (let i = 1; i < 10; i++) advanceLine();`);
+check('after the tenth, on to assembly', step(), 7);
 
 /* the Continue button, rather than a background tap */
 freshBuild();
