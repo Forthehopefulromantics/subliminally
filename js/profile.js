@@ -595,8 +595,8 @@ async function removeClonedVoice(){
     voiceCloneReplacing = false;
     forgetVoiceCatalogue();
     await loadVoiceCatalogue();
-    // Any subliminal set to "My voice" now falls back to the device voice.
-    if (state.aiVoiceId === MY_CLONED_VOICE) state.aiVoiceId = DEVICE_VOICE;
+    /* A subliminal set to "My voice" keeps asking for it: it is sent back to the
+       voice setup when it is next generated, never read by the device instead. */
     if (msg){ msg.textContent = 'Removed.'; msg.className = 'save-msg ok'; }
     renderVoiceClone();
     if (typeof renderVoiceCards === 'function' && document.getElementById('voiceClone')) renderVoiceCards();

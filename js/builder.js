@@ -1406,10 +1406,9 @@ async function onMyVoiceReady(){
      step, never to the affirmation-by-affirmation recorder. */
   setSelectedVoice(VOICE_CLONE);
   await renderVoiceCards();
-  await previewVoice(MY_CLONED_VOICE);
-  // previewVoice says its own piece when something went wrong; don't talk over it.
-  const msg = document.getElementById('voicePickerMsg');
-  if (msg && !msg.textContent){ msg.textContent = 'Your Voice is Ready ✦'; msg.className = 'save-msg ok'; }
+  /* Nothing is read in the new voice here. ElevenLabs is only asked for speech
+     when the subliminal is generated (prepareClonedVoice), never for a preview. */
+  sayInVoicePicker('Your Voice is Ready ✦', 'ok');
 }
 async function openMyVoicePanel(){
   const panel = document.getElementById('myVoicePanel');
@@ -1447,6 +1446,11 @@ async function previewVoice(picked){
   if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
   const voiceKey = await resolveVoiceKey(picked);
+  if (!voiceKey && picked === MY_CLONED_VOICE){
+    // Clone Your Voice has no stand-in: say why, and read nothing.
+    if (msg){ msg.textContent = clonedVoiceErrorText(currentUser ? 'no_cloned_voice' : 'not_signed_in'); msg.className = 'save-msg err'; }
+    return;
+  }
   if (!voiceKey){
     if (msg && picked !== DEVICE_VOICE && !currentUser){
       msg.textContent = 'Sign in to hear Serenity — this device reads it for now.';
@@ -1468,6 +1472,10 @@ async function previewVoice(picked){
     setSerenityPreviewLabel(false);
     el.src = url; el.play().catch(()=>{});
   } catch (e){
+    if (voiceKey === MY_CLONED_VOICE){
+      if (msg){ msg.textContent = clonedVoiceErrorText(e && e.message); msg.className = 'save-msg err'; }
+      return;
+    }
     if (msg){ msg.textContent = ttsErrorText(e); msg.className = 'save-msg'; }
     speakWithDeviceVoice(line);
   }
@@ -1504,6 +1512,32 @@ const TTS_MESSAGES = {
 function ttsErrorText(e){
   const code = (e && e.message) || '';
   return TTS_MESSAGES[code] || 'That voice is unavailable right now — using this device\'s voice.';
+}
+
+/* Clone Your Voice gets its own words, because the ones above all end "this
+   device reads it" -- and for a cloned voice that is never true. If it cannot
+   be generated, nothing plays in its place: not the device voice, not Serenity,
+   not another ElevenLabs voice. The person is told, and Play tries again. */
+const CLONE_RETRY = ' Nothing was played in another voice — tap Play to try again.';
+const CLONE_TTS_MESSAGES = {
+  not_signed_in:    'Sign in to hear this in your cloned voice.',
+  upgrade_required: 'Your cloned voice comes with Ritual.',
+  no_cloned_voice:  'Your voice hasn\'t been created yet — read the passage once and it will be ready.',
+  invalid_voice:    'Your cloned voice couldn\'t be found — create it again from the voice step.',
+  nothing_to_say:   'There are no affirmations to read yet — go back and add at least one.',
+  too_long:         'One of your affirmations is too long to read as one clip — shorten it and generate again.',
+  too_many_lines:   'That\'s more lines than one session can hold — trim a few.',
+  not_configured:   'Your cloned voice isn\'t switched on yet.' + CLONE_RETRY,
+  quota_exceeded:   'The voice service is out of credit for now.' + CLONE_RETRY,
+  rate_limited:     'The voice service is busy — give it a minute.' + CLONE_RETRY,
+  too_fast:         'That\'s a lot of generating at once — give it a minute.' + CLONE_RETRY,
+  hourly_limit:     'You\'ve built a lot this hour — give it a little while.' + CLONE_RETRY,
+  daily_limit:      'You\'ve built a lot today — it will be back tomorrow.' + CLONE_RETRY,
+  timeout:          'The voice service took too long.' + CLONE_RETRY,
+  network:          'Couldn\'t reach the voice service.' + CLONE_RETRY,
+};
+function clonedVoiceErrorText(code){
+  return CLONE_TTS_MESSAGES[code || ''] || ('Your cloned voice couldn\'t be generated just now.' + CLONE_RETRY);
 }
 
 /* ---------------- generated speech, once ----------------
@@ -1622,6 +1656,7 @@ let preparingSessionVoice = false;
 async function prepareSessionVoice(){
   if (preparingSessionVoice) return;
   if (state.voiceMode !== 'ai') return;
+  if (isClonedVoiceSession()) return prepareClonedVoice();
   const voiceKey = await resolveVoiceKey(state.aiVoiceId);
   if (!voiceKey) return;                       // device voice: nothing to generate
   const lineEl = document.getElementById('finalLine');
@@ -1643,6 +1678,103 @@ async function prepareSessionVoice(){
     }
   } catch (e){
     if (lineEl) lineEl.textContent = ttsErrorText(e);
+  } finally {
+    preparingSessionVoice = false;
+    if (playBtn) playBtn.disabled = false;
+  }
+}
+
+/* ---------------- Clone Your Voice: generated once, then only replayed ----------------
+   The person's own ElevenLabs voice is never named by the page: it asks for
+   'mine' and /api/tts looks the voice id up against the signed-in account, so
+   nobody can read in somebody else's voice by sending an id of their own.
+
+   ElevenLabs is asked for speech here and nowhere else in a cloned session --
+   when the subliminal is generated, or when that generation failed and Play is
+   pressed to try again. Every line it returns is kept (Supabase Storage on the
+   server, ttsCache here), so Play, Pause, Resume and Start Over only replay
+   audio already in hand, and reopening a saved subliminal is answered from the
+   stored clips rather than generated again. Only a change to the words (or the
+   pace they are read at) makes new speech, and only for the lines that changed. */
+function isClonedVoiceSession(){
+  return state.voiceMode === 'ai' && state.aiVoiceId === MY_CLONED_VOICE;
+}
+/* The builder's affirmations, trimmed, with the blank ones left out: an empty
+   field is never sent to ElevenLabs. */
+function clonedVoiceLines(){
+  return (state.affirmations || []).map(ttsLineText).filter(Boolean);
+}
+/* The layered second voice reads in the cloned voice too when the main voice is
+   the clone, rather than in the device's voice underneath it. */
+function clonedLayerLines(){
+  if (!isClonedVoiceSession() || !layerVoiceEnabled || state.layerVoiceMode !== 'ai') return [];
+  return (state.layerAffirmations || []).map(ttsLineText).filter(Boolean);
+}
+function clonedSequenceKey(){
+  return paceNow().speed + '|' + clonedVoiceLines().join('\u0001') + '|' + clonedLayerLines().join('\u0001');
+}
+function clonedClipUrl(line){
+  return ttsCache.get(ttsLineKey(MY_CLONED_VOICE, paceNow().speed, line)) || null;
+}
+/* Which generation the lines in hand belong to. Play checks this and nothing
+   else, so it can tell "already generated" from "needs generating" without
+   asking the server. */
+let clonedVoiceReadyKey = null;
+let clonedVoicePreparing = null;
+/* Anything played in the cloned voice that failed to load: drop what is held
+   for those lines so the retry asks the server again (which answers from its
+   stored clips, not from ElevenLabs, when they already exist). */
+function forgetClonedVoiceAudio(){
+  clonedVoiceReadyKey = null;
+  const speed = paceNow().speed;
+  clonedVoiceLines().concat(clonedLayerLines()).forEach(l => ttsCache.delete(ttsLineKey(MY_CLONED_VOICE, speed, l)));
+  Array.from(sequencePrepares.keys()).forEach(k => { if (k.startsWith(MY_CLONED_VOICE + '|')) sequencePrepares.delete(k); });
+}
+function prepareClonedVoice(){
+  if (clonedVoicePreparing) return clonedVoicePreparing;
+  clonedVoicePreparing = runClonedVoicePrepare().finally(() => { clonedVoicePreparing = null; });
+  return clonedVoicePreparing;
+}
+async function runClonedVoicePrepare(){
+  const lineEl = document.getElementById('finalLine');
+  const playBtn = document.getElementById('finalPlayBtn');
+  const say = (t) => { if (lineEl) lineEl.textContent = t; };
+  const lines = clonedVoiceLines();
+  if (!lines.length){ say(clonedVoiceErrorText('nothing_to_say')); return false; }
+  const key = clonedSequenceKey();
+  if (clonedVoiceReadyKey === key) return true;
+  const wasSaying = lineEl ? lineEl.textContent : '';
+  preparingSessionVoice = true;
+  if (playBtn) playBtn.disabled = true;
+  say('Creating your affirmations in your voice — this happens once, then it replays for as long as you set.');
+  try {
+    if (!currentUser) throw new Error('not_signed_in');
+    if (!tierHasFeature(await getMyTier(), 'studio_voice')) throw new Error('upgrade_required');
+    if (!(await myVoiceProfile())) throw new Error('no_cloned_voice');
+    const layerLines = clonedLayerLines();
+    const main = await prepareSequenceAudio(lines, MY_CLONED_VOICE);
+    if (!main.ok) throw new Error(main.code || 'generation_failed');
+    if (layerLines.length){
+      const layer = await prepareSequenceAudio(layerLines, MY_CLONED_VOICE);
+      if (!layer.ok) throw new Error(layer.code || 'generation_failed');
+    }
+    // Every line has to be in hand, or the session would have gaps to fill.
+    if (!lines.concat(layerLines).every(clonedClipUrl)) throw new Error('generation_failed');
+    clonedVoiceReadyKey = key;
+    say(wasSaying);
+    return true;
+  } catch (e){
+    const code = (e && e.message) || 'generation_failed';
+    say(clonedVoiceErrorText(code));
+    /* No voice to read in: back to the Phase 1 setup, not to another voice. */
+    if (code === 'no_cloned_voice' && document.getElementById('voiceClone')){
+      state.selectedVoice = VOICE_CLONE;
+      showStep(4);
+      paintVoiceCards(VOICE_CLONE);
+      sayInVoicePicker('One more step — read the passage below and your voice is ready.', 'err');
+      openMyVoicePanel();
+    }
+    return false;
   } finally {
     preparingSessionVoice = false;
     if (playBtn) playBtn.disabled = false;
@@ -3153,6 +3285,18 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
+  /* A cloned voice plays only audio that has already been generated. When it
+     has not (the generation failed, or the words changed), this press is the
+     retry: generate, then play. The context is opened now, inside the tap, so
+     the browser still lets it make a sound once the audio arrives. */
+  if (isClonedVoiceSession() && clonedVoiceReadyKey !== clonedSequenceKey()){
+    primeAudio();
+    prepareClonedVoice().then(ready => {
+      if (ready && !finalPlaying) playFinal();
+      else if (!ready) stopSilentKeeper();
+    });
+    return;
+  }
   stopAmbiencePreview();
   stopSerenityPreview();
   if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
@@ -3260,6 +3404,7 @@ function playFinal(){
   function runLayerSequence(){
     let idx = 0;
     const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
+    const clonedLayer = !useOwn && clonedLayerLines().length > 0;
     function playNextLayerLine(){
       if (!alive()) return;
       if (waitWhileFinalPaused(playNextLayerLine)) return;
@@ -3288,6 +3433,15 @@ function playFinal(){
           utter.onend = () => { if (finalPaused) waitWhileFinalPaused(deviceSpeak); else next(); };
           window.speechSynthesis.speak(utter);
         };
+        if (clonedLayer){
+          // Only what was generated; a line that is not in hand is skipped, never spoken by the device.
+          const url = clonedClipUrl(line);
+          if (!url){ next(); return; }
+          url.then(u => loadClip(finalCtx, studioClipHandle(u)))
+            .then(finalCallback(clip => { playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next); }))
+            .catch(() => { if (alive()) next(); });
+          return;
+        }
         resolveVoiceKey(state.layerAiVoiceId).catch(()=>null).then(voiceKey => {
           if (!alive()) return;
           if (!voiceKey){ deviceSpeak(); return; }
@@ -3353,6 +3507,15 @@ function playFinal(){
       // built into this device. Anything that goes wrong with a studio voice
       // falls back to the device rather than leaving the session silent.
       const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
+      /* ...except a cloned voice, which never falls back. A line that cannot be
+         played stops the session and says so; Play tries again. */
+      const cloned = isClonedVoiceSession();
+      function clonedVoiceFailed(){
+        if (!alive()) return;
+        forgetClonedVoiceAudio();
+        stopFinal();
+        document.getElementById('finalLine').textContent = clonedVoiceErrorText('network');
+      }
       function speakNext(){
         if (!alive()) return;
         if (waitWhileFinalPaused(speakNext)) return;
@@ -3442,6 +3605,17 @@ function playFinal(){
           if (!alive()) return;
           if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
+          if (cloned){
+            if (!ttsLineText(line)){ advance(); return; }   // a blank field is never read
+            const url = clonedClipUrl(line);
+            if (!url){ clonedVoiceFailed(); return; }
+            url.then(u => loadClip(finalCtx, studioClipHandle(u)))
+              .then(finalCallback(clip => {
+                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
+              }))
+              .catch(clonedVoiceFailed);
+            return;
+          }
           voicePromise.then(voiceKey => {
             if (!alive()) return;
             if (!voiceKey){ deviceSpeak(); return; }
