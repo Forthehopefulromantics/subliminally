@@ -116,9 +116,37 @@ const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
 let state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
+/* Three phases rather than eight bars: choosing everything (frequency through
+   ambience), recording it, and hearing it. The line after the current phase
+   fills as you move through that phase's steps. */
+const FLOW_PHASES = [
+  { label:'Create', first:0, last:5 },
+  { label:'Refine', first:6, last:6 },
+  { label:'Align',  first:7, last:7 },
+];
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
-  for (let i=0;i<TOTAL_STEPS;i++){ const d=document.createElement('div'); if(i<=step) d.classList.add('done'); bar.appendChild(d); }
+  bar.classList.add('flow-phases');
+  bar.setAttribute('aria-label', 'Build progress');
+  FLOW_PHASES.forEach((phase, i) => {
+    const current = step >= phase.first && step <= phase.last;
+    const done = step > phase.last;
+    const item = document.createElement('div');
+    item.className = 'flow-phase' + (current ? ' current' : '') + (done ? ' done' : '');
+    if (current) item.setAttribute('aria-current', 'step');
+    const dot = document.createElement('span'); dot.className = 'flow-phase-dot';
+    const label = document.createElement('span'); label.className = 'flow-phase-label';
+    label.textContent = (i + 1) + '. ' + phase.label;
+    item.appendChild(dot); item.appendChild(label);
+    if (i < FLOW_PHASES.length - 1){
+      const line = document.createElement('span'); line.className = 'flow-phase-line';
+      const span = phase.last - phase.first + 1;
+      const fill = done ? 1 : current ? (step - phase.first + 1) / (span + 1) : 0;
+      line.setAttribute('style', '--fill:' + fill);
+      item.appendChild(line);
+    }
+    bar.appendChild(item);
+  });
 }
 function showStep(n){
   document.querySelectorAll('.flow-step').forEach(s=>s.classList.remove('active'));
@@ -1704,9 +1732,12 @@ function renderBgGrid(){
     const heading = document.createElement('div');
     heading.className = 'bg-section-label';
     heading.textContent = section.category;
+    // The recorded tracks read as one list, as in the design; their category
+    // labels stay in the DOM for screen readers.
     bgGrid.appendChild(heading);
     const row = document.createElement('div');
     row.className = 'bg-row';
+    if (section.tracks.every(t => isRecordedAmbience(t.key))){ heading.classList.add('bg-section-label-recorded'); row.classList.add('bg-row-recorded'); }
     section.tracks.forEach(track => row.appendChild(bgCard(track)));
     bgGrid.appendChild(row);
   });

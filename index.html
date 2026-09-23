@@ -10,6 +10,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="stylesheet" href="/css/player.css" />
 <link rel="stylesheet" href="/css/listening-fixes.css?v=20260923c" />
+<link rel="stylesheet" href="/css/builder-celestial.css?v=20260923a" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
@@ -2760,8 +2761,8 @@
     <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head">
       <div class="eyebrow">Build yours</div>
-      <h2>Your subliminal, start to finish</h2>
-      <p>Five minutes: a frequency, what you're working through, and your own voice saying it.</p>
+      <h2>Build your subliminal</h2>
+      <p class="flow-tagline">Intentions today. A brighter tomorrow.</p>
     </div>
   </div>
   <div class="wrap">
@@ -2874,12 +2875,13 @@
 
       <!-- STEP 4: voice choice -->
       <div class="flow-step" data-step="4">
-        <div class="flow-title">Whose voice tonight?</div>
+        <div class="flow-title-row"><div class="flow-title">Choose your voice</div><span class="flow-kicker">A calmer you begins here</span></div>
         <div class="flow-sub">Your own voice is stronger — hearing yourself say it matters.</div>
         <div class="flow-body">
           <div class="voice-options" role="radiogroup" aria-label="Whose voice reads your affirmations">
             <button class="voice-card" id="voiceOwn" role="radio" aria-checked="false" onclick="chooseVoice('own')">
               <span class="badge">Recommended</span>
+              <span class="voice-art" aria-hidden="true"><svg viewBox="0 0 96 96" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="vaOwn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f7cba"/><stop offset="1" stop-color="#c3b2dc"/></linearGradient><radialGradient id="vaOwnGlow" cx=".5" cy=".42" r=".5"><stop offset="0" stop-color="#fbe9e4" stop-opacity=".9"/><stop offset="1" stop-color="#fbe9e4" stop-opacity="0"/></radialGradient></defs><rect width="96" height="96" fill="url(#vaOwn)"/><circle cx="48" cy="42" r="30" fill="url(#vaOwnGlow)"/><rect x="40" y="22" width="16" height="30" rx="8" fill="#fbeee6"/><path d="M33 44a15 15 0 0 0 30 0M48 59v11M40 70h16" fill="none" stroke="#fbeee6" stroke-width="2.4" stroke-linecap="round"/><path d="M20 20l1.3 3.7 3.7 1.3-3.7 1.3L20 30l-1.3-3.7L15 25l3.7-1.3zM76 64l1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1z" fill="#f6e3c2"/></svg></span>
               <h4>Record your own voice</h4>
               <p>Use your real voice</p>
             </button>
@@ -2889,14 +2891,16 @@
                  pre-generated file and never reaches ElevenLabs. -->
             <div class="voice-card voice-card-split" id="voiceSerenity">
               <button type="button" class="voice-card-face" role="radio" aria-checked="false" onclick="chooseVoice('serenity')">
-                <span class="sound-art" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M12 21v6m8-13v20m8-17v14m8-10v6M34 5l1 4 4 1-4 1-1 4-1-4-4-1 4-1zM10 38c8 5 20 5 28 0"/></svg></span><h4>Serenity</h4>
+                <span class="voice-art" aria-hidden="true"><svg viewBox="0 0 96 96" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="vaSer" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b78b6"/><stop offset="1" stop-color="#b9a7d6"/></linearGradient><radialGradient id="vaSerMoon" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#fbe8dc"/><stop offset="1" stop-color="#dcc3e6"/></radialGradient></defs><rect width="96" height="96" fill="url(#vaSer)"/><circle cx="48" cy="48" r="22" fill="url(#vaSerMoon)" opacity=".95"/><g stroke="#fdf1ea" stroke-width="1.3" stroke-linecap="round" opacity=".9"><path d="M10 48v0M14 45v6M18 43v10M22 46v4M26 40v16M30 44v8M34 36v24M38 41v14M42 33v30M46 38v20M50 33v30M54 38v20M58 35v26M62 42v12M66 38v20M70 44v8M74 41v14M78 45v6M82 47v2M86 48v0"/></g><path d="M20 18l1.2 3.3 3.3 1.2-3.3 1.2L20 27l-1.2-3.3-3.3-1.2 3.3-1.2zM78 14l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" fill="#f6e3c2"/></svg></span><h4>Serenity</h4>
                 <p>Calm, warm AI voice</p>
+                <span class="voice-kicker">A gentle voice for a brighter mind.</span>
               </button>
               <button type="button" class="voice-preview-btn" id="serenityPreviewBtn"
                       aria-label="Play a short Serenity preview"
                       onclick="toggleSerenityPreview(event)">Preview</button>
             </div>
             <button class="voice-card" id="voiceClone" role="radio" aria-checked="false" onclick="chooseVoice('clone')">
+              <span class="voice-art" aria-hidden="true"><svg viewBox="0 0 96 96" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="vaClone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7f6dac"/><stop offset="1" stop-color="#ab98cc"/></linearGradient><radialGradient id="vaCloneCore" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fde6c6"/><stop offset=".45" stop-color="#f3c996" stop-opacity=".7"/><stop offset="1" stop-color="#f3c996" stop-opacity="0"/></radialGradient></defs><rect width="96" height="96" fill="url(#vaClone)"/><g fill="none" stroke="#f1dcc0" stroke-width="1" opacity=".75"><circle cx="48" cy="48" r="10"/><circle cx="48" cy="48" r="17"/><circle cx="48" cy="48" r="24"/><circle cx="48" cy="48" r="31" opacity=".6"/><circle cx="48" cy="48" r="38" opacity=".35"/></g><circle cx="48" cy="48" r="12" fill="url(#vaCloneCore)"/></svg></span>
               <h4>Clone your voice</h4>
               <p>Create an AI version of your voice</p>
             </button>
@@ -2912,7 +2916,7 @@
 
       <!-- STEP 5: background ambience + mixer -->
       <div class="flow-step" data-step="5">
-        <div class="flow-title">Layer your ambience</div>
+        <div class="flow-title-row"><div class="flow-title">Layer your ambience</div><span class="flow-kicker">Set the mood with intention</span></div>
         <div class="flow-sub">Preview an ambience, then press Use to select it. You'll adjust every layer's volume on the final screen, once you can hear it all together.</div>
         <div class="flow-body">
           <!-- Two states live in here at once, and they are not the same state:
@@ -3077,6 +3081,7 @@
       </div>
 
     </div>
+    <div class="flow-ornament" aria-hidden="true"><span class="flow-ornament-star">✦</span><small>A brighter you</small></div>
   </div>
 </section>
 

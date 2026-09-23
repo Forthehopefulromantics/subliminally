@@ -1,0 +1,240 @@
+/* ---------------------------------------------------------------------------
+   Subliminally — the builder, dressed to the supplied celestial design.
+
+   Lavender sky, cream cards, a serif voice for names and a small spaced-caps
+   voice for the quiet lines. Every card on the voice and ambience steps is one
+   row: artwork, words, Preview, and a round mark that says what is chosen.
+   Night keeps the same shapes on the night sky.
+
+   Loaded after listening-fixes.css, and scoped to #flow-section, so nothing
+   outside the builder changes.
+--------------------------------------------------------------------------- */
+
+#flow-section{
+  --bc-card:#FBF8F5; --bc-card-sel:#FCF8FC; --bc-line:#E6DCEC;
+  --bc-ink:#221C45; --bc-muted:#6D6590; --bc-kicker:#8F84AA;
+  --bc-pill:#EEE8F3; --bc-pill-ink:#2A2450; --bc-pill-on:#5E4A8C;
+  --bc-check-line:#C5B8D6; --bc-accent:#7A5FA8; --bc-sel-line:#B99CDB;
+  --bc-cta:#5E4A8C; --bc-cta-ink:#F5EFFB; --bc-gold:#C6A06A;
+  --bc-shadow:0 1px 2px rgba(60,40,90,.04), 0 8px 24px rgba(88,64,130,.05);
+  --bc-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");
+}
+body[data-sky="night"] #flow-section{
+  --bc-card:rgba(42,31,66,.72); --bc-card-sel:rgba(60,44,92,.78); --bc-line:rgba(160,136,205,.30);
+  --bc-ink:#F3ECFB; --bc-muted:#B5A9D0; --bc-kicker:#A195C2;
+  --bc-pill:rgba(185,167,232,.14); --bc-pill-ink:#EDE3FA; --bc-pill-on:#8A6FC0;
+  --bc-check-line:#8E7CAD; --bc-accent:#9B7FD0; --bc-sel-line:#C9A8EE;
+  --bc-cta:#6E57A0; --bc-cta-ink:#FFFFFF; --bc-gold:#E3BE7F;
+  --bc-shadow:0 10px 30px rgba(8,4,24,.28);
+}
+
+/* ---------- the sky behind the builder ---------- */
+body[data-sky="day"] #flow-section{
+  position:relative; isolation:isolate;
+  background:linear-gradient(180deg,#F0EAF6 0%,#EBE3F3 55%,#E7DEF1 100%);
+}
+body[data-sky="day"] #flow-section::after{
+  content:''; position:absolute; inset:auto 0 0 0; height:240px; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(120px 70px at 4% 88%,rgba(214,196,232,.75),transparent 70%),
+    radial-gradient(160px 90px at 12% 100%,rgba(222,206,238,.8),transparent 70%),
+    radial-gradient(140px 80px at 94% 90%,rgba(214,196,232,.75),transparent 70%),
+    radial-gradient(180px 100px at 86% 104%,rgba(222,206,238,.8),transparent 70%);
+}
+body[data-sky="day"] #flow-section .flow-card{
+  background:rgba(255,255,255,.34)!important; border:1px solid rgba(255,255,255,.6);
+  box-shadow:0 20px 60px rgba(96,70,140,.08); backdrop-filter:blur(2px);
+}
+
+/* ---------- title ---------- */
+#flow-section .section-head .eyebrow{ display:none; }
+#flow-section .section-head h2{
+  font-family:var(--serif); font-weight:500; letter-spacing:-.01em;
+  font-size:clamp(34px,6vw,60px); line-height:1.08; color:var(--bc-ink);
+}
+#flow-section .section-head .flow-tagline{
+  margin-top:14px; max-width:none; font-size:11.5px; letter-spacing:.32em; text-transform:uppercase;
+  color:var(--bc-kicker);
+}
+
+/* ---------- progress: three phases ---------- */
+#flow-section .flow-phases{ display:grid; grid-template-columns:repeat(3,1fr); gap:0; margin:0 0 34px; }
+#flow-section .flow-phase{ position:relative; display:flex; flex-direction:column; align-items:center; gap:12px; height:auto; background:none; }
+#flow-section .flow-phase-dot{
+  position:relative; z-index:1; width:16px; height:16px; border-radius:50%;
+  border:1.5px solid var(--bc-check-line); background:var(--bc-card);
+}
+#flow-section .flow-phase.current .flow-phase-dot,
+#flow-section .flow-phase.done .flow-phase-dot{ background:var(--bc-accent); border-color:var(--bc-accent); }
+#flow-section .flow-phase.current .flow-phase-dot{ box-shadow:0 0 0 4px rgba(122,95,168,.14); }
+#flow-section .flow-phase-line{
+  position:absolute; top:7px; left:calc(50% + 12px); width:calc(100% - 24px); height:2px; border-radius:2px;
+  background:linear-gradient(90deg,var(--bc-accent) calc(var(--fill,0)*100%),var(--bc-line) 0);
+}
+#flow-section .flow-phase-label{ font-size:11px; letter-spacing:.3em; text-transform:uppercase; color:var(--bc-kicker); white-space:nowrap; }
+#flow-section .flow-phase.current .flow-phase-label{ color:var(--bc-ink); }
+
+/* ---------- step headings ---------- */
+#flow-section .flow-title-row{ display:flex; justify-content:space-between; align-items:baseline; gap:6px 18px; flex-wrap:wrap; }
+#flow-section .flow-title{ font-family:var(--serif); font-weight:400; font-size:clamp(24px,3.4vw,32px); line-height:1.2; color:var(--bc-ink); }
+#flow-section .flow-kicker{ font-size:10.5px; letter-spacing:.28em; text-transform:uppercase; color:var(--bc-kicker); }
+#flow-section .flow-sub{ color:var(--bc-muted); font-size:13.5px; margin-top:6px; }
+
+/* ---------- the voice cards ---------- */
+#flow-section .voice-options{ gap:14px; }
+#flow-section .voice-card{
+  display:grid; grid-template-columns:132px minmax(0,1fr) 44px; grid-template-rows:auto;
+  column-gap:22px; row-gap:0; align-items:center; padding:14px 22px 14px 14px!important;
+  background:var(--bc-card)!important; border:1px solid var(--bc-line)!important; border-radius:14px;
+  box-shadow:var(--bc-shadow); color:var(--bc-ink);
+}
+#flow-section .voice-card.sel{ background:var(--bc-card-sel)!important; border:2px solid var(--bc-sel-line)!important; padding:13px 21px 13px 13px!important; box-shadow:var(--bc-shadow); font-weight:inherit; }
+/* The round mark: empty ring, or filled with a tick when this is the voice. */
+#flow-section .voice-card::after{
+  content:''; grid-column:3; grid-row:1/span 5; align-self:center; justify-self:end;
+  width:44px; height:44px; border-radius:50%; border:1.5px solid var(--bc-check-line); box-sizing:border-box;
+}
+#flow-section .voice-card.sel::after{ background:var(--bc-accent) var(--bc-check) center/22px no-repeat; border-color:var(--bc-accent); }
+
+#flow-section .voice-art{
+  display:block; grid-column:1; grid-row:1/span 5; width:132px; aspect-ratio:8/7; border-radius:8px; overflow:hidden;
+  box-shadow:0 2px 10px rgba(80,58,128,.14);
+}
+#flow-section .voice-art svg{ display:block; width:100%; height:100%; }
+#flow-section .voice-card h4{ font-family:var(--serif); font-weight:400; font-size:clamp(20px,2.6vw,26px); line-height:1.15; color:var(--bc-ink); margin:0; }
+#flow-section .voice-card p{ font-size:15px; color:var(--bc-muted); margin:4px 0 0; }
+#flow-section .voice-kicker{ display:block; margin-top:12px; font-size:10.5px; line-height:1.9; letter-spacing:.28em; text-transform:uppercase; color:var(--bc-kicker); }
+#flow-section .voice-card .badge{
+  position:static; justify-self:start; grid-column:2; margin-bottom:6px;
+  font-size:9.5px; letter-spacing:.2em; color:var(--bc-accent); background:var(--bc-pill);
+}
+#flow-section .voice-card > h4, #flow-section .voice-card > p, #flow-section .voice-card > .locked-tag{ grid-column:2; }
+#flow-section .voice-card .locked-tag{ justify-self:start; margin:8px 0 0; }
+
+/* Serenity holds two buttons: the face chooses, Preview plays the demo. */
+#flow-section #voiceSerenity{ grid-template-columns:minmax(0,1fr) auto 44px; column-gap:18px; row-gap:0; }
+#flow-section #voiceSerenity::after{ grid-row:1; }
+#flow-section #voiceSerenity .voice-card-face{
+  display:grid; grid-template-columns:132px minmax(0,1fr); column-gap:22px; align-items:center; align-content:center;
+  padding:0!important; border-radius:10px; color:inherit; text-align:left;
+}
+#flow-section #voiceSerenity .voice-card-face > :not(.voice-art){ grid-column:2; }
+#flow-section #voiceSerenity .sound-art{ display:none; }
+
+/* ---------- Preview pills, voice and ambience alike ---------- */
+#flow-section #serenityPreviewBtn,
+#flow-section #bgGrid .bg-preview-btn{
+  grid-column:2; align-self:center!important; justify-self:end;
+  min-width:112px; height:48px!important; min-height:48px!important; padding:0 24px!important; margin:0!important;
+  border:0!important; border-radius:999px!important; background:var(--bc-pill)!important; color:var(--bc-pill-ink)!important;
+  font-family:var(--serif)!important; font-size:18px!important; letter-spacing:0; white-space:nowrap;
+}
+#flow-section #serenityPreviewBtn:hover,
+#flow-section #bgGrid .bg-preview-btn:hover{ filter:brightness(.97); }
+#flow-section #serenityPreviewBtn.is-playing,
+#flow-section #bgGrid .bg-preview-btn.is-playing{ background:var(--bc-pill-on)!important; color:#fff!important; }
+
+/* ---------- the ambience cards ---------- */
+#flow-section .bg-grid{ gap:14px; }
+#flow-section #bgGrid .bg-section-label{ color:var(--bc-kicker); letter-spacing:.24em; font-size:10.5px; margin:8px 0 -2px; }
+/* The recorded tracks read as one list; their category names stay for screen readers. */
+#flow-section #bgGrid .bg-section-label-recorded{
+  position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; margin:0;
+}
+#flow-section #bgGrid .bg-row-recorded{ grid-template-columns:1fr; gap:14px; }
+
+#flow-section #bgGrid .bg-card{
+  display:grid; grid-template-columns:minmax(0,1fr) auto 44px; column-gap:18px; align-items:center;
+  padding:12px 22px 12px 12px!important; border-radius:14px; text-align:left; color:var(--bc-ink);
+  background:var(--bc-card)!important; border:1px solid var(--bc-line)!important; box-shadow:var(--bc-shadow);
+}
+#flow-section #bgGrid .bg-card.sel{ background:var(--bc-card-sel)!important; border:2px solid var(--bc-sel-line)!important; padding:11px 21px 11px 11px!important; font-weight:inherit; }
+#flow-section #bgGrid .bg-card[data-auditioning]:not(.sel){ border-color:var(--bc-gold)!important; box-shadow:0 0 0 1px var(--bc-gold), var(--bc-shadow); }
+#flow-section #bgGrid .bg-card::after{
+  content:''; position:static; transform:none; grid-column:3; grid-row:1; align-self:center; justify-self:end;
+  width:44px; height:44px; border-radius:50%; border:1.5px solid var(--bc-check-line); box-sizing:border-box; background:none;
+}
+#flow-section #bgGrid .bg-card.sel::after{ content:''; background:var(--bc-accent) var(--bc-check) center/22px no-repeat; border-color:var(--bc-accent); }
+
+#flow-section #bgGrid .bg-card-face{
+  grid-column:1; display:grid; grid-template-columns:116px minmax(0,1fr); column-gap:22px; row-gap:2px;
+  align-items:center; align-content:center; padding:0; text-align:left; color:inherit;
+}
+#flow-section #bgGrid .ambience-art{ grid-row:1/3; width:116px; height:80px; border-radius:8px; object-fit:cover; box-shadow:0 2px 10px rgba(80,58,128,.14); }
+#flow-section #bgGrid .bg-name{ font-family:var(--serif); font-weight:400; font-size:clamp(19px,2.4vw,24px); line-height:1.15; color:var(--bc-ink); align-self:end; }
+#flow-section #bgGrid .ambience-description{ font-size:14.5px; line-height:1.4; color:var(--bc-muted); align-self:start; }
+/* The generated beds have an icon, not artwork: a small tile in the same place. */
+#flow-section #bgGrid .bg-card-face > .ic{
+  grid-row:1/3; display:grid; place-items:center; width:52px; height:52px; margin:0; border-radius:10px;
+  background:var(--bc-pill); font-size:20px;
+}
+#flow-section #bgGrid .bg-card-face > .ic + .bg-name{ align-self:center; grid-row:1/3; }
+#flow-section #bgGrid .bg-card-face:has(> .ic){ grid-template-columns:52px minmax(0,1fr); column-gap:16px; }
+
+#flow-section .ambience-confirm-row .candlebtn{
+  background:var(--bc-accent)!important; color:#fff!important; border-radius:999px; padding:11px 22px;
+}
+#flow-section .ambience-confirm-note{ color:var(--bc-muted); }
+
+/* ---------- Continue ---------- */
+#flow-section .flow-nav > .candlebtn,
+#flow-section .flow-nav > div > .candlebtn{ background:var(--bc-cta)!important; color:var(--bc-cta-ink)!important; }
+#flow-section .flow-step[data-step="4"] .flow-nav,
+#flow-section .flow-step[data-step="5"] .flow-nav{ flex-direction:column-reverse; align-items:stretch; gap:14px; margin-top:28px; }
+#flow-section .flow-step[data-step="4"] .flow-nav .candlebtn,
+#flow-section .flow-step[data-step="5"] .flow-nav .candlebtn{
+  width:100%; min-height:64px; border-radius:16px; padding:0 24px;
+  font-family:var(--serif); font-weight:400; font-size:19px; letter-spacing:.3em; text-transform:uppercase;
+  box-shadow:0 10px 26px rgba(70,50,110,.18);
+}
+#flow-section .flow-step[data-step="4"] .flow-nav .candlebtn:disabled,
+#flow-section .flow-step[data-step="5"] .flow-nav .candlebtn:disabled{ opacity:.45; box-shadow:none; }
+#flow-section .flow-step[data-step="4"] .flow-back,
+#flow-section .flow-step[data-step="5"] .flow-back{ align-self:center; color:var(--bc-muted); }
+#flow-section .flow-back{ color:var(--bc-muted); }
+
+/* ---------- the ornament at the foot ---------- */
+#flow-section .flow-ornament{
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; column-gap:18px;
+  max-width:520px; margin:40px auto 0; color:var(--bc-gold);
+}
+#flow-section .flow-ornament::before,
+#flow-section .flow-ornament::after{ content:''; height:1px; background:linear-gradient(90deg,transparent,var(--bc-gold)); opacity:.7; }
+#flow-section .flow-ornament::after{ background:linear-gradient(90deg,var(--bc-gold),transparent); }
+#flow-section .flow-ornament::before{ grid-column:1; grid-row:1; }
+#flow-section .flow-ornament::after{ grid-column:3; grid-row:1; }
+#flow-section .flow-ornament-star{ grid-column:2; grid-row:1; font-size:22px; line-height:1; }
+#flow-section .flow-ornament small{
+  grid-column:1/-1; grid-row:2; justify-self:center; margin-top:16px;
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase; color:var(--bc-kicker);
+}
+
+/* ---------- phone ---------- */
+@media (max-width:600px){
+  #flow-section .flow-phase-label{ font-size:9.5px; letter-spacing:.22em; }
+  #flow-section .voice-card{ grid-template-columns:76px minmax(0,1fr) 34px; column-gap:14px; padding:12px 14px 12px 12px!important; }
+  #flow-section .voice-card.sel{ padding:11px 13px 11px 11px!important; }
+  #flow-section .voice-card::after,
+  #flow-section #bgGrid .bg-card::after{ width:34px; height:34px; }
+  #flow-section .voice-card.sel::after,
+  #flow-section #bgGrid .bg-card.sel::after{ background-size:18px; }
+  #flow-section .voice-art{ width:76px; aspect-ratio:1; }
+  #flow-section .voice-card p{ font-size:14px; }
+  #flow-section .voice-kicker{ margin-top:8px; font-size:9.5px; letter-spacing:.22em; }
+  /* Serenity: artwork, words and mark on one row; Preview under the words. */
+  #flow-section #voiceSerenity{ grid-template-columns:minmax(0,1fr) 34px; row-gap:10px; }
+  #flow-section #voiceSerenity .voice-card-face{ grid-column:1; grid-template-columns:76px minmax(0,1fr); column-gap:14px; row-gap:0; }
+  #flow-section #voiceSerenity::after{ grid-column:2; grid-row:1; }
+  #flow-section #serenityPreviewBtn{ grid-column:1; grid-row:2; justify-self:start; margin-left:90px!important; }
+  /* Ambience: same idea. */
+  #flow-section #bgGrid .bg-card{ grid-template-columns:minmax(0,1fr) 34px; row-gap:10px; padding:12px 14px 12px 12px!important; }
+  #flow-section #bgGrid .bg-card.sel{ padding:11px 13px 11px 11px!important; }
+  #flow-section #bgGrid .bg-card::after{ grid-column:2; grid-row:1; }
+  #flow-section #bgGrid .bg-card-face{ grid-template-columns:84px minmax(0,1fr); column-gap:14px; }
+  #flow-section #bgGrid .ambience-art{ width:84px; height:64px; }
+  #flow-section #bgGrid .bg-preview-btn{ grid-column:1; grid-row:2; justify-self:start; margin-left:98px!important; }
+  #flow-section #serenityPreviewBtn,
+  #flow-section #bgGrid .bg-preview-btn{ min-width:0; height:40px!important; min-height:40px!important; padding:0 20px!important; font-size:16px!important; }
+  #flow-section .flow-step[data-step="4"] .flow-nav .candlebtn,
+  #flow-section .flow-step[data-step="5"] .flow-nav .candlebtn{ min-height:58px; font-size:16px; letter-spacing:.26em; }
+}
