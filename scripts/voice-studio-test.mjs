@@ -42,13 +42,14 @@ const db = {
 };
 let elevenCalls = [];
 let nextElevenResponse = null;   // { status, body } to fail with
+let failProfileSave = false;     // Supabase refuses the voice profile write
 
 function reset(){
   db.tier = { tier: 'ritual', status: 'active' };
   db.voiceProfile = null;
   db.clonedVoiceId = null;
   db.clips = []; db.generations = []; db.objects = new Map();
-  elevenCalls = []; nextElevenResponse = null;
+  elevenCalls = []; nextElevenResponse = null; failProfileSave = false;
 }
 
 function reply(body, opts){
@@ -95,6 +96,7 @@ globalThis.fetch = async (url, opts) => {
       return reply(row ? [row] : []);
     }
     if (method === 'POST'){
+      if (failProfileSave) return reply({ message: 'permission denied' }, { status: 403 });
       db.voiceProfile = { id: 'vp-1', user_id: body.user_id, provider: 'elevenlabs', provider_voice_id: body.provider_voice_id,
                           display_name: body.display_name, consent_at: body.consent_at, created_at: 'now' };
       return reply([db.voiceProfile]);
@@ -422,6 +424,42 @@ for (const [status, body, code] of [[500, 'boom', 'provider_failed'], [402, 'quo
   nextElevenResponse = { status, body };
   r = await callClone({ consent: CONSENT });
   check(`ElevenLabs ${status} saves no voice`, [r.body.error, db.voiceProfile, db.clonedVoiceId], [code, null, null]);
+}
+
+/* ---------------- what a failed clone says, and what it leaves ----------------
+   Each of these needs a different fix, so each comes back as its own code rather
+   than one "something went wrong". */
+for (const [status, body, code] of [
+  [401, '{"detail":{"status":"invalid_api_key","message":"Invalid API key"}}', 'provider_auth'],
+  [403, '{"detail":{"status":"can_not_use_instant_voice_cloning","message":"Your subscription does not include instant voice cloning"}}', 'plan_not_allowed'],
+  [400, '{"detail":{"status":"voice_limit_reached","message":"You have reached your maximum amount of custom voices"}}', 'voice_limit_reached'],
+  [400, '{"detail":{"status":"invalid_file","message":"Could not decode the audio file"}}', 'unsupported_format'],
+  [422, '{"detail":{"status":"verification_required","message":"Voice verification required"}}', 'verification_required'],
+]){
+  reset();
+  nextElevenResponse = { status, body };
+  r = await callClone({ consent: CONSENT });
+  check(`ElevenLabs ${status} ${code} is reported as ${code}`, [r.body.error, db.voiceProfile], [code, null]);
+}
+
+reset();
+failProfileSave = true;
+r = await callClone({ consent: CONSENT });
+check('a voice that cannot be saved to the account is reported', [r.code, r.body.error], [500, 'save_failed']);
+check('  ...and removed at the provider rather than left orphaned',
+  elevenCalls.some(c => c.method === 'DELETE' && c.url.endsWith('/voices/' + MY_CLONE)), true);
+
+/* Safari's recorder makes MP4 audio; the label on the upload is not trusted, the
+   bytes are. */
+reset();
+{
+  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(4096, 1)]);
+  const res = mockRes();
+  const req = { method: 'POST', headers: { authorization: 'Bearer good-token', 'content-type': 'audio/webm', 'x-voice-consent': CONSENT },
+                on(ev, fn){ if (ev === 'data') fn(mp4); if (ev === 'end') fn(); return req; }, destroy(){} };
+  await voiceClone(req, res);
+  const file = elevenCalls[0] && elevenCalls[0].form && elevenCalls[0].form.get('files');
+  check('an MP4 sample mislabelled as WebM is sent as what it is', [res.code, file && file.name, file && file.type], [200, 'sample.m4a', 'audio/mp4']);
 }
 
 /* ---------------- the key never reaches the browser ---------------- */

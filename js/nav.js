@@ -116,6 +116,8 @@ function showBuildPage(){
   document.body.setAttribute('data-view', 'build');
   window.scrollTo(0,0);
   history.pushState({ page:'build' }, '', '#build');
+  // Settings may have borrowed the voice recorder; an open "Use my voice" panel takes it back.
+  if (typeof renderMyVoicePanel === 'function') renderMyVoicePanel();
 }
 function showMarketingHome(){
   document.body.removeAttribute('data-view');
