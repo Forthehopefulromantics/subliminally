@@ -158,7 +158,7 @@ const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange
   'finalTitle','finalLine','finalNote','rerecordBtn','finalTitleInput','finalTitleMsg',
   'finalPointTag','sessionTarget','reviewSub','lockSoothing','lockCustomTrack','lockLayerVoice',
   'finalFreqPicker','flowSteps','recordFlowTitle','recordFlowSub','recordBreathNote',
-  'finalAmbiencePicker','finalAmbienceSelect','ambienceConfirmBtn','ambienceConfirmNote',
+  'finalAmbiencePicker','finalAmbienceSelect','ambienceConfirmBtn','ambienceRemoveBtn','ambienceConfirmNote',
   'ambienceMsg','mixBg','mixBgVal'];
 IDS.forEach(id => mk(id));
 
@@ -287,8 +287,11 @@ const run = (src) => vm.runInContext(src, ctx);
 
    What these tests are still about is the fork out of step 5 — and the fork
    now hangs off the confirm rather than off the card. */
+/* One sound no longer moves the screen on by itself -- there is room to layer
+   a second -- so the pick is followed by Continue, which goes through the same
+   fork (nextStep() from step 5 is startNextPhase()). */
 const pickAmbience = (key) => vm.runInContext(
-  `document.querySelector('#bgGrid .bg-card-face[data-key="${key}"]').onclick(); confirmAmbience();`, ctx);
+  `document.querySelector('#bgGrid .bg-card-face[data-key="${key}"]').onclick(); confirmAmbience(); if (step === 5) nextStep();`, ctx);
 const get = (expr) => vm.runInContext(`(${expr})`, ctx);
 async function settle(){
   // let the awaits inside the handlers resolve, then fire the 260ms advance

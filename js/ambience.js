@@ -95,6 +95,33 @@ function ambienceTrack(key){ return AMBIENCE_BY_KEY.get(key) || null; }
 function ambienceName(key){ const t = ambienceTrack(key); return t ? t.name : 'None'; }
 function isRecordedAmbience(key){ return AMBIENCE_TRACKS.some((t) => t.key === key); }
 
+/* LAYERING. A session can hold one meditation sound and one nature sound at
+   once — Deep Mind under rain, say. Two meditation beds, or two nature beds,
+   would be two of the same thing fighting, so each family holds one. The
+   recorded Nature track and every generated background are nature; the rest
+   of the shelf is meditation. */
+const AMBIENCE_NATURE_KEYS = new Set([
+  ...AMBIENCE_TRACKS.filter((t) => t.category === 'Nature').map((t) => t.key),
+  ...AMBIENCE_SYNTH.map((t) => t.key),
+]);
+function ambienceFamily(key){
+  if (!key || key === 'none' || !ambienceTrack(key)) return null;
+  return AMBIENCE_NATURE_KEYS.has(key) ? 'nature' : 'meditation';
+}
+/* The builder's shelf, by family: what can be layered with what. */
+function ambienceFamilies(){
+  // Grouped as the shelf always was: by category, recorded before generated.
+  const rank = ['Meditation', 'Ambient', 'Nature', 'Sleep', 'Generated'];
+  const all = [...AMBIENCE_TRACKS, ...AMBIENCE_SYNTH]
+    .map((t, i) => ({ t, i }))
+    .sort((x, y) => (rank.indexOf(x.t.category) - rank.indexOf(y.t.category)) || (x.i - y.i))
+    .map((x) => x.t);
+  return [
+    { family: 'meditation', label: 'Meditation', tracks: all.filter((t) => ambienceFamily(t.key) === 'meditation') },
+    { family: 'nature',     label: 'Nature',     tracks: all.filter((t) => ambienceFamily(t.key) === 'nature') },
+  ];
+}
+
 /* The order the selector draws them in: the recorded library first, grouped by
    what kind of quiet it is, then the generated ones, then None. */
 function ambienceSections(){
@@ -275,8 +302,10 @@ function scheduleFade(voice, to, seconds, ctx){
 
 /* ---------------- one bed, one track ----------------
 
-   ONLY ONE AMBIENCE PLAYS AT A TIME. That is enforced here rather than asked
-   of callers, because the way it gets broken is never a caller deciding to
+   ONLY ONE AMBIENCE PLAYS AT A TIME PER BED, AND ONLY ONE GROUP OF BEDS PLAYS
+   AT ALL. A group is a session's beds (its main bed and the layer under it) or
+   a preview's; starting any bed stops every bed outside its own group. That is
+   enforced here rather than asked of callers, because the way it gets broken is never a caller deciding to
    play two — it is a switch landing while the previous track is still
    decoding, and the late one connecting itself on top. So:
 
@@ -287,8 +316,9 @@ function scheduleFade(voice, to, seconds, ctx){
      * the outgoing track is *stopped*, at a time booked in the audio clock,
        not merely faded — a fade to zero still leaves a source running, and a
        source that is never stopped is a track that never ends;
-     * and starting any bed stops every other one, so a preview and a session
-       can never end up layered.
+     * and starting any bed stops every bed in another group, so a preview and
+       a session can never end up layered. The two beds of one session are
+       the only layering there is, and it is on purpose.
 
    A bed is not tied to one AudioContext. The player opens a fresh context for
    each session and closes it afterwards, so attach() is called again each
@@ -296,8 +326,9 @@ function scheduleFade(voice, to, seconds, ctx){
    start on the ambience that was chosen hours earlier. */
 const ambienceBeds = new Set();
 
-function AmbienceBed(role){
+function AmbienceBed(role, group){
   this.role = role || 'bed';
+  this.group = group || this.role;
   this.ctx = null;
   this.out = null;              // carries the mixer level
   this.destination = null;
@@ -351,7 +382,7 @@ AmbienceBed.prototype.to = function(key, opts){
     if (this.onchange) this.onchange(this.key);
     return Promise.resolve(null);
   }
-  ambienceBeds.forEach((bed) => { if (bed !== this) bed.stop({ fade: 0.25 }); });
+  ambienceBeds.forEach((bed) => { if (bed.group !== this.group) bed.stop({ fade: 0.25 }); });
 
   const started = isRecordedAmbience(this.key)
     ? this.startRecorded(this.key, fade, token)
@@ -491,6 +522,8 @@ if (typeof window !== 'undefined'){
   window.ambienceUrl = ambienceUrl;
   window.ambienceSections = ambienceSections;
   window.isRecordedAmbience = isRecordedAmbience;
+  window.ambienceFamily = ambienceFamily;
+  window.ambienceFamilies = ambienceFamilies;
   window.warmAmbience = warmAmbience;
   window.analyseAmbience = analyseAmbience;
 }

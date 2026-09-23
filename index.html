@@ -2917,7 +2917,7 @@
       <!-- STEP 5: background ambience + mixer -->
       <div class="flow-step" data-step="5">
         <div class="flow-title-row"><div class="flow-title">Layer your ambience</div><span class="flow-kicker">Set the mood with intention</span></div>
-        <div class="flow-sub">Preview an ambience, then press Use to select it. You'll adjust every layer's volume on the final screen, once you can hear it all together.</div>
+        <div class="flow-sub">Preview a sound, then press Use to select it. Choose one meditation sound and one nature sound to layer them together, or just one. You'll adjust the volume on the final screen, once you can hear it all together.</div>
         <div class="flow-body">
           <!-- Two states live in here at once, and they are not the same state:
                the card with the lilac ring is what this session is SET to, and
@@ -2926,6 +2926,7 @@
           <div class="bg-grid" id="bgGrid" role="radiogroup" aria-label="Background ambience"></div>
           <div class="ambience-confirm-row">
             <button type="button" class="mini-btn candlebtn" id="ambienceConfirmBtn" disabled onclick="confirmAmbience()">Using None</button>
+            <button type="button" class="ambience-remove-btn" id="ambienceRemoveBtn" hidden onclick="removeAmbienceLayer()"></button>
             <span class="ambience-confirm-note" id="ambienceConfirmNote"></span>
           </div>
           <div class="length-msg" id="ambienceMsg"></div>

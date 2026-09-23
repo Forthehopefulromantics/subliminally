@@ -34,6 +34,9 @@ function readMixSettings(){
     const value = el ? Number(el.value) : fallback;
     mix[id] = Number.isFinite(value) ? Math.max(0,Math.min(100,value)) : fallback;
   });
+  // The ambience layered under the main one (a meditation sound under a nature
+  // sound, or the other way round) travels with the mix, like the levels do.
+  if (typeof state !== 'undefined' && state && state.bgLayer && state.bgLayer !== 'none') mix.bgLayer = state.bgLayer;
   return mix;
 }
 function mixMessage(text){

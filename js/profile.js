@@ -188,6 +188,11 @@ async function loadSavedIntoBuilder(id, opts){
   state.freq = matchedFreq;
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
   state.bg = s.background || 'none';
+  /* The layer lives in mix_settings. Only a sound from the other family is a
+     layer; anything else is ignored rather than allowed to double one up. */
+  const savedLayer = s.mix_settings && s.mix_settings.bgLayer;
+  state.bgLayer = savedLayer && typeof ambienceFamily === 'function' && ambienceFamily(savedLayer)
+    && ambienceFamily(savedLayer) !== ambienceFamily(state.bg) ? savedLayer : 'none';
   state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
   const restoredMinutes = Math.min(480, Math.max(5, state.targetLengthMinutes));
   document.getElementById('sessionLengthSlider').value = restoredMinutes;

@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
    Subliminally — the builder, dressed to the supplied celestial design.
 
-   Lavender sky, cream cards, a serif voice for names and a small spaced-caps
+   A lavender veil, cream cards, a serif voice for names and a small spaced-caps
    voice for the quiet lines. Every card on the voice and ambience steps is one
    row: artwork, words, Preview, and a round mark that says what is chosen.
    Night keeps the same shapes on the night sky.
@@ -28,22 +28,13 @@ body[data-sky="night"] #flow-section{
   --bc-shadow:0 10px 30px rgba(8,4,24,.28);
 }
 
-/* ---------- the sky behind the builder ---------- */
-body[data-sky="day"] #flow-section{
-  position:relative; isolation:isolate;
-  background:linear-gradient(180deg,#F0EAF6 0%,#EBE3F3 55%,#E7DEF1 100%);
-}
-body[data-sky="day"] #flow-section::after{
-  content:''; position:absolute; inset:auto 0 0 0; height:240px; z-index:-1; pointer-events:none;
-  background:
-    radial-gradient(120px 70px at 4% 88%,rgba(214,196,232,.75),transparent 70%),
-    radial-gradient(160px 90px at 12% 100%,rgba(222,206,238,.8),transparent 70%),
-    radial-gradient(140px 80px at 94% 90%,rgba(214,196,232,.75),transparent 70%),
-    radial-gradient(180px 100px at 86% 104%,rgba(222,206,238,.8),transparent 70%);
-}
+/* ---------- the builder card ----------
+   The page keeps the site's own sky -- the clouds drift behind the builder by
+   day and by night, as they do everywhere else. Only the card is tinted, a
+   lavender veil the cream cards sit on. */
 body[data-sky="day"] #flow-section .flow-card{
-  background:rgba(255,255,255,.34)!important; border:1px solid rgba(255,255,255,.6);
-  box-shadow:0 20px 60px rgba(96,70,140,.08); backdrop-filter:blur(2px);
+  background:rgba(247,242,252,.88)!important; border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 20px 60px rgba(96,70,140,.10); backdrop-filter:blur(6px);
 }
 
 /* ---------- title ---------- */
@@ -136,11 +127,13 @@ body[data-sky="day"] #flow-section .flow-card{
 
 /* ---------- the ambience cards ---------- */
 #flow-section .bg-grid{ gap:14px; }
-#flow-section #bgGrid .bg-section-label{ color:var(--bc-kicker); letter-spacing:.24em; font-size:10.5px; margin:8px 0 -2px; }
-/* The recorded tracks read as one list; their category names stay for screen readers. */
-#flow-section #bgGrid .bg-section-label-recorded{
-  position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; margin:0;
+/* One heading per family: Meditation, Nature. One of each can be layered. */
+#flow-section #bgGrid .bg-section-label{
+  display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  color:var(--bc-ink); font-family:var(--serif); font-size:19px; letter-spacing:0; text-transform:none; margin:14px 0 -2px;
 }
+#flow-section #bgGrid .bg-section-label:first-child{ margin-top:4px; }
+#flow-section #bgGrid .bg-section-hint{ font-family:var(--sans); font-size:10.5px; letter-spacing:.26em; text-transform:uppercase; color:var(--bc-kicker); }
 #flow-section #bgGrid .bg-row-recorded{ grid-template-columns:1fr; gap:14px; }
 
 #flow-section #bgGrid .bg-card{
@@ -175,6 +168,11 @@ body[data-sky="day"] #flow-section .flow-card{
   background:var(--bc-accent)!important; color:#fff!important; border-radius:999px; padding:11px 22px;
 }
 #flow-section .ambience-confirm-note{ color:var(--bc-muted); }
+#flow-section .ambience-remove-btn{
+  border:1px solid var(--bc-line); background:var(--bc-card); color:var(--bc-ink);
+  border-radius:999px; padding:10px 18px; font:inherit; font-size:13px; cursor:pointer;
+}
+#flow-section .ambience-remove-btn[hidden]{ display:none; }
 
 /* ---------- Continue ---------- */
 #flow-section .flow-nav > .candlebtn,

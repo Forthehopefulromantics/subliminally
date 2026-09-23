@@ -59,7 +59,10 @@ function currentPlayerTitle(){
 function currentAmbienceLabel(){
   const bg = PLAYER_AMBIENCE.find(x => x.key === playerPrefs.ambience);
   const freq = state && state.freq ? `${state.freq.hz} Hz` : '';
-  return [freq, bg && bg.key !== 'none' && bg.name].filter(Boolean).join(' + ') || 'No ambience';
+  // A layered pair names both, off the session's own answer.
+  const layered = state && state.bgLayer && state.bgLayer !== 'none' && typeof ambienceName === 'function'
+    ? [ambienceName(state.bg), ambienceName(state.bgLayer)] : null;
+  return [freq, ...(layered || [bg && bg.key !== 'none' && bg.name])].filter(Boolean).join(' + ') || 'No ambience';
 }
 function trackIsAvailable(track){
   if (track.kind === 'frequency') return true;

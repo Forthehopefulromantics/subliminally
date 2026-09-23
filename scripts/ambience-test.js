@@ -223,7 +223,7 @@ const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange
   'finalTitle','finalLine','finalNote','rerecordBtn','finalTitleInput','finalTitleMsg',
   'finalPointTag','sessionTarget','reviewSub','lockSoothing','lockCustomTrack','lockLayerVoice',
   'finalFreqPicker','finalFreqSelect','finalAmbiencePicker','finalAmbienceSelect',
-  'ambienceConfirmBtn','ambienceConfirmNote','ambienceMsg','finalPlayBtn','stopBtn','loopToggle',
+  'ambienceConfirmBtn','ambienceRemoveBtn','ambienceConfirmNote','ambienceMsg','finalPlayBtn','stopBtn','loopToggle',
   'sessionProgress','sessionProgressFill','sessionElapsed','sessionRemaining','saveMsg',
   'flowSteps','recordFlowTitle','recordFlowSub','recordBreathNote'];
 IDS.forEach(id => mk(id));
@@ -374,11 +374,14 @@ check('their categories', get(`AMBIENCE_TRACKS.map(t => t.category)`),
   ['Meditation','Ambient','Nature','Sleep','Meditation']);
 check('the generated backgrounds are still there',
   get(`AMBIENCE_SYNTH.every(t => !!document.querySelector('#bgGrid .bg-card[data-key="' + t.key + '"]'))`), true);
-/* In DOM order, which is category order: both Meditation tracks, then
-   Ambient, Nature, Sleep — the shelf, grouped. */
+/* In DOM order, grouped by what can be layered: the meditation family
+   (Meditation, Ambient, Sleep), then the nature family. */
 check('only recorded tracks get a play button, and they are grouped',
   get(`Array.from(document.querySelectorAll('#bgGrid .bg-preview-btn')).map(b => b.dataset.key)`),
-  ['deep-mind','inner-stillness','the-sanctuary','ocean-escape','soft-asmr']);
+  ['deep-mind','inner-stillness','the-sanctuary','soft-asmr','ocean-escape']);
+check('every sound belongs to exactly one family',
+  get(`[...AMBIENCE_TRACKS, ...AMBIENCE_SYNTH].map(t => ambienceFamily(t.key))`),
+  ['meditation','meditation','nature','meditation','meditation','nature','nature','nature','nature','nature','nature','nature']);
 check('a bundled copy is the fallback when Supabase has not answered',
   get(`ambienceUrl('ocean-escape')`), 'audio/ambience/ocean-escape.mp3');
 run(`window.AMBIENCE_URLS = { 'ocean-escape': 'https://cdn.test/ocean.mp3' };`);
@@ -479,6 +482,54 @@ check('a switch underneath it does not reset the slider', get(`sessionBed.out.ga
 run(`finalPlaying = false;`);
 
 /* ============================================================ */
+section('one meditation sound and one nature sound, layered');
+run(`state.bg = 'none'; state.bgLayer = 'none'; ambienceCandidate = null; renderBgGrid();`);
+run(`auditionAmbience('deep-mind'); confirmAmbience();`);
+await settle();
+run(`auditionAmbience('rain'); confirmAmbience();`);
+await settle();
+check('a nature sound is added under the meditation sound', [bgKey(), get('state.bgLayer')], ['deep-mind', 'rain']);
+check('both cards are lit', [cardSelected('deep-mind'), cardSelected('rain'), cardSelected('none')], [true, true, false]);
+check('the button names the pair', confirmLabel(), 'Using Deep Mind + Rain');
+run(`auditionAmbience('inner-stillness'); confirmAmbience();`);
+await settle();
+check('a second meditation sound replaces the first, and keeps the nature one',
+  [bgKey(), get('state.bgLayer')], ['inner-stillness', 'rain']);
+check('never two of one family', [cardSelected('deep-mind'), cardSelected('inner-stillness')], [false, true]);
+run(`auditionAmbience('rain');`);
+check('a layered sound can be taken off on its own',
+  get(`document.getElementById('ambienceRemoveBtn').hidden`), false);
+run(`removeAmbienceLayer();`);
+check('removing it leaves the other', [bgKey(), get('state.bgLayer')], ['inner-stillness', 'none']);
+run(`auditionAmbience('ocean'); confirmAmbience(); auditionAmbience('none'); confirmAmbience();`);
+await settle();
+check('None clears both', [bgKey(), get('state.bgLayer')], ['none', 'none']);
+
+const layerCtx = new FakeCtx();
+stubDecode(layerCtx);
+ctx.__layerCtx = layerCtx;
+run(`finalCtx = __layerCtx; finalPlaying = true;
+     sessionBed.attach(__layerCtx, __layerCtx.destination);
+     sessionLayerBed.attach(__layerCtx, __layerCtx.destination);
+     state.bg = 'deep-mind'; state.bgLayer = 'ocean-escape';
+     applySessionAmbience({ fade: 1 });`);
+await flushDecodes();
+check('a layered session plays both, together',
+  layerCtx._sources.filter(s => s._started && s._stopped === null).length, 2);
+check('on the two beds of one session', [get('sessionBed.key'), get('sessionLayerBed.key')], ['deep-mind', 'ocean-escape']);
+run(`applyLiveMixGain('mixBg', 30);`);
+check('one ambience slider moves both', [get('sessionBed.level'), get('sessionLayerBed.level')], [0.3, 0.3]);
+run(`state.bgLayer = 'none'; applySessionAmbience({ fade: 1 });`);
+await flushDecodes();
+check('taking the layer off stops it', layerCtx._sources.filter(s => s._started && s._stopped === null).length, 1);
+// Put the session back the way the sections below expect it: one bed, playing.
+run(`sessionBed.detach(); sessionLayerBed.detach(); finalPlaying = false; finalCtx = __sessionCtx;
+     state.bg = 'soft-asmr'; state.bgLayer = 'none';`);
+stubDecode(sessionCtx);
+run(`sessionBed.attach(__sessionCtx, __sessionCtx.destination); sessionBed.to('soft-asmr', { fade: 1 });`);
+await flushDecodes();
+
+/* ============================================================ */
 section('nothing about a background, a frequency or a length regenerates a voice');
 run(`__voicePrepCount = 0;`); ttsCalls = []; fetchCalls = [];
 run(`state.freq = FREQS[5];`);
@@ -487,7 +538,8 @@ run(`changeSessionAmbience('ocean-escape');`);
 await settle();
 check('changing the ambience never reaches the provider', ttsCalls.length, 0);
 check('and never re-prepares the voice', get(`__voicePrepCount`), 0);
-check('but it does change the answer', bgKey(), 'ocean-escape');
+check('but it does change the answer: the nature sound layers under the meditation one',
+  [bgKey(), get('state.bgLayer')], ['the-sanctuary', 'ocean-escape']);
 
 run(`changeFinalFrequency('432');`);
 await settle();
