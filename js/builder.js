@@ -628,6 +628,13 @@ async function generateAffirmations(){
   state.count = state.eftMode ? EFT_LINE_COUNT : (state.visualizationMode ? 1 : parseInt(countRange.value));
   showStep(2);
 
+  /* The words these lines come back in are the ones chosen in Settings, so the
+     answer has to be in hand before anything is asked for. Today and the
+     profile page both load it, but somebody who opened the builder straight
+     from a link has been through neither -- and a missing answer is
+     indistinguishable from the neutral one, so it would have gone unnoticed. */
+  if (typeof ensureFaith === 'function') await ensureFaith();
+
   if (state.visualizationMode){
     // Nothing typed in the prompt = blank page, write it entirely yourself.
     // Something typed = get a full draft to rewrite, trim, or keep.
@@ -650,13 +657,21 @@ async function generateAffirmations(){
   renderAffList();
   showStep(3);
 }
+/* What the three generating endpoints are told about the saved faith answer:
+   the id, and for 'other' the word this person typed for what they reach
+   toward. The framing itself is written server-side, in lib/faith-language.js
+   -- the browser sends which answer it is, never the language to use. */
+function faithForGenerator(){
+  if (typeof myFaith === 'undefined' || !myFaith || !myFaith.id) return {};
+  return { faith: myFaith.id, faithWord: myFaith.id === 'other' ? (myFaith.own || null) : null };
+}
 async function callClaudeForAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
   const response = await fetch(API_BASE + "/api/generate-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal })
+    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal, ...faithForGenerator() })
   });
   if (!response.ok) return null;
   const data = await response.json();
@@ -673,7 +688,7 @@ async function callClaudeForEftAffirmations(){
   const response = await fetch(API_BASE + "/api/generate-eft-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
+    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel, ...faithForGenerator() })
   });
   if (!response.ok) return null;
   const data = await response.json();
@@ -761,7 +776,7 @@ async function callClaudeForVisualizationScript(){
   const response = await fetch(API_BASE + "/api/generate-visualization-script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel })
+    body: JSON.stringify({ goal: state.goal, toneLabel, freqLabel, ...faithForGenerator() })
   });
   if (!response.ok) return null;
   const data = await response.json();

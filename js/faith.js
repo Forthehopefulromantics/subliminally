@@ -22,6 +22,8 @@
 const FAITHS = [
   {
     id: 'christianity', label: 'Christianity',
+    words: ['God','prayer','faith','grace','being led'],
+    practices: ['prayer','scripture reading','gratitude','reflection'],
     higher: 'God', figure: 'Jesus', practice: 'prayer', text: 'the Bible',
     /* Said where the app would otherwise say something vague about the
        universe. Kept short, and never a promise about outcomes. */
@@ -30,24 +32,32 @@ const FAITHS = [
   },
   {
     id: 'islam', label: 'Islam',
+    words: ['Allah','prayer','du‘a','patience','gratitude'],
+    practices: ['prayer','du‘a','reflection','gratitude'],
     higher: 'Allah', figure: 'the Prophet Muhammad ﷺ', practice: 'salah', text: 'the Qur’an',
     line: 'Allah has not brought you this far to leave you.',
     habits: { morning:['Fajr on time','Read Qur’an','Morning adhkar'], night:['Isha on time','Evening adhkar','Make du‘a'] },
   },
   {
     id: 'hinduism', label: 'Hinduism',
+    words: ['the divine','dharma','stillness','devotion'],
+    practices: ['meditation','prayer','reflection','gratitude'],
     higher: 'Brahman', figure: 'the divine in you', practice: 'puja', text: 'the Gita',
     line: 'What you are reaching for is already within you.',
     habits: { morning:['Morning puja','Japa','Read a verse'], night:['Evening aarti','Reflect on the day','Seva'] },
   },
   {
     id: 'universe', label: 'Universe / Manifestation',
+    words: ['the Universe','alignment','manifestation','intention','energy'],
+    practices: ['visualization','scripting','intention setting','gratitude'],
     higher: 'the Universe', figure: 'your future self', practice: 'manifesting', text: 'your journal',
     line: 'What you are calling in is already on its way.',
     habits: { morning:['Morning intention','Read your affirmations','Visualise the day'], night:['Scripting','Gratitude list','Thank the day'] },
   },
   {
     id: 'psychology', label: 'Neutral / Psychology-based',
+    words: ['mindset','self-talk','habits','reflection','your own agency'],
+    practices: ['reflection','journalling','habit practice','planning'],
     /* Deliberately the neutral vocabulary: chosen by people who want the
        practice without the language around it. Everything else reads a blank
        answer the same way, so this simply makes that choice sayable. */
@@ -57,18 +67,24 @@ const FAITHS = [
   },
   {
     id: 'spirituality', label: 'Spiritual, not religious',
+    words: ['your higher self','intuition','energy','alignment','inner guidance'],
+    practices: ['meditation','visualization','reflection','gratitude'],
     higher: 'the Universe', figure: 'your higher self', practice: 'manifesting', text: 'your journal',
     line: 'The Universe is already moving toward you.',
     habits: { morning:['Morning meditation','Scripting','Set an intention'], night:['Gratitude list','Visualise it','Moon check-in'] },
   },
   {
     id: 'agnostic', label: 'Not sure',
+    words: ['what you are reaching for','steadiness','practice'],
+    practices: ['reflection','meditation','gratitude','journalling'],
     higher: null, figure: 'the person you are becoming', practice: 'practice', text: 'your journal',
     line: 'You are the one doing this. That is enough.',
     habits: { morning:['Sit quietly','Morning pages','Set an intention'], night:['Gratitude list','Wind down','Breathe'] },
   },
   {
     id: 'other', label: 'Something else', freeText: true,
+    words: ['what you are reaching for','steadiness','practice'],
+    practices: ['reflection','meditation','gratitude','journalling'],
     higher: null, figure: 'the person you are becoming', practice: 'practice', text: 'your journal',
     line: 'You are the one doing this. That is enough.',
     habits: { morning:['Sit quietly','Morning pages','Set an intention'], night:['Gratitude list','Wind down','Breathe'] },
@@ -106,6 +122,29 @@ function faithHabitIdeas(time){
   return [...(h.morning || []), ...(h.night || [])];
 }
 
+/* The whole saved answer as one object, for anything that wants more than a
+   single word out of it -- the vocabulary this person uses and the practices
+   worth suggesting to them. `word` is the name they typed under 'Something
+   else', and is null for every other answer.
+
+   This and lib/faith-language.js are the two halves of the same question,
+   keyed by the same ids: this one is what the interface says, that one is what
+   the generating endpoints are told before they write. Add an answer to one
+   and it belongs in the other. */
+function faithPersonalization(){
+  const f = faithNow();
+  return {
+    id: myFaith.id || null,
+    label: f.label,
+    word: (myFaith.id === 'other' && myFaith.own) ? myFaith.own : null,
+    higher: faithHigher(),
+    practice: f.practice,
+    text: f.text,
+    words: (f.words || []).slice(),
+    practices: (f.practices || []).slice(),
+  };
+}
+
 /* Rewrites a line written in the neutral vocabulary. Anything we do not have a
    word for is left exactly as it was, which is why every token has a neutral
    fallback rather than an empty string. */
@@ -120,11 +159,25 @@ function inMyWords(text){
     .replace(/\{text\}/g, f.text || 'your journal');
 }
 
+/* Whether the saved answer has been read from the profile yet. A person who
+   has answered and a person who has not both look like `myFaith.id === null`
+   until it has, which is exactly the confusion that would send somebody's
+   subliminals back in the neutral vocabulary without anybody noticing. */
+let faithLoaded = false;
+
 async function loadFaith(){
   if (!sb || !currentUser) return;
   const d = (await myProfile()) || {};
   myFaith = { id: d.faith || null, own: d.faith_other || '' };
   mySpiritStance = spiritStanceFrom(d);
+  faithLoaded = true;
+}
+
+/* For callers that need the answer rather than a fresh copy of it -- the
+   builder, before it asks for lines. Reads the profile once and then stops. */
+async function ensureFaith(){
+  if (faithLoaded || !sb || !currentUser) return;
+  await loadFaith();
 }
 
 /* ---------- prayer, or meditation ----------
@@ -187,6 +240,20 @@ function faithAnswerForSave(){
 
 
 /* ---------- Settings: change spiritual language any time ---------- */
+/* "What will change?" -- folded away on arrival. The four things a choice here
+   touches are worth saying plainly, and they are four paragraphs: opened by
+   default they would turn a settings card into a page of reading before the
+   chips are even reached. */
+function toggleFaithDetails(){
+  const panel = document.getElementById('faithDetails');
+  const btn = document.getElementById('faithDetailsToggle');
+  if (!panel || !btn) return;
+  const open = panel.hasAttribute('hidden');
+  if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const arrow = btn.querySelector('.faith-disclose-arrow');
+  if (arrow) arrow.textContent = open ? '\u2191' : '\u2193';
+}
 function renderFaithSettings(){
   const wrap = document.getElementById('settingsFaithChips');
   if (!wrap) return;

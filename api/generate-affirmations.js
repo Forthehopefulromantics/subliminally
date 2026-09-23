@@ -1,6 +1,7 @@
 export const config = { api: { bodyParser: true } };
 
 import { applyCors } from '../lib/cors.js';
+import { faithFraming } from '../lib/faith-language.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -15,17 +16,21 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { count, freqLabel, toneLabel, goal } = req.body || {};
+  const { count, freqLabel, toneLabel, goal, faith, faithWord } = req.body || {};
   // Standard subliminals contain at most ten affirmations. EFT keeps its own
   // separate 11-line structure and never calls this route.
   const safeCount = Math.min(Math.max(parseInt(count, 10) || 10, 5), 10);
+  /* Their saved answer in Settings, as framing rather than a word list. Null
+     when they have not answered or the answer is not one we know, and then the
+     section is left out rather than filled with a guess. */
+  const framing = faithFraming(faith, faithWord);
 
   const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
 Frequency association (mood only, not medical): ${freqLabel || 'none'}
 Desired voice/tone: ${toneLabel || 'warm'}
 What the person said they want help with: "${goal || 'not specified'}"
 Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
-Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.`;
+Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.${framing ? '\n\n' + framing : ''}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
