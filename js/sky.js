@@ -43,9 +43,11 @@ const CLOUD_LAYERS = [
   { top:'12%', w:'70%',  op:.62, dur:104, delay:-88 },
   { top:'27%', w:'38%',  op:.33, dur:150, delay:-15 },
   { top:'41%', w:'86%',  op:.58, dur:118, delay:-70 },
-  { top:'56%', w:'52%',  op:.42, dur:142, delay:-110 },
-  { top:'70%', w:'100%', op:.64, dur:96,  delay:-30 },
-  { top:'86%', w:'64%',  op:.48, dur:126, delay:-95 },
+  { top:'56%', w:'52%',  op:.38, dur:142, delay:-110 },
+  /* Keep the lower half airy: the original illustrated clouds remain, but
+     smaller/lighter so the blue sky reads all the way down the page. */
+  { top:'72%', w:'72%',  op:.42, dur:112, delay:-30 },
+  { top:'89%', w:'48%',  op:.32, dur:138, delay:-95 },
 ];
 
 /* Dealt once at startup. Seeded rather than random so the stars land in the
