@@ -124,6 +124,8 @@ export default async function handler(req, res) {
     res.status(400).json({ error: 'consent_required' });
     return;
   }
+  // The moment the confirmation reached us, stored with the voice it allowed.
+  const consentAt = new Date().toISOString();
 
   /* Already have one? Then that is the voice, and nothing is generated. Replacing
      it is a deliberate act ("Record it again"), not a side effect of building
@@ -161,7 +163,7 @@ export default async function handler(req, res) {
       fileName: `sample.${ext}`,
     });
 
-    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice' });
+    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice', consentAt });
 
     // Only bin the old one — and the audio read in it — once the new one is saved.
     if (previous && previous !== voiceId) {
