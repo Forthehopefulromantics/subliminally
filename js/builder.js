@@ -2117,7 +2117,11 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   clip.el.onended = done;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
-  if (p && p.catch) p.catch(done);
+  if (p && p.catch) p.catch(() => {
+    // Refused because a pause landed first: resumeFinal plays it on from here.
+    if (finalPaused && liveVoiceElements.has(clip.el)) return;
+    done();
+  });
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
@@ -2481,6 +2485,10 @@ let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
 let finalPaused=false, finalPauseStarted=null, finalPausedTotal=0, finalFadeEnding=false;
 let finalAffirmationIndex=0, finalRequestedIndex=null;
 let finalPauseWaiters=[];
+/* Bumped on every play, stop and finish. A callback carries the number it was
+   made under, so a clip, a voice line or a timer left over from an earlier
+   session can never play into the next one -- that was the second voice. */
+let finalSession=0;
 let liveToneGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 /* Every gain node a voice line is currently playing through. A line is its own
    node that dies when the line ends, so unlike the tone and the background
@@ -2506,23 +2514,73 @@ function waitWhileFinalPaused(resume){
   if (!finalPauseWaiters.includes(resume)) finalPauseWaiters.push(resume);
   return true;
 }
+/* Pause is authoritative. Every callback the sequence is driven by -- a clip
+   ending, a line finishing, a gap timer -- goes through this: from an earlier
+   session it is dropped; while paused it is held, once, until resume, so
+   nothing moves the affirmation on while the player says it is paused. */
+function finalCallback(fn){
+  if (fn && fn.__finalGuarded) return fn;   // one callback is held once, however it arrives
+  const session = finalSession;
+  let held = false;
+  const guarded = function(...args){
+    if (!finalPlaying || session !== finalSession) return;
+    if (finalPaused){
+      if (!held){ held = true; finalPauseWaiters.push(() => { held = false; guarded(...args); }); }
+      return;
+    }
+    fn(...args);
+  };
+  guarded.__finalGuarded = true;
+  return guarded;
+}
+/* A timer that belongs to the session: cleared by stop and finish, dropped
+   from the list once it has fired, and held by a pause like any callback. */
+function finalLater(fn, ms){
+  const run = finalCallback(fn);
+  const t = setTimeout(() => {
+    const i = finalTimeouts.indexOf(t); if (i >= 0) finalTimeouts.splice(i, 1);
+    run();
+  }, ms);
+  finalTimeouts.push(t);
+  return t;
+}
 function pauseFinal(){
   if (!finalPlaying || finalPaused) return;
   finalPaused = true; finalPauseStarted = Date.now();
-  try { if (finalCtx && finalCtx.state === 'running') finalCtx.suspend(); } catch(e){}
-  try { window.speechSynthesis.pause(); } catch(e){}
+  try { if (finalCtx && finalCtx.state !== 'closed'){ const p = finalCtx.suspend(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
+  // The iOS route out of the graph, then every clip element mid-line.
+  try { if (finalCtx && finalCtx.__outEl) finalCtx.__outEl.pause(); } catch(e){}
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
+  try { window.speechSynthesis.pause(); } catch(e){}
+  /* Some browsers accept pause() and go on speaking. There the line is cut
+     instead; the utterance's own handler holds it and says it again on resume. */
+  setTimeout(() => {
+    try {
+      const synth = window.speechSynthesis;
+      if (finalPaused && synth && synth.speaking && !synth.paused) synth.cancel();
+    } catch(e){}
+  }, 150);
+  stopSilentKeeper();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
 }
 function resumeFinal(){
   if (!finalPlaying || !finalPaused) return;
   if (finalPauseStarted) finalPausedTotal += Date.now() - finalPauseStarted;
   finalPauseStarted = null; finalPaused = false;
-  try { if (finalCtx && finalCtx.state === 'suspended') finalCtx.resume(); } catch(e){}
+  startSilentKeeper();
+  try { if (finalCtx && finalCtx.state !== 'closed' && finalCtx.state !== 'running'){ const p = finalCtx.resume(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
+  try { if (finalCtx && finalCtx.__outEl){ const p = finalCtx.__outEl.play(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
   try { window.speechSynthesis.resume(); } catch(e){}
-  liveVoiceElements.forEach(el => { try { const p=el.play(); if(p&&p.catch)p.catch(()=>{}); } catch(e){} });
+  // The same elements, from where they stopped: nothing new is created here.
+  liveVoiceElements.forEach(el => {
+    try {
+      const p = el.play();
+      if (p && p.catch) p.catch(() => { if (!finalPaused && typeof el.onended === 'function') el.onended(); });
+    } catch(e){}
+  });
   const waiters = finalPauseWaiters.splice(0);
-  waiters.forEach(fn => { const t=setTimeout(fn,0); finalTimeouts.push(t); });
+  const session = finalSession;
+  waiters.forEach(fn => { const t = setTimeout(() => { if (session === finalSession) fn(); }, 0); finalTimeouts.push(t); });
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 }
 function seekFinalAffirmation(delta){
@@ -2540,9 +2598,7 @@ function showFinalAffirmation(text, index){
 /* Swap only the ambience graph. Voice clips and the TTS cache are untouched. */
 function changeFinalAmbience(key){
   state.bg = key || 'none';
-  if (!finalPlaying || !finalCtx || !liveBgGain) return;
-  if (finalAmbience) finalAmbience.stop();
-  finalAmbience = buildAmbience(finalCtx, state.bg, liveBgGain);
+  if (finalPlaying && finalCtx) sessionBed.to(state.bg);
 }
 
 /* ---------- soothing layer picker ---------- */
@@ -2921,12 +2977,14 @@ function closeAudioOut(ctx){
 }
 
 function primeAudio(){
+  // A paused session stays paused: only resumeFinal wakes its context.
+  const holdPaused = finalPlaying && finalPaused;
   // Before the context, so the category is already right when it opens.
-  startSilentKeeper();
+  if (!holdPaused) startSilentKeeper();
   if (!finalCtx || finalCtx.state === 'closed'){
     finalCtx = new (window.AudioContext||window.webkitAudioContext)();
   }
-  if (finalCtx.state === 'suspended') finalCtx.resume().catch(()=>{});
+  if (finalCtx.state === 'suspended' && !holdPaused) finalCtx.resume().catch(()=>{});
   try {
     const s = finalCtx.createBufferSource();
     s.buffer = finalCtx.createBuffer(1, 1, 22050);
@@ -2957,7 +3015,10 @@ function playFinal(){
   finalPlaying = true;
   finalStartTime = Date.now();
   finalPaused = false; finalPauseStarted = null; finalPausedTotal = 0; finalFadeEnding = false;
+  finalPauseWaiters = [];
   finalAffirmationIndex = 0; finalRequestedIndex = null;
+  const session = ++finalSession;
+  const alive = () => finalPlaying && session === finalSession;
   deviceSpeechFailures = 0;
   deviceVoiceSilent = false;
   document.getElementById('finalPlayBtn').disabled = false;
@@ -3040,50 +3101,47 @@ function playFinal(){
     let idx = 0;
     const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
     function playNextLayerLine(){
-      if (!finalPlaying) return;
+      if (!alive()) return;
       if (waitWhileFinalPaused(playNextLayerLine)) return;
       const lines = state.layerAffirmations;
+      const next = finalCallback(() => { idx++; finalLater(playNextLayerLine, gapForNextLine()); });
       if (useOwn){
         const recorded = layerRecordings.map((r,i)=>({r,i})).filter(x=>x.r);
         if (!recorded.length) return;
         if (idx >= recorded.length) idx = 0; // loops independently, doesn't need to match the main track's length
         const { r } = recorded[idx];
-        loadClip(finalCtx, r).then(clip=>{
-          if (!finalPlaying) return;
-          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, ()=>{
-            idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t);
-          });
-        }).catch(e=>{
+        loadClip(finalCtx, r).then(finalCallback(clip=>{
+          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next);
+        })).catch(e=>{
           console.error('could not play layered line', e);
-          idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t);
+          next();
         });
       } else {
         if (idx >= lines.length) idx = 0;
         const line = lines[idx];
-        const advance = ()=>{ idx++; const t = setTimeout(playNextLayerLine, gapForNextLine()); finalTimeouts.push(t); };
         const deviceSpeak = ()=>{
-          if (!finalPlaying) return;
+          if (!alive()) return;
+          if (waitWhileFinalPaused(deviceSpeak)) return;
           const utter = new SpeechSynthesisUtterance(line);
           utter.rate = 0.85; utter.pitch = 0.85; // slightly slower and lower, so it reads as a distinct underlying voice
-          utter.onend = advance;
+          // Cut off by a pause: say the same line again on resume, not the next one.
+          utter.onend = () => { if (finalPaused) waitWhileFinalPaused(deviceSpeak); else next(); };
           window.speechSynthesis.speak(utter);
         };
         resolveVoiceKey(state.layerAiVoiceId).catch(()=>null).then(voiceKey => {
-          if (!finalPlaying) return;
+          if (!alive()) return;
           if (!voiceKey){ deviceSpeak(); return; }
           return synthesizeLine(line, voiceKey)
             .then(url => loadClip(finalCtx, studioClipHandle(url)))
-            .then(clip => {
-              if (!finalPlaying) return;
-              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, advance);
-            })
+            .then(finalCallback(clip => {
+              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next);
+            }))
             .catch(deviceSpeak);
         }).catch(deviceSpeak);
       }
     }
     // Starts a beat after the main voice so the two voices don't land on top of each other.
-    const t0 = setTimeout(playNextLayerLine, 2200);
-    finalTimeouts.push(t0);
+    finalLater(playNextLayerLine, 2200);
   }
 
   function runSequence(onDone){
@@ -3091,7 +3149,7 @@ function playFinal(){
       const recorded = recordings.map((r,i)=>({r,i})).filter(x=>x.r);
       let idx = 0;
       function playNext(){
-        if (!finalPlaying) return;
+        if (!alive()) return;
         if (waitWhileFinalPaused(playNext)) return;
         if (finalRequestedIndex !== null){
           const requestedRecorded = recorded.findIndex(x => x.i === finalRequestedIndex);
@@ -3102,29 +3160,29 @@ function playFinal(){
         const { r, i } = recorded[idx];
         showFinalAffirmation(state.affirmations[i], i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
-        loadClip(finalCtx, r).then(clip=>{
-          if (!finalPlaying) return;
+        loadClip(finalCtx, r).then(finalCallback(clip=>{
           let rep = 0;
           function playOnce(){
-            if (!finalPlaying) return;
+            if (!alive()) return;
             if (waitWhileFinalPaused(playOnce)) return;
-            playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, ()=>{
+            playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, finalCallback(()=>{
               rep++;
               if (rep < repeatsForThisLine){
                 // Short beat between repeats of the same line, timed to a single tap.
-                const t = setTimeout(playOnce, 700); finalTimeouts.push(t);
+                finalLater(playOnce, 700);
               } else {
                 if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
-                const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
+                finalLater(playNext, gapForNextLine());
               }
-            });
+            }));
           }
           playOnce();
-        }).catch(e=>{
+        })).catch(e=>{
+          if (!alive()) return;
           // Never fail silently — a session that plays no voice should say why.
           console.error('could not play recorded line', i, e);
           document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
-          idx++; const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
+          finalCallback(() => { idx++; finalLater(playNext, gapForNextLine()); })();
         });
       }
       playNext();
@@ -3136,22 +3194,23 @@ function playFinal(){
       // falls back to the device rather than leaving the session silent.
       const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
       function speakNext(){
-        if (!finalPlaying){ return; }
+        if (!alive()) return;
         if (waitWhileFinalPaused(speakNext)) return;
         if (finalRequestedIndex !== null){ idx = finalRequestedIndex; finalRequestedIndex = null; }
         if (idx >= lines.length){ onDone(lines.length > 0); return; }
         showFinalAffirmation(lines[idx], idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
-        function advance(){
+        // Held by a pause like every other callback: the index only moves while playing.
+        const advance = finalCallback(function(){
           rep++;
           if (rep < repeatsForThisLine){
-            const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
+            finalLater(speakOnce, 700);
           } else {
             if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
-            const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
+            finalLater(speakNext, gapForNextLine());
           }
-        }
+        });
         /* The device's own voice is the one thing here that can fail without
            saying anything. speak() resolves to nothing at all on an iPhone in a
            saved-to-home-screen web app, and on any browser where an AudioContext
@@ -3165,18 +3224,18 @@ function playFinal(){
            stop the session and say so. Eight hours of silence is the worst
            outcome this code can produce, and it was the likeliest one. */
         function deviceSpeak(){
-          if (!finalPlaying) return;
+          if (!alive()) return;
           if (waitWhileFinalPaused(deviceSpeak)) return;
           if (deviceVoiceSilent){
             // Known not to speak here: keep the lines moving with the music
             // rather than stalling four seconds on each one.
-            const t = setTimeout(advance, 2600); finalTimeouts.push(t);
+            finalLater(advance, 2600);
             return;
           }
           const utter = new SpeechSynthesisUtterance(lines[idx]);
           utter.rate = 0.92; utter.pitch = 1.0;
 
-          let settled = false;
+          let settled = false, watchdog = null;
           const settle = (spoke) => {
             if (settled) return;
             settled = true;
@@ -3186,35 +3245,51 @@ function playFinal(){
             if (deviceSpeechFailures >= 3 && !deviceVoiceSilent) reportNoDeviceVoice();
             advance();
           };
+          /* Ended or errored while paused: the pause cut it (or a browser that
+             cannot pause speech cancelled it). Not a failure and not the end of
+             the line -- the same line is said again when the session resumes. */
+          const cutByPause = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(watchdog);
+            waitWhileFinalPaused(deviceSpeak);
+          };
 
           utter.onstart = () => { deviceSpeechFailures = 0; };
-          utter.onend   = () => settle(true);
-          utter.onerror = () => settle(false);
+          utter.onend   = () => { if (finalPaused) cutByPause(); else settle(true); };
+          utter.onerror = () => { if (finalPaused) cutByPause(); else settle(false); };
 
           // Generous: a long affirmation at 0.92 rate still starts within a
-          // second or two. This only fires when nothing happened at all.
-          const watchdog = setTimeout(() => {
-            try { window.speechSynthesis.cancel(); } catch(e){}
-            settle(false);
-          }, 4000 + lines[idx].length * 90);
-          finalTimeouts.push(watchdog);
+          // second or two. This only fires when nothing happened at all, and
+          // time spent paused does not count against it.
+          const budget = 4000 + lines[idx].length * 90;
+          const armWatchdog = () => {
+            if (settled || !alive()) return;
+            watchdog = setTimeout(() => {
+              if (settled || !alive()) return;
+              if (finalPaused){ finalPauseWaiters.push(armWatchdog); return; }
+              try { window.speechSynthesis.cancel(); } catch(e){}
+              settle(false);
+            }, budget);
+            finalTimeouts.push(watchdog);
+          };
+          armWatchdog();
 
           try { window.speechSynthesis.speak(utter); }
           catch(e){ settle(false); }
         }
         function speakOnce(){
-          if (!finalPlaying) return;
+          if (!alive()) return;
           if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
           voicePromise.then(voiceKey => {
-            if (!finalPlaying) return;
+            if (!alive()) return;
             if (!voiceKey){ deviceSpeak(); return; }
             return synthesizeLine(line, voiceKey)
               .then(url => loadClip(finalCtx, studioClipHandle(url)))
-              .then(clip => {
-                if (!finalPlaying) return;
+              .then(finalCallback(clip => {
                 playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
-              })
+              }))
               .catch(() => deviceSpeak());
           }).catch(deviceSpeak);
         }
@@ -3240,7 +3315,8 @@ function playFinal(){
      nothing anyone does with the mixer will make it audible. Better to say so
      than to run a timer over silence. */
   const silenceCheck = setTimeout(() => {
-    if (finalPlaying && finalCtx && finalCtx.state !== 'running'){
+    // A context suspended by the pause button was not refused.
+    if (alive() && !finalPaused && finalCtx && finalCtx.state !== 'running'){
       stopFinal();
       document.getElementById('finalLine').textContent =
         'This browser blocked the sound. Tap play once more — and check the silent switch on the side of your phone.';
@@ -3266,8 +3342,8 @@ function playFinal(){
       document.getElementById('finalLine').textContent = why;  // after, or finishFinal overwrites it
       return;
     }
-    if (finalPlaying && selectedLoopMode !== 'none' && (stillBuildingTowardTarget || manualLoop)){
-      const t = setTimeout(() => runSequence(loopCheck), 0); finalTimeouts.push(t);
+    if (alive() && selectedLoopMode !== 'none' && (stillBuildingTowardTarget || manualLoop)){
+      finalLater(() => runSequence(loopCheck), 0);
     } else {
       finishFinal();
     }
@@ -3340,7 +3416,7 @@ function fadeOutAndFinishFinal(){
   if (!finalPlaying || finalFadeEnding) return;
   finalFadeEnding = true;
   const now = finalCtx ? finalCtx.currentTime : 0;
-  [liveToneGain,liveBgGain,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
+  [liveToneGain,sessionBed.out,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
     if (!node || !node.gain || !finalCtx) return;
     try {
       node.gain.cancelScheduledValues(now);
@@ -3348,7 +3424,8 @@ function fadeOutAndFinishFinal(){
       node.gain.exponentialRampToValueAtTime(.0001,now+1.5);
     } catch(e){}
   });
-  const t = setTimeout(finishFinal, 1600); finalTimeouts.push(t);
+  // Held by a pause like everything else, so a paused fade does not end the session.
+  finalLater(finishFinal, 1600);
 }
 
 function finishFinal(){
@@ -3358,11 +3435,12 @@ function finishFinal(){
   if (finalPlaying && finalStartTime && listenedSeconds > 60){
     awardLight(LIGHT_SOURCES.subliminal, '', document.getElementById('finalPlayBtn'));
   }
-  finalPlaying = false;
-  finalPaused = false; finalPauseStarted = null;
+  finalPlaying = false; finalSession++;
+  finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
   finalPauseWaiters = [];
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
   if (typeof recordPlayerSession === 'function') recordPlayerSession(true, listenedSeconds);
+  try { window.speechSynthesis.cancel(); } catch(e){}
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
@@ -3377,8 +3455,8 @@ function finishFinal(){
   } else if (finalChunks.length){
     window._subliminallyDownloadBlob = new Blob(finalChunks, { type:'audio/webm' });
   }
-  if (finalTone){ try{ finalTone.stop(); }catch(e){} }
-  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
+  if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
+  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   // The ending fade has finished; detach now so restarting cannot reuse a closed bus.
   sessionBed.stop({ fade: 0 });
@@ -3389,7 +3467,8 @@ function finishFinal(){
     sessionBed.detach();
     try { closing.close(); } catch(e){}
   }
-  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveToneGain = null; liveSoothingGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  finalStream = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
   liveVoiceElements.clear();
@@ -3397,7 +3476,7 @@ function finishFinal(){
 
 function stopFinal(){
   const listenedSeconds = Math.floor(getFinalElapsedMs()/1000);
-  finalPlaying = false;
+  finalPlaying = false; finalSession++;
   finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
   finalPauseWaiters = [];
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
@@ -3407,7 +3486,7 @@ function stopFinal(){
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
-  window.speechSynthesis.cancel();
+  try { window.speechSynthesis.cancel(); } catch(e){}
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
@@ -3422,7 +3501,8 @@ function stopFinal(){
     finalRecorder.stop();
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
-  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveToneGain = null; liveSoothingGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  finalStream = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
   liveVoiceElements.clear();
