@@ -3141,9 +3141,14 @@ function startCustomTrackPlayback(){
   g.gain.value = document.getElementById('mixCustom').value/100 * 0.6;
   g.connect(audioOut(finalCtx));
   liveCustomGain = g;
-  customTrackBlob.arrayBuffer().then(buf => finalCtx.decodeAudioData(buf)).then(audioBuf => {
-    if (!finalPlaying) return; // stopped before it finished decoding
-    const src = finalCtx.createBufferSource();
+  /* The context and session this track belongs to, held rather than read off
+     the globals when the decode lands: a switch mid-decode used to start the
+     old subliminal's track on the new session's context, under the new one. */
+  const ctx = finalCtx, session = finalSession;
+  customTrackBlob.arrayBuffer().then(buf => ctx.decodeAudioData(buf)).then(audioBuf => {
+    // Stopped, or replaced by another session, before it finished decoding.
+    if (!finalPlaying || session !== finalSession || ctx !== finalCtx) return;
+    const src = ctx.createBufferSource();
     src.buffer = audioBuf; src.loop = true;
     src.connect(g); src.start();
     customTrackSource = src;
@@ -3265,6 +3270,14 @@ function closeAudioOut(ctx){
 
 }
 
+/* Every session context that has been opened and not yet closed. There should
+   never be more than one; subliminallyAudioState() reports the count. */
+const openSessionContexts = new Set();
+function trackSessionContext(ctx){
+  openSessionContexts.add(ctx);
+  const close = ctx.close.bind(ctx);
+  ctx.close = function(){ openSessionContexts.delete(ctx); return close(); };
+}
 function primeAudio(){
   // A paused session stays paused: only resumeFinal wakes its context.
   const holdPaused = finalPlaying && finalPaused;
@@ -3272,6 +3285,7 @@ function primeAudio(){
   if (!holdPaused) startSilentKeeper();
   if (!finalCtx || finalCtx.state === 'closed'){
     finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+    trackSessionContext(finalCtx);
   }
   if (finalCtx.state === 'suspended' && !holdPaused) finalCtx.resume().catch(()=>{});
   try {

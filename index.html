@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0D0B18" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="stylesheet" href="/css/player.css" />
-<link rel="stylesheet" href="/css/listening-fixes.css?v=20260923c" />
+<link rel="stylesheet" href="/css/listening-fixes.css?v=20260923d" />
 <link rel="stylesheet" href="/css/builder-celestial.css?v=20260923a" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
@@ -1417,6 +1417,10 @@
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .sess-card.sel .sess-name{ color:var(--candle); }
   .sess-len{ font-size:10.5px; color:var(--haze); }
+  /* Loading: lit the moment it is tapped, breathing until the sound starts. */
+  .sess-card.is-loading .sess-play{ animation:sessLoading 1s ease-in-out infinite; }
+  @keyframes sessLoading{ 50%{ opacity:.45; transform:scale(.9); } }
+  @media (prefers-reduced-motion: reduce){ .sess-card.is-loading .sess-play{ animation:none; opacity:.7; } }
   .sess-card:focus-visible .sess-art{ border-color:var(--lilac); outline:2px solid var(--lilac);
     outline-offset:2px; }
 
@@ -3535,8 +3539,8 @@
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20260923c"></script>
-<script src="js/billing.js?v=20260923c"></script>
+<script src="js/builder.js?v=20260923d"></script>
+<script src="js/billing.js?v=20260923d"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
@@ -3545,10 +3549,10 @@
 <script src="js/avatar-emotions.js"></script>
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
-<script src="js/journey.js?v=20260923c"></script>
-<script src="js/profile.js?v=20260923c"></script>
-<script src="js/mix-settings.js?v=20260923c"></script>
-<script src="js/player.js?v=20260923c"></script>
+<script src="js/journey.js?v=20260923d"></script>
+<script src="js/profile.js?v=20260923d"></script>
+<script src="js/mix-settings.js?v=20260923d"></script>
+<script src="js/player.js?v=20260923d"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>
