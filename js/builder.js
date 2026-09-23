@@ -114,7 +114,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+let state = { freq:null, intention:null, goal:'', tone:null, count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 /* Three phases rather than eight bars: choosing everything (frequency through
    ambience), recording it, and hearing it. The line after the current phase
@@ -351,7 +351,7 @@ function nextStep(){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  state = { freq:null, intention:null, goal:'', tone:null, count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   /* Clearing through the one helper rather than stripping the class by hand:
      that left every chip on the page still announcing itself as pressed. */
   clearSelection('.sel');
@@ -360,7 +360,7 @@ function resetFlow(){
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
-  document.getElementById('countRange').value = 10; document.getElementById('countVal').textContent = 10;
+  document.getElementById('countRange').value = 5; document.getElementById('countVal').textContent = 5;
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
   renderDurationChips();
@@ -1845,10 +1845,9 @@ function bgCard(track){
   face.onclick = () => auditionAmbience(track.key);
   card.appendChild(face);
 
-  /* None has nothing to hear, and the generated backgrounds are made on the
-     spot rather than downloaded, so they are auditioned by the card itself —
-     there is no file to press play on. */
-  if (isRecordedAmbience(track.key)){
+  /* None has nothing to hear. Every other sound, recorded or generated on the
+     spot, gets the same small Preview control. */
+  if (track.key !== 'none'){
     const play = document.createElement('button');
     play.type = 'button';
     play.className = 'bg-preview-btn';
@@ -1866,7 +1865,7 @@ function bgCard(track){
 function auditionAmbience(key){
   ambienceCandidate = key;
   paintBgCards();
-  if (key === 'none' || !isRecordedAmbience(key)){ stopAmbiencePreview(); return; }
+  if (key === 'none'){ stopAmbiencePreview(); return; }
   startAmbiencePreview(key);
 }
 
@@ -1910,6 +1909,8 @@ function startAmbiencePreview(key){
   if (!previewLayerBed.ctx || previewLayerBed.ctx !== previewCtx) previewLayerBed.attach(previewCtx, audioOut(previewCtx));
   previewBed.setLevel(0.85);
   previewLayerBed.setLevel(0.85);
+  // One preview at a time: the last one is cut, not crossfaded under this one.
+  previewBed.stop({ fade: 0 });
   previewBed.to(key).then(() => paintBgCards());
   // Heard with the other family's pick, the way the session will play them.
   const family = ambienceFamily(key);
@@ -3762,4 +3763,11 @@ function stopBuilderPreviews(){
 if (typeof window.addEventListener === 'function'){
   window.addEventListener('hashchange', stopBuilderPreviews);
   window.addEventListener('pagehide', stopBuilderPreviews);
+}
+/* Most ways out of the builder change body[data-view] through pushState, which
+   fires no hashchange — so watch the view itself. */
+if (typeof MutationObserver === 'function' && document.body){
+  new MutationObserver(() => {
+    if (document.body.getAttribute('data-view') !== 'build') stopBuilderPreviews();
+  }).observe(document.body, { attributes: true, attributeFilter: ['data-view'] });
 }

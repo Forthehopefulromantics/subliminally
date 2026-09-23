@@ -376,9 +376,9 @@ check('the generated backgrounds are still there',
   get(`AMBIENCE_SYNTH.every(t => !!document.querySelector('#bgGrid .bg-card[data-key="' + t.key + '"]'))`), true);
 /* In DOM order, grouped by what can be layered: the meditation family
    (Meditation, Ambient, Sleep), then the nature family. */
-check('only recorded tracks get a play button, and they are grouped',
+check('every sound but None gets a play button, and they are grouped',
   get(`Array.from(document.querySelectorAll('#bgGrid .bg-preview-btn')).map(b => b.dataset.key)`),
-  ['deep-mind','inner-stillness','the-sanctuary','soft-asmr','ocean-escape']);
+  ['deep-mind','inner-stillness','the-sanctuary','soft-asmr','ocean-escape','rain','ocean','waterfall','forest','birds','thunder','brown']);
 check('every sound belongs to exactly one family',
   get(`[...AMBIENCE_TRACKS, ...AMBIENCE_SYNTH].map(t => ambienceFamily(t.key))`),
   ['meditation','meditation','nature','meditation','meditation','nature','nature','nature','nature','nature','nature','nature']);

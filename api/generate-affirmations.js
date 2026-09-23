@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   const { count, freqLabel, toneLabel, goal, faith, faithWord } = req.body || {};
   // Standard subliminals contain at most ten affirmations. EFT keeps its own
   // separate 11-line structure and never calls this route.
-  const safeCount = Math.min(Math.max(parseInt(count, 10) || 10, 5), 10);
+  const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 5), 10);
   /* Their saved answer in Settings, as framing rather than a word list. Null
      when they have not answered or the answer is not one we know, and then the
      section is left out rather than filled with a guess. */
