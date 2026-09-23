@@ -80,6 +80,7 @@ globalThis.fetch = async (url, opts) => {
   /* who is calling */
   if (u.includes('/auth/v1/user')){
     const token = (o.headers.Authorization || '').replace('Bearer ', '');
+    if (token === 'other-token') return reply({ id: 'user-xyz', email: 'someone@example.com' });
     if (token !== 'good-token') return reply({}, { status: 401 });
     return reply({ id: 'user-abc', email: 'kyla@example.com' });
   }
@@ -87,7 +88,12 @@ globalThis.fetch = async (url, opts) => {
   if (u.includes('/rest/v1/subscribers')) return reply(db.tier ? [db.tier] : []);
   /* the voice of their own */
   if (u.includes('/rest/v1/user_voice_profiles')){
-    if (method === 'GET') return reply(db.voiceProfile ? [db.voiceProfile] : []);
+    if (method === 'GET'){
+      // Rows are looked up by owner, as PostgREST would.
+      const owner = eqValue(paramsOf(u), 'user_id');
+      const row = db.voiceProfile && (!db.voiceProfile.user_id || db.voiceProfile.user_id === owner) ? db.voiceProfile : null;
+      return reply(row ? [row] : []);
+    }
     if (method === 'POST'){
       db.voiceProfile = { id: 'vp-1', user_id: body.user_id, provider: 'elevenlabs', provider_voice_id: body.provider_voice_id,
                           display_name: body.display_name, consent_at: body.consent_at, created_at: 'now' };
@@ -160,7 +166,8 @@ globalThis.fetch = async (url, opts) => {
   }
   /* the provider */
   if (u.startsWith('https://api.elevenlabs.io/')){
-    elevenCalls.push({ url: u, method, key: o.headers && o.headers['xi-api-key'], body });
+    elevenCalls.push({ url: u, method, key: o.headers && o.headers['xi-api-key'], body,
+                       form: (typeof FormData !== 'undefined' && o.body instanceof FormData) ? o.body : null });
     if (nextElevenResponse) return reply(nextElevenResponse.body || 'error', { status: nextElevenResponse.status });
     if (u.includes('/text-to-speech/')) return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
     if (u.includes('/voices/add')){
@@ -210,7 +217,7 @@ async function callClone({ method = 'POST', token = 'good-token', consent, repla
   await voiceClone(req, res);
   return res;
 }
-const CONSENT = 'I confirm this is my voice and I have permission to create an AI voice clone from it.';
+const CONSENT = 'I confirm this is my voice, or I have the necessary rights and consent to use this voice, and I consent to creating an AI voice clone.';
 const LINES = ['I am safe.', 'I keep what I promised myself.', 'I am becoming who I said I would be.'];
 
 /* ---------------- who may generate ---------------- */
@@ -358,6 +365,66 @@ check('  ...and clears the audio read in the old one', db.clips.length, 0);
 r = await callClone({ method: 'DELETE' });
 check('removing it removes the record', [r.code, db.voiceProfile], [200, null]);
 check('  ...and the mirror on the profile', db.clonedVoiceId, null);
+
+/* ---------------- phase 1: record, consent, clone, remember ---------------- */
+reset();
+r = await callClone({ token: null, consent: CONSENT });
+check('signed out, no clone', [r.code, r.body.error], [401, 'not_signed_in']);
+check('  ...and nothing reached the provider', elevenCalls.length, 0);
+
+reset();
+const beforeClone = Date.now();
+r = await callClone({ consent: CONSENT, sample: 'voice-bytes-'.repeat(400) });
+const add = elevenCalls.find(c => c.url.endsWith('/voices/add'));
+check('the sample reaches ElevenLabs Instant Voice Cloning', [r.code, !!add, add && add.method], [200, true, 'POST']);
+check('  ...from the server, with the server key', add.key, 'el_test_stub');
+check('  ...named by account id, not email', add.form.get('name'), 'subliminally-user-abc');
+check('  ...never the email address', JSON.stringify([...add.form.keys()].map(k => String(add.form.get(k)))).includes('kyla@'), false);
+check('  ...carrying the recording itself', (await add.form.get('files').text()).startsWith('voice-bytes-'), true);
+check('the returned voice_id is saved', db.voiceProfile.provider_voice_id, MY_CLONE);
+check('  ...for the signed-in user', db.voiceProfile.user_id, 'user-abc');
+check('  ...with a consent timestamp from this request', Date.parse(db.voiceProfile.consent_at) >= beforeClone - 1000, true);
+
+const catMine = mockRes();
+await voices({ method: 'POST', headers: { authorization: 'Bearer good-token' } }, catMine);
+check('a returning user is recognised as having a voice', !!catMine.body.myVoice, true);
+
+const catOther = mockRes();
+await voices({ method: 'POST', headers: { authorization: 'Bearer other-token' } }, catOther);
+check('another user does not see that voice', catOther.body.myVoice, null);
+const addsBeforeOther = elevenCalls.length;
+r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] }, 'other-token');
+check('another user cannot generate in it by key', [r.code, r.body.error], [409, 'no_cloned_voice']);
+r = await callTts({ voiceKey: MY_CLONE, lines: [LINES[0]] }, 'other-token');
+check('  ...nor by its raw voice_id', [r.code, r.body.error], [400, 'invalid_voice']);
+check('  ...and nothing reached the provider', elevenCalls.length - addsBeforeOther, 0);
+
+/* The profile row is writable by its owner, so a voice id typed into it is not
+   proof of ownership and must never be used. */
+reset();
+db.clonedVoiceId = 'somebody_elses_voice';
+r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] });
+check('a voice id written onto your own profile is not trusted', [r.code, r.body.error], [409, 'no_cloned_voice']);
+check('  ...and nothing reached the provider', elevenCalls.length, 0);
+
+for (const [status, body, code] of [[500, 'boom', 'provider_failed'], [402, 'quota', 'quota_exceeded'], [200, '{}', 'rejected']]){
+  reset();
+  nextElevenResponse = { status, body };
+  r = await callClone({ consent: CONSENT });
+  check(`ElevenLabs ${status} saves no voice`, [r.body.error, db.voiceProfile, db.clonedVoiceId], [code, null, null]);
+}
+
+/* ---------------- the key never reaches the browser ---------------- */
+{
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const clientFiles = [
+    ...readdirSync(new URL('js/', root)).filter(f => f.endsWith('.js')).map(f => new URL('js/' + f, root)),
+    ...readdirSync(root).filter(f => f.endsWith('.html')).map(f => new URL(f, root)),
+  ];
+  const leaks = clientFiles.filter(f => /ELEVENLABS_API_KEY|xi-api-key|api\.elevenlabs\.io/.test(readFileSync(f, 'utf8')));
+  check('no client file names the ElevenLabs key or calls ElevenLabs', leaks.map(String), []);
+}
 
 /* ---------------- the catalogue ---------------- */
 reset();

@@ -902,7 +902,7 @@ const MY_CLONED_VOICE = 'mine';  // resolved to this person's own voice, server-
 /* Shown if the catalogue cannot be reached. The server holds the real one and
    accepts nothing else, so a stale copy here fails the clone rather than cloning
    on the wrong words. */
-const VOICE_CONSENT_FALLBACK = 'I confirm this is my voice and I have permission to create an AI voice clone from it.';
+const VOICE_CONSENT_FALLBACK = 'I confirm this is my voice, or I have the necessary rights and consent to use this voice, and I consent to creating an AI voice clone.';
 
 let voiceCatalogue = { presets: FALLBACK_PRESET_VOICES, myVoice: null, consentStatement: VOICE_CONSENT_FALLBACK, provider: null, loaded: false };
 let voiceCataloguePromise = null;
@@ -1206,6 +1206,8 @@ async function chooseClonedVoice(){
   }
   closeMyVoicePanel();
   setSelectedVoice(VOICE_CLONE);
+  // Already made once, so it is never asked for again -- it is simply chosen.
+  sayInVoicePicker('Your Voice is Ready ✦', 'ok');
   advanceAfterPick();
 }
 
@@ -1261,7 +1263,7 @@ async function renderVoiceCards(){
   const cloneTitle = clone.querySelector('h4');
   const cloneDesc = clone.querySelector('p');
   if (cloneTitle) cloneTitle.textContent = cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Clone your voice';
-  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your voice, as an AI version' : 'Create an AI version of your voice';
+  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your Voice is Ready ✦' : 'Create an AI version of your voice';
 
   primeSerenityPreview();
   renderMyVoicePanel();
@@ -1379,9 +1381,9 @@ function renderMyVoicePanel(){
   if (!panel || panel.dataset.open !== '1') return;
   panel.innerHTML = `
     <div class="voice-clone-card">
-      <p class="voice-clone-intro">Your own voice, as one of the voices you can choose. Read the passage below once and a personal AI version of your voice is created for your account — after that every subliminal you build can be read in it, without recording line by line. The recording is used to create the voice and is never kept.</p>
       <div class="voice-clone-body" id="builderVoiceCloneBody"></div>
       <div class="save-msg" id="builderVoiceCloneMsg"></div>
+      <p class="voice-clone-intro" style="margin:14px 0 0;">A personal AI version of your voice is created for your account — after that every subliminal you build can be read in it, without recording line by line. The recording is used to create the voice and is never kept.</p>
     </div>`;
   mountVoiceClone('builderVoiceCloneBody', 'builderVoiceCloneMsg');
 }
@@ -1407,7 +1409,7 @@ async function onMyVoiceReady(){
   await previewVoice(MY_CLONED_VOICE);
   // previewVoice says its own piece when something went wrong; don't talk over it.
   const msg = document.getElementById('voicePickerMsg');
-  if (msg && !msg.textContent){ msg.textContent = 'Your voice is ready.'; msg.className = 'save-msg ok'; }
+  if (msg && !msg.textContent){ msg.textContent = 'Your Voice is Ready ✦'; msg.className = 'save-msg ok'; }
 }
 async function openMyVoicePanel(){
   const panel = document.getElementById('myVoicePanel');
