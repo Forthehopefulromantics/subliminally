@@ -334,7 +334,7 @@ window.addEventListener('popstate', (e) => {
   else if (page === 'rituals'){ document.body.setAttribute('data-view','rituals'); renderRitualsState(); }
   else if (page === 'today'){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
-  else if (page === 'build') document.body.setAttribute('data-view','build');
+  else if (page === 'build'){ document.body.setAttribute('data-view','build'); if (typeof renderMyVoicePanel === 'function') renderMyVoicePanel(); }
   else document.body.removeAttribute('data-view');
 });
 

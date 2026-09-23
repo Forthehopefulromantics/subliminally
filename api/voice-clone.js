@@ -48,7 +48,26 @@ const HTTP_FOR_CODE = {
   rejected: 422,
   provider_auth: 502,
   provider_failed: 502,
+  plan_not_allowed: 502,
+  voice_limit_reached: 502,
+  verification_required: 422,
+  unsupported_format: 415,
+  sample_too_short: 400,
+  save_failed: 500,
 };
+
+/* What the sample actually is, from its first bytes. The browser's label is not
+   always right — Safari has sent MP4 audio with no type, or the wrong one — and
+   the provider goes by the file name it is handed. */
+function sniffSample(buf) {
+  if (buf.length > 4 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return { type: 'audio/webm', ext: 'webm' };
+  if (buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp') return { type: 'audio/mp4', ext: 'm4a' };
+  if (buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS') return { type: 'audio/ogg', ext: 'ogg' };
+  if (buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WAVE') return { type: 'audio/wav', ext: 'wav' };
+  if (buf.length > 4 && buf.toString('latin1', 0, 4) === 'fLaC') return { type: 'audio/flac', ext: 'flac' };
+  if (buf.length > 3 && buf.toString('latin1', 0, 3) === 'ID3') return { type: 'audio/mpeg', ext: 'mp3' };
+  return null;
+}
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -148,8 +167,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  const contentType = req.headers['content-type'] || 'audio/webm';
-  const ext = contentType.includes('mp4') ? 'm4a' : contentType.includes('ogg') ? 'ogg' : contentType.includes('mpeg') ? 'mp3' : 'webm';
+  const declared = req.headers['content-type'] || '';
+  const sniffed = sniffSample(sample);
+  const contentType = sniffed ? sniffed.type : (declared || 'audio/webm');
+  const ext = sniffed ? sniffed.ext
+    : contentType.includes('mp4') ? 'm4a' : contentType.includes('ogg') ? 'ogg' : contentType.includes('mpeg') ? 'mp3' : 'webm';
 
   try {
     // Replace rather than accumulate: one voice per person, always the latest.
@@ -163,7 +185,16 @@ export default async function handler(req, res) {
       fileName: `sample.${ext}`,
     });
 
-    await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice', consentAt });
+    /* A voice that cannot be recorded against its owner is a voice nobody can
+       use or remove, so it does not stay at the provider either. */
+    try {
+      await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice', consentAt });
+    } catch (saveErr) {
+      console.error('voice-clone error: save_failed', (saveErr && saveErr.message) || saveErr);
+      await deleteVoice(voiceId);
+      res.status(500).json({ error: 'save_failed' });
+      return;
+    }
 
     // Only bin the old one — and the audio read in it — once the new one is saved.
     if (previous && previous !== voiceId) {
@@ -174,7 +205,8 @@ export default async function handler(req, res) {
     res.status(200).json({ created: true, displayName: 'My voice' });
   } catch (err) {
     const code = err instanceof VoiceProviderError ? err.code : 'clone_failed';
-    console.error('voice-clone error:', code, (err && err.detail) || (err && err.message) || err);
+    console.error('voice-clone error:', code, err && err.status, (err && err.detail) || (err && err.message) || err,
+      { bytes: sample.length, contentType, declared });
     res.status(HTTP_FOR_CODE[code] || 500).json({ error: code });
   }
 }
