@@ -19,7 +19,8 @@ process.env.ELEVENLABS_API_KEY = 'el_test_stub';
 process.env.SUPABASE_URL = 'https://stub.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service_stub';
 
-const SARAH = 'EXAVITQu4vr4xnSDxMaL';   // as in lib/voices.js
+const SERENITY = 'PrH4gjaYIM8R16R889Vf'; // the one AI voice on offer — lib/voices.js
+const SARAH = 'EXAVITQu4vr4xnSDxMaL';   // retired, still resolvable — LEGACY_PRESET_VOICES
 let MY_CLONE = 'voice_clone_of_kyla';
 let clonesMade = 0;
 
@@ -144,6 +145,11 @@ globalThis.fetch = async (url, opts) => {
   if (u.includes('/storage/v1/object/tts-cache/')){
     const path = u.split('/storage/v1/object/tts-cache/')[1];
     if (method === 'POST'){ db.objects.set(path, o.body); return reply({ Key: path }); }
+    // Reading an object straight back is how the Serenity demo is served.
+    if (method === 'GET'){
+      if (!db.objects.has(path)) return reply({ error: 'not found' }, { status: 404 });
+      return reply('', { bytes: new Uint8Array(Buffer.from(db.objects.get(path))) });
+    }
   }
   if (u.includes('/object/sign/tts-cache/')){    // the signed link being read back
     return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
@@ -170,6 +176,8 @@ globalThis.fetch = async (url, opts) => {
 const { default: tts } = await import(new URL('../api/tts.js', import.meta.url).href);
 const { default: voiceClone } = await import(new URL('../api/voice-clone.js', import.meta.url).href);
 const { default: voices } = await import(new URL('../api/voices.js', import.meta.url).href);
+const { default: voicePreview } = await import(new URL('../api/voice-preview.js', import.meta.url).href);
+const { PREVIEW_TEXT, previewStoragePath } = await import(new URL('../lib/voice-preview.js', import.meta.url).href);
 
 function mockRes(){
   const r = { code: null, body: null, headers: {} };
@@ -207,11 +215,11 @@ const LINES = ['I am safe.', 'I keep what I promised myself.', 'I am becoming wh
 
 /* ---------------- who may generate ---------------- */
 reset();
-check('no token is refused', (await callTts({ voiceKey: 'sarah', lines: LINES }, null)).code, 401);
+check('no token is refused', (await callTts({ voiceKey: 'serenity', lines: LINES }, null)).code, 401);
 
 reset();
 db.tier = null;                       // a free account has no subscribers row
-let r = await callTts({ voiceKey: 'sarah', lines: LINES });
+let r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('a free account is asked to upgrade', [r.code, r.body.error], [403, 'upgrade_required']);
 check('  ...and nothing was generated', elevenCalls.length, 0);
 
@@ -220,29 +228,52 @@ r = await callTts({ voiceKey: 'not-a-voice', lines: LINES });
 check('a voice nobody offers is refused', [r.code, r.body.error], [400, 'invalid_voice']);
 check('  ...and nothing was generated', elevenCalls.length, 0);
 
+/* ---------------- the voices that were retired ----------------
+   They are gone from the picker, not from the world: a subliminal saved with one
+   still plays, in the voice it was saved with, off the clips already cached. */
+reset();
+r = await callTts({ voiceKey: 'sarah', lines: [LINES[0]] });
+check('a subliminal saved with a retired voice still plays', r.code, 200);
+check('  ...in the voice it was saved with, not Serenity', elevenCalls[0].url.includes(SARAH), true);
+
+reset();
+db.tier = null;
+r = await callTts({ voiceKey: 'sarah', lines: [LINES[0]] });
+check('a retired voice is premium too', [r.code, r.body.error], [403, 'upgrade_required']);
+check('  ...and nothing was generated', elevenCalls.length, 0);
+
+/* A free account must not reach the provider by any route, including its own
+   cloned voice from a lapsed subscription. */
+reset();
+db.tier = null;
+db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+r = await callTts({ voiceKey: 'mine', lines: LINES });
+check('a lapsed account cannot use its own clone', [r.code, r.body.error], [403, 'upgrade_required']);
+check('  ...and nothing was generated', elevenCalls.length, 0);
+
 /* ---------------- generated once, then reused ---------------- */
 reset();
-r = await callTts({ voiceKey: 'sarah', speed: 0.92, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 0.92, lines: LINES });
 check('a sequence comes back one clip per line', [r.code, r.body.clips.length], [200, 3]);
 check('  ...every line playable', r.body.clips.every(c => !!c.url && !c.error), true);
 check('  ...one generation each', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 3);
-check('  ...read by the voice the key names', elevenCalls[0].url.includes(SARAH), true);
+check('  ...read by the voice the key names', elevenCalls[0].url.includes(SERENITY), true);
 check('  ...charged for what was said', r.body.characterCount, LINES.join('').length);
 check('the ledger has a row per line', db.generations.length, 3);
 check('  ...with the words hashed, not stored', db.generations.every(g => /^[0-9a-f]{64}$/.test(g.text_hash)), true);
 check('  ...and the character count', db.generations.map(g => g.character_count), LINES.map(l => l.length));
-check('no provider voice id in the response', JSON.stringify(r.body).includes(SARAH), false);
+check('no provider voice id in the response', JSON.stringify(r.body).includes(SERENITY), false);
 check('no API key in the response', JSON.stringify(r.body).includes('el_test_stub'), false);
 check('the key did reach the provider', elevenCalls[0].key, 'el_test_stub');
 
 const before = elevenCalls.length;
-r = await callTts({ voiceKey: 'sarah', speed: 0.92, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 0.92, lines: LINES });
 check('asking again generates nothing', elevenCalls.length - before, 0);
 check('  ...and is still playable', r.body.clips.every(c => c.url && c.cached), true);
 check('  ...and is charged nothing', r.body.characterCount, 0);
 check('  ...but is still on the ledger, as a reuse', db.generations.filter(g => g.cache_hit).length, 3);
 
-r = await callTts({ voiceKey: 'sarah', speed: 1.2, lines: LINES });
+r = await callTts({ voiceKey: 'serenity', speed: 1.2, lines: LINES });
 check('a different pace is different audio', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 6);
 
 /* the same words in a different voice are not the same clip */
@@ -253,7 +284,7 @@ check('a different voice is different audio', r.body.clips[0].cached, false);
 reset();
 const halfAnHourAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 for (let i = 0; i < 149; i++) db.generations.push({ cache_hit: false, created_at: halfAnHourAgo });
-r = await callTts({ voiceKey: 'sarah', lines: LINES });
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('a sequence over the allowance is refused whole', [r.code, r.body.error], [429, 'hourly_limit']);
 check('  ...before a single line is paid for', elevenCalls.length, 0);
 check('  ...and says how much room is left', r.body.headroom, 1);
@@ -261,22 +292,22 @@ check('  ...and says how much room is left', r.body.headroom, 1);
 /* ---------------- when the provider says no ---------------- */
 reset();
 nextElevenResponse = { status: 402, body: 'quota exceeded' };
-r = await callTts({ voiceKey: 'sarah', lines: LINES });
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('out of credits is its own answer', [r.code, r.body.error], [429, 'quota_exceeded']);
 check('  ...and it stops after the first line', elevenCalls.length, 1);
 
 reset();
 nextElevenResponse = { status: 404, body: 'voice_not_found' };
-r = await callTts({ voiceKey: 'sarah', lines: [LINES[0]] });
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
 check('a voice missing at the provider is invalid_voice', r.body.error, 'invalid_voice');
 
 reset();
-r = await callTts({ voiceKey: 'sarah', lines: ['a'.repeat(500), LINES[0]] });
+r = await callTts({ voiceKey: 'serenity', lines: ['a'.repeat(500), LINES[0]] });
 check('an over-long line fails on its own', r.body.clips[0].error, 'too_long');
 check('  ...and the rest of the sequence still plays', !!r.body.clips[1].url, true);
 
 reset();
-r = await callTts({ voiceKey: 'sarah', lines: new Array(30).fill(LINES[0]) });
+r = await callTts({ voiceKey: 'serenity', lines: new Array(30).fill(LINES[0]) });
 check('more lines than a session can hold is refused', [r.code, r.body.error], [400, 'too_many_lines']);
 
 /* ---------------- a voice of their own ---------------- */
@@ -333,12 +364,67 @@ reset();
 db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
 const catRes = mockRes();
 await voices({ method: 'POST', headers: { authorization: 'Bearer good-token' } }, catRes);
-check('the catalogue lists the preset voices', catRes.body.presets.length, 6);
+check('the catalogue offers one AI voice', catRes.body.presets.length, 1);
+check('  ...and it is Serenity', catRes.body.presets[0].key, 'serenity');
 check('  ...by key and name only', Object.keys(catRes.body.presets[0]).sort(), ['desc', 'key', 'name']);
-check('  ...never by provider id', JSON.stringify(catRes.body).includes(SARAH), false);
+check('  ...never by provider id', JSON.stringify(catRes.body).includes(SERENITY), false);
+check('  ...and never offers a retired voice', JSON.stringify(catRes.body).includes('sarah'), false);
 check('  ...says a voice of their own exists', catRes.body.myVoice.key, 'mine');
 check('  ...without its id', JSON.stringify(catRes.body).includes(MY_CLONE), false);
 check('  ...and carries the confirmation the clone route checks', catRes.body.consentStatement, CONSENT);
+
+/* ---------------- the Serenity demo ----------------
+   The one place a voice is heard without paying for it. It has to be free to
+   play, open to somebody with no account at all, and it has to cost exactly one
+   generation for the life of the app — not one per press, per person or per
+   page. It also has to be useless as free text-to-speech. */
+reset();
+async function callPreview({ method = 'GET', token = null, body } = {}){
+  const res = mockRes();
+  const headers = {};
+  if (token) headers.authorization = 'Bearer ' + token;
+  await voicePreview({ method, headers, body }, res);
+  return res;
+}
+const PREVIEW_PATH = previewStoragePath();
+
+r = await callPreview();
+check('the demo plays for somebody with no account', r.code, 200);
+check('  ...as an mp3', r.headers['Content-Type'], 'audio/mpeg');
+check('  ...cached hard, so most presses never reach the server', r.headers['Cache-Control'], 'public, max-age=31536000, immutable');
+check('  ...generated once', elevenCalls.filter(c => c.url.includes('/text-to-speech/')).length, 1);
+check('  ...in Serenity', elevenCalls[0].url.includes(SERENITY), true);
+check('  ...saying the one line it is allowed to say', elevenCalls[0].body.text, PREVIEW_TEXT);
+check('  ...and kept', db.objects.has(PREVIEW_PATH), true);
+
+const afterFirstPreview = elevenCalls.length;
+await callPreview();
+await callPreview();
+await callPreview();
+check('pressing Preview again costs nothing', elevenCalls.length - afterFirstPreview, 0);
+
+/* A second serverless instance, cold, with the file already in the bucket: it
+   must read it back rather than pay for it again. Importing the route under a
+   different URL is how you get one in a single process. */
+const { default: coldPreview } = await import(new URL('../api/voice-preview.js?instance=2', import.meta.url).href);
+const coldRes = mockRes();
+await coldPreview({ method: 'GET', headers: {} }, coldRes);
+check('a cold server reads the file back', coldRes.code, 200);
+check('  ...without generating anything', elevenCalls.length - afterFirstPreview, 0);
+check('  ...the same audio everybody else got', Buffer.from(coldRes.body).equals(Buffer.from(db.objects.get(PREVIEW_PATH))), true);
+
+/* It is a demo, not an endpoint. There is nothing to submit to it. */
+const postRes = await callPreview({ method: 'POST', body: { text: 'read my affirmations for free' } });
+check('nothing can be submitted to the demo', [postRes.code, postRes.body.error], [405, 'method_not_allowed']);
+check('  ...and nothing was generated', elevenCalls.length - afterFirstPreview, 0);
+
+/* Hearing Serenity is free. Being read BY Serenity is not, and the demo does not
+   change that for a single caller. */
+reset();
+db.tier = null;
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('the demo does not unlock Serenity for a free account', [r.code, r.body.error], [403, 'upgrade_required']);
+check('  ...and nothing was generated', elevenCalls.length, 0);
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nall checks passed');
 process.exit(fails ? 1 : 0);

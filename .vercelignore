@@ -4,3 +4,8 @@ www/
 node_modules/
 supabase/
 scripts/
+
+# Internal launch notes. The site is deployed from the repository root, so
+# anything here that is not ignored is uploaded and served as a static file —
+# subliminallybyfthr.com/LAUNCH.md would have returned the whole thing.
+LAUNCH.md

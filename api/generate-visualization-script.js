@@ -26,17 +26,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing goal' });
   }
 
-  const systemPrompt = `You write short visualization scripts for performers — athletes, artists, performers, salespeople, or anyone preparing for a specific moment (a game, an audition, a pitch, a performance) or calling in a specific outcome or situation.
+  const systemPrompt = `You write original, emotionally absorbing guided-visualization stories for Subliminally. Turn the person's desire into a cinematic "future memory": one believable scene in which the desire is already real and the listener experiences it from inside their own life. This is not an affirmation list, a motivational speech, or an imitation of any other wellness app.
 
 Return ONLY raw JSON, no markdown code fences, no commentary, matching this exact shape:
 { "script": string }
 
 Rules for "script":
-- Second person, present tense throughout ("You walk out...", "You feel..."), like a guided visualization a coach would read aloud.
-- Vivid and sensory — what they see, hear, and feel, not just what happens. Ground it in the specific details the person gave you; don't generalize it into something vague.
-- 4 to 7 short paragraphs, separated by a blank line (use \\n\\n between paragraphs in the JSON string).
-- Arc: settle into the moment -> move through it as it's actually unfolding -> land on the feeling of having done it, calm and certain.
-- Warm, ${toneLabel || 'grounded'} tone. No hype-speech clichés, no medical or performance-outcome guarantees, no second-guessing language ("maybe", "hopefully").
+- Second person, present tense throughout ("You open the door...", "You notice..."), written to be read slowly aloud.
+- Choose one specific, believable scene rather than a montage. Build it around the most emotionally meaningful evidence that the desire has become real: a message arriving, a loved one's expression, a private realization, a room they can finally enter, or another natural moment supported by the user's words.
+- Make it sensory and embodied: surroundings, light, sound, texture, breath, posture, and the physical feeling of recognition. Every detail should serve the user's desire rather than decorate the script.
+- 5 to 7 short paragraphs, separated by a blank line (use \\n\\n between paragraphs in the JSON string). Keep the pacing spacious and the language elegant, intimate, and easy to follow with closed eyes.
+- Arc: gentle arrival -> anticipation -> the revealing moment -> an honest emotional release -> a quiet, grounded aftermath where this new reality feels natural.
+- Include small human details and inner reactions that make the scene moving, but never invent names, relationships, trauma, exact sums, diagnoses, or life facts the user did not provide.
+- Warm, ${toneLabel || 'grounded'} tone. Emotionally powerful without becoming melodramatic, sexually explicit, manipulative, or dependent on fear.
+- No hype-speech clichés, medical claims, supernatural guarantees, or second-guessing language ("maybe", "hopefully"). Do not tell the listener the outcome is guaranteed; simply let them inhabit the imagined scene.
 - Do not reference the healing frequency directly.${framing ? '\n\n' + framing : ''}`;
 
   const userPrompt = `What they want to visualize, in their own words: ${goal}

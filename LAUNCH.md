@@ -5,28 +5,71 @@ Check this list before submitting to the App Store or announcing.
 
 ## Not switched on yet
 
-### ElevenLabs — studio voices and voice cloning
+### ElevenLabs — studio voices and voice cloning — switched on
 
-**Deliberately deferred until launch.** `api/tts.js`, `api/voices.js` and
-`api/voice-clone.js` are complete; with no key set the routes reply 503 and the
-app falls back to the device voice, which is what happens today.
+**Switched on 2026-09-21.** `api/tts.js`, `api/voices.js` and
+`api/voice-clone.js` were already complete; both things they were waiting on are
+now done:
 
-To switch on:
+1. `supabase/migrations/20261003_elevenlabs_voices.sql` — **run 2026-09-21.** It
+   created `user_voice_profiles`, `tts_clips`, `tts_generations` and the private
+   `tts-cache` bucket, all row-level-secured to their owner with read-only
+   policies. The backfill inserted no rows (no profile had a `cloned_voice_id`)
+   and the voice-key rewrites touched nothing (`subliminals` was empty).
+2. `ELEVENLABS_API_KEY` — **set in Vercel** (project `subliminally`, team
+   `fthr1`), all three environments, and a redeploy done. Environment variables
+   only reach new builds, so a redeploy is required after any change to it.
 
-1. Run `supabase/migrations/20261003_elevenlabs_voices.sql` in the Supabase SQL
-   editor. It creates `user_voice_profiles`, `tts_clips`, `tts_generations` and
-   the private `tts-cache` bucket. **Without it the routes reply 500** — the
-   cache and the cost ledger have nowhere to live.
-2. elevenlabs.io → avatar → **API Keys** → create one.
-3. Vercel → `subliminally` → **Settings → Environment Variables**.
-4. Add `ELEVENLABS_API_KEY`, all three environments.
-5. **Deployments → ⋯ → Redeploy.** Environment variables only reach new builds.
+The key is read in one place, `lib/elevenlabs.js`, and attached as the
+`xi-api-key` header by `callProvider()`; `api/delete-account.js` reads it too, to
+delete a cloned voice when an account goes. It is never sent to the browser —
+`isConfigured()` returns a boolean and nothing more. If it is ever unset the
+routes reply 503 and the app falls back to the device voice, exactly as before.
 
-Nothing else needs configuring at ElevenLabs: the preset voices are stock voices
-from the shared library, named by key in `lib/voices.js`, and a cloned voice is
-created through the API rather than in the dashboard. Adding a voice later is one
-row in that file — the picker asks the server what exists, so the page does not
-change.
+### The V1 voice picker
+
+Three cards, and only three:
+
+| Card | Free | Premium | ElevenLabs? |
+| --- | --- | --- | --- |
+| Record your own voice | ✅ | ✅ | no — recorded in the browser |
+| **Serenity** (`PrH4gjaYIM8R16R889Vf`) — *use* | 🔒 | ✅ | yes, per line |
+| **Serenity** — *Play Preview* | ✅ | ✅ | **no** — one stored file |
+| Clone your voice | 🔒 | ✅ | yes |
+
+A free account **sees all three**, with a lock and a RITUAL badge on the two
+that are paid, and tapping a locked one opens the existing upgrade sheet rather
+than doing nothing or failing. The device voice is no longer a card; it stays as
+the silent fallback whenever a generated voice cannot be used.
+
+**The Serenity demo is free, and is not the same thing as Serenity.** Two
+different routes, on purpose:
+
+- `/api/voice-preview` — one short pre-generated file of Serenity saying the
+  fixed line in `lib/voice-preview.js`. No sign-in, no parameters, no request
+  body: there is nothing to submit to it. It is generated **once, ever** (the
+  first request of the app's life), kept in the `tts-cache` bucket at
+  `_preview/<clip key>.mp3`, and read back after that. The response is
+  `public, max-age=31536000, immutable`, so in practice most presses are
+  answered by the browser or the CDN and never reach the function.
+- `/api/tts` — Serenity reading **your** affirmations, a request per line. This
+  is the premium one and the gate is unchanged: a 403 before a character
+  reaches the provider.
+
+Somebody deciding whether to pay for a voice has to be able to hear it; hearing
+it must not be a way to get it. That is the whole distinction, and
+`npm run test:voice` holds both halves of it.
+
+The six voices the picker used to offer — Sarah, Charlotte, Alice, Lily, Daniel
+and George — are **retired, not deleted**. They are in `LEGACY_PRESET_VOICES` in
+`lib/voices.js`: `/api/voices` no longer lists them and nothing can pick one, but
+`/api/tts` still resolves them, so a subliminal saved with one plays in the voice
+it was saved with and off the clips already cached. No stored row was rewritten.
+
+Nothing else needs configuring at ElevenLabs: Serenity is a voice created in the
+dashboard and named by key in `lib/voices.js`, and a cloned voice is created
+through the API. Adding a voice later is one row in that file — the picker asks
+the server what exists, so the page does not change.
 
 What this costs, and what it does not:
 
@@ -37,6 +80,10 @@ What this costs, and what it does not:
   back. `tts_generations` is the ledger, and the rate limits (40 a minute, 150 an
   hour, 600 a day, per person) are counted off it — cache hits are free and are
   not counted.
+- **The demo is generated once, ever.** Not per press, per person or per page —
+  one file for the life of the app, at `_preview/<clip key>.mp3`. The path is
+  derived from the words, the voice, the pace and the model, so changing any of
+  them is a new file generated once rather than a stale one to invalidate.
 - **A voice is cloned once.** Building a subliminal never creates a clone;
   `user_voice_profiles` holds the one voice per person and it is reused. A clone
   is only ever created with the confirmation sentence in `lib/user-voices.js`,
@@ -48,14 +95,36 @@ Two things that will bite:
 - **A paid plan is required.** The free tier forbids commercial API use and
   gives about one subliminal's worth of characters a month. Creator (~$22/mo)
   is the realistic floor, and voice cloning needs Creator or above.
-- **Studio voices are gated to any paid plan** in `api/tts.js`. A free account
-  gets "Studio voices come with Ritual" even once the key is set. Kyla's own
-  account needs a tier, or the gate needs a test bypass.
+- **Every generated voice is gated to a paid plan**, at the top of `api/tts.js`
+  and `api/voice-clone.js`, off the one definition in `hasPremiumAccess()`. A
+  free account gets a 403 before anything reaches ElevenLabs. That includes
+  Kyla's own account — testing Serenity needs a tier on it, or the gate needs a
+  test bypass. The Preview button is the exception and needs neither: it plays
+  the stored demo on any account, including none.
+
+- **The demo's first press is the only one that spends anything.** It has to
+  happen once on production, after `ELEVENLABS_API_KEY` is set, before anybody
+  can hear it — pressing Preview once (or opening
+  `https://subliminallybyfthr.com/api/voice-preview`) is enough, and every press
+  after that on every device is free. If the file is ever deleted from the
+  bucket, the next press regenerates it and stores it again.
 
 ### RevenueCat webhook
 
-`REVENUECAT_WEBHOOK_AUTH` = `dhEdleK-okLF-HlqrfZLVGrU4O5S2szsBRYsxo7xFlo` in
-Vercel, and point the RevenueCat webhook at `/api/revenuecat-webhook`.
+Set `REVENUECAT_WEBHOOK_AUTH` in Vercel → `subliminally` → Settings →
+Environment Variables, and give RevenueCat the same value when you point its
+webhook at `/api/revenuecat-webhook`. The two have to match — that shared value
+is the only thing proving a webhook call really came from RevenueCat.
+
+**The value does not belong in this file.** It was written out here in full until
+2026-09-21; read it from Vercel, or from the RevenueCat dashboard, when you need
+it.
+
+**Rotate it.** Removing it here does not unpublish it: it is still in this
+repository's git history, and until 2026-09-21 `LAUNCH.md` was not in
+`.vercelignore`, so it may also have been served as a static file from the site.
+Generate a new value, set it in Vercel, update the RevenueCat webhook to match,
+and redeploy. Until that is done, treat the old value as known.
 
 ### Higher Self emotion portraits — complete
 
@@ -166,7 +235,7 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20260930_onboarding_slideshow.sql` | run |
 | `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
 | `20261002_drop_unused_habit_counters.sql` | run 2026-09-20 |
-| `20261003_elevenlabs_voices.sql` | **not run — run it before setting `ELEVENLABS_API_KEY`** |
+| `20261003_elevenlabs_voices.sql` | run 2026-09-21 — before `ELEVENLABS_API_KEY` was set, as it had to be |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`

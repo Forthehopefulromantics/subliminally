@@ -34,13 +34,10 @@ const FALLBACK_BANK = {
   selfworth: ["I am allowed to take up space.","My worth is not up for debate.","I treat myself as someone I love.","I am whole as I am.","I belong to myself."],
   creativity: ["Ideas visit me easily.","I make things without judging them.","My imagination rests and refills.","I trust the first draft.","Creation is my natural state."],
 };
-const BACKGROUNDS = [
-  { key:'none', label:'None', ic:'—' }, { key:'rain', label:'Rain', ic:'🌧' },
-  { key:'ocean', label:'Ocean', ic:'🌊' }, { key:'waterfall', label:'Waterfall', ic:'💧' },
-  { key:'forest', label:'Wind & forest', ic:'🌲' }, { key:'birds', label:'Birds', ic:'🐦' },
-  { key:'thunder', label:'Distant storm', ic:'⛈' },
-  { key:'brown', label:'Brown noise', ic:'▮' },
-];
+/* The ambience library — its names, its categories, where its audio lives and
+   the one object allowed to play it — is js/ambience.js, loaded before this
+   file. Nothing about a background lives here any more except how to build the
+   generated ones (buildAmbience, further down) and how to draw the picker. */
 /* Binaural beats: a slightly different pure tone in each ear, which the brain perceives
    as a single pulsing "beat" at the difference between the two frequencies. That part is
    real, measurable audio physics. Which beat speed does what to your mental state is far
@@ -94,7 +91,30 @@ function eftRepeatsForIndex(i){ return 1; }
 /* ---------------- FLOW STATE ---------------- */
 let step = 0;
 const TOTAL_STEPS = 8;
-let state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
+
+/* ---------------- WHOSE VOICE: the three answers, named ----------------
+   There are exactly three answers to "whose voice tonight?", and every one of
+   them means a different route out of the voice step. They are named here, once,
+   and nothing downstream is allowed to infer the route from anything else.
+
+   Why this exists: the route used to be read off `voiceMode`/`aiVoiceId`, which
+   are the *storage* fields -- what gets written to the subliminals row and handed
+   to the player. 'ai' covers both Serenity and a cloned voice, and null covers
+   both "not answered yet" and "the paywall stopped them", so the one question
+   the flow actually has to answer -- does this person record, or not -- was being
+   reconstructed from fields that were never about that. Falling back to
+   recording was the default, and it is the worst possible default: it is the
+   long path, and it is the one nobody who chose an AI voice asked for.
+
+   So: `state.selectedVoice` is the answer to the question on the screen, and
+   `voiceMode`/`aiVoiceId` stay exactly what they were, derived from it. Nothing
+   in billing.js, profile.js or the player changes. */
+const VOICE_RECORD_OWN = 'record_own';   // record the lines yourself, one by one
+const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
+const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
+const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
+
+let state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 function renderProgress(){
   const bar = document.getElementById('flowProgress'); bar.innerHTML='';
@@ -106,12 +126,38 @@ function showStep(n){
   step = n; renderProgress();
   if (n === 1){ updateSessionLengthHint(); renderDurationChips(); }
   if (n === 1 || n === 5) applyBuilderLocks();
+  /* The record panel is drawn as it opens, every time, from whatever the lines
+     and the index currently are. This is what makes the "..." placeholder in
+     index.html unreachable rather than merely unlikely: there is no route onto
+     step 6, present or future, that can skip it. */
+  if (n === 6) showRecordLine();
+  /* The three voice cards are always on screen, so their locks — and the demo
+     the Serenity one can play — are drawn as the step opens rather than as a
+     side effect of picking something. */
+  if (n === 4){
+    /* Draw what is chosen before anything is awaited, so coming back to this
+       screen never shows three blank cards for a beat. */
+    paintVoiceCards();
+    renderVoiceCards();
+    restoreVoiceChoice();
+  }
+  else stopSerenityPreview();   // the demo does not follow you to the next screen
+  /* Opening the ambience step: draw both states from scratch — what is chosen
+     and what, if anything, is being auditioned — and start the download of the
+     chosen track so pressing play later does not wait on it. Leaving it stops
+     the preview, for the same reason the voice demo does not follow you. */
+  if (n === 5){
+    ambienceCandidate = state.bg;
+    paintBgCards();
+    warmAmbience(state.bg);
+  }
+  else stopAmbiencePreview();
   if (n === 1 && pendingRitualMode){
     const chip = document.querySelector(`#ritualModeChips .length-chip[data-mode="${pendingRitualMode}"]`);
     pendingRitualMode = null;
     if (chip) pickRitualMode(chip);
   }
-  if (n === 7) renderFinalFreqPicker();
+  if (n === 7){ renderFinalFreqPicker(); renderFinalAmbiencePicker(); }
 }
 /* The session-length slider runs from 5 minutes to 8 hours with no restriction on
    dragging — nothing is gated until they try to actually generate/save a session
@@ -176,10 +222,8 @@ function syncDurationChips(){
   if (!wrap) return;
   const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
   const exact = DURATION_PRESETS.includes(minutes);
-  wrap.querySelectorAll('.length-chip').forEach(c => {
-    const isSel = c.dataset.custom ? !exact : parseInt(c.dataset.minutes, 10) === minutes;
-    c.classList.toggle('sel', isSel);
-  });
+  syncSelection('#durationChips .length-chip',
+    c => c.dataset.custom ? !exact : parseInt(c.dataset.minutes, 10) === minutes);
 }
 /* Tapping a length past your plan does not move the slider and does not scold.
    It opens the one contextual sheet for that length and leaves the choice
@@ -224,7 +268,7 @@ async function applyBuilderLocks(){
 
 /* Custom is not a sixth length — it is the slider, which was already there. */
 function pickCustomDuration(){
-  document.querySelectorAll('#durationChips .length-chip').forEach(c => c.classList.toggle('sel', !!c.dataset.custom));
+  syncSelection('#durationChips .length-chip', c => !!c.dataset.custom);
   document.getElementById('sessionLengthSlider').focus({ preventScroll: true });
 }
 /* The fewest lines a subliminal is built from. Five is enough for a loop to
@@ -255,24 +299,49 @@ function nextStep(){
     }
     if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   }
+  /* THE BUG THIS LINE FIXES, because it caused both of the ones reported.
+
+     Step 5 is the last screen before the flow forks: record your own lines
+     (step 6) or go straight to assembly (step 7). `startNextPhase()` is the
+     fork, and the Continue button called it -- but three other things on step 5
+     called plain `nextStep()` instead, and plain `nextStep()` is step+1, which
+     is step 6 unconditionally. Picking a background did it, and picking a
+     background is the most ordinary thing anybody does on that screen.
+
+     So somebody who chose Serenity tapped "Rain" and landed in the manual
+     recorder. And because nothing routed them there, nothing had *prepared*
+     them there either: showRecordLine() never ran, so the panel still held the
+     literal "..." and a hard-coded count that sit in index.html as placeholders, and
+     `recordings` was never sized to the affirmations. One missing fork, two
+     bugs.
+
+     step+1 is right for every other screen. From step 5 the only way on is the
+     fork. */
+  if (step === 5){ startNextPhase(); return; }
   showStep(step+1);
 }
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:14, affirmations:[], voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null };
-  document.querySelectorAll('.sel').forEach(c=>c.classList.remove('sel'));
+  state = { freq:null, intention:null, goal:'', tone:null, count:10, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  /* Clearing through the one helper rather than stripping the class by hand:
+     that left every chip on the page still announcing itself as pressed. */
+  clearSelection('.sel');
+  forgetVoiceChoice();
+  paintVoiceCards();
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
-  document.getElementById('countRange').value = 14; document.getElementById('countVal').textContent = 14;
+  document.getElementById('countRange').value = 10; document.getElementById('countVal').textContent = 10;
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
   renderDurationChips();
-  const defaultSoothing = document.querySelector('#soothingChips .length-chip[data-variant="none"]');
-  if (defaultSoothing) defaultSoothing.classList.add('sel');
+  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
   state.binauralBand = null;
-  document.querySelectorAll('#binauralChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.band==='none'));
+  syncSelectionByData('#binauralChips .length-chip', 'band', 'none');
+  stopAmbiencePreview();
+  ambienceCandidate = null;
+  paintBgCards();
   document.getElementById('binauralGuideText').style.display = 'none';
   document.getElementById('soothingMixRow').style.display = 'none';
   document.getElementById('soothingMsg').textContent = '';
@@ -287,7 +356,7 @@ function resetFlow(){
   document.getElementById('layerVoicePanel').classList.remove('open');
   document.getElementById('layerAffText').value = '';
   document.getElementById('layerVoiceMsg').textContent = '';
-  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.toggle('sel', b.dataset.mode==='ai'));
+  paintLayerVoiceOptions();
   document.getElementById('layerVoiceMixRow').style.display = 'none';
   affirmationPace = DEFAULT_PACE;
   setAffirmationGap(DEFAULT_GAP_SECONDS);
@@ -297,7 +366,7 @@ function resetFlow(){
   document.getElementById('mixVoice').value = 65; document.getElementById('mixVoiceVal').value = 65;
   state.eftMode = false;
   state.visualizationMode = false;
-  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.toggle('sel', c.dataset.mode==='subliminal'));
+  paintRitualModeChips();
   document.getElementById('eftGuidePanel').style.display = 'none';
   document.getElementById('visualizationGuidePanel').style.display = 'none';
   document.getElementById('ritualModeMsg').textContent = '';
@@ -306,6 +375,7 @@ function resetFlow(){
   const lengthQ = document.getElementById('sessionLengthRow');
   if (lengthQ) lengthQ.style.display = '';
   editingExistingId = null;
+  restoreMixSettings(null, null);
   contentAlreadySaved = false;
   document.getElementById('finalTitleInput').value = '';
   document.getElementById('finalTitleMsg').textContent = '';
@@ -315,31 +385,47 @@ function resetFlow(){
 
 /* ---- step 0: frequency ---- */
 const freqChips = document.getElementById('freqChips');
+/* Which frequency is lit, derived from state.freq. Tapping writes the answer and
+   then calls this -- rather than painting the tapped card and hoping nothing
+   ever redraws the list, which is how a chosen frequency used to vanish when
+   you came back to step 0 from step 1. */
+function paintFreqCards(){
+  syncSelection('#freqChips .freq-card3', el => !!state.freq && el.dataset.hz === String(state.freq.hz));
+}
 FREQS.forEach(f=>{
   const c = document.createElement('button'); c.className='freq-card3';
+  c.dataset.hz = f.hz;
+  c.setAttribute('role', 'radio');
   c.innerHTML = `<div class="hz">${f.hz} Hz</div><div class="word">${f.word}</div>`;
   c.onclick = ()=>{
-    document.querySelectorAll('.freq-card3').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel'); state.freq = f;
+    state.freq = f;
+    paintFreqCards();
     document.getElementById('freqGuideText').textContent = '"'+f.guide+'"';
     document.getElementById('toStep1').disabled = false;
   };
   freqChips.appendChild(c);
 });
+paintFreqCards();
 
 /* ---- step 1: quiz ---- */
 const intentionChips = document.getElementById('intentionChips');
+function paintIntentionChips(){ syncSelectionByData('#intentionChips .chip', 'key', state.intention); }
 INTENTIONS.forEach(([k,label])=>{
   const c = document.createElement('button'); c.className='chip'; c.textContent = label;
-  c.onclick = ()=>{ document.querySelectorAll('#intentionChips .chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); state.intention=k; };
+  c.dataset.key = k; c.setAttribute('role', 'radio');
+  c.onclick = ()=>{ state.intention = k; paintIntentionChips(); };
   intentionChips.appendChild(c);
 });
+paintIntentionChips();
 const toneChips = document.getElementById('toneChips');
+function paintToneChips(){ syncSelectionByData('#toneChips .chip', 'key', state.tone); }
 [["gentle","Gentle & nurturing"],["bold","Bold & direct"],["calm","Calm & neutral"]].forEach(([k,label])=>{
   const c = document.createElement('button'); c.className='chip'; c.textContent=label;
-  c.onclick=()=>{ document.querySelectorAll('#toneChips .chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); state.tone=k; };
+  c.dataset.key = k; c.setAttribute('role', 'radio');
+  c.onclick=()=>{ state.tone = k; paintToneChips(); };
   toneChips.appendChild(c);
 });
+paintToneChips();
 const countRange = document.getElementById('countRange');
 countRange.addEventListener('input', ()=>{ document.getElementById('countVal').textContent = countRange.value; state.count = parseInt(countRange.value); });
 
@@ -352,6 +438,15 @@ EFT_LINE_POINTS.forEach((p, i) => {
   li.innerHTML = `<b>${p.label}</b> — ${p.where}`;
   eftPointsList.appendChild(li);
 });
+/* Which mode is lit, off the two booleans that actually decide the build. */
+function currentRitualMode(){
+  if (state.eftMode) return 'eft';
+  if (state.visualizationMode) return 'visualization';
+  return 'subliminal';
+}
+function paintRitualModeChips(){
+  syncSelectionByData('#ritualModeChips .length-chip', 'mode', currentRitualMode());
+}
 async function pickRitualMode(btn){
   const msg = document.getElementById('ritualModeMsg');
   const mode = btn.dataset.mode;
@@ -367,10 +462,9 @@ async function pickRitualMode(btn){
       return;
     }
   }
-  document.querySelectorAll('#ritualModeChips .length-chip').forEach(c=>c.classList.remove('sel'));
-  btn.classList.add('sel');
   state.eftMode = (mode === 'eft');
   state.visualizationMode = (mode === 'visualization');
+  paintRitualModeChips();
   document.getElementById('eftGuidePanel').style.display = state.eftMode ? 'block' : 'none';
   document.getElementById('visualizationGuidePanel').style.display = state.visualizationMode ? 'block' : 'none';
   document.getElementById('countRow').style.display = (state.eftMode || state.visualizationMode) ? 'none' : 'block';
@@ -479,12 +573,12 @@ function applyModeCopy(mode){
   const reviewTitle = document.getElementById('reviewTitle');
   const reviewSub = document.getElementById('reviewSub');
   if (mode === 'visualization'){
-    goalLabel.textContent = 'Describe what you want to happen, in as much detail as you can';
-    document.getElementById('quizGoal').placeholder = 'e.g. I\'m walking out onto the court for the championship game. The crowd is loud, I can feel my heartbeat, but my hands are steady...';
+    goalLabel.textContent = 'Describe your desire — and the moment you would know it had become real';
+    document.getElementById('quizGoal').placeholder = 'e.g. I receive the message that the opportunity is mine. My sister is beside me, I read it twice, and I finally feel the relief of knowing the work mattered...';
     generateBtn.textContent = 'Continue to my script ✦';
     regenerateBtn.textContent = '↻ Get a new draft';
-    loadingTitle.textContent = 'Setting up your script…';
-    loadingSub.textContent = 'One moment.';
+    loadingTitle.textContent = 'Turning your desire into a scene…';
+    loadingSub.textContent = 'Writing a future memory you can step inside.';
     reviewTitle.textContent = 'Your visualization script';
     reviewSub.textContent = 'Write it yourself, edit the draft, or both — this is entirely yours.';
   } else if (mode === 'eft'){
@@ -734,30 +828,47 @@ function renderAffList(){
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 
 /* ---------------- step 4: voice choice ----------------
-   Two things are being chosen here: whether to record yourself or not, and — if
-   not — which voice reads the lines. The studio voices are generated by
-   /api/tts; when that isn't configured (or the person isn't on a paid plan) the
+   One question, three answers, one card each:
+
+     Record your own voice   free on every account, never touches ElevenLabs
+     Serenity                premium to USE, free to HEAR
+     Clone your voice        premium
+
+   The middle one is the one worth being careful about, because it is two things
+   wearing one name:
+
+     the DEMO  — one short pre-generated file of Serenity saying a fixed line.
+                 Anybody may play it, free account or none at all. It is served
+                 by /api/voice-preview, which reads a file back and does not
+                 generate anything. Pressing it is not choosing Serenity.
+     the VOICE — Serenity reading YOUR affirmations, generated per line by
+                 /api/tts. That costs money, so it is premium, and the route
+                 refuses a free account before a character reaches the provider.
+
+   Keeping them apart is the whole point: somebody deciding whether to pay for a
+   voice has to be able to hear it, and hearing it must not be a way to get it.
+
+   When a generated voice isn't configured — or the person's plan lapsed — the
    app falls back to the device's own speech synthesis, which is how it has
    always worked, so nothing breaks. */
-/* What the picker offers is a *key* — 'sarah', 'daniel', 'mine', 'device' — and
-   never a provider voice id. The ids live on the server (lib/voices.js), which is
-   also the only place that decides whether a requested voice exists, so the page
+/* What the page stores is a *key* — 'serenity', 'mine', 'device' — and never a
+   provider voice id. The ids live on the server (lib/voices.js), which is also
+   the only place that decides whether a requested voice exists, so the page
    cannot ask for a voice nobody is paying for and nobody reading the page source
    learns which voices we use.
 
+   V1 offers one AI voice, Serenity. The six voices the picker used to list are
+   retired: they are not offered here and /api/voices no longer returns them, but
+   the server still resolves them so a subliminal saved with one keeps playing.
+   See LEGACY_PRESET_VOICES in lib/voices.js.
+
    The names come from /api/voices for anybody signed in, so a voice added to the
-   catalogue later appears here without this file changing. The list below is the
-   fallback for a visitor who has not signed in yet: names only, because without
-   an account there is nothing to generate with anyway and every preview is read
-   by the device. */
+   catalogue later can appear without this file changing. The list below is the
+   fallback for a visitor who has not signed in yet. */
 const FALLBACK_PRESET_VOICES = [
-  { key: 'sarah',     name: 'Sarah',     desc: 'warm, calm' },
-  { key: 'charlotte', name: 'Charlotte', desc: 'soft, low' },
-  { key: 'alice',     name: 'Alice',     desc: 'clear, steady' },
-  { key: 'lily',      name: 'Lily',      desc: 'bright' },
-  { key: 'daniel',    name: 'Daniel',    desc: 'deep, grounding' },
-  { key: 'george',    name: 'George',    desc: 'measured' },
+  { key: 'serenity', name: 'Serenity', desc: 'Calm, warm AI voice' },
 ];
+const SERENITY_VOICE = 'serenity';
 const DEVICE_VOICE = 'device';   // the browser's own speechSynthesis
 const MY_CLONED_VOICE = 'mine';  // resolved to this person's own voice, server-side
 /* Shown if the catalogue cannot be reached. The server holds the real one and
@@ -861,44 +972,368 @@ function answered(el){
   }, STEP_ADVANCE_MS);
 }
 
-function chooseVoice(mode){
-  state.voiceMode = mode;
-  document.getElementById('voiceOwn').classList.toggle('sel', mode==='own');
-  document.getElementById('voiceAI').classList.toggle('sel', mode==='ai');
-  document.getElementById('voicePicker').style.display = mode === 'ai' ? 'block' : 'none';
-  if (mode === 'ai') renderVoiceChips();
-  document.getElementById('toStep5').disabled = false;
-  if (mode === 'own') advanceAfterPick();
+/* ---------- the three cards ----------
+   Record your own voice, Serenity, Clone your voice. One tap is the whole
+   answer, so a card that can be chosen chooses and moves on.
+
+   Serenity and a cloned voice are premium; recording yourself is free on every
+   account. A free account tapping either premium card gets the existing upgrade
+   sheet and *keeps whatever it had chosen* — nothing is half-selected behind a
+   paywall, so continuing can never send somebody into a voice they cannot use.
+
+   The Serenity demo is the exception, and it is not on this path at all: it is a
+   separate control inside the card (toggleSerenityPreview) which plays one
+   pre-generated file and does nothing else. */
+function chooseVoice(choice){
+  if (choice === 'own' || choice === VOICE_RECORD_OWN) return chooseOwnVoice();
+  if (choice === 'serenity' || choice === VOICE_SERENITY) return chooseSerenity();
+  if (choice === 'clone' || choice === VOICE_CLONE) return chooseClonedVoice();
 }
 
-async function renderVoiceChips(){
-  const wrap = document.getElementById('voiceChips');
-  if (!wrap) return;
-  const cat = await loadVoiceCatalogue();
-  if (!state.aiVoiceId) state.aiVoiceId = cat.presets[0].key;
+/* ---------------- the answer, and the two fields it derives ----------------
+   ONE place writes the voice choice. It writes `selectedVoice` -- the answer --
+   and derives `voiceMode`/`aiVoiceId` from it, so the thing the flow routes on
+   and the thing the row is saved with can never disagree.
+
+   It is synchronous on purpose, and it repaints before it returns. A tap has to
+   light the card up in the same frame it happened in; anything that has to be
+   checked first (a plan, whether a clone exists) is checked by the caller, and
+   the caller repaints from state either way. */
+function setSelectedVoice(choice){
+  state.selectedVoice = choice;
+  if (choice === VOICE_RECORD_OWN){
+    state.voiceMode = 'own';
+    state.aiVoiceId = null;
+  } else if (choice === VOICE_SERENITY){
+    state.voiceMode = 'ai';
+    state.aiVoiceId = SERENITY_VOICE;
+  } else if (choice === VOICE_CLONE){
+    state.voiceMode = 'ai';
+    state.aiVoiceId = MY_CLONED_VOICE;
+  } else {
+    state.voiceMode = null;
+    state.aiVoiceId = null;
+  }
+  rememberVoiceChoice(choice);
+  paintVoiceCards();
+  const cta = document.getElementById('toStep5');
+  if (cta) cta.disabled = !choice;
+}
+
+/* The other direction: what a subliminal loaded out of the library, or reopened
+   mid-build, was built in. profile.js writes voiceMode/aiVoiceId straight from
+   the saved row and knows nothing about selectedVoice, so the picker reads the
+   answer back out of them rather than coming up blank and defaulting to
+   recording. */
+function selectedVoiceFromState(){
+  if (state.selectedVoice) return state.selectedVoice;
+  if (state.voiceMode === 'own') return VOICE_RECORD_OWN;
+  if (state.voiceMode === 'ai'){
+    if (state.aiVoiceId === MY_CLONED_VOICE) return VOICE_CLONE;
+    if (state.aiVoiceId === SERENITY_VOICE) return VOICE_SERENITY;
+  }
+  return null;
+}
+
+/* ---------------- remembering it across a refresh ----------------
+   The builder itself does not survive a reload -- a half-built subliminal is not
+   a thing worth restoring -- but the voice is a preference, not a step, and
+   coming back to the picker having silently forgotten it is how somebody ends up
+   in the recording flow they did not choose.
+
+   Stored against the account id, because the next person to sign in on this
+   device did not choose anything. 'record_own' is the exception and is kept for
+   a signed-out visitor too: it needs no account and no plan. */
+const VOICE_CHOICE_KEY = 'fthr_voice_choice';
+function voiceChoiceOwner(){ return (currentUser && currentUser.id) || 'anon'; }
+function rememberVoiceChoice(choice){
+  try {
+    if (!choice) localStorage.removeItem(VOICE_CHOICE_KEY);
+    else localStorage.setItem(VOICE_CHOICE_KEY, JSON.stringify({ choice, user: voiceChoiceOwner() }));
+  } catch(e){ /* private mode: the choice still works for this visit */ }
+}
+function rememberedVoiceChoice(){
+  try {
+    const raw = JSON.parse(localStorage.getItem(VOICE_CHOICE_KEY) || 'null');
+    if (!raw || !VOICE_CHOICES.includes(raw.choice)) return null;
+    // Somebody else's choice is not a default to fall into.
+    if (raw.user !== voiceChoiceOwner() && raw.choice !== VOICE_RECORD_OWN) return null;
+    return raw.choice;
+  } catch(e){ return null; }
+}
+function forgetVoiceChoice(){ try { localStorage.removeItem(VOICE_CHOICE_KEY); } catch(e){} }
+
+/* Put the remembered answer back as the voice step opens, but only if it is
+   still true: a plan that lapsed, or a cloned voice that was deleted, must not
+   come back as a selected card that cannot be used. Nothing is restored over an
+   answer already made in this build. */
+async function restoreVoiceChoice(){
+  if (state.selectedVoice) return;
+  if (selectedVoiceFromState()) return;   // loaded from a saved subliminal
+  const choice = rememberedVoiceChoice();
+  if (!choice) return;
+  if (choice === VOICE_RECORD_OWN){ setSelectedVoice(VOICE_RECORD_OWN); return; }
+  if (!currentUser) return;
+  const tier = await getMyTier();
+  const feature = choice === VOICE_SERENITY ? 'studio_voice' : 'my_voice';
+  if (!tierHasFeature(tier, feature)){ forgetVoiceChoice(); return; }
+  if (choice === VOICE_CLONE && !(await myVoiceProfile())){ forgetVoiceChoice(); return; }
+  if (state.selectedVoice) return;        // they answered while we were asking
+  setSelectedVoice(choice);
+}
+
+function voicePickerMsgEl(){ return document.getElementById('voicePickerMsg'); }
+function sayInVoicePicker(text, kind){
+  const msg = voicePickerMsgEl();
+  if (!msg) return;
+  msg.textContent = text || '';
+  msg.className = 'save-msg' + (text && kind ? ' ' + kind : '');
+}
+
+/* The one answer that is recorded and moved on from. 'own' means this device
+   never asks the server for a voice at all -- no plan to check, so nothing to
+   await, so the card lights up in the frame the tap arrived in. */
+function chooseOwnVoice(){
+  closeMyVoicePanel();
+  sayInVoicePicker('');
+  setSelectedVoice(VOICE_RECORD_OWN);
+  advanceAfterPick();
+}
+
+/* ---------------- the highlight does not wait for the network ----------------
+   Serenity and Clone both have a plan to check first, and getMyTier() can be a
+   round trip. The old handlers awaited it before touching the screen, so on a
+   slow connection a tap did nothing at all for a moment -- which reads as a
+   broken button, and the obvious thing to do with a broken button is press it
+   again.
+
+   So the tap paints immediately, optimistically, and then the check either
+   commits the answer or repaints from the real state. `paintVoiceCards()` only
+   ever draws what `state` actually says, so the revert is not a second code
+   path that could disagree with the first -- it is the same render, run again
+   over unchanged state. A refused tap therefore cannot leave the screen showing
+   a voice the account does not have. */
+function previewVoicePick(choice){
+  sayInVoicePicker('');
+  paintVoiceCards(choice);
+}
+
+/* Tapping the Serenity CARD asks for Serenity to read the affirmations, which is
+   the premium thing. The paywall opens and the card does not light up: Serenity
+   only becomes the voice once the plan actually allows it. Pressing the small
+   Preview button instead is a different handler entirely and never comes here. */
+async function chooseSerenity(){
+  if (!currentUser){
+    sayInVoicePicker('Create a free account first, then Serenity can read your affirmations.', 'err');
+    return;
+  }
+  previewVoicePick(VOICE_SERENITY);
+  const tier = await getMyTier();
+  if (!tierHasFeature(tier, 'studio_voice')){
+    paintVoiceCards();   // back to whatever is actually chosen
+    openUpgradeModal('studio_voice', { tier, trigger: 'voice_card' });
+    return;
+  }
+  closeMyVoicePanel();
+  setSelectedVoice(VOICE_SERENITY);
+  advanceAfterPick();
+}
+
+/* A personal AI version of someone's own voice. Premium, and — the first time —
+   a passage to read before anything is created, which is the panel below rather
+   than a step of its own. */
+async function chooseClonedVoice(){
+  if (!currentUser){
+    sayInVoicePicker('Create a free account first, then your voice can be one of the voices here.', 'err');
+    return;
+  }
+  previewVoicePick(VOICE_CLONE);
+  const tier = await getMyTier();
+  if (!tierHasFeature(tier, 'my_voice')){
+    paintVoiceCards();
+    openUpgradeModal('my_voice', { tier, trigger: 'voice_card' });
+    return;
+  }
+  const mine = await myVoiceProfile();
+  /* No voice of their own yet, so the setup comes first -- the passage to read,
+     the confirmation, the upload. What it is NOT is the affirmation-by-
+     affirmation recorder: cloning is one passage read once.
+
+     The card stays lit while the panel is open, because "clone my voice" is what
+     they asked for and the panel is the answer to it. The *voice* is still not
+     committed -- voiceMode/aiVoiceId stay untouched, so nothing can generate in
+     a voice that does not exist yet, and Continue stays disabled until
+     onMyVoiceReady() commits it. */
+  if (!mine){
+    /* The answer is recorded -- they asked for their own cloned voice -- but the
+       VOICE is not, because it does not exist yet. That split is deliberate:
+       selectedVoice is what the fork reads, so a Continue pressed from here is
+       sent back to finish the clone; voiceMode/aiVoiceId stay empty, so nothing
+       can try to generate in a voice that was never made. */
+    state.selectedVoice = VOICE_CLONE;
+    rememberVoiceChoice(VOICE_CLONE);
+    paintVoiceCards();
+    openMyVoicePanel();
+    return;
+  }
+  closeMyVoicePanel();
+  setSelectedVoice(VOICE_CLONE);
+  advanceAfterPick();
+}
+
+/* What the three cards look like right now: which one is chosen, and which of
+   them this account has to pay for. Nothing is ever removed from a free
+   account's screen — the same rule as every other premium control in the app —
+   it is drawn with a lock and explains itself when tapped. */
+/* WHICH CARD IS LIT. Synchronous, derived entirely from `state`, and safe to run
+   as often as anything likes -- which is the point: it runs on the tap, on the
+   step opening, after a plan check, after a clone is created, and after a
+   restore, and every one of those produces the same answer for the same state.
+
+   `showing` is an optional override for the one frame between a tap and the plan
+   check coming back. It changes nothing in state; leaving it out means "draw the
+   truth", which is how every refusal path reverts. */
+function paintVoiceCards(showing){
+  const own = document.getElementById('voiceOwn');
+  const serenity = document.getElementById('voiceSerenity');
+  const clone = document.getElementById('voiceClone');
+  if (!own || !serenity || !clone) return;
+  const chosen = showing || selectedVoiceFromState();
+  setSelected(own, chosen === VOICE_RECORD_OWN);
+  setSelected(serenity, chosen === VOICE_SERENITY);
+  setSelected(clone, chosen === VOICE_CLONE);
+  /* The Serenity card is a div holding two buttons, so the face is what a
+     screen reader is actually on -- it carries the state, not the wrapper. */
+  const face = serenity.querySelector('.voice-card-face');
+  if (face) setSelected(face, chosen === VOICE_SERENITY);
+}
+
+async function renderVoiceCards(){
+  const own = document.getElementById('voiceOwn');
+  const serenity = document.getElementById('voiceSerenity');
+  const clone = document.getElementById('voiceClone');
+  if (!own || !serenity || !clone) return;
+
+  paintVoiceCards();
+
+  /* The lock and the RITUAL badge come off the same feature table as the rest.
+     Both cards are locked on what the plan allows rather than on what exists, so
+     a lapsed member's own cloned voice is drawn honestly: still theirs, not
+     usable until the plan is back. */
   const tier = currentUser ? await getMyTier() : 'none';
+  /* The lock goes on Serenity's FACE, not on the card: the card also holds the
+     Preview button, and the demo is free. A lock drawn across the whole card
+     would say the opposite of what this screen is for. */
+  lockedControl(serenity.querySelector('.voice-card-face') || serenity, 'studio_voice', tier);
+  lockedControl(clone, 'my_voice', tier);
 
-  /* "Use my voice" is first and always drawn, cloned or not — the same rule as
-     every other premium control in the app: nothing is removed from a free
-     account's screen, it is drawn with a lock and explains itself when tapped. */
-  const chips = [{
-    key: MY_CLONED_VOICE,
-    name: cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Use my voice',
-    desc: cat.myVoice ? 'your voice' : 'read one passage',
-    mine: true,
-  }];
-  cat.presets.forEach(v => chips.push({ key: v.key, name: v.name, desc: v.desc, mine: false }));
-  chips.push({ key: DEVICE_VOICE, name: 'This device', desc: 'built-in', mine: false });
+  /* Once a voice of their own exists, the card stops offering to make one and
+     starts naming the one they have. */
+  const cat = await loadVoiceCatalogue();
+  const cloneTitle = clone.querySelector('h4');
+  const cloneDesc = clone.querySelector('p');
+  if (cloneTitle) cloneTitle.textContent = cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Clone your voice';
+  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your voice, as an AI version' : 'Create an AI version of your voice';
 
-  wrap.innerHTML = chips.map(c => `
-    <button type="button" class="voice-chip${state.aiVoiceId === c.key ? ' sel' : ''}${c.mine ? ' mine' : ''}"
-      data-voice-key="${c.key}" onclick="pickAiVoice('${c.key}')">
-      ${c.name} <span class="voice-chip-desc">${c.desc}</span>
-    </button>`).join('');
-
-  // The lock and the RITUAL badge come off the same feature table as the rest.
-  if (!cat.myVoice) lockedControl(wrap.querySelector(`[data-voice-key="${MY_CLONED_VOICE}"]`), 'my_voice', tier);
+  primeSerenityPreview();
   renderMyVoicePanel();
+}
+
+/* ---------------- the Serenity demo ----------------
+   THE COST RULE for the demo, in one place: it is ONE pre-generated file. The
+   same bytes for everybody, free account or not, signed in or not. Pressing
+   Preview twenty times is twenty reads of that file out of the browser cache —
+   see api/voice-preview.js, which generates it once for the life of the app and
+   reads it back after that. No press of this button has ever reached ElevenLabs,
+   and none ever should.
+
+   It is deliberately not previewVoice(): that one asks /api/tts to read *your*
+   affirmations in a voice, which costs money and is premium. The demo and the
+   premium generation are two routes on the server for exactly this reason. */
+/* Read at press time, not at load time: API_BASE is declared in js/account.js,
+   which the page loads after this file. */
+function serenityPreviewSrc(){ return `${API_BASE}/api/voice-preview`; }
+/* Has to match PREVIEW_TEXT in lib/voice-preview.js — it is only read aloud here
+   when the file itself cannot be played, so that a tap is never silent. */
+const SERENITY_PREVIEW_LINE = "Your thoughts are becoming calmer, clearer, and more aligned with the person you're becoming.";
+
+/* Stop the demo if it is the thing playing. Answers whether it was, so the one
+   button can be both play and stop without asking twice. */
+function stopSerenityPreview(){
+  const el = document.getElementById('voicePreview');
+  if (!el || el.dataset.kind !== 'serenity-demo') return false;
+  const wasPlaying = !el.paused && !el.ended;
+  if (wasPlaying){
+    el.pause();
+    try { el.currentTime = 0; } catch(e){}
+  }
+  setSerenityPreviewLabel(false);
+  return wasPlaying;
+}
+
+/* The same two marks the player uses, drawn here rather than borrowed from
+   player.js: the builder must stand up on its own, and it is loaded first. */
+const PREVIEW_PLAY_MARK  = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
+const PREVIEW_PAUSE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
+
+function setSerenityPreviewLabel(playing){
+  const btn = document.getElementById('serenityPreviewBtn');
+  if (!btn) return;
+  btn.textContent = playing ? 'Stop' : 'Preview';
+  btn.classList.toggle('is-playing', !!playing);
+  btn.setAttribute('aria-label', playing ? 'Stop the Serenity preview' : 'Play a short Serenity preview');
+}
+
+/* Point the player at the file as the step opens, so the first tap plays rather
+   than waits. One small file, fetched from the CDN and then cached for a year. */
+function primeSerenityPreview(){
+  const el = document.getElementById('voicePreview');
+  if (!el || el.dataset.kind === 'serenity-demo') return;
+  el.dataset.kind = 'serenity-demo';
+  el.preload = 'auto';
+  el.src = serenityPreviewSrc();
+  setSerenityPreviewLabel(false);
+}
+
+/* THE PREVIEW BUTTON. It plays the demo and does nothing else: it does not
+   choose Serenity, it does not open the paywall, and it does not call
+   ElevenLabs.
+
+   Note what is *not* in here: an await before play(). A browser only lets audio
+   start inside the gesture that asked for it, and awaiting a plan lookup or a
+   round trip first spends that gesture — which is why the old preview did
+   nothing at all on a phone and said nothing about why. So the src is set ahead
+   of time and this handler is synchronous right up to play(). */
+function toggleSerenityPreview(ev){
+  if (ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const el = document.getElementById('voicePreview');
+  if (!el) return;
+  sayInVoicePicker('');
+
+  if (stopSerenityPreview()) return;   // it was playing; that press was "stop"
+  stopAmbiencePreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+
+  try { window.speechSynthesis.cancel(); } catch(e){}
+  if (el.dataset.kind !== 'serenity-demo'){
+    // previewVoice() borrows this element for a cloned voice; take it back.
+    el.dataset.kind = 'serenity-demo';
+    el.src = serenityPreviewSrc();
+  }
+  try { el.currentTime = 0; } catch(e){}
+  setSerenityPreviewLabel(true);
+  el.onended = () => setSerenityPreviewLabel(false);
+  el.onerror = () => setSerenityPreviewLabel(false);
+  const started = el.play();
+  if (started && started.catch){
+    started.catch(() => {
+      /* No signal, or the demo has never been generated. It is a courtesy, not a
+         feature to apologise for, so this device reads the same line instead. */
+      setSerenityPreviewLabel(false);
+      sayInVoicePicker('Hearing a sample on this device — Serenity itself is a moment away.');
+      speakWithDeviceVoice(SERENITY_PREVIEW_LINE);
+    });
+  }
 }
 
 /* ---------------- "Use my voice" ----------------
@@ -930,13 +1365,17 @@ function closeMyVoicePanel(){
   if (typeof unmountVoiceClone === 'function') unmountVoiceClone();
 }
 /* Called by the recorder once a voice exists. The person asked for their voice by
-   tapping the chip, so the chip is what they get back — selected, panel closed,
+   tapping the card, so the card is what they get back — selected, panel closed,
    rather than a message telling them to tap it again. */
 async function onMyVoiceReady(){
-  if (!document.getElementById('voiceChips')) return;
+  if (!document.getElementById('voiceClone')) return;
   closeMyVoicePanel();
-  state.aiVoiceId = MY_CLONED_VOICE;
-  await renderVoiceChips();
+  forgetVoiceCatalogue();
+  /* The clone now exists, so the choice they made when they tapped the card is
+     finally committable -- and from here Continue takes them to the next build
+     step, never to the affirmation-by-affirmation recorder. */
+  setSelectedVoice(VOICE_CLONE);
+  await renderVoiceCards();
   await previewVoice(MY_CLONED_VOICE);
   // previewVoice says its own piece when something went wrong; don't talk over it.
   const msg = document.getElementById('voicePickerMsg');
@@ -950,70 +1389,56 @@ async function openMyVoicePanel(){
   panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-/* Picking a voice. Everything except "Use my voice" is a preview and a move on;
-   "Use my voice" is a plan check, then either the voice they already have or the
-   panel that explains how to make one. */
-async function pickAiVoice(key){
-  const msg = document.getElementById('voicePickerMsg');
-  if (key === MY_CLONED_VOICE){
-    const mine = await myVoiceProfile();
-    if (!mine){
-      if (!currentUser){
-        if (msg){ msg.textContent = 'Create a free account first, then your voice can be one of the voices here.'; msg.className = 'save-msg err'; }
-        return;
-      }
-      const tier = await getMyTier();
-      if (!tierHasFeature(tier, 'my_voice')){
-        openUpgradeModal('my_voice', { tier, trigger: 'voice_chip' });
-        return;
-      }
-      openMyVoicePanel();
-      return;
-    }
-    closeMyVoicePanel();
-  } else if (myVoicePanelOpen()){
-    closeMyVoicePanel();
-  }
-  const first = state.aiVoiceId !== key;
-  state.aiVoiceId = key;
-  renderVoiceChips();
-  previewVoice(key);
-  // Moving on the first pick only: tapping through voices to hear them should
-  // not throw you off the screen you are comparing them on.
-  if (first && !pickAiVoice._moved){ pickAiVoice._moved = true; advanceAfterPick(); }
-}
-
 /* Resolve what the picker stores into the key the API wants. Returns null when
    the line should be read by this device instead — no account, no voice of their
    own yet, or the device voice chosen on purpose. */
 async function resolveVoiceKey(picked){
   if (!picked || picked === DEVICE_VOICE) return null;
   if (!currentUser) return null;
+  /* Every voice past this point is generated, which means it is premium — this
+     one included when it is a subliminal saved on Ritual being opened by an
+     account that has since lapsed, or one of the retired voices that is still
+     named in an older row. The server would refuse it anyway; returning null
+     here means this device reads the session instead of a round trip that ends
+     in an error message over somebody's affirmations. */
+  if (!tierHasFeature(await getMyTier(), 'studio_voice')) return null;
   if (picked === MY_CLONED_VOICE) return (await myVoiceProfile()) ? MY_CLONED_VOICE : null;
   return picked;
 }
 
+/* A *generated* preview: one of your own lines, read by a voice you are paying
+   for. This is /api/tts and it costs money, so resolveVoiceKey has already
+   refused it for anybody without a plan. Used after a voice is cloned, so the
+   first thing that happens is hearing it.
+
+   The Serenity demo does not come through here — see toggleSerenityPreview. */
 async function previewVoice(picked){
   const msg = document.getElementById('voicePickerMsg');
-  msg.textContent = ''; msg.className = 'save-msg';
+  if (msg){ msg.textContent = ''; msg.className = 'save-msg'; }
   const line = (state.affirmations && state.affirmations[0]) || 'I am safe, and I am becoming who I said I would be.';
   const voiceKey = await resolveVoiceKey(picked);
   if (!voiceKey){
-    if (picked !== DEVICE_VOICE && !currentUser){
-      msg.textContent = 'Sign in to hear the studio voices — this device reads it for now.';
+    if (msg && picked !== DEVICE_VOICE && !currentUser){
+      msg.textContent = 'Sign in to hear Serenity — this device reads it for now.';
     }
     speakWithDeviceVoice(line);
     return;
   }
-  msg.textContent = 'Loading the voice…';
+  if (msg) msg.textContent = 'Loading the voice…';
   try {
     const url = await synthesizeLine(line, voiceKey);
-    msg.textContent = '';
+    if (msg) msg.textContent = '';
     const el = document.getElementById('voicePreview');
+    if (!el) return;
+    /* The player is shared with the Serenity demo; say who is using it, so a
+       press of Preview afterwards puts the demo back rather than replaying
+       somebody's affirmation. */
+    el.dataset.kind = 'generated';
+    el.onended = null;
+    setSerenityPreviewLabel(false);
     el.src = url; el.play().catch(()=>{});
   } catch (e){
-    msg.textContent = ttsErrorText(e);
-    msg.className = 'save-msg';
+    if (msg){ msg.textContent = ttsErrorText(e); msg.className = 'save-msg'; }
     speakWithDeviceVoice(line);
   }
 }
@@ -1030,17 +1455,17 @@ function speakWithDeviceVoice(line){
    This is the one place those codes become something a person can read, and every
    one of them ends the same way — the session still plays, in this device's voice. */
 const TTS_MESSAGES = {
-  not_signed_in:    'Sign in to use the studio voices — this device reads it for now.',
-  upgrade_required: 'Studio voices come with Ritual — using this device\'s voice for now.',
-  not_configured:   'Studio voices aren\'t switched on yet — using this device\'s voice.',
-  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Use my voice" to read the passage once.',
+  not_signed_in:    'Sign in to use Serenity — this device reads it for now.',
+  upgrade_required: 'Serenity comes with Ritual — using this device\'s voice for now.',
+  not_configured:   'Serenity isn\'t switched on yet — using this device\'s voice.',
+  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Clone your voice" to read the passage once.',
   invalid_voice:    'That voice isn\'t available any more — choose another one, or this device reads it.',
   consent_required: 'Tick the confirmation first, then your voice can be created.',
-  quota_exceeded:   'The studio voices have run out of time this month — this device reads it for now, and they\'ll be back.',
+  quota_exceeded:   'Serenity has run out of time this month — this device reads it for now, and it\'ll be back.',
   rate_limited:     'The voice service is busy — give it a minute and try again. This device reads it for now.',
   too_fast:         'That\'s a lot of generating at once — give it a minute. This device reads it for now.',
-  hourly_limit:     'You\'ve built a lot this hour. The studio voices come back shortly; this device reads it until then.',
-  daily_limit:      'You\'ve built a lot today. The studio voices come back tomorrow; this device reads it until then.',
+  hourly_limit:     'You\'ve built a lot this hour. Serenity comes back shortly; this device reads it until then.',
+  daily_limit:      'You\'ve built a lot today. Serenity comes back tomorrow; this device reads it until then.',
   timeout:          'The voice service took too long — this device reads it for now.',
   network:          'Couldn\'t reach the voice service — this device reads it for now.',
   too_long:         'That line is too long to read as one clip — shorten it, or this device reads it.',
@@ -1194,19 +1619,221 @@ async function prepareSessionVoice(){
   }
 }
 
-/* ---------------- step 5: background + mixer ---------------- */
+/* ---------------- step 5: ambience + mixer ----------------
+
+   AUDITIONING IS NOT CHOOSING. Every other picker in this app answers its
+   question on the tap, because every other picker can be judged by looking at
+   it. Ambience cannot: the only way to know whether Ocean Escape is the one is
+   to hear it, and hearing five of them in a row used to mean answering the
+   question five times and being marched to the next step by the last one.
+
+   So this screen has two states rather than one, and they are kept strictly
+   apart:
+
+     state.bg            THE ANSWER. What gets saved, what the session plays,
+                         and the only thing the persistent highlight is
+                         derived from. Nothing but confirmAmbience() writes it.
+     ambienceCandidate   WHAT IS BEING LISTENED TO. Never saved, never played
+                         by a session, and drawn as a different thing entirely.
+
+   Tapping a card auditions it. The card that is *chosen* keeps its ring the
+   whole time, so at no point is the screen unable to say what the answer
+   currently is — which is the rule in js/selectable.js, and the reason the
+   preview had to be built as a second state instead of as a tap that gets
+   undone. The confirm button is the only thing that moves one into the
+   other. */
 const bgGrid = document.getElementById('bgGrid');
-BACKGROUNDS.forEach(b=>{
-  const c = document.createElement('button'); c.className='bg-card'+(b.key==='none'?' sel':'');
-  c.innerHTML = `<span class="ic">${b.ic}</span>${b.label}`;
-  c.onclick = ()=>{
-    document.querySelectorAll('.bg-card').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel'); state.bg = b.key;
-    // Same as the voice cards: the pick is the answer, so it moves on.
-    setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
-  };
-  bgGrid.appendChild(c);
-});
+/* Its own bed, its own context: a preview must not be able to disturb a
+   session, and the one-at-a-time rule in ambience.js means it cannot layer
+   over one either. */
+const previewBed = new AmbienceBed('preview');
+let previewCtx = null;
+let previewTimer = null;
+let ambienceCandidate = null;   // null means "nothing is being auditioned"
+/* Previews end on their own. Somebody who taps one and then wanders off to
+   read the copy underneath should not still be listening to rain ten minutes
+   later. */
+const AMBIENCE_PREVIEW_MS = 25000;
+
+/* THE ONE PAINT. Both states, re-derived from scratch, every time anything
+   about either of them changes.
+
+   The chosen card gets .sel and the ARIA, off state.bg, exactly as before.
+   The card being auditioned gets data-auditioning, which is a different mark
+   in a different colour — it is deliberately not .sel, because a second card
+   wearing the chosen treatment is the bug the whole selectable system exists
+   to stop. */
+function paintBgCards(){
+  syncSelectionByData('#bgGrid .bg-card', 'key', state.bg);
+  /* The card is a wrapper holding two buttons, so the face is what a screen
+     reader is on: it carries the state, not the div around it. */
+  syncSelectionByData('#bgGrid .bg-card-face', 'key', state.bg);
+  document.querySelectorAll('#bgGrid .bg-card').forEach(card => {
+    const auditioning = !!ambienceCandidate && card.dataset.key === ambienceCandidate;
+    card.toggleAttribute('data-auditioning', auditioning);
+  });
+  document.querySelectorAll('#bgGrid .bg-preview-btn').forEach(btn => {
+    const live = previewBed.playing() && btn.dataset.key === previewBed.key;
+    btn.classList.toggle('is-playing', live);
+    btn.setAttribute('aria-label', `${live ? 'Stop' : 'Play'} a preview of ${ambienceName(btn.dataset.key)}`);
+    btn.textContent = live ? 'Stop' : 'Preview';
+  });
+  paintAmbienceConfirm();
+}
+
+/* The confirm button says what pressing it would do, and is inert when it
+   would do nothing. "Use Ocean Escape" is a sentence; "Confirm" is a dare. */
+function paintAmbienceConfirm(){
+  const btn = document.getElementById('ambienceConfirmBtn');
+  const note = document.getElementById('ambienceConfirmNote');
+  if (!btn) return;
+  const pending = ambienceCandidate && ambienceCandidate !== state.bg;
+  btn.disabled = !pending;
+  btn.textContent = pending ? `Use ${ambienceName(ambienceCandidate)}` : `Using ${ambienceName(state.bg)}`;
+  if (note){
+    note.textContent = pending
+      ? `Listening to ${ambienceName(ambienceCandidate)} — your session is still set to ${ambienceName(state.bg)}.`
+      : '';
+  }
+}
+
+function renderBgGrid(){
+  if (!bgGrid) return;
+  bgGrid.innerHTML = '';
+  ambienceSections().forEach(section => {
+    const heading = document.createElement('div');
+    heading.className = 'bg-section-label';
+    heading.textContent = section.category;
+    bgGrid.appendChild(heading);
+    const row = document.createElement('div');
+    row.className = 'bg-row';
+    section.tracks.forEach(track => row.appendChild(bgCard(track)));
+    bgGrid.appendChild(row);
+  });
+  paintBgCards();
+}
+
+function bgCard(track){
+  const card = document.createElement('div');
+  card.className = 'bg-card bg-card-split';
+  card.dataset.key = track.key;
+
+  const face = document.createElement('button');
+  face.type = 'button';
+  face.className = 'bg-card-face';
+  face.dataset.key = track.key;
+  face.setAttribute('role', 'radio');
+  /* Built as nodes rather than a template string: the name and the icon are
+     data, and data does not go through innerHTML. */
+  const ic = document.createElement('span');
+  ic.className = 'ic'; ic.textContent = track.ic;
+  const label = document.createElement('span');
+  label.className = 'bg-name'; label.textContent = track.name;
+  const art = {'deep-mind':'night','inner-stillness':'mirror','the-sanctuary':'clouds','ocean-escape':'waters','soft-asmr':'bedroom'}[track.key];
+  if (art){ const image = document.createElement('img'); image.src = '/img/covers/' + art + '.webp'; image.alt = ''; image.className = 'ambience-art'; face.appendChild(image); }
+  else face.appendChild(ic);
+  face.appendChild(label);
+  if (track.blurb){ const desc = document.createElement('span'); desc.className = 'ambience-description'; desc.textContent = track.blurb; face.appendChild(desc); }
+  if (track.blurb) face.setAttribute('title', track.blurb);
+  face.onclick = () => auditionAmbience(track.key);
+  card.appendChild(face);
+
+  /* None has nothing to hear, and the generated backgrounds are made on the
+     spot rather than downloaded, so they are auditioned by the card itself —
+     there is no file to press play on. */
+  if (isRecordedAmbience(track.key)){
+    const play = document.createElement('button');
+    play.type = 'button';
+    play.className = 'bg-preview-btn';
+    play.dataset.key = track.key;
+    play.textContent = 'Preview';
+    play.onclick = (ev) => toggleAmbiencePreview(ev, track.key);
+    card.appendChild(play);
+  }
+  return card;
+}
+
+/* Tapping a card. Writes the candidate, repaints, and starts listening — in
+   that order, and the first two synchronously, so the mark lands in the frame
+   the tap happened in rather than whenever the mp3 arrives. */
+function auditionAmbience(key){
+  ambienceCandidate = key;
+  paintBgCards();
+  if (key === 'none' || !isRecordedAmbience(key)){ stopAmbiencePreview(); return; }
+  startAmbiencePreview(key);
+}
+
+function toggleAmbiencePreview(ev, key){
+  if (ev){ ev.stopPropagation(); ev.preventDefault(); }
+  if (previewBed.playing() && previewBed.key === key){ stopAmbiencePreview(); return; }
+  ambienceCandidate = key;
+  paintBgCards();
+  startAmbiencePreview(key);
+}
+
+/* A preview needs a context, and on iOS a context may only be opened and
+   unlocked inside the gesture that asked for it — so this is deliberately not
+   async before the context exists. audioOut() and the silent keeper are the
+   same ones the session uses: on a phone with the ringer switch off, Web Audio
+   is silenced and a media element is not, and a preview that cannot be heard
+   is worse than no preview at all. */
+function startAmbiencePreview(key){
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  const msg = document.getElementById('ambienceMsg');
+  if (msg) msg.textContent = '';
+  if (finalPlaying){
+    // A session is running. Auditioning would have to stop its ambience to
+    // honour one-track-at-a-time, and silently pulling the bed out from under
+    // a session nobody asked to interrupt is not a preview.
+    if (msg) msg.textContent = 'Stop the session first — ambience previews and a running session share the speaker.';
+    return;
+  }
+  try {
+    if (!previewCtx || previewCtx.state === 'closed'){
+      previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+      previewBed.attach(previewCtx, audioOut(previewCtx));
+    }
+    if (previewCtx.state === 'suspended') previewCtx.resume().catch(()=>{});
+    startSilentKeeper();
+  } catch(e){
+    if (msg) msg.textContent = 'This device would not open the speaker for a preview.';
+    return;
+  }
+  previewBed.setLevel(0.85);
+  previewBed.to(key).then(() => paintBgCards());
+  paintBgCards();
+
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => stopAmbiencePreview(), AMBIENCE_PREVIEW_MS);
+}
+
+function stopAmbiencePreview(){
+  clearTimeout(previewTimer); previewTimer = null;
+  previewBed.stop({ fade: 0 });
+  previewBed.detach(); // invalidates pending downloads before they can start
+  const ctx = previewCtx; previewCtx = null;
+  if (ctx){ closeAudioOut(ctx); try { ctx.close(); } catch(e){} }
+  paintBgCards();
+  if (!finalPlaying) stopSilentKeeper();
+}
+
+
+/* THE ONLY WRITE TO state.bg FROM THIS SCREEN. */
+function confirmAmbience(){
+  stopAmbiencePreview();
+  if (!ambienceCandidate || ambienceCandidate === state.bg) return;
+  state.bg = ambienceCandidate;      // the answer, written first
+  paintBgCards();                    // then the screen, derived from it
+  stopAmbiencePreview();
+  warmAmbience(state.bg);
+  /* Same as the voice cards: an answered question moves on. Through
+     nextStep(), which from step 5 is the voice fork — step+1 from here is the
+     manual recorder, whether or not anybody asked to record. */
+  setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
+}
+
+renderBgGrid();
 
 /* ---------------- Ritual-only: second, layered voice ---------------- */
 let layerVoiceEnabled = false;
@@ -1226,10 +1853,12 @@ async function toggleLayerVoice(checked){
   layerVoiceEnabled = true;
   panel.classList.add('open');
 }
+function paintLayerVoiceOptions(){
+  syncSelectionByData('.layer-voice-options button', 'mode', layerVoiceMode);
+}
 function pickLayerVoiceMode(btn){
-  document.querySelectorAll('.layer-voice-options button').forEach(b=>b.classList.remove('sel'));
-  btn.classList.add('sel');
   layerVoiceMode = btn.dataset.mode;
+  paintLayerVoiceOptions();
   answered(btn);
 }
 
@@ -1247,22 +1876,64 @@ function startNextPhase(){
   if (layerVoiceEnabled && !state.layerAffirmations.length) state.layerAffirmations = state.affirmations.slice();
   state.layerVoiceMode = layerVoiceEnabled ? layerVoiceMode : null;
 
-  const needsPrimaryRecording = state.voiceMode === 'own';
+  /* ---------------- THE FORK ----------------
+     Read off the answer to the question on the voice screen, and nothing else.
+     Three answers, three routes, stated rather than inferred:
+
+       record_own   -> the affirmation-by-affirmation recorder (step 6)
+       serenity     -> straight to assembly; Serenity reads the lines (step 7)
+       clone_voice  -> straight to assembly in their own cloned voice (step 7),
+                       or back to the clone setup if the clone is not made yet
+
+     The layered second voice is a separate question with its own answer, and it
+     is the only other thing that can need the recorder. */
+  const voice = selectedVoiceFromState();
+
+  /* No answer at all. Continue is disabled until there is one, so this is only
+     reachable if something went wrong -- and the wrong thing to do about it is
+     guess. It used to fall through to a build with no voice; before that, to
+     the recorder. Neither is what anybody asked for, so ask. */
+  if (!voice){
+    showStep(4);
+    paintVoiceCards();
+    sayInVoicePicker('Choose whose voice reads your affirmations, and this is ready to build.', 'err');
+    return;
+  }
+
+  /* Chose their own voice as a clone but never finished making it. They are not
+     sent to the line-by-line recorder for it -- that is a different feature and
+     not what they asked for. Back to the picker, with the setup open. */
+  if (voice === VOICE_CLONE && state.aiVoiceId !== MY_CLONED_VOICE){
+    showStep(4);
+    paintVoiceCards(VOICE_CLONE);
+    sayInVoicePicker('One more step — read the passage below and your voice is ready.', 'err');
+    openMyVoicePanel();
+    return;
+  }
+
+  const needsPrimaryRecording = voice === VOICE_RECORD_OWN;
   const needsLayerRecording = layerVoiceEnabled && layerVoiceMode === 'own';
 
   if (needsPrimaryRecording){
-    recordTarget = 'primary';
-    recIndex = 0; recordings = new Array(state.affirmations.length).fill(null);
-    setRecordStepCopy('primary');
-    showRecordLine(); showStep(6);
+    beginRecordingPass('primary');
   } else if (needsLayerRecording){
-    recordTarget = 'layer';
-    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-    setRecordStepCopy('layer');
-    showRecordLine(); showStep(6);
+    beginRecordingPass('layer');
   } else {
     prepareFinal(); showStep(7);
   }
+}
+
+/* Opening the recorder is one operation: which pass, from the top, with an
+   answers-shaped array to record into and the copy that goes with it. Every
+   caller goes through here, so there is no way to arrive on step 6 with the
+   index, the array and the lines disagreeing. */
+function beginRecordingPass(target){
+  recordTarget = target;
+  recIndex = 0;
+  if (target === 'layer') layerRecordings = new Array(state.layerAffirmations.length).fill(null);
+  else recordings = new Array(state.affirmations.length).fill(null);
+  setRecordStepCopy(target);
+  showStep(6);   // showStep draws the line; see showRecordLine()
 }
 
 function setRecordStepCopy(target){
@@ -1301,14 +1972,54 @@ for (let i=0;i<20;i++){ const d=document.createElement('div'); d.style.height='4
 function activeRecordLines(){ return recordTarget === 'layer' ? state.layerAffirmations : state.affirmations; }
 function activeRecordArray(){ return recordTarget === 'layer' ? layerRecordings : recordings; }
 
+/* WHAT THE RECORD SCREEN SAYS, derived from the lines and the index and nothing
+   else -- the same rule as the voice cards. It runs whenever step 6 opens (see
+   showStep) as well as on every advance, so the screen cannot be reached in a
+   state it has not drawn.
+
+   The reported bug was the first line reading "..." under a correct dynamic count.
+   Both of those strings are the placeholders in index.html: the screen had been
+   opened without this function ever running (see nextStep), so nothing had
+   replaced either. The counter looked right purely because the placeholder
+   happened to say the same thing the first line would have. Nothing here was
+   ever off by one -- recIndex starts at 0 and `lines[recIndex]` is line one --
+   it simply was not called.
+
+   The guard below is the other half: a line can only be drawn once there are
+   lines. Rather than printing "..." over missing data, it says what is actually
+   happening and leaves the controls alone until there is something to record. */
+function recordLinesReady(){
+  const lines = activeRecordLines();
+  return Array.isArray(lines) && lines.length > 0;
+}
 function showRecordLine(){
+  const counterEl = document.getElementById('recCounter');
+  const lineEl = document.getElementById('recLine');
+  if (!counterEl || !lineEl) return;
+
   const lines = activeRecordLines(); const arr = activeRecordArray();
+  if (!recordLinesReady()){
+    counterEl.textContent = '';
+    lineEl.textContent = 'Preparing your affirmations…';
+    lineEl.classList.add('record-line-loading');
+    document.getElementById('recTapHint').style.display = 'none';
+    document.getElementById('recStatus').textContent = 'one moment';
+    document.getElementById('nextLineBtn').disabled = true;
+    document.getElementById('skipBtn').disabled = true;
+    return;
+  }
+  lineEl.classList.remove('record-line-loading');
+  document.getElementById('skipBtn').disabled = false;
+  /* An index past the end is a bug somewhere upstream, but it must not show up
+     here as the word "undefined" in quotes. */
+  if (recIndex < 0 || recIndex >= lines.length) recIndex = 0;
+
   const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_LINE_POINTS[recIndex];
   const isScript = state.visualizationMode && recordTarget === 'primary';
-  document.getElementById('recCounter').textContent = isEftPoint
+  counterEl.textContent = isEftPoint
     ? `Line ${recIndex+1} of 11 — ${EFT_LINE_POINTS[recIndex].label}`
     : (isScript ? 'Your full script — one continuous take' : `${recIndex+1} of ${lines.length}`);
-  document.getElementById('recLine').textContent = '"'+lines[recIndex]+'"';
+  lineEl.textContent = '"'+lines[recIndex]+'"';
   document.getElementById('recTapHint').textContent = isEftPoint
     ? (EFT_LINE_POINTS[recIndex].isSetup
         ? `Tap continuously: ${EFT_LINE_POINTS[recIndex].where}`
@@ -1327,10 +2038,7 @@ function advanceLine(){
   // Finished this pass. If we just finished the primary voice and a layer recording
   // is still needed, seamlessly continue into the layer pass instead of leaving step 6.
   if (recordTarget === 'primary' && layerVoiceEnabled && layerVoiceMode === 'own'){
-    recordTarget = 'layer';
-    recIndex = 0; layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-    setRecordStepCopy('layer');
-    showRecordLine();
+    beginRecordingPass('layer');
     return;
   }
   prepareFinal(); showStep(7);
@@ -1419,7 +2127,8 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   }
   clip.gain.gain.value = gainValue;
   liveVoiceGains.add(clip.gain);
-  const done = () => { liveVoiceGains.delete(clip.gain); if (onended) onended(); };
+  liveVoiceElements.add(clip.el);
+  const done = () => { liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el); if (onended) onended(); };
   clip.el.onended = done;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
@@ -1438,13 +2147,20 @@ let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dat
    overlapping, which is what came back doubled on playback. A flag set
    synchronously closes the gap: the second press has nothing to start. */
 let recPressed = false;
+let recOpening = false;
 const recBtn = document.getElementById('recBtn');
 async function startRec(e){
   if (e && e.preventDefault) e.preventDefault();
-  if (recPressed || recBtn.classList.contains('recording')) return;
+  if (recPressed || recOpening || recBtn.classList.contains('recording')) return;
   recPressed = true;
-  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  if (finalPlaying) stopFinal();
+  recOpening = true;
+  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}}); }
   catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
+  finally { recOpening = false; }
   /* Let go while the microphone was still opening. Nothing was recorded, so
      the stream is handed straight back rather than left running. */
   if (!recPressed){
@@ -1457,14 +2173,16 @@ async function startRec(e){
   holdStart = Date.now(); audioChunks=[];
   const recMime = pickRecordingMime();
   mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
-  mediaRecorder.ondataavailable = ev=>audioChunks.push(ev.data);
+  const takeRecorder = mediaRecorder, takeStream = micStream, takeChunks = [];
+  const takeStarted = holdStart, takeIndex = recIndex, takeRecords = activeRecordArray();
+  mediaRecorder.ondataavailable = ev=>takeChunks.push(ev.data);
   mediaRecorder.onstop = ()=>{
-    const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || recMime || 'audio/webm'});
+    const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
     const url = URL.createObjectURL(blob);
-    micStream.getTracks().forEach(t=>t.stop());
-    const held = Date.now()-holdStart;
+    takeStream.getTracks().forEach(t=>t.stop());
+    const held = Date.now()-takeStarted;
     if (held > 400){
-      activeRecordArray()[recIndex] = { url, blob };
+      takeRecords[takeIndex] = { url, blob };
       document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
       document.getElementById('nextLineBtn').disabled=false;
     } else {
@@ -1528,27 +2246,16 @@ function makeNoiseBuffer(ctx, seconds, color){
   }
   return buffer;
 }
+/* The generated backgrounds, and only those. A recorded track never reaches
+   this function — it is fetched, decoded, level-matched and looped by the bed
+   in js/ambience.js, which is also what fades between them. This used to carry
+   a branch that played a recorded file if one existed for the key, with no
+   fade, no level matching and a loop that ticked once per pass; the bed
+   replaced all of it. */
 function buildAmbience(ctx, key, destination){
   const nodes = []; const timers = [];
-  if (key === 'none') return { stop(){} };
+  if (key === 'none' || isRecordedAmbience(key)) return { stop(){} };
   const master = ctx.createGain(); master.gain.value = 1; master.connect(destination); nodes.push(master);
-
-  // If a real recorded track has been uploaded for this key (see Supabase ambience_tracks
-  // table), use it instead of the synthesized version below.
-  if (window.AMBIENCE_URLS && window.AMBIENCE_URLS[key]){
-    let stopped = false;
-    let src = null;
-    fetch(window.AMBIENCE_URLS[key])
-      .then(r => r.arrayBuffer())
-      .then(buf => ctx.decodeAudioData(buf))
-      .then(audioBuf => {
-        if (stopped) return;
-        src = ctx.createBufferSource(); src.buffer = audioBuf; src.loop = true;
-        src.connect(master); src.start();
-      })
-      .catch(e => console.error('ambience track failed to load, no fallback for this key:', key, e));
-    return { stop(){ stopped = true; if (src){ try{ src.stop(); }catch(e){} } } };
-  }
 
   function noiseLayer(color, hp, lp, gainVal){
     const src = ctx.createBufferSource(); src.buffer = makeNoiseBuffer(ctx, 4, color); src.loop = true;
@@ -1626,6 +2333,10 @@ function prepareFinal(){
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
   document.getElementById('rerecordBtn').style.display = (state.voiceMode === 'own') ? 'inline-flex' : 'none';
   renderFinalFreqPicker();
+  renderFinalAmbiencePicker();
+  /* Start the ambience download now, while somebody is reading this screen and
+     naming their subliminal, rather than in the second after they press play. */
+  warmAmbience(state.bg);
   updateFinalPointTag(0);
 
   const titleInput = document.getElementById('finalTitleInput');
@@ -1659,7 +2370,6 @@ function rerecordVoice(){
     recordings = new Array(state.affirmations.length).fill(null);
   }
   setRecordStepCopy('primary');
-  showRecordLine();
   showStep(6);
 }
 /* Shows which tapping point (or the setup statement) the currently-playing line
@@ -1677,6 +2387,35 @@ function updateFinalPointTag(index){
     tag.style.display = 'none';
   }
 }
+
+/* ---------------- THE THREE LAYERS, AND WHY THEY NEVER TOUCH ----------------
+
+   A finished session is three things playing at once, and all three can be
+   changed on this screen without the other two noticing:
+
+     the affirmation voice   generated once, per person, and cached — the one
+                             expensive thing in the app
+     the ambience            a shared recording, looped by sessionBed
+     the frequency layer     two oscillators, free, retuned in place
+
+   The rule this screen exists to hold: CHANGING THE AMBIENCE, THE FREQUENCY
+   OR THE SESSION LENGTH MUST NEVER REGENERATE THE VOICE. Not "should rarely" —
+   never. Somebody who decides at 11pm that they want the ocean instead of the
+   pad is changing the background of a recording that already exists; if that
+   cost them another pass through the speech provider it would be slow, it
+   would cost money, and on a metered plan it could fail outright and leave
+   them with silence where their affirmations were.
+
+   Which is why the three functions below are the whole of it. None of them
+   calls prepareFinal(), prepareSessionVoice(), or anything that leads there:
+
+     changeFinalFrequency    retunes the live oscillators
+     changeSessionAmbience   crossfades the bed
+     pickDuration / the length slider   move a number and a label
+
+   prepareSessionVoice() is called from exactly one place — prepareFinal(),
+   when this screen opens — and that is the only place it should ever be
+   called from. */
 
 /* You can change the frequency right on the finished/loaded subliminal — no need to
    rebuild the whole thing from scratch. Works for a freshly-built one and for anything
@@ -1705,9 +2444,59 @@ function changeFinalFrequency(hzStr){
   }
 }
 
-let finalCtx=null, finalTone=null, finalToneLayer2=null, finalAmbience=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+/* The same idea for the ambience: a second picker on the finished subliminal,
+   so the background can be changed on the way to sleep without rebuilding
+   anything. Both ways round are handled here and there is nothing else to it:
+
+     playing    the bed crossfades — out, in, one track audible at any moment
+     not playing  the key is recorded and the next play starts on it
+
+   Drawn as a select for the same reason the frequency picker is: it is a
+   small change to a finished thing, not the choosing screen again. */
+function renderFinalAmbiencePicker(){
+  const wrap = document.getElementById('finalAmbiencePicker');
+  const sel = document.getElementById('finalAmbienceSelect');
+  if (!wrap || !sel) return;
+  sel.innerHTML = ambienceSections().map(section =>
+    `<optgroup label="${section.category}">` +
+    section.tracks.map(t => `<option value="${t.key}">${t.name}</option>`).join('') +
+    `</optgroup>`
+  ).join('');
+  sel.value = state.bg;
+  wrap.style.display = 'block';
+}
+
+function changeSessionAmbience(key){
+  if (!ambienceTrack(key)) return;
+  state.bg = key;                       // the answer, written first
+  /* The ambience step is behind this screen and will be seen again. Moving its
+     candidate with the answer is what stops it reopening with a confirm button
+     offering to choose something they have already moved on from. */
+  ambienceCandidate = key;
+  paintBgCards();                       // the ambience step, still derived from it
+  const sel = document.getElementById('finalAmbienceSelect');
+  if (sel && sel.value !== key) sel.value = key;
+  warmAmbience(key);
+  /* Mid-session: the bed fades the old one out, starts the new one and fades
+     it in, and guarantees the two are never both up. Not playing: nothing to
+     fade, and the next play will pick this up off state.bg. */
+  if (finalPlaying) sessionBed.to(key);
+}
+
+let finalCtx=null, finalTone=null, finalToneLayer2=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+/* The session's ambience. One object, for the whole life of the page: it
+   outlives the AudioContext, which is opened per play and closed after, so the
+   ambience somebody chose is still the ambience when they press play again.
+   See js/ambience.js for why exactly one of these is allowed to be audible. */
+const sessionBed = new AmbienceBed('session');
 let finalStartTime=null, finalTimerInterval=null, finalPremiumPad=null;
-let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
+/* No liveBgGain among these: the ambience level lives on sessionBed, because a
+   handle on the gain node of whichever track happens to be playing is lost the
+   moment the bed swaps it for another one. */
+let finalPaused=false, finalPauseStarted=null, finalPausedTotal=0, finalFadeEnding=false;
+let finalAffirmationIndex=0, finalRequestedIndex=null;
+let finalPauseWaiters=[];
+let liveToneGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 /* Every gain node a voice line is currently playing through. A line is its own
    node that dies when the line ends, so unlike the tone and the background
    there is no single handle to hold — the set is what is live right now, and
@@ -1715,9 +2504,60 @@ let liveToneGain=null, liveBgGain=null, liveSoothingGain=null, liveCustomGain=nu
    volume did nothing until the *next* line started, which on a long line with
    gaps between repeats is indistinguishable from a broken slider. */
 let liveVoiceGains = new Set();
+let liveVoiceElements = new Set();
 function voiceMixValue(){
   const el = document.getElementById('mixVoice');
   return el ? el.value/100 : 1;
+}
+
+/* Player time excludes pauses so the UI, completion record and timer agree. */
+function getFinalElapsedMs(){
+  if (!finalStartTime) return 0;
+  const pendingPause = finalPaused && finalPauseStarted ? Date.now() - finalPauseStarted : 0;
+  return Math.max(0, Date.now() - finalStartTime - finalPausedTotal - pendingPause);
+}
+function waitWhileFinalPaused(resume){
+  if (!finalPaused) return false;
+  if (!finalPauseWaiters.includes(resume)) finalPauseWaiters.push(resume);
+  return true;
+}
+function pauseFinal(){
+  if (!finalPlaying || finalPaused) return;
+  finalPaused = true; finalPauseStarted = Date.now();
+  try { if (finalCtx && finalCtx.state === 'running') finalCtx.suspend(); } catch(e){}
+  try { window.speechSynthesis.pause(); } catch(e){}
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+}
+function resumeFinal(){
+  if (!finalPlaying || !finalPaused) return;
+  if (finalPauseStarted) finalPausedTotal += Date.now() - finalPauseStarted;
+  finalPauseStarted = null; finalPaused = false;
+  try { if (finalCtx && finalCtx.state === 'suspended') finalCtx.resume(); } catch(e){}
+  try { window.speechSynthesis.resume(); } catch(e){}
+  liveVoiceElements.forEach(el => { try { const p=el.play(); if(p&&p.catch)p.catch(()=>{}); } catch(e){} });
+  const waiters = finalPauseWaiters.splice(0);
+  waiters.forEach(fn => { const t=setTimeout(fn,0); finalTimeouts.push(t); });
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+}
+function seekFinalAffirmation(delta){
+  const lines = state.affirmations || [];
+  if (!lines.length) return;
+  finalRequestedIndex = (finalAffirmationIndex + delta + lines.length) % lines.length;
+}
+function showFinalAffirmation(text, index){
+  finalAffirmationIndex = Number.isInteger(index) ? index : finalAffirmationIndex;
+  const el = document.getElementById('finalLine');
+  if (el) el.textContent = '"'+(text || '')+'"';
+  updateFinalPointTag(finalAffirmationIndex);
+  if (typeof showImmersiveAffirmation === 'function') showImmersiveAffirmation(text || '');
+}
+/* Swap only the ambience graph. Voice clips and the TTS cache are untouched. */
+function changeFinalAmbience(key){
+  state.bg = key || 'none';
+  if (!finalPlaying || !finalCtx || !liveBgGain) return;
+  if (finalAmbience) finalAmbience.stop();
+  finalAmbience = buildAmbience(finalCtx, state.bg, liveBgGain);
 }
 
 /* ---------- soothing layer picker ---------- */
@@ -1748,11 +2588,10 @@ document.addEventListener('DOMContentLoaded', () => {
 /* Binaural beats are just audio physics, so unlike the soothing layer/custom track/
    layered voice, this isn't gated to any tier — it's available to everyone. */
 function pickBinauralBand(btn){
-  document.querySelectorAll('#binauralChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
-  answered(btn);
   const band = btn.dataset.band;
   state.binauralBand = band === 'none' ? null : band;
+  syncSelectionByData('#binauralChips .length-chip', 'band', state.binauralBand || 'none');
+  answered(btn);
   const guideEl = document.getElementById('binauralGuideText');
   if (state.binauralBand){
     const b = BINAURAL_BANDS[state.binauralBand];
@@ -1775,10 +2614,9 @@ async function pickSoothingLayer(btn){
     }
   }
 
-  document.querySelectorAll('#soothingChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
-  answered(btn);
   state.soothingLayer = variant;
+  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
+  answered(btn);
   document.getElementById('soothingMixRow').style.display = variant === 'none' ? 'none' : 'flex';
   if (finalPlaying) restartSoothingLayer();
 }
@@ -1836,15 +2674,15 @@ function pickPace(btn){
   if (!p) return;
   affirmationPace = p.key;
   state.pace = p.key;
-  document.querySelectorAll('#paceChips .length-chip').forEach(c => c.classList.remove('sel'));
-  btn.classList.add('sel');
+  syncSelectionByData('#paceChips .length-chip', 'pace', state.pace);
   setAffirmationGap(p.gap);
 }
 function renderPaceChips(){
   const wrap = document.getElementById('paceChips');
   if (!wrap) return;
   wrap.innerHTML = AFFIRMATION_PACES.map(p =>
-    `<button type="button" class="length-chip${p.key === affirmationPace ? ' sel' : ''}"
+    `<button type="button" role="radio" class="length-chip${p.key === affirmationPace ? ' sel' : ''}"
+       aria-checked="${p.key === affirmationPace}"
        data-pace="${p.key}" onclick="pickPace(this)">${p.label}<span>${p.sub}</span></button>`).join('');
 }
 (function wireLineGap(){
@@ -1884,9 +2722,13 @@ function setLiveGain(node, v){
   try { node.gain.setValueAtTime(v, t); } catch(e){ node.gain.value = v; }
 }
 function applyLiveMixGain(id, value){
+  if (typeof queueMixSave === 'function') queueMixSave();
   if (!finalPlaying) return;
   if (id==='mixTone') setLiveGain(liveToneGain, value/100 * 0.10);
-  if (id==='mixBg') setLiveGain(liveBgGain, value/100);
+  /* The ambience level is the bed's, not a node's: it has to survive the bed
+     swapping one track for another underneath it, which a handle on the gain
+     node of the track that is currently playing does not. */
+  if (id==='mixBg') sessionBed.setLevel(value/100);
   if (id==='mixSoothing') setLiveGain(liveSoothingGain, value/100 * 0.4);
   if (id==='mixCustom') setLiveGain(liveCustomGain, value/100 * 0.6);
   if (id==='mixLayerVoice') setLiveGain(liveLayerVoiceGain, value/100);
@@ -2044,12 +2886,9 @@ function stopSilentKeeper(){
    heard on their own recordings and on the finished subliminal. Lowering a
    volume would have hidden it; there is only ever one route out of here now.
 
-   Which route depends on the device, because only one of them has a problem to
-   solve. On iOS the element is the one that survives the ringer switch, so iOS
-   gets the element and the direct path is let go the moment the element is
-   genuinely playing — if it never plays, the direct path is still there and
-   nothing is lost. Everywhere else ctx.destination is exactly right and no
-   element is created at all. */
+   iOS uses the media element exclusively. If playback is refused, disconnect
+   that route before connecting the direct fallback; never wait for a playing
+   event with both routes connected. */
 function needsMediaElementOutput(){
   // iPhones and iPads, in the browser and inside the wrapped app. iPadOS 13+
   // reports itself as a Mac, so a Mac with a touchscreen counts as one too.
@@ -2064,42 +2903,36 @@ function audioOut(ctx){
   if (ctx.__outBus) return ctx.__outBus;
   const bus = ctx.createGain();
   bus.gain.value = 1;
-  bus.connect(ctx.destination);
-  ctx.__outDirect = true;
+  ctx.__outDirect = false;
   ctx.__outBus = bus;
-  if (!needsMediaElementOutput()) return bus;
+  const useDirect = () => {
+    if (ctx.__outClosed || ctx.__outDirect) return;
+    if (ctx.__outMd) { try { bus.disconnect(ctx.__outMd); } catch(e){} }
+    bus.connect(ctx.destination); ctx.__outDirect = true;
+  };
+  if (!needsMediaElementOutput()){ useDirect(); return bus; }
   try {
     const md = ctx.createMediaStreamDestination();
     const el = new Audio();
     el.srcObject = md.stream;
     el.setAttribute('playsinline', '');
     el.autoplay = true;
-    /* The handover, at the only moment it can be made safely: the element is
-       making sound, so letting the direct path go cannot leave silence — and
-       keeping it would be the second copy. */
-    el.addEventListener('playing', () => {
-      if (!ctx.__outDirect) return;
-      try { bus.disconnect(ctx.destination); ctx.__outDirect = false; } catch(e){}
-    });
     bus.connect(md);
+    ctx.__outEl = el; ctx.__outMd = md;
     const p = el.play();
-    if (p && p.catch) p.catch(() => {});   // refused: the direct path still carries it
-    ctx.__outEl = el;
-    ctx.__outMd = md;
-  } catch(e){ /* not supported here; the direct connection above still carries it */ }
+    if (p && p.catch) p.catch(useDirect);
+  } catch(e){ useDirect(); }
   return bus;
 }
 function closeAudioOut(ctx){
-  if (!ctx || !ctx.__outEl) return;
+  if (!ctx) return;
+  ctx.__outClosed = true;
+  if (ctx.__outBus){ try { ctx.__outBus.disconnect(); } catch(e){} }
+  if (!ctx.__outEl) return;
   try { ctx.__outEl.pause(); ctx.__outEl.srcObject = null; } catch(e){}
   ctx.__outEl = null;
   if (ctx.__outMd){ try { ctx.__outBus.disconnect(ctx.__outMd); } catch(e){} ctx.__outMd = null; }
-  /* The element was carrying the sound; with it gone the direct path is the
-     only way out again. Contexts are normally closed right after this, but a
-     reused one must not come back mute. */
-  if (ctx.__outBus && !ctx.__outDirect){
-    try { ctx.__outBus.connect(ctx.destination); ctx.__outDirect = true; } catch(e){}
-  }
+
 }
 
 function primeAudio(){
@@ -2120,6 +2953,9 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
   if (!hasVoice){
     /* Tell the truth about which of the two this is. Telling someone to record
@@ -2132,14 +2968,19 @@ function playFinal(){
     return;
   }
 
+  if (typeof openImmersivePlayer === 'function') openImmersivePlayer();
   finalPlaying = true;
   finalStartTime = Date.now();
+  finalPaused = false; finalPauseStarted = null; finalPausedTotal = 0; finalFadeEnding = false;
+  finalAffirmationIndex = 0; finalRequestedIndex = null;
   deviceSpeechFailures = 0;
   deviceVoiceSilent = false;
-  document.getElementById('finalPlayBtn').disabled = true;
+  document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
   finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
+  if (typeof setupMediaSession === 'function') setupMediaSession();
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
 
   // Reuses the context opened by the tap when there is one, rather than making
   // a fresh suspended one that will never be allowed to start.
@@ -2178,10 +3019,15 @@ function playFinal(){
   }
   liveToneGain = toneGain;
 
-  const bgGain = finalCtx.createGain(); bgGain.gain.value = document.getElementById('mixBg').value/100;
-  bgGain.connect(audioOut(finalCtx));
-  finalAmbience = buildAmbience(finalCtx, state.bg, bgGain);
-  liveBgGain = bgGain;
+  /* The ambience, on its own graph with its own lifetime. It is started here
+     and never rebuilt for the rest of the session: changing the frequency,
+     dragging a slider or letting the loop come round again does not touch it,
+     and switching to a different track (changeSessionAmbience) crossfades this
+     same bed rather than restarting anything. */
+  sessionBed.attach(finalCtx, audioOut(finalCtx));
+  sessionBed.setLevel(document.getElementById('mixBg').value/100);
+  sessionBed.to(state.bg, { fade: 2.5 });   // in with the tone, not on top of it
+  const bgGain = sessionBed.out;
 
   // The soothing layer only plays if the person actually chose one in the ambience step
   // (and their tier allows it — see pickSoothingLayer). Not automatic.
@@ -2210,6 +3056,7 @@ function playFinal(){
     const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
     function playNextLayerLine(){
       if (!finalPlaying) return;
+      if (waitWhileFinalPaused(playNextLayerLine)) return;
       const lines = state.layerAffirmations;
       if (useOwn){
         const recorded = layerRecordings.map((r,i)=>({r,i})).filter(x=>x.r);
@@ -2260,22 +3107,30 @@ function playFinal(){
       let idx = 0;
       function playNext(){
         if (!finalPlaying) return;
+        if (waitWhileFinalPaused(playNext)) return;
+        if (finalRequestedIndex !== null){
+          const requestedRecorded = recorded.findIndex(x => x.i === finalRequestedIndex);
+          finalRequestedIndex = null;
+          if (requestedRecorded >= 0) idx = requestedRecorded;
+        }
         if (idx >= recorded.length){ onDone(recorded.length > 0); return; }
         const { r, i } = recorded[idx];
-        document.getElementById('finalLine').textContent = '"'+state.affirmations[i]+'"'; updateFinalPointTag(i);
+        showFinalAffirmation(state.affirmations[i], i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
         loadClip(finalCtx, r).then(clip=>{
           if (!finalPlaying) return;
           let rep = 0;
           function playOnce(){
             if (!finalPlaying) return;
+            if (waitWhileFinalPaused(playOnce)) return;
             playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, ()=>{
               rep++;
               if (rep < repeatsForThisLine){
                 // Short beat between repeats of the same line, timed to a single tap.
                 const t = setTimeout(playOnce, 700); finalTimeouts.push(t);
               } else {
-                idx++; const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
+                if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+                const t = setTimeout(playNext, gapForNextLine()); finalTimeouts.push(t);
               }
             });
           }
@@ -2297,8 +3152,10 @@ function playFinal(){
       const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
       function speakNext(){
         if (!finalPlaying){ return; }
+        if (waitWhileFinalPaused(speakNext)) return;
+        if (finalRequestedIndex !== null){ idx = finalRequestedIndex; finalRequestedIndex = null; }
         if (idx >= lines.length){ onDone(lines.length > 0); return; }
-        document.getElementById('finalLine').textContent = '"'+lines[idx]+'"'; updateFinalPointTag(idx);
+        showFinalAffirmation(lines[idx], idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
         function advance(){
@@ -2306,7 +3163,8 @@ function playFinal(){
           if (rep < repeatsForThisLine){
             const t = setTimeout(speakOnce, 700); finalTimeouts.push(t);
           } else {
-            idx++; const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
+            if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+            const t = setTimeout(speakNext, gapForNextLine()); finalTimeouts.push(t);
           }
         }
         /* The device's own voice is the one thing here that can fail without
@@ -2323,6 +3181,7 @@ function playFinal(){
            outcome this code can produce, and it was the likeliest one. */
         function deviceSpeak(){
           if (!finalPlaying) return;
+          if (waitWhileFinalPaused(deviceSpeak)) return;
           if (deviceVoiceSilent){
             // Known not to speak here: keep the lines moving with the music
             // rather than stalling four seconds on each one.
@@ -2360,6 +3219,7 @@ function playFinal(){
         }
         function speakOnce(){
           if (!finalPlaying) return;
+          if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
           voicePromise.then(voiceKey => {
             if (!finalPlaying) return;
@@ -2406,11 +3266,12 @@ function playFinal(){
   let passesWithNoAudio = 0;
   runSequence(function loopCheck(playedSomething){
     const targetMs = (state.targetLengthMinutes || 0) * 60 * 1000;
-    const elapsed = Date.now() - finalStartTime;
+    const elapsed = getFinalElapsedMs();
     const stillBuildingTowardTarget = targetMs && elapsed < targetMs;
     /* Tapping has no set length, so it keeps coming back round until you stop
        it. That is the whole point of not asking how long first. */
-    const manualLoop = document.getElementById('loopToggle').checked || state.eftMode;
+    const selectedLoopMode = typeof getPlayerLoopMode === 'function' ? getPlayerLoopMode() : (document.getElementById('loopToggle').checked ? 'entire' : 'none');
+    const manualLoop = selectedLoopMode === 'entire' || state.eftMode;
     if (playedSomething) passesWithNoAudio = 0; else passesWithNoAudio++;
     if (passesWithNoAudio >= 1){
       const why = state.voiceMode === 'own'
@@ -2420,7 +3281,7 @@ function playFinal(){
       document.getElementById('finalLine').textContent = why;  // after, or finishFinal overwrites it
       return;
     }
-    if (finalPlaying && (stillBuildingTowardTarget || manualLoop)){
+    if (finalPlaying && selectedLoopMode !== 'none' && (stillBuildingTowardTarget || manualLoop)){
       const t = setTimeout(() => runSequence(loopCheck), 0); finalTimeouts.push(t);
     } else {
       finishFinal();
@@ -2442,7 +3303,7 @@ try { localStorage.removeItem(NO_DEVICE_VOICE_KEY); } catch(e){}
 const DEVICE_VOICE_MESSAGE =
   "This device won't let the built-in voice speak inside the app — it's a limit " +
   "of the browser, not of your subliminal. Record the lines in your own voice, " +
-  "or pick a studio voice, and it will play.";
+  "or pick Serenity, and it will play.";
 
 /* The device voice failing is not the session failing. The tone, the nature
    sound and the soothing layer are all still playing and all still worth
@@ -2474,7 +3335,7 @@ function updateSessionTimerLabel(){
     if (progressWrap) progressWrap.style.display = 'none';
     return;
   }
-  const elapsedSec = Math.floor((Date.now() - finalStartTime)/1000);
+  const elapsedSec = Math.floor(getFinalElapsedMs()/1000);
   const targetSec = targetMin * 60;
   const remaining = Math.max(0, targetSec - elapsedSec);
   const mm = Math.floor(remaining/60), ss = remaining%60;
@@ -2487,18 +3348,40 @@ function updateSessionTimerLabel(){
     elapsedEl.textContent = fmtClock(elapsedSec);
     remainingEl.textContent = remaining > 0 ? '-' + fmtClock(remaining) : (document.getElementById('loopToggle').checked ? 'looping' : '-0:00:00');
   }
+  if (remaining <= 0 && !finalFadeEnding) fadeOutAndFinishFinal();
+}
+
+function fadeOutAndFinishFinal(){
+  if (!finalPlaying || finalFadeEnding) return;
+  finalFadeEnding = true;
+  const now = finalCtx ? finalCtx.currentTime : 0;
+  [liveToneGain,liveBgGain,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
+    if (!node || !node.gain || !finalCtx) return;
+    try {
+      node.gain.cancelScheduledValues(now);
+      node.gain.setValueAtTime(Math.max(.0001,node.gain.value),now);
+      node.gain.exponentialRampToValueAtTime(.0001,now+1.5);
+    } catch(e){}
+  });
+  const t = setTimeout(finishFinal, 1600); finalTimeouts.push(t);
 }
 
 function finishFinal(){
   // A session only counts once it has actually run for a while; starting and
   // stopping shouldn't pay, and the database won't pay twice in a day anyway.
-  if (finalPlaying && finalStartTime && Date.now() - finalStartTime > 60000){
+  const listenedSeconds = Math.floor(getFinalElapsedMs()/1000);
+  if (finalPlaying && finalStartTime && listenedSeconds > 60){
     awardLight(LIGHT_SOURCES.subliminal, '', document.getElementById('finalPlayBtn'));
   }
   finalPlaying = false;
+  finalPaused = false; finalPauseStarted = null;
+  finalPauseWaiters = [];
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  if (typeof recordPlayerSession === 'function') recordPlayerSession(true, listenedSeconds);
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal';
@@ -2512,15 +3395,28 @@ function finishFinal(){
   if (finalTone){ try{ finalTone.stop(); }catch(e){} }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
-  if (finalAmbience){ finalAmbience.stop(); }
+  // The ending fade has finished; detach now so restarting cannot reuse a closed bus.
+  sessionBed.stop({ fade: 0 });
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
-  if (finalCtx){ setTimeout(()=>{ try{ finalCtx.close(); }catch(e){} }, 300); }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  if (finalCtx){
+    const closing = finalCtx;
+    finalCtx = null;
+    sessionBed.detach();
+    try { closing.close(); } catch(e){}
+  }
+  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
+  liveVoiceElements.clear();
 }
 
 function stopFinal(){
+  const listenedSeconds = Math.floor(getFinalElapsedMs()/1000);
   finalPlaying = false;
+  finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
+  finalPauseWaiters = [];
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
+  if (typeof recordPlayerSession === 'function') recordPlayerSession(false, listenedSeconds);
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
@@ -2530,15 +3426,21 @@ function stopFinal(){
   if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
-  if (finalAmbience){ finalAmbience.stop(); finalAmbience=null; }
+  /* Stop means stop: the context closes on the next line, so there is nothing
+     to fade into and nothing that could still be running afterwards. The key
+     the bed is on survives, which is what makes pressing play again come back
+     on the same ambience. */
+  sessionBed.detach();
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalRecorder && finalRecorder.state !== 'inactive'){
     finalRecorder.onstop = ()=>{ window._subliminallyDownloadBlob = new Blob(finalChunks, {type:'audio/webm'}); };
     finalRecorder.stop();
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
-  liveToneGain = null; liveBgGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
+  liveVoiceElements.clear();
   const btn = document.getElementById('finalPlayBtn');
   if (btn){ btn.disabled=false; btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>Play my subliminal'; }
 }
@@ -2624,3 +3526,15 @@ async function runSoundCheck(){
    and a `const` cannot be read before its declaration has run. Called from the
    top, this threw on load and took every function below it with it. */
 renderPaceChips();
+
+// Preview audio belongs to the builder view, never to the next page.
+function stopBuilderPreviews(){
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  stopRec();
+}
+if (typeof window.addEventListener === 'function'){
+  window.addEventListener('hashchange', stopBuilderPreviews);
+  window.addEventListener('pagehide', stopBuilderPreviews);
+}

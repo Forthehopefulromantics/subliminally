@@ -6,10 +6,23 @@
    see the ones loaded before it. Order matters — see index.html. */
 
 /* ---------- boot ---------- */
+/* ---------- the ambience library ----------
+   Where each shared ambience track's audio actually lives. Overrides the copy
+   bundled at audio/ambience/, which is what plays until this lands and if it
+   never does -- so nothing on the page may wait on it, and nothing does: the
+   URL is resolved at the moment a track is played, not when the picker is
+   drawn. See ambienceUrl() in js/ambience.js.
+
+   Rows without a url are ones the upload script has not put in the bucket yet.
+   They are skipped rather than written as null, because writing null here
+   would override the bundled copy with nothing. */
 window.AMBIENCE_URLS = {};
 if (sb){
-  sb.from('ambience_tracks').select('*').then(({ data }) => {
-    if (data) data.forEach(row => { window.AMBIENCE_URLS[row.key] = row.url; });
+  sb.from('ambience_tracks').select('key,url,is_active').then(({ data, error }) => {
+    if (error || !data) return;   // the bundled copies carry it
+    data.forEach(row => {
+      if (row && row.url && row.is_active !== false) window.AMBIENCE_URLS[row.key] = row.url;
+    });
   });
 }
 
@@ -55,6 +68,7 @@ if (sb){
     const isNewPerson = wasId !== (currentUser && currentUser.id);
     if (authSettled && isNewPerson && currentUser && event === 'SIGNED_IN') routeAfterAuth({ landOnToday: true });
     if (currentUser) savePushToken();
+    if (currentUser && typeof hydratePlayerPrefs === 'function') hydratePlayerPrefs();
     syncRevenueCatIdentity();
   });
 
@@ -63,6 +77,7 @@ if (sb){
     authSettled = true;
     document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     renderAccountArea();
+    if (currentUser && typeof hydratePlayerPrefs === 'function') await hydratePlayerPrefs();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');

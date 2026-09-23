@@ -1,0 +1,189 @@
+/* ---------------------------------------------------------------------------
+   Subliminally — the listening surfaces.
+
+   One palette, everywhere you press something while a session is playing:
+   lavender for the things you may touch, warm candle gold for the thing that is
+   happening, and a night sky behind both. The controls used to be a row of
+   seven grey pictograms borrowed from a music app; there are two now, and they
+   are dressed like the rest of the ritual rather than like a media player.
+--------------------------------------------------------------------------- */
+
+:root{
+  --ls-lilac:#B9A7E8;
+  --ls-lilac-soft:rgba(185,167,232,.38);
+  --ls-candle:#E3BE7F;
+  --ls-candle-lit:#F6DCAA;
+  --ls-veil:rgba(32,23,59,.90);
+  --ls-ink:#F6EDFF;
+}
+
+/* ---------- the shell, on a phone in the dark ---------- */
+.ip-shell{ box-sizing:border-box; grid-template-rows:auto minmax(120px,1fr) auto; }
+.ip-hero{ min-height:120px; }
+.ip-lower{ max-height:64dvh; overflow-y:auto; padding-bottom:4px; }
+
+/* ---------- cover art, chosen from the player ----------
+   The artwork is the button. A cover is a picture you press, not a row of text
+   in a settings list, and the star says it can be changed without a label
+   shouting it over the affirmation. */
+.ip-track-copy{ display:flex; align-items:center; justify-content:center; gap:14px; text-align:left; }
+.ip-track-text{ min-width:0; }
+.ip-cover{ position:relative; flex:0 0 auto; width:58px; height:58px; padding:0; cursor:pointer;
+  border-radius:17px; border:1px solid rgba(227,190,127,.55); background:linear-gradient(150deg,rgba(185,167,232,.30),rgba(38,32,64,.72));
+  display:grid; place-items:center; overflow:visible; color:var(--ls-lilac);
+  box-shadow:0 8px 26px rgba(24,14,54,.55), 0 0 0 1px rgba(255,255,255,.05) inset;
+  transition:border-color .25s ease, box-shadow .25s ease, transform .25s ease; }
+.ip-cover:hover,.ip-cover:focus-visible{ border-color:var(--ls-candle-lit); color:var(--ls-candle-lit); transform:translateY(-1px);
+  box-shadow:0 10px 30px rgba(24,14,54,.6), 0 0 22px rgba(227,190,127,.28); }
+.ip-cover:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:3px; }
+.ip-cover img{ width:100%; height:100%; border-radius:16px; object-fit:cover; display:block; }
+.ip-cover-empty{ display:grid; place-items:center; }
+.ip-cover-empty[hidden]{ display:none; }
+.ip-cover-empty svg{ width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+.ip-cover-edit{ position:absolute; right:-6px; bottom:-6px; width:22px; height:22px; border-radius:50%;
+  display:grid; place-items:center; color:#2b1f4a; background:linear-gradient(145deg,#fff6e4,var(--ls-candle));
+  box-shadow:0 3px 12px rgba(227,190,127,.45); }
+.ip-cover-edit svg{ width:13px; height:13px; fill:currentColor; stroke:none; }
+
+/* ---------- sound adjustments: the six layers, saved with the subliminal ---------- */
+.listening-mix{ border:1px solid var(--ls-lilac-soft); background:var(--ls-veil); border-radius:18px;
+  padding:12px 14px; color:var(--ls-ink); }
+.listening-mix summary{ cursor:pointer; font-size:12.5px; letter-spacing:.06em; padding:5px 2px; color:var(--ls-lilac); }
+.listening-mix summary::marker{ color:var(--ls-candle); }
+.listening-mix[open] summary{ color:var(--ls-candle-lit); }
+.listening-mix-row{ display:grid; grid-template-columns:105px minmax(70px,1fr) 44px; gap:10px; align-items:center;
+  padding:9px 0; font-size:12px; }
+.listening-mix-row[hidden]{ display:none; }
+.listening-mix-row input{ width:100%; accent-color:var(--ls-lilac); }
+.listening-mix-row input:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:3px; }
+.listening-mix-row output{ text-align:right; color:var(--ls-candle); font-variant-numeric:tabular-nums; }
+.listening-mix .ps-use{ margin-top:6px; }
+[data-mix-status]{ font-size:12px; line-height:1.5; min-height:18px; color:#d8c9ef; }
+
+/* ---------- the two play controls ----------
+   A lit moon and a way back to the beginning. Nothing else: Open, Levels,
+   Favorite, Previous, Next, Loop, Timer and Share were eight ways to leave the
+   sentence you were meant to be listening to. */
+.ip-controls{ display:flex!important; justify-content:center; align-items:center; gap:26px!important;
+  padding:6px 0 2px; }
+
+.ip-main-play{ position:relative; width:74px; height:74px; margin:0; border-radius:50%; cursor:pointer;
+  display:grid; place-items:center; color:var(--ls-candle-lit);
+  border:1.5px solid rgba(227,190,127,.72);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(246,220,170,.26), rgba(120,92,186,.30) 52%, rgba(24,16,52,.95) 100%);
+  box-shadow:0 0 0 7px rgba(185,167,232,.10), 0 12px 38px rgba(96,62,170,.42), 0 0 34px rgba(227,190,127,.22);
+  transition:box-shadow .3s ease, border-color .3s ease, transform .2s ease; }
+/* A ring of faint stars, the same sky the player is sitting in. */
+.ip-main-play::before{ content:''; position:absolute; inset:-13px; border-radius:50%; pointer-events:none;
+  background:
+    radial-gradient(1.6px 1.6px at 50% 2%, rgba(255,247,232,.85), transparent 60%),
+    radial-gradient(1.4px 1.4px at 92% 30%, rgba(227,190,127,.75), transparent 60%),
+    radial-gradient(1.2px 1.2px at 78% 88%, rgba(185,167,232,.8), transparent 60%),
+    radial-gradient(1.4px 1.4px at 14% 74%, rgba(255,247,232,.7), transparent 60%),
+    radial-gradient(1.2px 1.2px at 6% 26%, rgba(185,167,232,.75), transparent 60%);
+  opacity:.9; }
+.ip-main-play svg{ width:26px; height:26px; stroke-width:2; }
+.ip-main-play:hover,.ip-main-play:focus-visible{ border-color:var(--ls-candle-lit); transform:translateY(-1px);
+  box-shadow:0 0 0 9px rgba(185,167,232,.14), 0 14px 44px rgba(96,62,170,.5), 0 0 44px rgba(227,190,127,.34); }
+.ip-main-play:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:4px; }
+.ip-main-play:active{ transform:translateY(1px) scale(.98); }
+
+.ip-controls .ip-control{ flex-direction:row; gap:9px; font-size:12px; letter-spacing:.04em;
+  min-height:48px; padding:0 20px; border-radius:999px; color:var(--ls-lilac);
+  border:1px solid var(--ls-lilac-soft); background:rgba(28,18,63,.5);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  transition:color .25s ease, border-color .25s ease, box-shadow .25s ease; }
+.ip-controls .ip-control svg{ width:17px; height:17px; }
+.ip-controls .ip-control:hover,.ip-controls .ip-control:focus-visible{ color:var(--ls-candle-lit);
+  border-color:rgba(227,190,127,.65); box-shadow:0 0 24px rgba(227,190,127,.18); }
+.ip-controls .ip-control:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:3px; }
+
+/* ---------- the bar at the bottom of every other page ----------
+   Same two controls, same palette, so pausing from the journey list and
+   pausing from the player are visibly the same act. */
+.now-bar-in .nb-play{ flex:0 0 auto; width:42px; height:42px; border-radius:50%; cursor:pointer;
+  display:grid; place-items:center; color:var(--ls-candle-lit);
+  border:1px solid rgba(227,190,127,.6);
+  background:radial-gradient(circle at 50% 36%, rgba(246,220,170,.22), rgba(120,92,186,.26) 55%, rgba(24,16,52,.92) 100%);
+  box-shadow:0 0 18px rgba(227,190,127,.18); transition:.25s ease; }
+.now-bar-in .nb-play svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.now-bar-in .nb-play:hover,.now-bar-in .nb-play:focus-visible{ border-color:var(--ls-candle-lit); box-shadow:0 0 26px rgba(227,190,127,.3); }
+.now-bar-in .nb-restart{ flex:0 0 auto; display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  min-height:42px; padding:0 15px; border-radius:999px; font:inherit; font-size:12px;
+  color:var(--ls-lilac); border:1px solid var(--ls-lilac-soft); background:none; transition:.25s ease; }
+.now-bar-in .nb-restart svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.now-bar-in .nb-play:focus-visible,.now-bar-in .nb-restart:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:2px; }
+.now-bar-in .nb-restart:hover,.now-bar-in .nb-restart:focus-visible{ color:var(--ls-candle-lit); border-color:rgba(227,190,127,.6); }
+body.player-open .now-bar{ display:none!important; }
+
+/* The build page's own play button, wearing the same clothes. */
+#finalPlayBtn.play-control{ display:inline-flex; align-items:center; gap:7px; }
+#finalPlayBtn.play-control svg{ width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+
+/* ---------- choosing a cover, over the top of the player ---------- */
+.cover-pop{ position:fixed!important; z-index:1800!important; top:50%!important; left:50%!important;
+  right:auto!important; bottom:auto!important; transform:translate(-50%,-50%);
+  width:min(88vw,430px); max-height:80dvh; overflow:auto;
+  background:#241b42!important; color:var(--ls-ink)!important;
+  border:1px solid rgba(207,177,239,.85)!important; border-radius:24px!important; padding:20px!important;
+  box-shadow:0 0 0 100vmax rgba(13,8,40,.73), 0 30px 80px rgba(10,5,32,.6); }
+.cover-pop button{ color:var(--ls-ink)!important; border-color:rgba(183,152,212,.9)!important;
+  background:#35244f!important; min-height:44px; }
+.cover-pop-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.cover-pop-grid button{ padding:0!important; border-radius:12px!important; overflow:hidden; }
+.cover-pop-grid img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; display:block; }
+.cover-pop-foot{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+
+/* ---------- celestial line art for the ambience and voice cards ---------- */
+.sound-art{ display:inline-grid; place-items:center; width:54px; height:54px; border-radius:18px;
+  color:var(--ls-lilac); background:radial-gradient(circle at 28% 20%,rgba(233,198,239,.33),rgba(87,65,128,.20));
+  border:1px solid rgba(189,161,222,.4); margin-bottom:10px; }
+.sound-art svg{ width:36px; height:36px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+.bg-card.sel .sound-art,.voice-card.sel .sound-art{ color:var(--ls-candle); border-color:var(--ls-candle);
+  box-shadow:0 0 18px rgba(185,149,226,.3); }
+.voice-preview-btn{ display:inline-flex!important; align-items:center; justify-content:center; gap:7px;
+  border-radius:999px!important; min-height:40px; color:var(--ls-lilac)!important; }
+.voice-preview-btn svg{ width:14px; height:14px; }
+
+@media (max-height:650px){
+  .ip-shell{ gap:6px; padding-top:6px; }
+  .ip-lower{ gap:6px; }
+  .ip-affirmation{ font-size:26px; }
+  .ip-main-play{ width:64px; height:64px; }
+}
+@media (prefers-reduced-motion:reduce){
+  .ip-affirmation{ transition:none; }
+  .ip-cloud{ animation:none; }
+  .ip-main-play,.ip-control,.ip-cover{ transition:none; }
+}
+
+/* The whole title is the way back into the player, the way a now-playing bar
+   works everywhere else. It replaces the "Open" button rather than losing it. */
+.now-bar-in .nb-txt{ appearance:none; border:0; background:none; padding:0; margin:0;
+  font:inherit; color:inherit; text-align:left; cursor:pointer; border-radius:10px; }
+.now-bar-in .nb-txt:hover b{ color:var(--ls-candle-lit); }
+.now-bar-in .nb-txt:focus-visible{ outline:2px solid var(--ls-candle); outline-offset:3px; }
+
+/* Builder controls follow the supplied day/night references. */
+#voiceSerenity{padding:12px!important;gap:10px;position:relative;}
+#voiceSerenity .voice-card-face{display:grid;grid-template-columns:64px 1fr;column-gap:14px;align-items:center;padding:0!important;}
+#voiceSerenity .sound-art{grid-row:1/3;width:64px;height:64px;margin:0;}
+#voiceSerenity h4,#voiceSerenity p{margin:0;}
+#serenityPreviewBtn,#bgGrid .bg-preview-btn{align-self:center!important;flex:none!important;width:auto!important;min-width:76px;height:44px!important;min-height:44px!important;padding:0 13px!important;margin:0 10px 0 0!important;border:1px solid rgba(190,157,226,.5)!important;border-radius:999px!important;background:rgba(186,152,222,.12)!important;color:#e4cdf6!important;font-size:14px!important;white-space:nowrap;}
+#serenityPreviewBtn.is-playing,#bgGrid .bg-preview-btn.is-playing{background:#685080!important;color:#fff!important;}
+#bgGrid .bg-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+#bgGrid .bg-card{position:relative;flex-wrap:wrap;align-items:center;text-align:left;border:1px solid #766185!important;background:rgba(54,41,70,.6)!important;border-radius:16px;padding:12px;gap:8px;}
+#bgGrid .bg-card-face{display:grid;grid-template-columns:64px 1fr;gap:4px 12px;text-align:left;flex:1 0 100%;padding:0;color:inherit;}
+#bgGrid .ambience-art{width:64px;height:68px;object-fit:cover;border-radius:10px;grid-row:1/3;}
+#bgGrid .bg-name{font-family:var(--serif);font-size:20px;align-self:end;}
+#bgGrid .ambience-description{font-size:14px;line-height:1.4;color:var(--haze);}
+#bgGrid .bg-preview-btn{margin-left:76px!important;}
+#bgGrid .bg-card::after{content:'';position:absolute;right:12px;bottom:18px;width:24px;height:24px;border:1px solid #ae91c6;border-radius:50%;pointer-events:none;}
+#bgGrid .bg-card.sel{border:2px solid #c89eea!important;box-shadow:0 0 16px #b99ad22b;}
+#bgGrid .bg-card.sel::after{content:'✓';display:grid;place-items:center;background:#cda9ee;color:#271735;border-color:#cda9ee;}
+#voiceSerenity.sel{border-color:#c89eea!important;box-shadow:0 0 16px #b99ad22b;}
+body[data-sky="day"] #bgGrid .bg-card{background:#fffafc!important;color:#2e1b48;border-color:#ded1e7!important;}
+body[data-sky="day"] #bgGrid .bg-card.sel{border-color:#a67bc7!important;}
+body[data-sky="day"] #serenityPreviewBtn,body[data-sky="day"] #bgGrid .bg-preview-btn{background:#efe5f4!important;color:#503268!important;border-color:#dfcbea!important;}
+@media(max-width:600px){#bgGrid .bg-row{grid-template-columns:1fr;}#bgGrid .bg-card-face{flex:1 1 150px;}#bgGrid .bg-preview-btn{margin:0 32px 0 0!important;}#bgGrid .bg-card::after{bottom:50%;transform:translateY(50%);}#voiceSerenity .voice-card-face{grid-template-columns:48px 1fr;gap:8px;}#voiceSerenity .sound-art{width:48px;height:54px;}#voiceSerenity h4{font-size:19px;}#voiceSerenity p{font-size:14px;}#serenityPreviewBtn{min-width:70px;margin-right:0!important;padding:0 9px!important;}}

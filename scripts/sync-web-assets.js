@@ -24,7 +24,12 @@ const FILES_TO_COPY = [
 // Whole folders the site references. Without these the native apps bundle the
 // markup but none of the pictures, and every <img> is a blank space in the app
 // while looking fine on the website.
-const DIRS_TO_COPY = ['img', 'js'];
+//
+// audio/ is the ambience library. The apps need it bundled for the same reason
+// the website ships it: it is the copy that plays when the ambience_tracks
+// lookup has not come back yet, and the one that plays on a phone with no
+// signal. Roughly 1.5 MB for the five of them.
+const DIRS_TO_COPY = ['img', 'js', 'audio'];
 
 fs.mkdirSync(WWW, { recursive: true });
 
