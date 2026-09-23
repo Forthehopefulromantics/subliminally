@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
    Subliminally — the builder, dressed to the supplied celestial design.
 
-   A lavender veil, cream cards, a serif voice for names and a small spaced-caps
+   A soft sunrise veil, cream cards, a serif voice for names and a small spaced-caps
    voice for the quiet lines. Every card on the voice and ambience steps is one
    row: artwork, words, Preview, and a round mark that says what is chosen.
    Night keeps the same shapes on the night sky.
@@ -11,12 +11,12 @@
 --------------------------------------------------------------------------- */
 
 #flow-section{
-  --bc-card:#FBF8F5; --bc-card-sel:#FCF8FC; --bc-line:#E6DCEC;
-  --bc-ink:#221C45; --bc-muted:#6D6590; --bc-kicker:#8F84AA;
-  --bc-pill:#EEE8F3; --bc-pill-ink:#2A2450; --bc-pill-on:#5E4A8C;
-  --bc-check-line:#C5B8D6; --bc-accent:#7A5FA8; --bc-sel-line:#B99CDB;
-  --bc-cta:#5E4A8C; --bc-cta-ink:#F5EFFB; --bc-gold:#C6A06A;
-  --bc-shadow:0 1px 2px rgba(60,40,90,.04), 0 8px 24px rgba(88,64,130,.05);
+  --bc-card:#FFFDF8; --bc-card-sel:#FFF6EA; --bc-line:#F0D9C9;
+  --bc-ink:#3E2A48; --bc-muted:#7A6584; --bc-kicker:#B56E52;
+  --bc-pill:#FFF0E4; --bc-pill-ink:#6A4338; --bc-pill-on:#F0845F;
+  --bc-check-line:#E4C7B5; --bc-accent:#F0845F; --bc-sel-line:#E8A383;
+  --bc-cta:#F0845F; --bc-cta-ink:#FFFFFF; --bc-gold:#C6A06A;
+  --bc-shadow:0 1px 2px rgba(92,54,39,.03), 0 8px 24px rgba(143,91,65,.06);
   --bc-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");
 }
 body[data-sky="night"] #flow-section{
@@ -33,8 +33,8 @@ body[data-sky="night"] #flow-section{
    day and by night, as they do everywhere else. Only the card is tinted, a
    lavender veil the cream cards sit on. */
 body[data-sky="day"] #flow-section .flow-card{
-  background:rgba(247,242,252,.88)!important; border:1px solid rgba(255,255,255,.7);
-  box-shadow:0 20px 60px rgba(96,70,140,.10); backdrop-filter:blur(6px);
+  background:rgba(255,248,240,.84)!important; border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 20px 60px rgba(122,82,58,.08); backdrop-filter:blur(6px);
 }
 
 /* ---------- title ---------- */
