@@ -328,6 +328,16 @@ r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] });
 check('"mine" reads in their own cloned voice', elevenCalls[0].url.includes(MY_CLONE), true);
 check('  ...without naming it in the response', JSON.stringify(r.body).includes(MY_CLONE), false);
 
+/* Somebody else, signed in and paying, cannot read in this person's voice —
+   not by asking for 'mine', and not by sending the provider id itself. */
+reset();
+db.voiceProfile = { id: 'vp-1', user_id: 'user-abc', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] }, 'other-token');
+check('another user\'s "mine" is their own, not this one', [r.code, r.body.error], [409, 'no_cloned_voice']);
+r = await callTts({ voiceKey: MY_CLONE, lines: [LINES[0]] }, 'other-token');
+check('another user sending this voice id is refused', [r.code, r.body.error], [400, 'invalid_voice']);
+check('  ...and nothing reached ElevenLabs', elevenCalls.length, 0);
+
 /* ---------------- cloning ---------------- */
 reset();
 r = await callClone({ consent: null });

@@ -442,6 +442,162 @@ check('Continue opens', get(`document.getElementById('toStep5').disabled`), fals
 run(`showStep(5); startNextPhase();`);
 check('and it builds, without recording a line', step(), 7);
 
+/* ================= 4. CLONE YOUR VOICE, PHASE 2 =================
+   Generating the subliminal is the only thing that asks for speech. Play,
+   pause, resume, start over, the mixer and reopening all replay what was made,
+   and a failure is said out loud rather than read by the device instead. */
+section('Clone your voice — generate once, then only replay');
+['finalPlayBtn', 'mixVoice', 'mixLayerVoice', 'loopToggle'].forEach(id => { if (!doc.getElementById(id)) mk(id); });
+['mixVoice', 'mixTone', 'mixBg', 'mixLayerVoice'].forEach(id => { doc.getElementById(id).value = '80'; });
+doc.getElementById('loopToggle').checked = true;   // keep looping, as a set session length does
+
+/* The server: every /api/tts request is recorded, and it answers like the real
+   route — a line it has read before comes back from storage, only a new one
+   costs an ElevenLabs generation. */
+const ttsCalls = [];
+const serverClips = new Set();
+let elevenGenerations = 0;
+let ttsFailWith = null;
+ctx.fetch = async (url, o) => {
+  if (!String(url).endsWith('/api/tts')) return { ok: false, status: 404, json: async () => ({}) };
+  const body = JSON.parse(o.body);
+  ttsCalls.push({ body, auth: o.headers.Authorization });
+  if (ttsFailWith) return { ok: false, status: 502, json: async () => ({ error: ttsFailWith }) };
+  const clips = body.lines.map((text, index) => {
+    const cached = serverClips.has(text);
+    if (!cached){ serverClips.add(text); elevenGenerations++; }
+    return { index, text, url: `https://storage.test/${encodeURIComponent(text)}.mp3`, cached, error: null };
+  });
+  return { ok: true, status: 200, json: async () => ({ clips }) };
+};
+
+/* Audio, stubbed at the edges: a context that accepts anything, and clips that
+   report what was played. The device voice counts every attempt to speak. */
+run(`
+  sb = { auth: { getSession: async () => ({ data: { session: { access_token: 'tok-owner' } } }) } };
+  __device = 0; __played = []; __loads = 0; __ends = [];
+  function __node(){
+    const t = function(){};
+    return new Proxy(t, {
+      get(o, k){
+        if (k === Symbol.toPrimitive) return () => 0;
+        if (k === 'then') return undefined;
+        if (k === 'state') return 'running';
+        if (!(k in o)) o[k] = __node();
+        return o[k];
+      },
+      set(o, k, v){ o[k] = v; return true; },
+      apply(){ return __node(); },
+    });
+  }
+  AudioContext = function(){ return __node(); };
+  window.speechSynthesis = { speak(){ __device++; }, cancel(){}, pause(){}, resume(){} };
+  SpeechSynthesisUtterance = function(t){ this.text = t; };
+  speakWithDeviceVoice = function(){ __device++; };
+  startSilentKeeper = function(){}; stopSilentKeeper = function(){};
+  startCustomTrackPlayback = function(){};
+  sessionBed.attach = sessionLayerBed.attach = function(){};
+  sessionBed.setLevel = sessionLayerBed.setLevel = function(){};
+  sessionBed.to = sessionLayerBed.to = function(){};
+  sessionBed.detach = sessionLayerBed.detach = function(){};
+  loadClip = async function(c, handle){ __loads++; return { url: handle.url }; };
+  playClip = function(c, clip, gain, dest, onended){ __played.push(clip.url); __ends.push(onended); };
+`);
+const played = () => get('__played.slice()');
+const device = () => get('__device');
+const finalLine = () => get(`document.getElementById('finalLine').textContent`);
+async function drain(rounds = 6){
+  // let a few lines play through: end each clip, then run the gap timers
+  for (let i = 0; i < rounds; i++){
+    for (let j = 0; j < 12; j++) await Promise.resolve();
+    run(`__ends.splice(0).forEach(f => f && f());`);
+    while (timers.length){ const fn = timers.shift(); fn(); }
+  }
+  for (let j = 0; j < 12; j++) await Promise.resolve();
+}
+
+setWorld({ tier: 'ritual', myVoice: { name: 'My voice' } });
+freshBuild();
+// Whatever the sections above left in flight lands before the count starts.
+await settle();
+run(`ttsCache.clear(); sequencePrepares.clear(); clonedVoiceReadyKey = null;`);
+ttsCalls.length = 0; serverClips.clear(); elevenGenerations = 0;
+run(`chooseClonedVoice()`); await settle();
+check('the saved voice is recognized and committed', [get('state.voiceMode'), get('state.aiVoiceId')], ['ai', 'mine']);
+check('choosing it generated nothing', ttsCalls.length, 0);
+/* The builder's five, with the blanks and stray spaces a person leaves behind. */
+run(`state.affirmations = ['  I am calm.  ', '', 'I am   safe.', '   ', 'I rest easily.'];`);
+run(`prepareSessionVoice()`); await settle();
+check('generating asks the server once', ttsCalls.length, 1);
+check('  ...for the saved voice by key, never an id', ttsCalls[0].body.voiceKey, 'mine');
+check('  ...as the signed-in user', ttsCalls[0].auth, 'Bearer tok-owner');
+check('  ...with trimmed lines and no blanks', ttsCalls[0].body.lines, ['I am calm.', 'I am safe.', 'I rest easily.']);
+check('  ...and ElevenLabs read each line once', elevenGenerations, 3);
+check('the subliminal is marked generated', get('clonedVoiceReadyKey === clonedSequenceKey()'), true);
+run(`prepareSessionVoice()`); await settle();
+check('generating the same words again asks for nothing', ttsCalls.length, 1);
+
+run(`playFinal()`); await drain();
+check('Play reaches the existing player', get('finalPlaying'), true);
+check('  ...and plays the generated clone audio', played().slice(0, 2), [
+  'https://storage.test/I%20am%20calm..mp3', 'https://storage.test/I%20am%20safe..mp3']);
+check('  ...with no request made by Play', ttsCalls.length, 1);
+run(`pauseFinal()`); await drain(2);
+const pausedAt = played().length;
+check('pause holds the voice', played().length, pausedAt);
+run(`resumeFinal()`); await drain(2);
+check('resume carries on', played().length > pausedAt, true);
+run(`__played = []; stopFinal(); playFinal();`); await drain(1);
+check('Start over plays again from the top', played()[0], 'https://storage.test/I%20am%20calm..mp3');
+check('pause, resume and start over made no requests', ttsCalls.length, 1);
+run(`document.getElementById('mixBg').value = '20'; document.getElementById('mixVoice').value = '40'; state.bg = 'rain'; state.bgLayer = 'none';`);
+check('volume and nature changes leave it generated', get('clonedVoiceReadyKey === clonedSequenceKey()'), true);
+run(`stopFinal(); playFinal();`); await drain(2);
+check('  ...so playing again asks for nothing', ttsCalls.length, 1);
+check('the device voice never spoke', device(), 0);
+run(`stopFinal();`);
+
+/* Reopening: a fresh page has nothing in hand, so the saved clips are asked for
+   again — and the server answers them from storage, not from ElevenLabs. */
+run(`ttsCache.clear(); sequencePrepares.clear(); clonedVoiceReadyKey = null;`);
+run(`prepareSessionVoice()`); await settle();
+check('reopening fetches the stored audio', ttsCalls.length, 2);
+check('  ...without generating it again', elevenGenerations, 3);
+
+/* Editing the words and generating again makes new speech for that line only. */
+run(`state.affirmations[4] = 'I rest deeply.';`);
+check('changed words mean it needs generating', get('clonedVoiceReadyKey === clonedSequenceKey()'), false);
+run(`prepareSessionVoice()`); await settle();
+check('  ...and only the changed line is generated', [ttsCalls[2].body.lines, elevenGenerations], [['I rest deeply.'], 4]);
+
+/* A failure is shown, nothing else is played, and Play is the retry. */
+run(`state.affirmations[0] = 'I am brave.'; __played = [];`);
+ttsFailWith = 'network';
+run(`playFinal()`); await drain(2);
+check('a failed generation is not played', [get('finalPlaying'), played().length], [false, 0]);
+check('  ...it says so', finalLine().includes('tap Play to try again'), true);
+check('  ...and never falls back to the device voice', device(), 0);
+check('  ...or to any other voice', ttsCalls.every(c => c.body.voiceKey === 'mine'), true);
+ttsFailWith = null;
+run(`playFinal()`); await drain(2);
+check('Play after a failure retries, then plays', [get('finalPlaying'), played()[0]], [true, 'https://storage.test/I%20am%20brave..mp3']);
+run(`stopFinal();`);
+
+/* A clip that cannot be loaded stops the session with a message, not the device. */
+run(`loadClip = async function(){ throw new Error('decode'); }; __played = [];`);
+run(`playFinal()`); await drain(2);
+check('an unplayable clip stops rather than substitutes', [get('finalPlaying'), device()], [false, 0]);
+check('  ...and says so', finalLine().includes('tap Play to try again'), true);
+run(`loadClip = async function(c, handle){ __loads++; return { url: handle.url }; };`);
+
+/* No saved voice: back to the Phase 1 setup, nothing generated. */
+setWorld({ tier: 'ritual', myVoice: null });
+const before = ttsCalls.length;
+run(`clonedVoiceReadyKey = null; showStep(7); prepareSessionVoice();`); await settle();
+check('without a saved voice, nothing is generated', ttsCalls.length, before);
+check('  ...and the voice setup opens instead', [step(), get(`document.getElementById('myVoicePanel').dataset.open`)], [4, '1']);
+check('  ...still without the device voice', device(), 0);
+
 /* ================= the paywall must not strand the screen ================= */
 section('A refused tap leaves the screen telling the truth');
 setWorld({ tier: 'free', myVoice: null });
