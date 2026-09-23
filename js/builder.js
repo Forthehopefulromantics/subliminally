@@ -1264,7 +1264,7 @@ const PREVIEW_PAUSE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="current
 function setSerenityPreviewLabel(playing){
   const btn = document.getElementById('serenityPreviewBtn');
   if (!btn) return;
-  btn.innerHTML = (playing ? PREVIEW_PAUSE_MARK : PREVIEW_PLAY_MARK) + (playing ? ' Pause preview' : ' Preview');
+  btn.textContent = playing ? 'Stop' : 'Preview';
   btn.classList.toggle('is-playing', !!playing);
   btn.setAttribute('aria-label', playing ? 'Stop the Serenity preview' : 'Play a short Serenity preview');
 }
@@ -1296,6 +1296,8 @@ function toggleSerenityPreview(ev){
   sayInVoicePicker('');
 
   if (stopSerenityPreview()) return;   // it was playing; that press was "stop"
+  stopAmbiencePreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
 
   try { window.speechSynthesis.cancel(); } catch(e){}
   if (el.dataset.kind !== 'serenity-demo'){
@@ -1659,7 +1661,7 @@ function paintBgCards(){
     const live = previewBed.playing() && btn.dataset.key === previewBed.key;
     btn.classList.toggle('is-playing', live);
     btn.setAttribute('aria-label', `${live ? 'Stop' : 'Play'} a preview of ${ambienceName(btn.dataset.key)}`);
-    btn.textContent = live ? '❙❙' : '▶';
+    btn.textContent = live ? 'Stop' : 'Preview';
   });
   paintAmbienceConfirm();
 }
@@ -1712,7 +1714,11 @@ function bgCard(track){
   ic.className = 'ic'; ic.textContent = track.ic;
   const label = document.createElement('span');
   label.className = 'bg-name'; label.textContent = track.name;
-  face.appendChild(ic); face.appendChild(label);
+  const art = {'deep-mind':'night','inner-stillness':'mirror','the-sanctuary':'clouds','ocean-escape':'waters','soft-asmr':'bedroom'}[track.key];
+  if (art){ const image = document.createElement('img'); image.src = '/img/covers/' + art + '.webp'; image.alt = ''; image.className = 'ambience-art'; face.appendChild(image); }
+  else face.appendChild(ic);
+  face.appendChild(label);
+  if (track.blurb){ const desc = document.createElement('span'); desc.className = 'ambience-description'; desc.textContent = track.blurb; face.appendChild(desc); }
   if (track.blurb) face.setAttribute('title', track.blurb);
   face.onclick = () => auditionAmbience(track.key);
   card.appendChild(face);
@@ -1725,7 +1731,7 @@ function bgCard(track){
     play.type = 'button';
     play.className = 'bg-preview-btn';
     play.dataset.key = track.key;
-    play.textContent = '▶';
+    play.textContent = 'Preview';
     play.onclick = (ev) => toggleAmbiencePreview(ev, track.key);
     card.appendChild(play);
   }
@@ -1757,6 +1763,8 @@ function toggleAmbiencePreview(ev, key){
    is silenced and a media element is not, and a preview that cannot be heard
    is worse than no preview at all. */
 function startAmbiencePreview(key){
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
   const msg = document.getElementById('ambienceMsg');
   if (msg) msg.textContent = '';
   if (finalPlaying){
@@ -1786,22 +1794,19 @@ function startAmbiencePreview(key){
 }
 
 function stopAmbiencePreview(){
-  if (!previewCtx && !previewBed.playing()) return;   // nothing is listening
   clearTimeout(previewTimer); previewTimer = null;
-  previewBed.stop({ fade: 0.5 });
+  previewBed.stop({ fade: 0 });
+  previewBed.detach(); // invalidates pending downloads before they can start
+  const ctx = previewCtx; previewCtx = null;
+  if (ctx){ closeAudioOut(ctx); try { ctx.close(); } catch(e){} }
   paintBgCards();
-  /* Let the fade finish before the context goes, or the last half second is
-     cut off rather than faded. */
-  setTimeout(() => {
-    if (previewBed.playing()) return;
-    previewBed.detach();
-    if (previewCtx){ closeAudioOut(previewCtx); try { previewCtx.close(); } catch(e){} previewCtx = null; }
-    stopSilentKeeper();
-  }, 700);
+  if (!finalPlaying) stopSilentKeeper();
 }
+
 
 /* THE ONLY WRITE TO state.bg FROM THIS SCREEN. */
 function confirmAmbience(){
+  stopAmbiencePreview();
   if (!ambienceCandidate || ambienceCandidate === state.bg) return;
   state.bg = ambienceCandidate;      // the answer, written first
   paintBgCards();                    // then the screen, derived from it
@@ -2127,13 +2132,20 @@ let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dat
    overlapping, which is what came back doubled on playback. A flag set
    synchronously closes the gap: the second press has nothing to start. */
 let recPressed = false;
+let recOpening = false;
 const recBtn = document.getElementById('recBtn');
 async function startRec(e){
   if (e && e.preventDefault) e.preventDefault();
-  if (recPressed || recBtn.classList.contains('recording')) return;
+  if (recPressed || recOpening || recBtn.classList.contains('recording')) return;
   recPressed = true;
-  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  if (finalPlaying) stopFinal();
+  recOpening = true;
+  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}}); }
   catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
+  finally { recOpening = false; }
   /* Let go while the microphone was still opening. Nothing was recorded, so
      the stream is handed straight back rather than left running. */
   if (!recPressed){
@@ -2146,14 +2158,16 @@ async function startRec(e){
   holdStart = Date.now(); audioChunks=[];
   const recMime = pickRecordingMime();
   mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
-  mediaRecorder.ondataavailable = ev=>audioChunks.push(ev.data);
+  const takeRecorder = mediaRecorder, takeStream = micStream, takeChunks = [];
+  const takeStarted = holdStart, takeIndex = recIndex, takeRecords = activeRecordArray();
+  mediaRecorder.ondataavailable = ev=>takeChunks.push(ev.data);
   mediaRecorder.onstop = ()=>{
-    const blob = new Blob(audioChunks, {type: mediaRecorder.mimeType || recMime || 'audio/webm'});
+    const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
     const url = URL.createObjectURL(blob);
-    micStream.getTracks().forEach(t=>t.stop());
-    const held = Date.now()-holdStart;
+    takeStream.getTracks().forEach(t=>t.stop());
+    const held = Date.now()-takeStarted;
     if (held > 400){
-      activeRecordArray()[recIndex] = { url, blob };
+      takeRecords[takeIndex] = { url, blob };
       document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
       document.getElementById('nextLineBtn').disabled=false;
     } else {
@@ -2857,12 +2871,9 @@ function stopSilentKeeper(){
    heard on their own recordings and on the finished subliminal. Lowering a
    volume would have hidden it; there is only ever one route out of here now.
 
-   Which route depends on the device, because only one of them has a problem to
-   solve. On iOS the element is the one that survives the ringer switch, so iOS
-   gets the element and the direct path is let go the moment the element is
-   genuinely playing — if it never plays, the direct path is still there and
-   nothing is lost. Everywhere else ctx.destination is exactly right and no
-   element is created at all. */
+   iOS uses the media element exclusively. If playback is refused, disconnect
+   that route before connecting the direct fallback; never wait for a playing
+   event with both routes connected. */
 function needsMediaElementOutput(){
   // iPhones and iPads, in the browser and inside the wrapped app. iPadOS 13+
   // reports itself as a Mac, so a Mac with a touchscreen counts as one too.
@@ -2877,42 +2888,36 @@ function audioOut(ctx){
   if (ctx.__outBus) return ctx.__outBus;
   const bus = ctx.createGain();
   bus.gain.value = 1;
-  bus.connect(ctx.destination);
-  ctx.__outDirect = true;
+  ctx.__outDirect = false;
   ctx.__outBus = bus;
-  if (!needsMediaElementOutput()) return bus;
+  const useDirect = () => {
+    if (ctx.__outClosed || ctx.__outDirect) return;
+    if (ctx.__outMd) { try { bus.disconnect(ctx.__outMd); } catch(e){} }
+    bus.connect(ctx.destination); ctx.__outDirect = true;
+  };
+  if (!needsMediaElementOutput()){ useDirect(); return bus; }
   try {
     const md = ctx.createMediaStreamDestination();
     const el = new Audio();
     el.srcObject = md.stream;
     el.setAttribute('playsinline', '');
     el.autoplay = true;
-    /* The handover, at the only moment it can be made safely: the element is
-       making sound, so letting the direct path go cannot leave silence — and
-       keeping it would be the second copy. */
-    el.addEventListener('playing', () => {
-      if (!ctx.__outDirect) return;
-      try { bus.disconnect(ctx.destination); ctx.__outDirect = false; } catch(e){}
-    });
     bus.connect(md);
+    ctx.__outEl = el; ctx.__outMd = md;
     const p = el.play();
-    if (p && p.catch) p.catch(() => {});   // refused: the direct path still carries it
-    ctx.__outEl = el;
-    ctx.__outMd = md;
-  } catch(e){ /* not supported here; the direct connection above still carries it */ }
+    if (p && p.catch) p.catch(useDirect);
+  } catch(e){ useDirect(); }
   return bus;
 }
 function closeAudioOut(ctx){
-  if (!ctx || !ctx.__outEl) return;
+  if (!ctx) return;
+  ctx.__outClosed = true;
+  if (ctx.__outBus){ try { ctx.__outBus.disconnect(); } catch(e){} }
+  if (!ctx.__outEl) return;
   try { ctx.__outEl.pause(); ctx.__outEl.srcObject = null; } catch(e){}
   ctx.__outEl = null;
   if (ctx.__outMd){ try { ctx.__outBus.disconnect(ctx.__outMd); } catch(e){} ctx.__outMd = null; }
-  /* The element was carrying the sound; with it gone the direct path is the
-     only way out again. Contexts are normally closed right after this, but a
-     reused one must not come back mute. */
-  if (ctx.__outBus && !ctx.__outDirect){
-    try { ctx.__outBus.connect(ctx.destination); ctx.__outDirect = true; } catch(e){}
-  }
+
 }
 
 function primeAudio(){
@@ -2933,6 +2938,9 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
   const hasVoice = state.voiceMode === 'own' ? recordings.some(r=>r) : true;
   if (!hasVoice){
     /* Tell the truth about which of the two this is. Telling someone to record
@@ -3372,15 +3380,14 @@ function finishFinal(){
   if (finalTone){ try{ finalTone.stop(); }catch(e){} }
   if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} }
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
-  /* A session reaching its own end is the one case worth fading rather than
-     cutting: the last thing somebody hears at the end of eight hours should
-     not be the ambience stopping dead. The context close waits for it. */
-  const bedFade = 1.2;
-  sessionBed.stop({ fade: bedFade });
+  // The ending fade has finished; detach now so restarting cannot reuse a closed bus.
+  sessionBed.stop({ fade: 0 });
   if (customTrackSource){ try{ customTrackSource.stop(); }catch(e){} customTrackSource=null; }
   if (finalCtx){
     const closing = finalCtx;
-    setTimeout(()=>{ sessionBed.detach(); try{ closing.close(); }catch(e){} }, (bedFade + 0.3) * 1000);
+    finalCtx = null;
+    sessionBed.detach();
+    try { closing.close(); } catch(e){}
   }
   liveToneGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
@@ -3504,3 +3511,15 @@ async function runSoundCheck(){
    and a `const` cannot be read before its declaration has run. Called from the
    top, this threw on load and took every function below it with it. */
 renderPaceChips();
+
+// Preview audio belongs to the builder view, never to the next page.
+function stopBuilderPreviews(){
+  stopAmbiencePreview();
+  stopSerenityPreview();
+  if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  stopRec();
+}
+if (typeof window.addEventListener === 'function'){
+  window.addEventListener('hashchange', stopBuilderPreviews);
+  window.addEventListener('pagehide', stopBuilderPreviews);
+}

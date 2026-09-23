@@ -143,7 +143,7 @@ function openImmersivePlayer(){
 }
 function closeImmersivePlayer(){
   const el=document.getElementById('immersivePlayer'); if(el){el.classList.remove('open');el.setAttribute('aria-hidden','true');}
-  document.body.classList.remove('player-open'); closePlayerSheets(); stopAmbiencePreview(); clearInterval(playerUiTimer); playerUiTimer=null;
+  document.body.classList.remove('player-open'); closePlayerSheets(); stopPlayerAmbiencePreview(); clearInterval(playerUiTimer); playerUiTimer=null;
 }
 function showImmersiveAffirmation(text){
   const stream=document.getElementById('ipAffirmationStream'); if(!stream) return;
@@ -199,23 +199,25 @@ function usePendingAmbience(){
   if(!playerPendingTrack)return;
   if(playerPendingTrack.kind==='frequency'){const f=FREQS.find(x=>x.hz===playerPendingTrack.hz);if(f){playerPrefs.frequency=f.hz;state.freq=f;changeFinalFrequency(String(f.hz));}}
   else {playerPrefs.ambience=playerPendingTrack.key;state.bg=playerPendingTrack.key;if(typeof changeFinalAmbience==='function')changeFinalAmbience(state.bg);}
-  persistPlayerPrefs();renderPlayerSelectionState();closePlayerSheets();stopAmbiencePreview();
+  persistPlayerPrefs();renderPlayerSelectionState();closePlayerSheets();stopPlayerAmbiencePreview();
 }
-function stopAmbiencePreview(){
+function stopPlayerAmbiencePreview(){
   if(playerPreview&&playerPreview.audio){playerPreview.audio.pause();playerPreview.audio.src='';}
   if(playerPreview&&playerPreview.engine)playerPreview.engine.stop();
   if(playerPreviewCtx){try{playerPreviewCtx.close();}catch(e){}playerPreviewCtx=null;}
   playerPreview=null;
 }
 function previewAmbience(key){
-  const t=PLAYER_AMBIENCE.find(x=>x.key===key);if(!t||!trackIsAvailable(t))return;
-  if(playerPreview&&playerPreview.key===key){stopAmbiencePreview();renderAmbienceLibrary();return;}
   stopAmbiencePreview();
+  stopSerenityPreview();
+  const t=PLAYER_AMBIENCE.find(x=>x.key===key);if(!t||!trackIsAvailable(t))return;
+  if(playerPreview&&playerPreview.key===key){stopPlayerAmbiencePreview();renderAmbienceLibrary();return;}
+  stopPlayerAmbiencePreview();
   if(window.AMBIENCE_URLS&&window.AMBIENCE_URLS[key]){const audio=new Audio(window.AMBIENCE_URLS[key]);audio.loop=true;audio.volume=.45;audio.play().catch(()=>{});playerPreview={key,audio};}
   else {playerPreviewCtx=new (window.AudioContext||window.webkitAudioContext)();const g=playerPreviewCtx.createGain();g.gain.value=.25;g.connect(playerPreviewCtx.destination);let engine;if(t.kind==='frequency'){const o=playerPreviewCtx.createOscillator();o.type='sine';o.frequency.value=t.hz;o.connect(g);o.start();engine={stop(){try{o.stop();}catch(e){}}};}else engine=buildAmbience(playerPreviewCtx,key,g);playerPreview={key,engine};}
   renderAmbienceLibrary();
 }
-function closePlayerSheets(){document.querySelectorAll('.player-sheet').forEach(x=>x.classList.remove('open'));stopAmbiencePreview();}
+function closePlayerSheets(){document.querySelectorAll('.player-sheet').forEach(x=>x.classList.remove('open'));stopPlayerAmbiencePreview();}
 
 function openLoopSheet(){const options=[['entire','Loop entire subliminal'],['current','Loop current affirmation'],['none','No loop']];document.getElementById('loopOptions').innerHTML=options.map(([k,l])=>`<button class="ps-option${playerPrefs.loopMode===k?' sel':''}" onclick="setPlayerLoopMode('${k}')"><span>${l}</span><span>${playerPrefs.loopMode===k?'✓':''}</span></button>`).join('');document.getElementById('loopSheet').classList.add('open');}
 function setPlayerLoopMode(mode){playerPrefs.loopMode=mode;persistPlayerPrefs();renderPlayerSelectionState();openLoopSheet();setTimeout(closePlayerSheets,220);}
