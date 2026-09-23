@@ -175,13 +175,114 @@ async function renameLibraryItem(id){
 /* `stayHere` is for playing from the library: the state is loaded exactly the
    same way, but you are not thrown onto the builder page to find a second
    button. Everything before this point is identical either way -- there is one
-   loader, not two. */
+   loader, not two.
+
+   It works in two halves, and the split is what keeps two subliminals from
+   ever sharing the player. The first half only fetches: the row, the
+   recordings, the custom track and the layered voice, all at once rather than
+   one after another (one after another was most of the wait between the tap
+   and the first sound), and into local variables only. The second half writes
+   all of it into the builder's state in one synchronous step. A load that is
+   cancelled -- `opts.signal`, because a newer tap superseded it -- stops at the
+   next await and never reaches the second half, so it can never leave its
+   recordings mixed into someone else's session. That was the bug: two loads in
+   flight both writing into `recordings` as their downloads came back. */
+function playbackCancelled(){
+  const e = new Error('superseded by a newer play request');
+  e.name = 'AbortError';
+  return e;
+}
+/* Recordings are stored under a fresh path each time they are saved, so a path
+   names one immutable file and the blob behind it can be kept. Switching back
+   to a subliminal you played a minute ago then costs one small query, not a
+   download of every line again. Small and bounded: this is for switching
+   between tonight's few, not a library cache. */
+const savedAudioBlobs = new Map();          // `${bucket}/${path}` -> Promise<Blob>
+const SAVED_AUDIO_BLOB_LIMIT = 80;
+function fetchSavedAudio(bucket, path, signal){
+  const key = bucket + '/' + path;
+  const hit = savedAudioBlobs.get(key);
+  if (hit){ savedAudioBlobs.delete(key); savedAudioBlobs.set(key, hit); return hit; }
+  /* The download itself is not tied to one request's signal: it is shared
+     through the cache, and a second tap on the same subliminal should pick up
+     the download the first one started rather than begin it again. The
+     request that is waiting on it is what gets cancelled. */
+  const job = (async () => {
+    const { data: signed, error: sErr } = await sb.storage.from(bucket).createSignedUrl(path, 3600);
+    if (sErr || !signed) throw new Error((sErr && sErr.message) || 'could not get a link to the audio');
+    const res = await fetch(signed.signedUrl);
+    if (!res.ok) throw new Error('the audio file came back ' + res.status);
+    const blob = await res.blob();
+    if (!blob.size) throw new Error('the audio file is empty');
+    return blob;
+  })();
+  savedAudioBlobs.set(key, job);
+  job.catch(() => { if (savedAudioBlobs.get(key) === job) savedAudioBlobs.delete(key); });
+  while (savedAudioBlobs.size > SAVED_AUDIO_BLOB_LIMIT) savedAudioBlobs.delete(savedAudioBlobs.keys().next().value);
+  return abortable(job, signal);
+}
+function abortable(promise, signal){
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(playbackCancelled());
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(playbackCancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(v => { signal.removeEventListener('abort', onAbort); resolve(v); },
+                 e => { signal.removeEventListener('abort', onAbort); reject(e); });
+  });
+}
 async function loadSavedIntoBuilder(id, opts){
   if (!sb || !currentUser) return;
+  const signal = opts && opts.signal;
+  // Opened for editing rather than played: a play still loading loses to it.
+  if (!signal && typeof cancelPendingPlayback === 'function') cancelPendingPlayback();
+  const checkCancelled = () => { if (signal && signal.aborted) throw playbackCancelled(); };
   await flushMixSave();
-  const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
+  checkCancelled();
+  const { data: s, error } = await abortable(
+    sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle(), signal);
+  checkCancelled();
   if (error || !s) throw error || new Error('This subliminal could not be loaded.');
+
+  /* ---- first half: fetch, into locals only ----
+     Every way a recording can fail used to end in `null`, which is the same
+     value as "this line was never recorded". So a subliminal whose audio could
+     not be fetched — an expired link, a storage rule, a phone that dropped off
+     the network — came back looking like one you had never recorded, and the
+     player said "go back and hold the record button", which was untrue and
+     unfixable by doing what it asked. Load failures are counted and told apart
+     from lines that genuinely have no recording. */
+  const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
+  const hasLayerRecordings = Array.isArray(s.layer_recording_urls) && s.layer_recording_urls.some(p => p);
+  const loadErrors = [];
+  const loadRecording = (path, countErrors) => {
+    if (!path) return Promise.resolve(null);   // never recorded: not an error
+    return fetchSavedAudio('recordings', path, signal)
+      .then(blob => ({ blob }))
+      .catch(e => {
+        if (e && e.name === 'AbortError') throw e;
+        if (countErrors) loadErrors.push((e && e.message) || 'the audio could not be downloaded');
+        return null;
+      });
+  };
+  const [mainBlobs, layerBlobs, customBlob] = await Promise.all([
+    hasRealRecordings ? Promise.all(s.recording_urls.map(p => loadRecording(p, true))) : null,
+    hasLayerRecordings ? Promise.all(s.layer_recording_urls.map(p => loadRecording(p, false))) : [],
+    s.custom_track_url
+      ? fetchSavedAudio('custom-tracks', s.custom_track_url, signal).catch(e => {
+          if (e && e.name === 'AbortError') throw e;
+          console.error('custom track reload failed:', e);
+          return null;
+        })
+      : null,
+  ]);
+  checkCancelled();
+
+  /* ---- second half: commit, synchronously ----
+     Nothing below awaits, so once this starts it finishes as one step: either
+     all of this subliminal is in the builder or none of it is. */
   if (finalPlaying) stopFinal();
+  const toRec = r => r ? { url: URL.createObjectURL(r.blob), blob: r.blob } : null;
   editingExistingId = id;
   state.playerTitle = s.title || 'Your Subliminal';
   const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
@@ -197,36 +298,9 @@ async function loadSavedIntoBuilder(id, opts){
   state.visualizationMode = !!s.visualization_mode;
   state.binauralBand = s.binaural_band || null;
 
-  const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
-    /* Every way this can fail used to end in `null`, which is the same value as
-       "this line was never recorded". So a subliminal whose audio could not be
-       fetched — an expired link, a storage rule, a phone that dropped off the
-       network — came back looking like one you had never recorded, and the
-       player said "go back and hold the record button", which was untrue and
-       unfixable by doing what it asked. Load failures are now counted and told
-       apart from lines that genuinely have no recording. */
-    recordings = [];
-    recordingLoadErrors = [];
-    for (const path of s.recording_urls){
-      if (!path){ recordings.push(null); continue; }   // never recorded: not an error
-      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-      if (sErr || !signed){
-        recordings.push(null);
-        recordingLoadErrors.push((sErr && sErr.message) || 'could not get a link to the audio');
-        continue;
-      }
-      try {
-        const res = await fetch(signed.signedUrl);
-        if (!res.ok) throw new Error('the audio file came back ' + res.status);
-        const blob = await res.blob();
-        if (!blob.size) throw new Error('the audio file is empty');
-        recordings.push({ url: URL.createObjectURL(blob), blob });
-      } catch(e){
-        recordings.push(null);
-        recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');
-      }
-    }
+    recordings = mainBlobs.map(toRec);
+    recordingLoadErrors = loadErrors;
     state.voiceMode = 'own';
     state.selectedVoice = VOICE_RECORD_OWN;
     if (recordingLoadErrors.length){
@@ -245,19 +319,8 @@ async function loadSavedIntoBuilder(id, opts){
     state.selectedVoice = selectedVoiceFromState();
   }
 
-  customTrackBlob = null;
-  document.getElementById('customTrackName').textContent = '';
-  if (s.custom_track_url){
-    const { data: signed, error: sErr } = await sb.storage.from('custom-tracks').createSignedUrl(s.custom_track_url, 3600);
-    if (!sErr && signed){
-      try {
-        const res = await fetch(signed.signedUrl);
-        const blob = await res.blob();
-        customTrackBlob = blob;
-        document.getElementById('customTrackName').textContent = 'Your uploaded track';
-      } catch(e){ console.error('custom track reload failed:', e); }
-    }
-  }
+  customTrackBlob = customBlob || null;
+  document.getElementById('customTrackName').textContent = customBlob ? 'Your uploaded track' : '';
 
   // Ritual-only second voice layer, if this saved subliminal has one.
   state.layerAffirmations = Array.isArray(s.layer_affirmations) ? s.layer_affirmations.slice() : [];
@@ -269,20 +332,7 @@ async function loadSavedIntoBuilder(id, opts){
   document.getElementById('layerVoicePanel').classList.toggle('open', layerVoiceEnabled);
   document.getElementById('layerAffText').value = state.layerAffirmations.join('\n');
   paintLayerVoiceOptions();
-  layerRecordings = [];
-  const hasLayerRecordings = Array.isArray(s.layer_recording_urls) && s.layer_recording_urls.some(p => p);
-  if (hasLayerRecordings){
-    for (const path of s.layer_recording_urls){
-      if (!path){ layerRecordings.push(null); continue; }
-      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-      if (sErr || !signed){ layerRecordings.push(null); continue; }
-      try {
-        const res = await fetch(signed.signedUrl);
-        const blob = await res.blob();
-        layerRecordings.push({ url: URL.createObjectURL(blob), blob });
-      } catch(e){ layerRecordings.push(null); }
-    }
-  }
+  layerRecordings = layerBlobs.map(toRec);
 
   prepareFinal();
   restoreMixSettings(id, s.mix_settings);
@@ -293,7 +343,6 @@ async function loadSavedIntoBuilder(id, opts){
     showStep(7);
   }
 }
-
 async function deleteMySubliminal(id){
   if (!sb || !currentUser) return;
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);
@@ -600,34 +649,116 @@ async function submitFeedback(){
    The engine is the one in builder.js: the same state, the same mixer, the same
    session. Only the way in is different — nothing about playback is duplicated
    here, because two players would drift and one of them would be the broken one. */
-async function playFromLibrary(id){
+/* ---------- one subliminal at a time ----------
+   Every way of playing a saved subliminal -- a Today card, Today's play button,
+   the library -- comes through here, and this is the only place that decides
+   what is playing. There is one engine (builder.js) and one request in flight.
+
+   A tap on a different subliminal stops the one playing *first*, synchronously,
+   in the tap: every oscillator, clip, element, ambience bed and timer of the old
+   session goes with stopFinal before anything new is asked for. Then it cancels
+   whatever load was still in the air, and only then starts its own. The loads
+   used to race: tap A, tap B while A was still downloading, and nothing was
+   playing yet to stop -- so both loads ran, both wrote into the same builder
+   state, and whichever finished first got the player. The newest tap has to win,
+   and now a load that has been superseded is thrown away at its next await. */
+let playbackRequest = null;       // { id, controller } -- the one load in flight
+function pendingPlaybackId(){ return playbackRequest ? playbackRequest.id : null; }
+function cancelPendingPlayback(){
+  if (!playbackRequest) return;
+  playbackLog('cancel load', playbackRequest.id);
+  try { playbackRequest.controller.abort(); } catch(e){}
+  playbackRequest = null;
+}
+/* Anything that shows what is playing repaints from here, so a card can light
+   up in the same frame as the tap rather than when the audio arrives. */
+function playbackChanged(){
+  reflectLibraryPlaying();
+  if (typeof paintTodaySessionState === 'function') paintTodaySessionState();
+  if (typeof renderNowBar === 'function') renderNowBar();
+}
+
+async function playFromLibrary(id, opts){
   if (!sb || !currentUser){ openAuthModal(); return; }
-  /* First thing, before anything is awaited: the tap is the only moment a
-     browser will let audio begin, and loading the subliminal ends it. */
+  const quiet = !!(opts && opts.stayOnPage);
+
+  // Pressing play on the one already playing pauses it, the way a playlist does.
+  if (finalPlaying && libraryNowPlayingId === id){
+    toggleImmersivePlayback();
+    if (!quiet) openImmersivePlayer();
+    playbackChanged();
+    return;
+  }
+  // The same one tapped again while it is still loading is not a second session.
+  if (playbackRequest && playbackRequest.id === id) return;
+
+  // Stop, then cancel, then start: the order matters.
+  cancelPendingPlayback();
+  if (finalPlaying){ playbackLog('stop', libraryNowPlayingId); stopFinal(); }
+  /* After the stop, never before it: stopFinal closes the context, and the tap
+     is the only moment a browser will let a new one begin -- loading the
+     subliminal ends it. Priming first and stopping second closed the context
+     this tap had just unlocked, and the session then opened a fresh one after
+     the await that iOS was free to refuse. */
   primeAudio();
+
+  const req = { id, controller: new AbortController() };
+  playbackRequest = req;
+  libraryNowPlayingId = id;
+  playbackLog('load', id);
   const btn = document.getElementById('libPlay-' + id);
   const now = document.getElementById('libNow-' + id);
-
-  // Pressing play on the one already playing stops it, the way a playlist does.
-  if (finalPlaying && libraryNowPlayingId === id){ toggleImmersivePlayback(); openImmersivePlayer(); return; }
-  if (finalPlaying) stopFinal();
-
-  libraryNowPlayingId = id;
   if (btn) btn.classList.add('is-loading');
   if (now) now.textContent = 'Loading…';
+  playbackChanged();
 
   try {
-    await loadSavedIntoBuilder(id, { stayHere: true });
+    await loadSavedIntoBuilder(id, { stayHere: true, signal: req.controller.signal });
   } catch (e){
-    if (now) now.textContent = 'Could not load this one.';
     if (btn) btn.classList.remove('is-loading');
+    if (playbackRequest !== req) return;          // superseded: the newer tap owns the screen
+    playbackRequest = null;
     libraryNowPlayingId = null;
+    console.warn('could not load subliminal', id, e);
+    if (now) now.textContent = 'Could not load this one.';
+    playbackChanged();
     return;
   }
   if (btn) btn.classList.remove('is-loading');
+  if (playbackRequest !== req){ playbackLog('discard stale load', id); return; }
+  playbackRequest = null;
+  if (finalPlaying) stopFinal();                  // nothing may be under it
   playFinal();
-  reflectLibraryPlaying();
+  playbackLog('play', id);
+  playbackChanged();
 }
+
+/* ---------- checking it ----------
+   `?audiodebug` in the address (remembered for the visit) logs every stop,
+   load, discard and play, and window.subliminallyAudioState() reports what is
+   live: there should never be more than one session context open. */
+const playbackDebug = (() => {
+  try {
+    if (/[?&]audiodebug\b/.test(location.search)) sessionStorage.setItem('fthr_audio_debug', '1');
+    return sessionStorage.getItem('fthr_audio_debug') === '1';
+  } catch(e){ return false; }
+})();
+function playbackLog(what, id){
+  if (!playbackDebug) return;
+  console.info('[playback]', what, id || '', subliminallyAudioState());
+}
+function subliminallyAudioState(){
+  return {
+    playing: libraryNowPlayingId && finalPlaying ? libraryNowPlayingId : null,
+    paused: !!finalPaused,
+    loading: pendingPlaybackId(),
+    session: finalSession,
+    openContexts: typeof openSessionContexts !== 'undefined' ? openSessionContexts.size : null,
+    contextState: finalCtx ? finalCtx.state : 'none',
+    liveVoiceElements: liveVoiceElements.size,
+  };
+}
+window.subliminallyAudioState = subliminallyAudioState;
 
 let libraryNowPlayingId = null;
 

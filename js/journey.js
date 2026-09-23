@@ -165,12 +165,10 @@ function renderTodaySession(lastSub){
     <div class="sess-row" role="radiogroup" aria-label="Choose tonight's subliminal">
       ${todaySubs.map(s => {
         const mins = Math.round((s.duration_seconds || 0) / 60);
-        const on = s.id === todaySubChosen;
-        const playing = finalPlaying && libraryNowPlayingId === s.id;
-        return `<button type="button" class="sess-card${on ? ' sel' : ''}" role="radio"
-            aria-checked="${on}" onclick="chooseTodaySub('${s.id}')">
+        return `<button type="button" class="sess-card" role="radio" data-sub="${s.id}"
+            aria-checked="false" onclick="chooseTodaySub('${s.id}')">
           <span class="sess-art" id="sessArt-${s.id}">
-            <span class="sess-play" aria-hidden="true">${playing ? '❚❚' : '▶'}</span>
+            <span class="sess-play" aria-hidden="true">▶</span>
           </span>
           <span class="sess-name">${(s.title || 'Untitled').replace(/</g,'&lt;')}</span>
           <span class="sess-len">${mins ? formatSessionLength(mins) : ''}</span>
@@ -178,16 +176,69 @@ function renderTodaySession(lastSub){
       }).join('')}
     </div>
     <div class="sess-actions">
-      <button class="btn btn-primary" onclick="playTodaySubliminal()">
-        <span class="sess-btn-mark" aria-hidden="true">${finalPlaying && !finalPaused ? PAUSE_MARK : PLAY_MARK}</span>
-        ${finalPlaying ? (finalPaused ? 'Resume' : 'Pause') : 'Play it'}</button>
+      <button class="btn btn-primary" id="todayPlayBtn" onclick="playTodaySubliminal()"></button>
       <button class="btn btn-ghost" onclick="resetFlow(); showBuildPage(); showStep(0);">
         <span class="sess-btn-mark" aria-hidden="true">${PLUS_MARK}</span>Build a new one</button>
       <button class="btn btn-ghost" onclick="showLibraryPage(); setLibraryTab('mine');">
         <span class="sess-btn-mark" aria-hidden="true">${STACK_MARK}</span>All my subliminals</button>
     </div>`;
+  paintTodaySessionState();
   todaySubs.forEach(s => { if (s.cover_path) showTodaySubCover(s.id, s.cover_path); });
 }
+
+/* What one of tonight's cards is doing, read off the one player rather than
+   kept in a second copy that could disagree with it. */
+function todaySubPlayState(id){
+  if (typeof pendingPlaybackId === 'function' && pendingPlaybackId() === id) return 'loading';
+  if (finalPlaying && libraryNowPlayingId === id) return finalPaused ? 'paused' : 'playing';
+  return 'idle';
+}
+/* The selection ring, the marks and the button, painted in place. Cheap and
+   synchronous, so it runs inside the tap -- the card you pressed is lit before
+   anything has loaded -- and on every change of what is playing, without
+   rebuilding the cards (which would fetch their cover art again). */
+let todaySessionPainted = '';
+function paintTodaySessionState(){
+  const card = document.getElementById('todaySessionCard');
+  if (!card) return;
+  const cards = card.querySelectorAll('.sess-card[data-sub]');
+  if (!cards.length) return;
+  cards.forEach(b => {
+    const id = b.dataset.sub;
+    const on = id === todaySubChosen;
+    const st = todaySubPlayState(id);
+    b.classList.toggle('sel', on);
+    b.setAttribute('aria-checked', String(on));
+    b.classList.toggle('is-loading', st === 'loading');
+    b.classList.toggle('is-playing', st === 'playing');
+    const mark = b.querySelector('.sess-play');
+    const glyph = st === 'playing' ? '❚❚' : st === 'loading' ? '…' : '▶';
+    if (mark && mark.textContent !== glyph) mark.textContent = glyph;
+  });
+  const btn = card.querySelector('#todayPlayBtn');
+  if (btn){
+    const st = todaySubChosen ? todaySubPlayState(todaySubChosen) : 'idle';
+    const label = st === 'loading' ? 'Starting…' : st === 'playing' ? 'Pause' : st === 'paused' ? 'Resume' : 'Play it';
+    const sig = st + '|' + label;
+    if (btn.dataset.state !== sig){
+      btn.innerHTML = `<span class="sess-btn-mark" aria-hidden="true">${st === 'playing' ? PAUSE_MARK : PLAY_MARK}</span>${label}`;
+      btn.dataset.state = sig;
+    }
+    btn.setAttribute('aria-busy', String(st === 'loading'));
+  }
+  todaySessionPainted = todaySessionSignature();
+}
+function todaySessionSignature(){
+  return [todaySubChosen, libraryNowPlayingId, finalPlaying, finalPaused,
+    typeof pendingPlaybackId === 'function' ? pendingPlaybackId() : null].join('|');
+}
+/* A session can be paused, stopped or finished from the full-screen player,
+   the bar at the bottom or the lock screen. One cheap beat keeps the cards
+   honest about it, and does nothing when nothing has changed. */
+setInterval(() => {
+  if (document.body.getAttribute('data-view') !== 'today') return;
+  if (todaySessionSignature() !== todaySessionPainted){ paintTodaySessionState(); renderTodayJourney(); }
+}, 500);
 
 /* Empty and not-loaded-yet look identical from in here, and they should not
    read the same on screen. "Nothing set yet" is a true thing to say about a
@@ -400,28 +451,27 @@ async function showTodaySubCover(id, path){
 }
 
 function chooseTodaySub(id){
+  /* A card is a play button, not only a choice: tapping one plays it, stopping
+     whatever was playing. Tapping the one that is playing pauses it. */
   todaySubChosen = id;
-  renderTodaySession(null);
+  paintTodaySessionState();                 // lit in this frame, before any audio
+  playTodaySubliminal();
 }
 
 /* Play whichever is chosen, without leaving Today. The tick comes from
    light_ledger like every other quest — playing it is what checks it off, and
-   awardLight already refuses to pay twice in a day. */
+   awardLight already refuses to pay twice in a day.
+
+   All the deciding -- pause this one, or stop it and start that one, and which
+   of several quick taps wins -- is playFromLibrary's. This used to pause
+   whatever was playing whenever anything was, so choosing a different card and
+   pressing play paused the old one instead of playing the new one. */
 function playTodaySubliminal(){
-  /* Pause, not stop. Everywhere else in the app the second press on a playing
-     session pauses it and keeps your place; this card used to be the one
-     button that threw the session away. */
-  if (finalPlaying){ toggleImmersivePlayback(); renderTodaySession(null); renderTodayJourney(); return; }
-  if (typeof primeAudio === 'function') primeAudio();   // inside the tap
   const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
   if (!id){ showBuildPage(); return; }
-  /* Loading a saved subliminal takes a moment, and a button that looks
-     unchanged for that moment reads as a button that did nothing. */
-  const card = document.getElementById('todaySessionCard');
-  const btn = card && card.querySelector('.btn-primary');
-  if (btn){ btn.textContent = 'Starting…'; btn.disabled = true; }
-  if (typeof playFromLibrary === 'function'){
-    playFromLibrary(id);
-    setTimeout(() => { renderTodaySession(null); renderTodayJourney(); }, 900);
-  } else showBuildPage();
+  todaySubChosen = id;
+  if (typeof playFromLibrary !== 'function'){ showBuildPage(); return; }
+  playFromLibrary(id, { stayOnPage: true });   // its first steps run inside this tap
+  paintTodaySessionState();
+  renderTodayJourney();
 }
