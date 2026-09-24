@@ -1215,7 +1215,7 @@
     --midnight:#87C8E6; --midnight-2:#B9DFEE;
     --veil:rgba(255,253,248,.90); --dusk:rgba(62,42,72,.14);
     --moonlight:#3E2A48; --haze:#7A6584;
-    --candle:#D9623B; --lilac:#7A4FB5; --good:#8FCBA6;
+    --candle:#D9623B; --lilac:#D98262; --good:#8FCBA6;
     --hairline:rgba(62,42,72,.10); --sunk:rgba(62,42,72,.06);
   }
   body[data-sky="night"]{
@@ -1245,6 +1245,13 @@
   body[data-sky="day"] .btn-primary:hover{ box-shadow:0 10px 26px rgba(217,98,59,.30); }
   body[data-sky="day"] .btn-ghost{ border-color:rgba(62,42,72,.24); }
   body[data-sky="day"] ::selection{ background:#F0845F; color:#fff; }
+  /* Day mode is sunrise, not lavender: remove the remaining purple-coded
+     frequency/help surfaces while keeping the night palette untouched. */
+  body[data-sky="day"] .freq-card3.sel{ background:rgba(240,132,95,.13); border-color:#E8A383; }
+  body[data-sky="day"] .freq-card3 .word{ color:#C86F51; }
+  body[data-sky="day"] .freq-guide{ background:rgba(255,240,228,.72); border-color:rgba(232,163,131,.42); }
+  body[data-sky="day"] .disclaimer{ background:rgba(255,240,228,.62); border-color:rgba(232,163,131,.34); }
+  body[data-sky="day"] .disclaimer span.i{ color:#D98262; }
   /* Rules that had a colour written into them instead of a token. */
   body[data-sky="day"] .day-habit{ background:#FFF6EA; border-color:rgba(62,42,72,.12); }
   body[data-sky="day"] .today-progress, body[data-sky="day"] .cal-nav{ background:rgba(128,110,150,.18); }
