@@ -171,6 +171,8 @@ body.player-open .now-bar{ display:none!important; }
 #voiceSerenity .sound-art{grid-row:1/3;width:64px;height:64px;margin:0;}
 #voiceSerenity h4,#voiceSerenity p{margin:0;}
 #serenityPreviewBtn,#bgGrid .bg-preview-btn{align-self:center!important;flex:none!important;width:auto!important;min-width:76px;height:44px!important;min-height:44px!important;padding:0 13px!important;margin:0 10px 0 0!important;border:1px solid rgba(190,157,226,.5)!important;border-radius:999px!important;background:rgba(186,152,222,.12)!important;color:#e4cdf6!important;font-size:14px!important;white-space:nowrap;}
+#serenityPreviewBtn svg,#bgGrid .bg-preview-btn svg{width:15px;height:15px;flex:none;filter:drop-shadow(0 0 7px rgba(227,190,127,.42));}
+#serenityPreviewBtn span,#bgGrid .bg-preview-btn span{line-height:1;}
 #serenityPreviewBtn.is-playing,#bgGrid .bg-preview-btn.is-playing{background:#685080!important;color:#fff!important;}
 #bgGrid .bg-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
 #bgGrid .bg-card{position:relative;flex-wrap:wrap;align-items:center;text-align:left;border:1px solid #766185!important;background:rgba(54,41,70,.6)!important;border-radius:16px;padding:12px;gap:8px;}

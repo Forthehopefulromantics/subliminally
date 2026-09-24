@@ -1309,9 +1309,10 @@ const PREVIEW_PAUSE_MARK = '<svg viewBox="0 0 24 24" fill="none" stroke="current
 function setSerenityPreviewLabel(playing){
   const btn = document.getElementById('serenityPreviewBtn');
   if (!btn) return;
-  btn.textContent = playing ? 'Stop' : 'Preview';
+  btn.innerHTML = (playing ? PREVIEW_PAUSE_MARK : PREVIEW_PLAY_MARK)
+    + `<span>${playing ? 'Pause' : 'Preview'}</span>`;
   btn.classList.toggle('is-playing', !!playing);
-  btn.setAttribute('aria-label', playing ? 'Stop the Serenity preview' : 'Play a short Serenity preview');
+  btn.setAttribute('aria-label', playing ? 'Pause the Serenity preview' : 'Play a short Serenity preview');
 }
 
 /* Point the player at the file as the step opens, so the first tap plays rather
@@ -1892,8 +1893,9 @@ function paintBgCards(){
   document.querySelectorAll('#bgGrid .bg-preview-btn').forEach(btn => {
     const live = previewBed.playing() && btn.dataset.key === previewBed.key;
     btn.classList.toggle('is-playing', live);
-    btn.setAttribute('aria-label', `${live ? 'Stop' : 'Play'} a preview of ${ambienceName(btn.dataset.key)}`);
-    btn.textContent = live ? 'Stop' : 'Preview';
+    btn.setAttribute('aria-label', `${live ? 'Pause' : 'Play'} a preview of ${ambienceName(btn.dataset.key)}`);
+    btn.innerHTML = (live ? PREVIEW_PAUSE_MARK : PREVIEW_PLAY_MARK)
+      + `<span>${live ? 'Pause' : 'Preview'}</span>`;
   });
   paintAmbienceConfirm();
 }
@@ -1986,7 +1988,7 @@ function bgCard(track){
     play.type = 'button';
     play.className = 'bg-preview-btn';
     play.dataset.key = track.key;
-    play.textContent = 'Preview';
+    play.innerHTML = PREVIEW_PLAY_MARK + '<span>Preview</span>';
     play.onclick = (ev) => toggleAmbiencePreview(ev, track.key);
     card.appendChild(play);
   }
