@@ -19,6 +19,12 @@
   --bc-shadow:0 1px 2px rgba(92,54,39,.03), 0 8px 24px rgba(143,91,65,.06);
   --bc-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");
 }
+body[data-sky="day"] #flow-section{
+  /* Day mode is sunrise, never lavender. Override legacy site tokens used by older builder controls. */
+  --lilac:#D98663; --dusk:#FFF3E7; --veil:#FFF8F0; --haze:#7A6584;
+  --candle:#F0845F; --moonlight:#3E2A48;
+}
+
 body[data-sky="night"] #flow-section{
   --bc-card:rgba(42,31,66,.72); --bc-card-sel:rgba(60,44,92,.78); --bc-line:rgba(160,136,205,.30);
   --bc-ink:#F3ECFB; --bc-muted:#B5A9D0; --bc-kicker:#A195C2;
@@ -243,3 +249,18 @@ body[data-sky="day"] #flow-section .flow-card{
   #flow-section .flow-step[data-step="4"] .flow-nav .candlebtn,
   #flow-section .flow-step[data-step="5"] .flow-nav .candlebtn{ min-height:58px; font-size:16px; letter-spacing:.26em; }
 }
+
+/* Complete day-mode cleanup for legacy selection controls inside the builder. */
+body[data-sky="day"] #flow-section .freq-card3.sel,
+body[data-sky="day"] #flow-section .length-chip.sel,
+body[data-sky="day"] #flow-section .ritual-mode-chip.sel,
+body[data-sky="day"] #flow-section .pace-chip.sel,
+body[data-sky="day"] #flow-section .chip.sel{
+  background:#FFF0E4!important; border-color:#E8A383!important; color:#6A4338!important;
+  box-shadow:none!important;
+}
+body[data-sky="day"] #flow-section input[type="range"]{ accent-color:#F0845F!important; }
+body[data-sky="day"] #flow-section .freq-card3 .word,
+body[data-sky="day"] #flow-section .rec-status{ color:#B56E52!important; }
+body[data-sky="day"] #flow-section .freq-guide,
+body[data-sky="day"] #flow-section .disclaimer{ background:#FFF8F0!important; border-color:#F0D9C9!important; }
