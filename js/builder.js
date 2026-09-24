@@ -1978,7 +1978,7 @@ function bgCard(track){
   face.appendChild(label);
   if (track.blurb){ const desc = document.createElement('span'); desc.className = 'ambience-description'; desc.textContent = track.blurb; face.appendChild(desc); }
   if (track.blurb) face.setAttribute('title', track.blurb);
-  face.onclick = () => auditionAmbience(track.key);
+  face.onclick = () => selectAmbienceFromCard(track.key);
   card.appendChild(face);
 
   /* None has nothing to hear. Every other sound, recorded or generated on the
@@ -1998,6 +1998,21 @@ function bgCard(track){
 /* Tapping a card. Writes the candidate, repaints, and starts listening — in
    that order, and the first two synchronously, so the mark lands in the frame
    the tap happened in rather than whenever the mp3 arrives. */
+/* Selecting a card must actually select it. Preview remains a separate control. */
+function selectAmbienceFromCard(key){
+  stopAmbiencePreview();
+  ambienceCandidate = key;
+  if (key === 'none') {
+    state.bg = 'none';
+    state.bgLayer = 'none';
+  } else {
+    chooseAmbience(key);
+    warmAmbience(state.bg);
+    warmAmbience(state.bgLayer);
+  }
+  paintBgCards();
+}
+
 function auditionAmbience(key){
   ambienceCandidate = key;
   paintBgCards();
