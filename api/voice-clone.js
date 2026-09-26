@@ -29,8 +29,8 @@ import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
 import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
-import { checkVoiceSample, parseWav } from '../lib/voice-sample.js';
-import { TranscodeError, sniffContainer, transcodeToWav } from '../lib/audio-transcode.js';
+import { checkVoiceSample, measureWav, parseWav, SILENCE_FLOOR } from '../lib/voice-sample.js';
+import { TranscodeError, normalizeLoudness, sniffContainer, transcodeToWav } from '../lib/audio-transcode.js';
 
 // The sample arrives as audio (multipart or raw), not JSON; cloning at the provider can take
 // most of a minute, so the function is given room to finish.
@@ -201,16 +201,50 @@ export default async function handler(req, res) {
     return;
   }
 
+  /* Is there anything on the recording at all? Checked on the audio exactly as
+     it arrived — before loudness normalization — so a muted or disconnected
+     mic cannot be boosted into passing. A real voice, however quiet, peaks
+     well above this floor; see SILENCE_FLOOR in lib/voice-sample.js. */
+  const wavInfo = parseWav(sample.wav);
+  if (!wavInfo) {
+    // normalizeSample always returns PCM WAV or throws; this would mean it didn't.
+    console.error('voice-clone: normalized sample is not valid WAV', user.id, { bytes: sample.wav.length, source: sample.source });
+    res.status(415).json({ error: 'unsupported_format' });
+    return;
+  }
+  const rawLevel = measureWav(sample.wav, wavInfo);
+  console.log('voice-clone: level before normalization', user.id, { ...rawLevel, source: sample.source });
+  if (rawLevel.peak < SILENCE_FLOOR) {
+    console.error('voice-clone: nothing on the recording (mic likely muted, unavailable, or not connected)',
+      user.id, rawLevel, { bytes: sample.wav.length, source: sample.source, declared });
+    res.status(400).json({ error: 'sample_silent' });
+    return;
+  }
+
+  /* Bring a genuinely quiet recording up to a normal speaking level before it
+     is measured or sent. A real voice that only measured as "silent" because
+     it was captured quietly — soft-spoken, a bit of distance from the mic, or
+     (common on iOS) autoGainControl not applying the way it does on a call —
+     is fixed here, not by loosening what counts as a voice. See
+     lib/audio-transcode.js normalizeLoudness. */
+  let normalized = sample.wav;
+  try {
+    normalized = await normalizeLoudness(sample.wav);
+  } catch (e) {
+    console.warn('voice-clone: loudness normalization failed, using the recording as received', user.id,
+      (e && e.code) || '', (e && e.detail) || (e && e.message) || e);
+  }
+
   /* The length is checked here, on the audio, not taken from the page's timer. */
-  const checked = checkVoiceSample(sample.wav);
+  const checked = checkVoiceSample(normalized);
   if (!checked.ok) {
     console.error('voice-clone: sample rejected', user.id, checked.code, checked.detail,
-      { bytes: sample.wav.length, source: sample.source, declared });
+      { bytes: normalized.length, rawLevel, source: sample.source, declared });
     res.status(HTTP_FOR_CODE[checked.code] || 400).json({ error: checked.code });
     return;
   }
   console.log('voice-clone: sample ok', user.id, { ...checked, source: sample.source });
-  const wav = sample.wav;
+  const wav = normalized;
 
   try {
     // Replace rather than accumulate: one voice per person, always the latest.

@@ -187,6 +187,7 @@ const { default: voiceClone } = await import(new URL('../api/voice-clone.js', im
 const { default: voices } = await import(new URL('../api/voices.js', import.meta.url).href);
 const { default: voicePreview } = await import(new URL('../api/voice-preview.js', import.meta.url).href);
 const { PREVIEW_TEXT, previewStoragePath } = await import(new URL('../lib/voice-preview.js', import.meta.url).href);
+const { parseWav: parseWavHeader, measureWav: measureWavLevel } = await import(new URL('../lib/voice-sample.js', import.meta.url).href);
 
 function mockRes(){
   const r = { code: null, body: null, headers: {} };
@@ -204,7 +205,7 @@ async function callTts(body, token = 'good-token'){
 }
 /* What the page sends: 16-bit PCM WAV, mono, 22.05 kHz — speech-like tone
    bursts with pauses, or silence. */
-function makeWav(seconds, { rate = 22050, silent = false } = {}){
+function makeWav(seconds, { rate = 22050, silent = false, amplitude = 0.3 } = {}){
   const n = Math.round(seconds * rate);
   const buf = Buffer.alloc(44 + n * 2);
   buf.write('RIFF', 0, 'latin1'); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8, 'latin1');
@@ -213,13 +214,49 @@ function makeWav(seconds, { rate = 22050, silent = false } = {}){
   buf.write('data', 36, 'latin1'); buf.writeUInt32LE(n * 2, 40);
   for (let i = 0; i < n; i++){
     const t = i / rate;
+    // Real silence: at the noise floor of a 16-bit capture, not a quiet tone —
+    // a genuinely muted or disconnected mic reads at essentially nothing.
     const talking = !silent && (t % 1.5) < 1.0;   // a second of voice, half a second of pause
-    const v = talking ? 0.3 * Math.sin(2 * Math.PI * 180 * t) : 0.001 * Math.sin(i);
+    const v = silent ? 0.00005 * Math.sin(i) : (talking ? amplitude * Math.sin(2 * Math.PI * 180 * t) : 0.001 * Math.sin(i));
     buf.writeInt16LE(Math.round(v * 32767), 44 + i * 2);
   }
   return buf;
 }
 const GOOD_WAV = makeWav(75);
+// Genuinely spoken, genuinely quiet: real consonant/vowel structure (not a flat
+// tone) at a peak level a fixed threshold used to refuse outright — the
+// "recorded fine, but the mic captured it quietly" case (soft-spoken, some
+// distance from the mic, or iOS not applying autoGainControl the way a call
+// does when echo cancellation and noise suppression are off). Loud enough to
+// clear SILENCE_FLOOR, far under the old flat "voiced" threshold before
+// normalization brings it up.
+function makeQuietSpeechWav(seconds, { rate = 22050, peak = 0.02 } = {}){
+  const n = Math.round(seconds * rate);
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0, 'latin1'); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8, 'latin1');
+  buf.write('fmt ', 12, 'latin1'); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36, 'latin1'); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++){
+    const t = i / rate;
+    const talking = (t % 1.5) < 1.0;
+    // A fundamental plus a couple of harmonics — closer to a voiced formant
+    // shape than a pure tone, still cheap to synthesize.
+    const v = talking
+      ? peak * (0.6 * Math.sin(2 * Math.PI * 150 * t) + 0.3 * Math.sin(2 * Math.PI * 300 * t) + 0.1 * Math.sin(2 * Math.PI * 450 * t))
+      : 0.0005 * Math.sin(i);
+    buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), 44 + i * 2);
+  }
+  return buf;
+}
+/* Same audio, a normalization pass or a container swap away: not byte-identical
+   any more (the route always brings loudness up to a working level now), but
+   still the same recording — same duration, still real 16-bit PCM WAV. */
+function sameRecording(buf, wantSeconds){
+  const wav = parseWavHeader(buf);
+  if (!wav) return false;
+  return Math.abs(wav.seconds - wantSeconds) < 1 && wav.format === 1 && wav.bitsPerSample === 16;
+}
 
 async function callClone({ method = 'POST', token = 'good-token', consent, replace, sample = GOOD_WAV, contentType = 'audio/wav' } = {}){
   const res = mockRes();
@@ -411,7 +448,7 @@ check('the sample reaches ElevenLabs Instant Voice Cloning', [r.code, !!add, add
 check('  ...from the server, with the server key', add.key, 'el_test_stub');
 check('  ...named by account id, not email', add.form.get('name'), 'subliminally-user-abc');
 check('  ...never the email address', JSON.stringify([...add.form.keys()].map(k => String(add.form.get(k)))).includes('kyla@'), false);
-check('  ...carrying the recording itself', Buffer.from(await add.form.get('files').arrayBuffer()).equals(GOOD_WAV), true);
+check('  ...carrying the recording itself', sameRecording(Buffer.from(await add.form.get('files').arrayBuffer()), 75), true);
 check('  ...as a WAV file', [add.form.get('files').name, add.form.get('files').type], ['sample.wav', 'audio/wav']);
 check('the returned voice_id is saved', db.voiceProfile.provider_voice_id, MY_CLONE);
 check('  ...for the signed-in user', db.voiceProfile.user_id, 'user-abc');
@@ -486,6 +523,32 @@ reset();
 r = await callClone({ consent: CONSENT, sample: makeWav(59.7) });
 check('1:00 on the clock that decodes to 59.7s is accepted', [r.code, !!r.body.created], [200, true]);
 
+/* ---------------- a real but quiet recording is not "not enough voice" ----------------
+   The bug this guards against: a phone mic that captured actual, continuous
+   speech, but at a peak level under the old flat threshold — soft-spoken, some
+   distance from the mic, or (on iOS Safari) autoGainControl not applying the
+   way it does on a call, because turning off echo cancellation and noise
+   suppression for a cleaner sample also turns off the gain stage that rides
+   along with them. That is not the same thing as a muted or disconnected mic,
+   and must not be refused as sample_silent. */
+for (const peak of [0.05, 0.02, 0.008]){
+  reset();
+  const quiet = makeQuietSpeechWav(75, { peak });
+  const level = measureWavLevel(quiet, parseWavHeader(quiet));
+  r = await callClone({ consent: CONSENT, sample: quiet });
+  check(`continuous real speech at peak ${peak} (raw voicedSeconds ${level.voicedSeconds}) is cloned, not refused as silent`,
+    [r.code, r.body.error, !!r.body.created], [200, undefined, true]);
+}
+reset();
+{
+  // Below SILENCE_FLOOR before any boost: this is what a muted or disconnected
+  // mic actually looks like, and boosting it must not manufacture a "voice".
+  const dead = makeWav(70, { silent: true });
+  r = await callClone({ consent: CONSENT, sample: dead });
+  check('true silence (below the floor, before normalization) is still refused', [r.code, r.body.error], [400, 'sample_silent']);
+  check('  ...and nothing reached the provider', elevenCalls.length, 0);
+}
+
 /* ---------------- anything that is not WAV is converted, not refused ----------------
    What an iPhone records (AAC in a fragmented MP4, as Safari's MediaRecorder
    writes it), what people upload (M4A, MP4, MOV, MP3, WebM), sent the way the
@@ -557,8 +620,8 @@ check('1:00 on the clock that decodes to 59.7s is accepted', [r.code, !!r.body.c
 
   reset();
   r = await callClone({ consent: CONSENT, ...(await multipart(GOOD_WAV, 'audio/wav', 'voice-sample.wav')) });
-  check('the page\'s own WAV, as multipart, is sent unchanged', [r.code, !!r.body.created], [200, true]);
-  check('  ...byte for byte', Buffer.from(await sentToProvider().arrayBuffer()).equals(GOOD_WAV), true);
+  check('the page\'s own WAV, as multipart, is cloned', [r.code, !!r.body.created], [200, true]);
+  check('  ...still the same recording after normalization', sameRecording(Buffer.from(await sentToProvider().arrayBuffer()), 75), true);
 
   for (const [label, sample, code] of [
     ['a 45 second M4A', await multipart(media.shortM4a, 'audio/mp4', 'short.m4a'), 'sample_too_short'],

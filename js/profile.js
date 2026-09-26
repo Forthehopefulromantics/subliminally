@@ -355,6 +355,21 @@ const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not some
 const VOICE_CLONE_MIN_SECONDS = 60;
 const VOICE_CLONE_MIN_TOLERANCE = 0.5;   // 1:00 on the clock can decode to 59.9s
 const VOICE_CLONE_MIN_VOICED = 15;       // seconds clearly above the room, of that minute
+// Below this, before any boost, there is nothing there to bring up — a muted or
+// disconnected mic, not a quiet voice. Kept equal to lib/voice-sample.js
+// SILENCE_FLOOR, which checks the same thing server-side, on whatever this
+// device could not measure itself. Real speech, however soft, peaks well
+// above it; a dead input does not.
+const VOICE_CLONE_SILENCE_FLOOR = 0.003;
+// A recording that peaks under this is brought up to it (see
+// voiceCloneNormalizeGain) before it is measured for "enough voice" or sent —
+// the fix for a real but quiet recording reading as silent, rather than a
+// looser silence check.
+const VOICE_CLONE_TARGET_PEAK = 0.6;
+// How far a quiet recording can be boosted. Capped so a genuinely near-silent
+// room (mic muted, or far below VOICE_CLONE_SILENCE_FLOOR already refused)
+// is never amplified into something that reads as a voice.
+const VOICE_CLONE_MAX_GAIN = 12;
 const VOICE_CLONE_SEND_SECONDS = 90;     // more than this does not improve an instant clone
 const VOICE_CLONE_RATE = 22050;
 const VOICE_CLONE_MAX_RECORD_SECONDS = 180;
@@ -371,7 +386,7 @@ const VOICE_CLONE_STOP_TIMEOUT_MS = 5000;      // recorder handing over its audi
 const VOICE_CLONE_DECODE_TIMEOUT_MS = 45000;
 const VOICE_CLONE_UPLOAD_TIMEOUT_MS = 80000;   // the route gives ElevenLabs 50s of its 60
 const VOICE_CLONE_AUTH_TIMEOUT_MS = 10000;
-const VOICE_CLONE_SHORT_TEXT = 'We need at least 1 minute of your voice to create your AI voice. Keep recording or choose a longer file.';
+const VOICE_CLONE_SHORT_TEXT = 'Keep recording — at least 1 minute is required to create your AI voice.';
 
 let voiceCloneRecorder = null, voiceCloneStream = null,
     voiceCloneTimer = null, voiceCloneStart = 0;
@@ -1055,10 +1070,27 @@ async function prepareVoiceSample(media, { source, timedSeconds } = {}){
     return { ok: false, reason: 'upload_too_long', detail: `${seconds}s` };
   }
   const mono = await voiceCloneMono(decoded);
-  const level = measureVoiceCloneLevel(mono, VOICE_CLONE_RATE);
-  /* A short take that is only silence is still reported as silence: telling
-     somebody to keep talking into a muted microphone helps nobody. */
-  if (level.peak < 0.01 || level.voicedSeconds < 1){
+  const rawLevel = measureVoiceCloneLevel(mono, VOICE_CLONE_RATE);
+  /* Is there anything here at all? Checked before any boost, on the level the
+     microphone actually captured — a muted or disconnected mic reads at
+     essentially nothing; real speech, however quiet, does not. */
+  if (rawLevel.peak < VOICE_CLONE_SILENCE_FLOOR){
+    console.error('[voice-clone] nothing on the recording (mic likely muted, unavailable, or not connected)', rawLevel);
+    return { ok: false, reason: source === 'upload' ? 'upload_no_audio' : 'sample_silent', detail: JSON.stringify(rawLevel) };
+  }
+  /* A real voice that only reads as quiet — soft-spoken, some distance from the
+     mic, or (common on iOS Safari) autoGainControl not applying the way it does
+     on a call, because turning off echo cancellation and noise suppression for
+     a cleaner sample also turns off the gain stage that normally rides with
+     them — is brought up to a normal level here, in place, before it is
+     measured or sent. This is the fix for a real recording reading as "not
+     enough voice"; the server does the same (see lib/audio-transcode.js
+     normalizeLoudness) for anything that reaches it a different way. */
+  const gain = voiceCloneNormalizeGain(rawLevel.peak);
+  if (gain > 1) voiceCloneApplyGain(mono, gain);
+  const level = gain > 1 ? measureVoiceCloneLevel(mono, VOICE_CLONE_RATE) : rawLevel;
+  console.log('[voice-clone] level', { rawPeak: rawLevel.peak, gain: +gain.toFixed(2), peak: level.peak, voicedSeconds: level.voicedSeconds });
+  if (level.voicedSeconds < 1){
     return { ok: false, reason: source === 'upload' ? 'upload_no_audio' : 'sample_silent', detail: JSON.stringify(level) };
   }
   /* Where the voice starts: a video that opens on ten seconds of nothing should
@@ -1167,6 +1199,20 @@ function measureVoiceCloneLevel(data, rate){
   }
   return { peak: +peak.toFixed(4), voicedSeconds: +(voicedFrames * 0.02).toFixed(1), firstVoicedSample };
 }
+/* How much to boost a recording that peaked under VOICE_CLONE_TARGET_PEAK, so
+   that "quiet but real" is not measured the same way as "nothing there". */
+function voiceCloneNormalizeGain(peak){
+  if (!(peak > 0) || peak >= VOICE_CLONE_TARGET_PEAK) return 1;
+  return Math.min(VOICE_CLONE_MAX_GAIN, VOICE_CLONE_TARGET_PEAK / peak);
+}
+/* In place: every sample scaled and clamped to [-1, 1], so a few loud
+   consonants above the target do not clip into distortion. */
+function voiceCloneApplyGain(mono, gain){
+  for (let i = 0; i < mono.length; i++){
+    const v = mono[i] * gain;
+    mono[i] = v > 1 ? 1 : v < -1 ? -1 : v;
+  }
+}
 /* 16-bit PCM WAV, mono. */
 function encodeVoiceCloneWav(samples, rate){
   const buf = new ArrayBuffer(44 + samples.length * 2);
@@ -1202,14 +1248,14 @@ const VOICE_CLONE_MESSAGES = {
   upgrade_required:      null,   // filled in below, it quotes the price
   not_configured:        "Voice cloning isn't switched on yet.",
   consent_required:      'Tick the confirmation first — a voice is only ever made from your own.',
-  sample_empty:          "That recording came out empty — tap Record Again and try once more.",
+  sample_empty:          "We didn't receive any recorded audio — tap Record Again and try once more.",
   sample_silent:         "We couldn't hear enough of your voice in that. Check your microphone isn't muted or in use by another app, speak close to it, and try again.",
   sample_unreadable:     "This device couldn't read that recording — tap Record Again, or choose Upload Audio or Video.",
   upload_unreadable:     "We couldn't read the audio in that file — try an MP3, M4A, WAV, MP4 or MOV.",
   upload_no_audio:       "That file doesn't seem to have any sound we can use — choose one with you speaking.",
   upload_too_long:       'That file is longer than 10 minutes — trim it to a few minutes of you speaking, or choose another.',
   decode_timeout:        'Getting the audio ready took too long on this device — try again, or use a shorter file.',
-  unsupported_format:    "We couldn't read the audio in that recording or file. Your sample is kept — tap Try Again, or use an M4A, MP3, WAV, MP4 or MOV.",
+  unsupported_format:    "This audio format couldn't be processed. Your sample is kept — tap Try Again, or use an M4A, MP3, WAV, MP4 or MOV.",
   sample_no_audio:       "That file doesn't seem to have any sound we can use — choose one with you speaking.",
   upload_malformed:      "Your recording didn't upload properly — check your connection, then tap Try Again.",
   transcode_unavailable: "Voice creation is temporarily unavailable. Your recording is kept — try again in a few minutes.",
@@ -1220,8 +1266,8 @@ const VOICE_CLONE_MESSAGES = {
   rate_limited:          'The voice service is busy — try again in a minute.',
   rejected:              "The voice service couldn't use that recording — try again somewhere quieter.",
   invalid_voice:         "The voice service couldn't use that recording — try again somewhere quieter.",
-  provider_auth:         "Voice cloning is unavailable right now (a sign-in problem on our side). Your recording is kept — try again later.",
-  plan_not_allowed:      "Voice cloning isn't available on our voice service right now. Your recording is kept — try again later.",
+  provider_auth:         "Voice creation is temporarily unavailable. Your recording is kept — try again later.",
+  plan_not_allowed:      "Voice creation is temporarily unavailable. Your recording is kept — try again later.",
   verification_required: "The voice service wants an extra verification step for this voice. Your recording is kept — contact support and we'll sort it out.",
   voice_limit_reached:   "The voice service has no room for another voice right now. Your recording is kept — contact support and we'll sort it out.",
   save_failed:           "Your voice was made but couldn't be saved to your account, so nothing was kept. Your recording is still here — tap Try Again.",
