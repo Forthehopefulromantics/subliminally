@@ -351,12 +351,16 @@ function nextStep(){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  state = { freq:null, intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   affirmationMode = 'generate';
   affirmationGenerateCount = 5;
   /* Clearing through the one helper rather than stripping the class by hand:
      that left every chip on the page still announcing itself as pressed. */
   clearSelection('.sel');
+  /* Intensity is part of state too: leaving it out of the object above made it
+     undefined after a reset, so a second build generated with no intensity at
+     all and none of the three cards was lit. */
+  paintIntensityCards();
   forgetVoiceChoice();
   paintVoiceCards();
   document.getElementById('quizGoal').value='';
@@ -381,6 +385,9 @@ function resetFlow(){
   document.getElementById('customTrackName').textContent = '';
   document.getElementById('customTrackMsg').textContent = '';
   document.getElementById('customMixRow').style.display = 'none';
+  /* The previous subliminal's own-voice takes, too -- a subliminal opened with
+     Load & adjust leaves its recordings here, and a new one must not inherit them. */
+  recordings = []; recordingLoadErrors = []; recIndex = 0;
   layerVoiceEnabled = false; layerVoiceMode = 'ai'; layerRecordings = []; recordTarget = 'primary';
   document.getElementById('layerVoiceToggle').checked = false;
   document.getElementById('layerVoicePanel').classList.remove('open');

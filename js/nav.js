@@ -33,6 +33,17 @@ function setLibraryTab(tab){
   document.getElementById('libraryTabMine').style.display = tab === 'mine' ? 'block' : 'none';
   if (tab === 'mine') renderMyLibraryState();
 }
+/* "Create New Subliminal" on Mine. A brand-new build, never an edit: resetFlow()
+   clears only what belongs to the unfinished draft -- affirmations, title,
+   cover, voice, sounds, recordings, and the edit id, so saving makes a new row
+   -- and leaves the saved library, the profile and preferences alone. Any sound
+   levels still being written to the subliminal you were looking at are flushed
+   to that one first, inside restoreMixSettings(). */
+function startNewSubliminal(){
+  resetFlow();
+  showBuildPage();
+  showStep(0);
+}
 function renderMyLibraryState(){
   document.body.setAttribute('data-signed-in', currentUser ? 'yes' : 'no');
   document.getElementById('myLibraryLocked').style.display = currentUser ? 'none' : 'block';

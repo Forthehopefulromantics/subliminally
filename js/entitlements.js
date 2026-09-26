@@ -284,9 +284,8 @@ function lockedCard(key, o){
 
 /* ---------------- <PlanLimit /> ----------------
    How much of your plan you have used, said plainly, with the way to get more
-   sitting quietly beside it. It is drawn for every tier, including Ritual,
-   because "Unlimited subliminals" is information a member paid for and should
-   get to see. */
+   sitting quietly beside it. The library only draws it for a capped plan; see
+   renderLibraryPlanLimit(). */
 function planLimitMarkup(used, tier, opts){
   const o = opts || {};
   const cap = tierLibraryCap(tier);
