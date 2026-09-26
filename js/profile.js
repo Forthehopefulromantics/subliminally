@@ -384,6 +384,10 @@ let voiceCloneChecking = null;
 let voiceCloneTake = null;
 /* True while the sample is on its way to the provider. */
 let voiceCloneBusy = false;
+/* The last Create that failed, kept so the card can say exactly what failed
+   (request, status, code) and offer Try Again with the same take. Cleared by a
+   new take or a success. { code, status, detail } */
+let voiceCloneFailure = null;
 /* Ticked in this session, for this attempt. Never remembered: a new voice is a
    new confirmation, including when somebody records theirs again. */
 let voiceCloneConsented = false;
@@ -453,6 +457,7 @@ function discardVoiceCloneTake(){
   voiceCloneAudioSession(null);
   if (voiceCloneTake && voiceCloneTake.url){ try { URL.revokeObjectURL(voiceCloneTake.url); } catch(e){} }
   voiceCloneTake = null;
+  voiceCloneFailure = null;
 }
 function voiceCloneClock(secs){
   secs = Math.max(0, Math.floor(secs));
@@ -477,7 +482,7 @@ function voiceCloneEscape(text){
 
 const VOICE_CLONE_HEADER = `
   <h4 class="voice-clone-title">Create Your AI Voice</h4>
-  <p class="voice-clone-sub">Give us at least 1 minute of your natural speaking voice so we can create your personal AI voice.</p>
+  <p class="voice-clone-sub">For the best results, provide at least 1 minute of clear speech in your natural speaking voice.</p>
   <p class="voice-clone-tip">Find a quiet space and speak naturally. Avoid music, TV, other people talking, heavy background noise, or audio effects.</p>`;
 
 function voiceCloneOptionsHtml(){
@@ -504,7 +509,7 @@ async function renderVoiceClone(){
   const body = voiceCloneBodyEl();
   if (!body) return;
   if (voiceCloneBusy){
-    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions"><span class="voice-rec-dot"></span><span class="voice-rec-label">Creating your voice — this usually takes under a minute…</span></div>`;
+    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions" role="status"><span class="voice-rec-dot"></span><span class="voice-rec-label">Creating your voice…</span></div>`;
     return;
   }
   if (voiceCloneChecking){
@@ -541,17 +546,19 @@ async function renderVoiceClone(){
     live.innerHTML = `
       ${VOICE_CLONE_HEADER}
       ${voiceCloneOptionsHtml()}
-      ${upload ? `<div class="voice-clone-file"><span class="voice-clone-file-name">${voiceCloneEscape(t.fileName)}</span><span class="voice-rec-time">${voiceCloneClock(Math.round(t.seconds))}</span></div>` : ''}
+      ${upload ? `<div class="voice-clone-file"><span class="voice-clone-file-name">${voiceCloneEscape(t.fileName)}</span></div>` : ''}
       <div class="voice-clone-review">
         <audio controls preload="auto" playsinline data-vc="preview"></audio>
-        <span class="voice-rec-time">${t.ok ? voiceCloneClock(Math.round(t.seconds)) : `${voiceCloneClock(Math.round(t.seconds))} / 1:00 minimum`}</span>
+        <span class="voice-rec-time" data-vc="duration">${voiceCloneDurationText(Math.round(t.seconds))}</span>
       </div>
+      ${t.ok ? '' : `<p class="voice-clone-tip" data-vc="short">${voiceCloneEscape(VOICE_CLONE_SHORT_TEXT)}</p>`}
       <label class="voice-clone-consent">
         <input type="checkbox" data-vc="consent" ${voiceCloneConsented ? 'checked' : ''} ${t.ok ? '' : 'disabled'} onchange="setVoiceCloneConsent(this.checked)">
         <span>${voiceCloneEscape(consent)}</span>
       </label>
+      ${voiceCloneFailure ? `<p class="voice-clone-tip" data-vc="error-detail" role="alert">Details: ${voiceCloneEscape(voiceCloneFailureDetail(voiceCloneFailure))}</p>` : ''}
       <div class="voice-clone-actions">
-        <button class="mini-btn candlebtn" data-vc="create" ${voiceCloneCanCreate() ? '' : 'disabled'} onclick="createVoiceClone()">Create My Voice</button>
+        <button class="mini-btn candlebtn" data-vc="create" ${voiceCloneCanCreate() ? '' : 'disabled'} onclick="createVoiceClone()">${voiceCloneFailure ? 'Try Again' : 'Create My Voice'}</button>
         ${upload
           ? '<button class="mini-btn ghostbtn" onclick="removeVoiceCloneUpload()">Remove and choose another</button>'
           : '<button class="mini-btn ghostbtn" onclick="reRecordVoiceClone()">Record Again</button>'}
@@ -567,7 +574,7 @@ async function renderVoiceClone(){
   if (mine && !voiceCloneReplacing){
     live.innerHTML = `
       <div class="voice-clone-have">
-        <span><b>Your voice is ready ✓</b> — pick <b>${voiceCloneEscape(mine.name || 'My voice')}</b> when you choose a voice.</span>
+        <span><b>Your voice is ready ✦</b> — pick <b>${voiceCloneEscape(mine.name || 'My voice')}</b> when you choose a voice.</span>
         <button class="mini-btn ghostbtn" data-vc="test" onclick="testClonedVoice()">Hear a test affirmation</button>
         <button class="mini-btn ghostbtn" onclick="beginReplaceVoice()">Record it again</button>
         <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
@@ -594,12 +601,24 @@ async function renderVoiceClone(){
     <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
     <div class="voice-clone-actions">
       <button class="mini-btn candlebtn" onclick="startVoiceClone()">Start Recording</button>
-      <span class="voice-rec-time">0:00 / 1:00 minimum</span>
+      <span class="voice-rec-time">${voiceCloneDurationText(0)}</span>
       ${keep}
     </div>`;
 }
-function voiceCloneTimerText(secs){
-  return voiceCloneLongEnough(secs) ? `${voiceCloneClock(secs)} ✓` : `${voiceCloneClock(secs)} / 1:00 minimum`;
+/* "0:43 / 1:00 minimum" while short, "1:05 / 1:00 minimum ✓" once there. The
+   same line during recording, on the review screen and for an uploaded file. */
+function voiceCloneDurationText(secs){
+  const clock = `${voiceCloneClock(secs)} / 1:00 minimum`;
+  return voiceCloneLongEnough(secs) ? `${clock} ✓` : clock;
+}
+function voiceCloneTimerText(secs){ return voiceCloneDurationText(secs); }
+/* What failed, in words someone can pass on: the request, what came back, and
+   our code for it. Never the provider's own error text (that is in the server
+   log), and never anything secret. */
+function voiceCloneFailureDetail(f){
+  if (!f) return '';
+  const answered = f.status ? `HTTP ${f.status}` : (f.code === 'timeout' ? 'no answer before the time limit' : 'no response');
+  return `POST /api/voice-clone → ${answered}, ${f.code || 'clone_failed'}`;
 }
 
 /* ---------- listening back ----------
@@ -914,10 +933,12 @@ async function acceptVoiceCloneMedia(media, { source, timedSeconds, fileName, at
     seconds: result.seconds, voicedSeconds: result.voicedSeconds, source, fileName,
   };
   voiceCloneConsented = false;
+  voiceCloneFailure = null;
   console.log('[voice-clone] sample ready', { ok: result.ok, seconds: result.seconds, voicedSeconds: result.voicedSeconds, wavBytes: result.blob.size });
   if (!result.ok){
     console.error('[voice-clone] sample rejected:', result.reason, result.detail || '');
-    sayVoiceClone(voiceCloneErrorText(result.reason, source), 'err');
+    // Too short is said on the card itself, next to the "0:40 / 1:00 minimum".
+    sayVoiceClone(result.reason === 'sample_too_short' ? '' : voiceCloneErrorText(result.reason, source), 'err');
   } else {
     sayVoiceClone('');
   }
@@ -938,15 +959,15 @@ async function prepareVoiceSample(media, { source, timedSeconds } = {}){
     return { ok: false, reason: 'sample_empty', detail: `${media ? media.size : 0} bytes` };
   }
   /* A file says how long it is before it is decoded, so a clip that is plainly
-     too short or too long is turned away without reading it all into memory. */
+     too long is turned away without reading it all into memory. One that is too
+     short is still decoded — it is small — so the card can show exactly how
+     long it is against the minute ("0:40 / 1:00 minimum") rather than only
+     saying no. */
   if (source === 'upload'){
     const meta = await probeVoiceCloneDuration(media);
     console.log('[voice-clone] file duration from metadata:', meta);
     if (meta && meta > VOICE_CLONE_MAX_UPLOAD_SECONDS){
       return { ok: false, reason: 'upload_too_long', detail: `${meta}s` };
-    }
-    if (meta && !voiceCloneLongEnough(meta)){
-      return { ok: false, reason: 'sample_too_short', detail: `${meta}s from metadata` };
     }
   }
   let bytes;
@@ -971,6 +992,8 @@ async function prepareVoiceSample(media, { source, timedSeconds } = {}){
   }
   const mono = await voiceCloneMono(decoded);
   const level = measureVoiceCloneLevel(mono, VOICE_CLONE_RATE);
+  /* A short take that is only silence is still reported as silence: telling
+     somebody to keep talking into a muted microphone helps nobody. */
   if (level.peak < 0.01 || level.voicedSeconds < 1){
     return { ok: false, reason: source === 'upload' ? 'upload_no_audio' : 'sample_silent', detail: JSON.stringify(level) };
   }
@@ -1125,6 +1148,7 @@ const VOICE_CLONE_MESSAGES = {
   unsupported_format:    "The recording couldn't be prepared in a format the voice service reads — try again.",
   sample_too_short:      VOICE_CLONE_SHORT_TEXT,
   sample_too_long:       'That sample was too large to send — try again with a shorter recording.',
+  sample_not_received:   "Your recording didn't finish uploading — check your connection, then tap Try Again.",
   quota_exceeded:        "The voice service is out of cloning credits right now — your recording wasn't used, and nothing was charged.",
   rate_limited:          'The voice service is busy — try again in a minute.',
   rejected:              "The voice service couldn't use that recording — try again somewhere quieter.",
@@ -1133,16 +1157,16 @@ const VOICE_CLONE_MESSAGES = {
   plan_not_allowed:      "Voice cloning isn't available on our voice service right now. Your recording is kept — try again later.",
   verification_required: "The voice service wants an extra verification step for this voice. Your recording is kept — contact support and we'll sort it out.",
   voice_limit_reached:   "The voice service has no room for another voice right now. Your recording is kept — contact support and we'll sort it out.",
-  save_failed:           "Your voice was made but couldn't be saved to your account, so nothing was kept. Your recording is still here — press Create My Voice to try again.",
-  provider_failed:       'The voice service had a problem creating your voice — press Create My Voice to try again.',
-  timeout:               "Creating your voice took too long, so we stopped waiting. Your recording is kept — press Create My Voice to try again.",
-  network:               "Couldn't reach the voice service — check your connection, then press Create My Voice to try again.",
-  not_signed_in:         'Your sign-in has expired — sign in again, then press Create My Voice.',
+  save_failed:           "Your voice was made but couldn't be saved to your account, so nothing was kept. Your recording is still here — tap Try Again.",
+  provider_failed:       'The voice service had a problem creating your voice — tap Try Again.',
+  timeout:               "Creating your voice took too long, so we stopped waiting. Your recording is kept — tap Try Again.",
+  network:               "Couldn't reach the voice service — check your connection, then tap Try Again.",
+  not_signed_in:         'Your sign-in has expired — sign in again, then tap Try Again.',
 };
 function voiceCloneErrorText(code, source){
   if (code === 'upgrade_required') return `Cloning your voice comes with Ritual — ${tierPriceText('ritual')}.`;
   if (code === 'sample_silent' && source === 'upload') return VOICE_CLONE_MESSAGES.upload_no_audio;
-  return VOICE_CLONE_MESSAGES[code] || "Couldn't create your voice — press Create My Voice to try again.";
+  return VOICE_CLONE_MESSAGES[code] || "Couldn't create your voice — tap Try Again.";
 }
 /* A route that died before it could answer in JSON still has a status to go by. */
 function voiceCloneCodeForStatus(status){
@@ -1182,7 +1206,7 @@ async function sendVoiceCloneSample(take){
     catch(e){
       const code = e && e.name === 'AbortError' ? 'timeout' : 'network';
       console.error('[voice-clone] request failed:', code, e && e.message, `after ${Date.now() - started}ms`);
-      return { code };
+      return { code, status: 0 };
     }
     // Reading the body is covered by the same abort, so it cannot hang either.
     const text = await res.text().catch(e => { console.error('[voice-clone] response unreadable:', e); return ''; });
@@ -1190,11 +1214,11 @@ async function sendVoiceCloneSample(take){
     try { out = JSON.parse(text); } catch(e){}
     if (!res.ok){
       console.error('[voice-clone] /api/voice-clone answered', res.status, text.slice(0, 400));
-      return { code: out.error || voiceCloneCodeForStatus(res.status) };
+      return { code: out.error || voiceCloneCodeForStatus(res.status), status: res.status };
     }
     if (!out.created && !out.reused){
       console.error('[voice-clone] /api/voice-clone answered', res.status, 'without a voice:', text.slice(0, 400));
-      return { code: 'clone_failed' };
+      return { code: 'clone_failed', status: res.status };
     }
     console.log('[voice-clone] voice created', res.status, out, `in ${Date.now() - started}ms`);
     return { ok: true };
@@ -1226,13 +1250,16 @@ async function uploadVoiceClone(take){
   }
 
   if (!outcome || !outcome.ok){
-    /* The take is still there, so the person can press Create again — or
-       listen and record again — without recording the minute again. The tick
-       stays too: nothing about what they agreed to has changed. */
+    /* The take is still there, so the person can press Try Again — or listen
+       and record again — without recording the minute again. The tick stays
+       too: nothing about what they agreed to has changed. What failed is shown
+       on the card, not only in the console. */
+    voiceCloneFailure = { code: (outcome && outcome.code) || 'clone_failed', status: (outcome && outcome.status) || 0 };
     renderVoiceClone();
-    sayVoiceClone(voiceCloneErrorText(outcome && outcome.code), 'err');
+    sayVoiceClone(voiceCloneErrorText(voiceCloneFailure.code), 'err');
     return;
   }
+  voiceCloneFailure = null;
   voiceCloneReplacing = false;
   voiceCloneConsented = false;
   discardVoiceCloneTake();
@@ -1246,7 +1273,7 @@ async function uploadVoiceClone(take){
     return;
   }
   await renderVoiceClone();
-  sayVoiceClone('Your voice is ready ✓', 'ok');
+  sayVoiceClone('Your voice is ready ✦', 'ok');
 }
 
 /* One line, generated in the voice just made, so it can be heard working. */
@@ -1265,7 +1292,7 @@ async function testClonedVoice(){
     voiceCloneAudioSession('playback');
     el.onended = () => voiceCloneAudioSession(null);
     await el.play().catch(() => {});
-    sayVoiceClone('Your voice is ready ✓', 'ok');
+    sayVoiceClone('Your voice is ready ✦', 'ok');
   } catch(e){
     console.error('[voice-clone] test affirmation failed:', e && (e.code || e.message));
     sayVoiceClone(typeof clonedVoiceErrorText === 'function' ? clonedVoiceErrorText(e && (e.code || e.message)) : "Couldn't generate a test just now.", 'err');

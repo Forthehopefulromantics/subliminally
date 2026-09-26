@@ -60,17 +60,29 @@ const HTTP_FOR_CODE = {
   save_failed: 500,
 };
 
+/* A body that stops arriving must not hold the function open until Vercel kills
+   it at 60s with a bare 504 — that looks exactly like a hang from the page. */
+const BODY_TIMEOUT_MS = 20000;
+
 function readRawBody(req) {
+  // Some runtimes hand the body over already read; use it rather than wait on a
+  // stream that will never emit.
+  let pre = null;
+  try { pre = req.body; } catch (e) { pre = null; }   // Vercel's body getter can throw on odd input
+  if (Buffer.isBuffer(pre)) {
+    return pre.length > MAX_SAMPLE_BYTES ? Promise.reject(new Error('too_large')) : Promise.resolve(pre);
+  }
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    const timer = setTimeout(() => { reject(new Error('body_timeout')); req.destroy(); }, BODY_TIMEOUT_MS);
     req.on('data', (c) => {
       size += c.length;
-      if (size > MAX_SAMPLE_BYTES) { reject(new Error('too_large')); req.destroy(); return; }
+      if (size > MAX_SAMPLE_BYTES) { clearTimeout(timer); reject(new Error('too_large')); req.destroy(); return; }
       chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
-    req.on('error', reject);
+    req.on('end', () => { clearTimeout(timer); resolve(Buffer.concat(chunks)); });
+    req.on('error', (e) => { clearTimeout(timer); reject(e); });
   });
 }
 
@@ -150,8 +162,10 @@ export default async function handler(req, res) {
   let sample;
   try { sample = await readRawBody(req); }
   catch (e) {
-    console.error('voice-clone: sample not received', user.id, (e && e.message) || e);
-    res.status(413).json({ error: 'sample_too_long' });
+    const reason = (e && e.message) || String(e);
+    console.error('voice-clone: sample not received', user.id, reason);
+    if (reason === 'too_large') res.status(413).json({ error: 'sample_too_long' });
+    else res.status(408).json({ error: 'sample_not_received' });
     return;
   }
   const declared = req.headers['content-type'] || '';
