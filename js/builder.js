@@ -1494,7 +1494,7 @@ async function chooseClonedVoice(){
   closeMyVoicePanel();
   setSelectedVoice(VOICE_CLONE);
   // Already made once, so it is never asked for again -- it is simply chosen.
-  sayInVoicePicker('Your voice is ready ✓', 'ok');
+  sayInVoicePicker('Your voice is ready ✦', 'ok');
   advanceAfterPick();
 }
 
@@ -1550,7 +1550,7 @@ async function renderVoiceCards(){
   const cloneTitle = clone.querySelector('h4');
   const cloneDesc = clone.querySelector('p');
   if (cloneTitle) cloneTitle.textContent = cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Clone your voice';
-  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your voice is ready ✓' : 'Create an AI version of your voice';
+  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your voice is ready ✦' : 'Create an AI version of your voice';
 
   primeSerenityPreview();
   renderMyVoicePanel();
@@ -1695,7 +1695,7 @@ async function onMyVoiceReady(){
   setSelectedVoice(VOICE_CLONE);    // lights the card and enables Continue
   /* Nothing is read in the new voice here. ElevenLabs is only asked for speech
      when the subliminal is generated (prepareClonedVoice), never for a preview. */
-  sayInVoicePicker('Your voice is ready ✓', 'ok');
+  sayInVoicePicker('Your voice is ready ✦', 'ok');
   // Redrawing the cards checks the plan again; a failure there must not take
   // back the voice that was just made, or the message saying so.
   try { await renderVoiceCards(); }
