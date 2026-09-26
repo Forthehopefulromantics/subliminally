@@ -29,17 +29,20 @@ import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
 import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
-import { checkVoiceSample } from '../lib/voice-sample.js';
+import { checkVoiceSample, parseWav } from '../lib/voice-sample.js';
+import { TranscodeError, sniffContainer, transcodeToWav } from '../lib/audio-transcode.js';
 
-// The sample arrives as raw audio, not JSON; cloning at the provider can take
+// The sample arrives as audio (multipart or raw), not JSON; cloning at the provider can take
 // most of a minute, so the function is given room to finish.
 export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
 // Vercel refuses a request body over 4.5 MB before this function ever runs. The
-// page sends at most 90 seconds of 22.05 kHz mono WAV (~4 MB), so this is a
-// ceiling that is actually reachable, not a promise the platform will break.
+// page sends at most 90 seconds of 22.05 kHz mono WAV (~4 MB), or a recording or
+// file in its own format when the device could not convert it (a minute or two
+// of AAC is well under this), so this is a ceiling that is actually reachable,
+// not a promise the platform will break.
 const MAX_SAMPLE_BYTES = 4.4 * 1024 * 1024;
 
 const HTTP_FOR_CODE = {
@@ -57,6 +60,10 @@ const HTTP_FOR_CODE = {
   unsupported_format: 415,
   sample_too_short: 400,
   sample_silent: 400,
+  sample_empty: 400,
+  sample_no_audio: 422,
+  upload_malformed: 400,
+  transcode_unavailable: 503,
   save_failed: 500,
 };
 
@@ -159,8 +166,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  let sample;
-  try { sample = await readRawBody(req); }
+  let raw;
+  try { raw = await readRawBody(req); }
   catch (e) {
     const reason = (e && e.message) || String(e);
     console.error('voice-clone: sample not received', user.id, reason);
@@ -169,19 +176,41 @@ export default async function handler(req, res) {
     return;
   }
   const declared = req.headers['content-type'] || '';
-  console.log('voice-clone: sample received', user.id, { bytes: sample ? sample.length : 0, declared, replacing });
 
-  /* The length is checked here, on the audio, not taken from the page's timer.
-     The page converts every recording and upload to 16-bit PCM WAV first (see
-     js/profile.js prepareVoiceSample), so anything else is refused rather than
-     guessed at. */
-  const checked = checkVoiceSample(sample);
+  let upload;
+  try { upload = await unpackSample(raw, declared, req.headers['x-voice-filename']); }
+  catch (e) {
+    console.error('voice-clone: upload could not be read', user.id, (e && e.message) || e, { bytes: raw.length, declared });
+    res.status(400).json({ error: 'upload_malformed' });
+    return;
+  }
+  console.log('voice-clone: sample received', user.id,
+    { bytes: upload.bytes.length, declared, fileType: upload.type, fileName: upload.name, replacing });
+
+  /* Whatever arrived becomes 16-bit PCM WAV here, before anything is measured or
+     sent. The page normally sends WAV already; anything else — an older iPhone
+     build posting Safari's AAC/MP4 as recorded, or a recording or file the device
+     could not decode — is transcoded with ffmpeg rather than refused. */
+  let sample;
+  try { sample = await normalizeSample(upload); }
+  catch (e) {
+    const code = e instanceof TranscodeError ? e.code : 'unsupported_format';
+    console.error('voice-clone: sample could not be converted', user.id, code, (e && e.detail) || (e && e.message) || e,
+      { bytes: upload.bytes.length, declared, fileType: upload.type, fileName: upload.name });
+    res.status(HTTP_FOR_CODE[code] || 415).json({ error: code });
+    return;
+  }
+
+  /* The length is checked here, on the audio, not taken from the page's timer. */
+  const checked = checkVoiceSample(sample.wav);
   if (!checked.ok) {
-    console.error('voice-clone: sample rejected', user.id, checked.code, checked.detail, { bytes: sample ? sample.length : 0, declared });
+    console.error('voice-clone: sample rejected', user.id, checked.code, checked.detail,
+      { bytes: sample.wav.length, source: sample.source, declared });
     res.status(HTTP_FOR_CODE[checked.code] || 400).json({ error: checked.code });
     return;
   }
-  console.log('voice-clone: sample ok', user.id, checked);
+  console.log('voice-clone: sample ok', user.id, { ...checked, source: sample.source });
+  const wav = sample.wav;
 
   try {
     // Replace rather than accumulate: one voice per person, always the latest.
@@ -190,7 +219,7 @@ export default async function handler(req, res) {
     const voiceId = await createInstantVoiceClone({
       name: `subliminally-${user.id}`,
       description: 'Cloned from a Subliminally voice sample, with the speaker\'s confirmation.',
-      sample,
+      sample: wav,
       contentType: 'audio/wav',
       fileName: 'sample.wav',
     });
@@ -220,7 +249,48 @@ export default async function handler(req, res) {
     // The provider's own HTTP status and body, so the real reason is in the log.
     console.error('voice-clone error:', code, 'ElevenLabs status:', err && err.status,
       'ElevenLabs body:', (err && err.detail) || (err && err.message) || err,
-      { bytes: sample.length, seconds: checked.seconds, declared });
+      { bytes: wav.length, seconds: checked.seconds, source: sample.source, declared });
     res.status(HTTP_FOR_CODE[code] || 500).json({ error: code });
   }
+}
+
+/* The sample and what the sender said it was. The page sends multipart/form-data
+   with the audio in a `sample` file field (named with the extension that matches
+   its type); an older build sends the audio as the whole body, typed by
+   Content-Type. Both are read. */
+async function unpackSample(raw, declared, headerName) {
+  if (/^multipart\/form-data/i.test(declared)) {
+    const form = await new Request('http://voice-clone.local/', {
+      method: 'POST', headers: { 'content-type': declared }, body: raw,
+    }).formData();
+    const file = form.get('sample');
+    if (!file || typeof file === 'string') throw new Error('no sample file field');
+    return { bytes: Buffer.from(await file.arrayBuffer()), type: file.type || '', name: file.name || '' };
+  }
+  return { bytes: raw, type: declared.split(';')[0].trim(), name: typeof headerName === 'string' ? headerName.slice(0, 200) : '' };
+}
+
+const EXT_FOR_TYPE = {
+  'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac',
+  'video/mp4': 'mp4', 'video/quicktime': 'mov', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+  'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav', 'audio/webm': 'webm', 'video/webm': 'webm',
+  'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/x-caf': 'caf', 'video/3gpp': '3gp', 'audio/3gpp': '3gp',
+};
+
+// M4A, MP4 and MOV are the same container; calling one the other is not a mismatch.
+const sameFamily = (a, b) => a === b || (['m4a', 'mp4', 'mov', '3gp'].includes(a) && ['m4a', 'mp4', 'mov', '3gp'].includes(b));
+
+/* { wav, source } — the sample as PCM WAV, and how it got that way (for the log). */
+async function normalizeSample({ bytes, type, name }) {
+  if (!bytes || bytes.length < 1024) throw new TranscodeError('sample_empty', `${bytes ? bytes.length : 0} bytes`);
+  if (parseWav(bytes)) return { wav: bytes, source: 'wav' };
+  // What the bytes are beats what they were called; the name and type are the fallback.
+  const sniffed = sniffContainer(bytes);
+  const fromName = (/\.([a-z0-9]{1,5})$/i.exec(name || '') || [])[1];
+  const ext = (sniffed && sniffed.ext) || (fromName && fromName.toLowerCase()) || EXT_FOR_TYPE[(type || '').toLowerCase()] || 'bin';
+  if (sniffed && type && EXT_FOR_TYPE[type.toLowerCase()] && !sameFamily(EXT_FOR_TYPE[type.toLowerCase()], sniffed.ext)) {
+    console.warn('voice-clone: declared type does not match the bytes', { declared: type, actual: sniffed.type, name });
+  }
+  const wav = await transcodeToWav(bytes, { ext });
+  return { wav, source: `transcoded from ${(sniffed && sniffed.type) || type || 'unknown'} (.${ext})` };
 }

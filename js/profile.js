@@ -338,9 +338,12 @@ async function deleteMySubliminal(id){
    format before it is sent: 16-bit PCM WAV, mono, 22.05 kHz, at most 90 seconds
    (see prepareVoiceSample). That is what ElevenLabs reads without question, it
    fits under the 4.5 MB a Vercel function will accept, and it is what
-   /api/voice-clone measures to check the minute is really there. The sample is
-   never stored; only the resulting voice, held server-side against this
-   account, is kept.
+   /api/voice-clone measures to check the minute is really there. When this
+   device cannot decode a recording or file itself, the original is sent as it
+   is — typed and named for what it really is (an iPhone recording is
+   audio/mp4, .m4a) — and the server converts it with ffmpeg instead
+   (lib/audio-transcode.js). The sample is never stored; only the resulting
+   voice, held server-side against this account, is kept.
 
    Every step that waits on something — the microphone, the recorder handing
    over its audio, decoding, the network — has a time limit, and every path ends
@@ -359,6 +362,9 @@ const VOICE_CLONE_MAX_RECORD_SECONDS = 180;
    taking the tab down on a phone. */
 const VOICE_CLONE_MAX_UPLOAD_BYTES = 300 * 1024 * 1024;
 const VOICE_CLONE_MAX_UPLOAD_SECONDS = 10 * 60;
+/* The most that can be sent as-is for the server to convert, under the 4.5 MB
+   Vercel accepts. A minute or two of an iPhone recording (AAC) is well under. */
+const VOICE_CLONE_MAX_RAW_BYTES = 4.3 * 1024 * 1024;
 /* Time limits. Past these something is wrong, and saying so beats waiting. */
 const VOICE_CLONE_MIC_TIMEOUT_MS = 20000;      // includes the permission prompt
 const VOICE_CLONE_STOP_TIMEOUT_MS = 5000;      // recorder handing over its audio
@@ -378,7 +384,8 @@ let voiceCloneStarting = false;
    ready, shown as the label; null when nothing is. */
 let voiceCloneChecking = null;
 /* The finished, prepared sample, waiting to be listened to and confirmed:
-   { blob (WAV), url, seconds, voicedSeconds, source, fileName }. Kept after a
+   { blob (WAV), url, seconds, voicedSeconds, source, fileName } — or, when this
+   device could not decode it, { raw:true, blob (the original, its own type) }. Kept after a
    failed upload so trying again does not mean recording again. A take under a
    minute is kept too, so it can be listened to, but cannot be sent. */
 let voiceCloneTake = null;
@@ -482,7 +489,7 @@ function voiceCloneEscape(text){
 
 const VOICE_CLONE_HEADER = `
   <h4 class="voice-clone-title">Create Your AI Voice</h4>
-  <p class="voice-clone-sub">For the best results, provide at least 1 minute of clear speech in your natural speaking voice.</p>
+  <p class="voice-clone-sub">Record at least 1 minute of your natural speaking voice for the best results.</p>
   <p class="voice-clone-tip">Find a quiet space and speak naturally. Avoid music, TV, other people talking, heavy background noise, or audio effects.</p>`;
 
 function voiceCloneOptionsHtml(){
@@ -549,7 +556,7 @@ async function renderVoiceClone(){
       ${upload ? `<div class="voice-clone-file"><span class="voice-clone-file-name">${voiceCloneEscape(t.fileName)}</span></div>` : ''}
       <div class="voice-clone-review">
         <audio controls preload="auto" playsinline data-vc="preview"></audio>
-        <span class="voice-rec-time" data-vc="duration">${voiceCloneDurationText(Math.round(t.seconds))}</span>
+        <span class="voice-rec-time" data-vc="duration">${t.unmeasured ? 'Length is checked when you create your voice' : voiceCloneDurationText(Math.round(t.seconds))}</span>
       </div>
       ${t.ok ? '' : `<p class="voice-clone-tip" data-vc="short">${voiceCloneEscape(VOICE_CLONE_SHORT_TEXT)}</p>`}
       <label class="voice-clone-consent">
@@ -921,6 +928,17 @@ async function acceptVoiceCloneMedia(media, { source, timedSeconds, fileName, at
     if (attempt === voiceCloneAttempt) voiceCloneChecking = null;
   }
   if (attempt !== voiceCloneAttempt) return;   // cancelled or replaced meanwhile
+  if (!result.ok && !result.blob && VOICE_CLONE_UNDECODABLE.includes(result.reason)){
+    /* This device couldn't decode it — that is not the same as it being
+       unusable. Send the original as it is and let the server convert it. */
+    const raw = await voiceCloneRawTake(media, { source, timedSeconds, fileName });
+    if (attempt !== voiceCloneAttempt) return;
+    if (raw){
+      console.warn('[voice-clone] could not decode here (' + result.reason + '); the original goes to the server to convert',
+        { type: media.type || '(none)', bytes: media.size, seconds: raw.seconds, measured: !raw.unmeasured });
+      result = raw;
+    }
+  }
   if (!result.ok && !result.blob){
     console.error('[voice-clone] sample rejected:', result.reason, result.detail || '');
     sayVoiceClone(voiceCloneErrorText(result.reason, source), 'err');
@@ -931,10 +949,11 @@ async function acceptVoiceCloneMedia(media, { source, timedSeconds, fileName, at
   voiceCloneTake = {
     ok: result.ok, blob: result.blob, url: URL.createObjectURL(result.blob),
     seconds: result.seconds, voicedSeconds: result.voicedSeconds, source, fileName,
+    raw: !!result.raw, unmeasured: !!result.unmeasured,
   };
   voiceCloneConsented = false;
   voiceCloneFailure = null;
-  console.log('[voice-clone] sample ready', { ok: result.ok, seconds: result.seconds, voicedSeconds: result.voicedSeconds, wavBytes: result.blob.size });
+  console.log('[voice-clone] sample ready', { ok: result.ok, seconds: result.seconds, voicedSeconds: result.voicedSeconds, bytes: result.blob.size, type: result.blob.type, raw: !!result.raw });
   if (!result.ok){
     console.error('[voice-clone] sample rejected:', result.reason, result.detail || '');
     // Too short is said on the card itself, next to the "0:40 / 1:00 minimum".
@@ -943,6 +962,51 @@ async function acceptVoiceCloneMedia(media, { source, timedSeconds, fileName, at
     sayVoiceClone('');
   }
   renderVoiceClone();
+}
+
+/* Reasons that mean "this browser could not decode it", not "there is nothing
+   there" — the server may well be able to. */
+const VOICE_CLONE_UNDECODABLE = ['sample_unreadable', 'upload_unreadable', 'decode_timeout'];
+/* The original recording or file as a take, for the server to convert. Its
+   length comes from the recording timer or the file's own header; the server
+   measures it again on the converted audio either way. null when it is too big
+   to send as-is. */
+async function voiceCloneRawTake(media, { source, timedSeconds }){
+  if (!media || !media.size || media.size > VOICE_CLONE_MAX_RAW_BYTES) return null;
+  let seconds = source === 'record' ? timedSeconds : null;
+  if (!seconds){
+    try { seconds = await probeVoiceCloneDuration(media); } catch(e){ seconds = null; }
+  }
+  const unmeasured = !seconds;
+  const ok = unmeasured || voiceCloneLongEnough(seconds);
+  return { ok, raw: true, unmeasured, blob: media, seconds: seconds || 0, voicedSeconds: null,
+    reason: ok ? undefined : 'sample_too_short' };
+}
+/* The extension that matches the sample's real type. The name travels with the
+   upload, so an MP4/M4A is never sent looking like WebM or anything else. */
+const VOICE_CLONE_EXT = {
+  'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/wave': 'wav',
+  'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a', 'audio/aac': 'aac',
+  'video/mp4': 'mp4', 'video/quicktime': 'mov', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+  'audio/webm': 'webm', 'video/webm': 'webm', 'audio/ogg': 'ogg', 'audio/flac': 'flac',
+  'audio/x-caf': 'caf', 'video/3gpp': '3gp', 'audio/3gpp': '3gp',
+};
+function voiceCloneUploadName(take){
+  const type = String(take.blob.type || '').split(';')[0].trim().toLowerCase();
+  if (!take.raw) return 'voice-sample.wav';
+  // An upload keeps its own name, which already carries its real extension.
+  if (take.source === 'upload' && /\.[a-z0-9]{1,5}$/i.test(take.fileName || '')) return take.fileName;
+  const ext = VOICE_CLONE_EXT[type];
+  return ext ? `voice-recording.${ext}` : 'voice-recording';   // no guess: the server reads the bytes
+}
+
+/* Some browsers leave a file's type blank (a .MOV, often). Its extension says
+   what it is; without either the server still reads the bytes. */
+function voiceCloneTypedBlob(blob, fileName){
+  if (blob.type) return blob;
+  const ext = (/\.([a-z0-9]{1,5})$/i.exec(fileName || '') || [])[1];
+  const type = ext && Object.keys(VOICE_CLONE_EXT).find(t => VOICE_CLONE_EXT[t] === ext.toLowerCase());
+  return type ? new Blob([blob], { type }) : blob;
 }
 
 /* ---------- turning anything into a sample ----------
@@ -1145,7 +1209,10 @@ const VOICE_CLONE_MESSAGES = {
   upload_no_audio:       "That file doesn't seem to have any sound we can use — choose one with you speaking.",
   upload_too_long:       'That file is longer than 10 minutes — trim it to a few minutes of you speaking, or choose another.',
   decode_timeout:        'Getting the audio ready took too long on this device — try again, or use a shorter file.',
-  unsupported_format:    "The recording couldn't be prepared in a format the voice service reads — try again.",
+  unsupported_format:    "We couldn't read the audio in that recording or file. Your sample is kept — tap Try Again, or use an M4A, MP3, WAV, MP4 or MOV.",
+  sample_no_audio:       "That file doesn't seem to have any sound we can use — choose one with you speaking.",
+  upload_malformed:      "Your recording didn't upload properly — check your connection, then tap Try Again.",
+  transcode_unavailable: "Voice creation is temporarily unavailable. Your recording is kept — try again in a few minutes.",
   sample_too_short:      VOICE_CLONE_SHORT_TEXT,
   sample_too_long:       'That sample was too large to send — try again with a shorter recording.',
   sample_not_received:   "Your recording didn't finish uploading — check your connection, then tap Try Again.",
@@ -1173,6 +1240,8 @@ function voiceCloneCodeForStatus(status){
   if (status === 413) return 'sample_too_long';
   if (status === 401) return 'not_signed_in';
   if (status === 504 || status === 408) return 'timeout';
+  if (status === 502 || status === 503) return 'provider_failed';
+  if (status === 415) return 'unsupported_format';
   return 'clone_failed';
 }
 /* The session token, without waiting forever: supabase-js can hold getSession()
@@ -1188,21 +1257,26 @@ async function sendVoiceCloneSample(take){
   try { token = await voiceCloneToken(); }
   catch(e){ console.error('[voice-clone] no session token:', e && (e.code || e.message)); }
   if (!token) return { code: 'not_signed_in' };
+  /* multipart/form-data, the sample as a file with its real type and a name
+     whose extension matches it. The browser sets the Content-Type (with the
+     boundary) itself. */
+  const fileName = voiceCloneUploadName(take);
+  const form = new FormData();
+  form.append('sample', voiceCloneTypedBlob(take.blob, fileName), fileName);
   const headers = {
-    'Content-Type': 'audio/wav',
     Authorization: `Bearer ${token}`,
     // The confirmation travels with the sample, and the route checks it against
     // its own copy of the sentence before spending anything.
     'X-Voice-Consent': await voiceConsentStatement(),
   };
   if (voiceCloneReplacing) headers['X-Voice-Replace'] = '1';
-  console.log('[voice-clone] sending sample', { bytes: take.blob.size, seconds: +take.seconds.toFixed(1), replacing: voiceCloneReplacing });
+  console.log('[voice-clone] sending sample', { bytes: take.blob.size, type: take.blob.type, fileName, raw: !!take.raw, seconds: +(take.seconds || 0).toFixed(1), replacing: voiceCloneReplacing });
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), VOICE_CLONE_UPLOAD_TIMEOUT_MS);
   const started = Date.now();
   try {
     let res;
-    try { res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: take.blob, signal: abort.signal }); }
+    try { res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: form, signal: abort.signal }); }
     catch(e){
       const code = e && e.name === 'AbortError' ? 'timeout' : 'network';
       console.error('[voice-clone] request failed:', code, e && e.message, `after ${Date.now() - started}ms`);

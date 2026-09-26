@@ -474,8 +474,8 @@ check('  ...and removed at the provider rather than left orphaned',
 for (const [label, sample, code] of [
   ['a 45 second sample', makeWav(45), 'sample_too_short'],
   ['a minute of silence', makeWav(70, { silent: true }), 'sample_silent'],
-  ['an MP4 the page did not convert', Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(8192, 1)]), 'unsupported_format'],
-  ['an empty body', Buffer.alloc(0), 'unsupported_format'],
+  ['an MP4 header with nothing readable behind it', Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(8192, 1)]), 'unsupported_format'],
+  ['an empty body', Buffer.alloc(0), 'sample_empty'],
 ]){
   reset();
   r = await callClone({ consent: CONSENT, sample });
@@ -485,6 +485,96 @@ for (const [label, sample, code] of [
 reset();
 r = await callClone({ consent: CONSENT, sample: makeWav(59.7) });
 check('1:00 on the clock that decodes to 59.7s is accepted', [r.code, !!r.body.created], [200, true]);
+
+/* ---------------- anything that is not WAV is converted, not refused ----------------
+   What an iPhone records (AAC in a fragmented MP4, as Safari's MediaRecorder
+   writes it), what people upload (M4A, MP4, MOV, MP3, WebM), sent the way the
+   page sends it (multipart, named for its type) and the way an older app build
+   sends it (the raw bytes as the body). Each is made with the same ffmpeg the
+   server uses, from the same speech-like WAV. */
+{
+  const { spawnSync } = await import('node:child_process');
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { default: ffmpeg } = await import('ffmpeg-static');
+  const dir = mkdtempSync(join(tmpdir(), 'voice-test-'));
+  writeFileSync(join(dir, 'src.wav'), makeWav(75, { rate: 44100 }));
+  writeFileSync(join(dir, 'short.wav'), makeWav(45, { rate: 44100 }));
+  function make(name, args, from = 'src.wav'){
+    const out = join(dir, name);
+    const r = spawnSync(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', ...args.pre || [], '-i', join(dir, from), ...args.post, out]);
+    if (r.status !== 0) throw new Error(`could not make ${name}: ${r.stderr}`);
+    return readFileSync(out);
+  }
+  const video = { pre: ['-f', 'lavfi', '-i', 'color=c=black:s=320x240:r=15:d=75'], post: [] };
+  const media = {
+    safariM4a: make('safari.m4a', { post: ['-c:a', 'aac', '-b:a', '64k', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4'] }),
+    m4a: make('voice.m4a', { post: ['-c:a', 'aac', '-b:a', '64k', '-movflags', '+faststart'] }),
+    mp3: make('voice.mp3', { post: ['-c:a', 'libmp3lame', '-b:a', '64k'] }),
+    webm: make('voice.webm', { post: ['-c:a', 'libopus', '-b:a', '32k'] }),
+    mov: make('clip.mov', { pre: video.pre, post: ['-map', '0:v', '-map', '1:a', '-c:v', 'mpeg4', '-q:v', '31', '-c:a', 'aac', '-b:a', '64k', '-shortest'] }),
+    mp4: make('clip.mp4', { pre: video.pre, post: ['-map', '0:v', '-map', '1:a', '-c:v', 'mpeg4', '-q:v', '31', '-c:a', 'aac', '-b:a', '64k', '-shortest'] }),
+    silentVideo: make('novoice.mp4', { pre: video.pre, post: ['-map', '0:v', '-c:v', 'mpeg4', '-q:v', '31'] }),
+    shortM4a: make('short.m4a', { post: ['-c:a', 'aac', '-b:a', '64k'] }, 'short.wav'),
+    wav24: make('voice24.wav', { post: ['-c:a', 'pcm_s24le', '-ar', '16000'] }),
+  };
+  rmSync(dir, { recursive: true, force: true });
+
+  async function multipart(bytes, type, name){
+    const form = new FormData();
+    form.append('sample', new Blob([bytes], { type }), name);
+    const r = new Response(form);
+    return { sample: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') };
+  }
+  function sentToProvider(){
+    const add = elevenCalls.find(c => c.url.includes('/voices/add'));
+    return add && add.form ? add.form.get('files') : null;
+  }
+
+  for (const [label, bytes, type, name] of [
+    ['an iPhone Safari recording (fragmented MP4/AAC)', media.safariM4a, 'audio/mp4', 'voice-recording.m4a'],
+    ['an uploaded M4A', media.m4a, 'audio/x-m4a', 'Voice Memo.m4a'],
+    ['an uploaded MP3', media.mp3, 'audio/mpeg', 'me.mp3'],
+    ['an uploaded WebM', media.webm, 'audio/webm', 'me.webm'],
+    ['an uploaded MOV video', media.mov, 'video/quicktime', 'IMG_0001.MOV'],
+    ['an uploaded MP4 video', media.mp4, 'video/mp4', 'clip.mp4'],
+    ['a 24-bit WAV', media.wav24, 'audio/wav', 'studio.wav'],
+    ['an M4A with no type and a wrong name', media.m4a, '', 'recording.webm'],
+  ]){
+    reset();
+    r = await callClone({ consent: CONSENT, ...(await multipart(bytes, type, name)) });
+    check(`${label} is converted and cloned`, [r.code, !!r.body.created], [200, true]);
+    const file = sentToProvider();
+    check('  ...and reaches ElevenLabs as PCM WAV named .wav',
+      file ? [file.type, file.name, Buffer.from(await file.arrayBuffer()).toString('latin1', 0, 4)] : null,
+      ['audio/wav', 'sample.wav', 'RIFF']);
+  }
+
+  reset();
+  r = await callClone({ consent: CONSENT, sample: media.safariM4a, contentType: 'audio/mp4' });
+  check('an older app build posting raw audio/mp4 is converted, not refused', [r.code, !!r.body.created], [200, true]);
+
+  reset();
+  r = await callClone({ consent: CONSENT, ...(await multipart(GOOD_WAV, 'audio/wav', 'voice-sample.wav')) });
+  check('the page\'s own WAV, as multipart, is sent unchanged', [r.code, !!r.body.created], [200, true]);
+  check('  ...byte for byte', Buffer.from(await sentToProvider().arrayBuffer()).equals(GOOD_WAV), true);
+
+  for (const [label, sample, code] of [
+    ['a 45 second M4A', await multipart(media.shortM4a, 'audio/mp4', 'short.m4a'), 'sample_too_short'],
+    ['a video with no sound', await multipart(media.silentVideo, 'video/mp4', 'novoice.mp4'), 'sample_no_audio'],
+    ['a form with no sample in it', { sample: Buffer.from('--x\r\nContent-Disposition: form-data; name="other"\r\n\r\nhi\r\n--x--\r\n'), contentType: 'multipart/form-data; boundary=x' }, 'upload_malformed'],
+  ]){
+    reset();
+    r = await callClone({ consent: CONSENT, ...sample });
+    check(`${label} is refused as ${code}`, [r.code >= 400, r.body.error], [true, code]);
+    check('  ...and nothing reached the provider', elevenCalls.length, 0);
+  }
+
+  reset();
+  r = await callClone({ consent: null, ...(await multipart(media.m4a, 'audio/mp4', 'v.m4a')) });
+  check('an upload without the confirmation is still refused', [r.code, r.body.error], [400, 'consent_required']);
+}
 
 /* ---------------- the key never reaches the browser ---------------- */
 {

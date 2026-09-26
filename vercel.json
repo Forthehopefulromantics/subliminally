@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/voice-clone.js": {
+      "includeFiles": "node_modules/ffmpeg-static/ffmpeg"
+    }
+  }
+}
