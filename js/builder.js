@@ -352,6 +352,8 @@ function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
   state = { freq:null, intention:null, goal:'', tone:null, count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  affirmationMode = 'generate';
+  affirmationGenerateCount = 5;
   /* Clearing through the one helper rather than stripping the class by hand:
      that left every chip on the page still announcing itself as pressed. */
   clearSelection('.sel');
@@ -399,6 +401,14 @@ function resetFlow(){
   document.getElementById('visualizationGuidePanel').style.display = 'none';
   document.getElementById('ritualModeMsg').textContent = '';
   document.getElementById('countRow').style.display = 'block';
+  /* Reset affirmation mode UI */
+  selectAffirmationMode('generate');
+  selectAffirmationCount(5);
+  if (document.getElementById('affirmationPasteText')) document.getElementById('affirmationPasteText').value = '';
+  if (document.getElementById('fileUploadMsg')) document.getElementById('fileUploadMsg').textContent = '';
+  if (document.getElementById('affirmationFileInput')) document.getElementById('affirmationFileInput').value = '';
+  switchAffirmationTab('paste');
+  updateAffirmationButtonText();
   applyModeCopy('subliminal');
   const lengthQ = document.getElementById('sessionLengthRow');
   if (lengthQ) lengthQ.style.display = '';
@@ -633,6 +643,17 @@ function applyModeCopy(mode){
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
 async function generateAffirmations(){
+  /* Handle import mode first — if user pasted affirmations, use those */
+  if (affirmationMode === 'import'){
+    if (handleAffirmationInputBeforeGenerate()) return;
+    const msg = document.getElementById('fileUploadMsg') || document.getElementById('affListMsg');
+    if (msg){
+      msg.textContent = 'Please paste affirmations or upload a file.';
+      msg.className = 'save-msg err';
+    }
+    return;
+  }
+
   const msg = document.getElementById('lengthMsg');
   const minutes = state.targetLengthMinutes || parseInt(document.getElementById('sessionLengthSlider').value, 10);
   const requiredTier = requiredTierForMinutes(minutes);
@@ -653,7 +674,7 @@ async function generateAffirmations(){
   msg.textContent = '';
 
   state.goal = document.getElementById('quizGoal').value.trim();
-  state.count = state.eftMode ? EFT_LINE_COUNT : (state.visualizationMode ? 1 : parseInt(countRange.value));
+  state.count = state.eftMode ? EFT_LINE_COUNT : (state.visualizationMode ? 1 : affirmationGenerateCount);
   showStep(2);
 
   /* The words these lines come back in are the ones chosen in Settings, so the
@@ -854,6 +875,219 @@ function renderAffList(){
   if (listMsg && !affirmationShortfall()){ listMsg.textContent = ''; listMsg.className = 'save-msg'; }
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
+
+/* ---- affirmation mode: generate or import ---- */
+let affirmationMode = 'generate';
+let affirmationGenerateCount = 5;
+
+function updateAffirmationButtonText(){
+  const btn = document.getElementById('generateBtn');
+  if (btn){
+    btn.textContent = affirmationMode === 'generate' ? 'Generate my affirmations ✦' : 'Continue →';
+  }
+}
+
+function selectAffirmationMode(mode){
+  affirmationMode = mode;
+  state.goal = '';
+  state.affirmations = [];
+  document.querySelectorAll('.affirmation-choice-card').forEach(c => c.classList.remove('sel'));
+  document.querySelector(`[data-mode="${mode}"]`).classList.add('sel');
+  const generateSection = document.getElementById('affirmationGenerateSection');
+  const importSection = document.getElementById('affirmationImportSection');
+  if (mode === 'generate'){
+    if (generateSection) generateSection.classList.add('active');
+    if (importSection) importSection.classList.remove('active');
+  } else {
+    if (generateSection) generateSection.classList.remove('active');
+    if (importSection) importSection.classList.add('active');
+    if (document.getElementById('affirmationPasteTab')) document.getElementById('affirmationPasteTab').classList.add('active');
+    if (document.getElementById('affirmationUploadTab')) document.getElementById('affirmationUploadTab').classList.remove('active');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('sel'));
+    document.querySelector('[data-tab="paste"]').classList.add('sel');
+  }
+  updateAffirmationButtonText();
+  answered(event && event.target);
+}
+
+function selectAffirmationCount(count){
+  affirmationGenerateCount = count;
+  document.querySelectorAll('#affirmationCountChips .chip').forEach(c => c.classList.remove('sel'));
+  document.querySelector(`[data-count="${count}"]`).classList.add('sel');
+  state.count = count;
+}
+
+function switchAffirmationTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('sel'));
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('sel');
+  document.querySelectorAll('.affirmation-tab-content').forEach(t => t.classList.remove('active'));
+  if (tab === 'paste') document.getElementById('affirmationPasteTab')?.classList.add('active');
+  else document.getElementById('affirmationUploadTab')?.classList.add('active');
+}
+
+function parseAffirmationsFromText(text){
+  if (!text || typeof text !== 'string') return [];
+  const lines = text.split('\n');
+  const affirmations = [];
+  for (const line of lines){
+    let clean = line.trim();
+    if (!clean) continue;
+    clean = clean.replace(/^[\d]+[\.\)\s]+/, '');
+    clean = clean.replace(/^[-•*]\s+/, '');
+    clean = clean.trim();
+    if (clean) affirmations.push(clean);
+  }
+  return affirmations;
+}
+
+function handleAffirmationFileDrop(event){
+  event.preventDefault();
+  event.stopPropagation();
+  event.currentTarget.classList.remove('drag-over');
+  const files = event.dataTransfer?.files;
+  if (files && files.length > 0) handleAffirmationFileUpload(files[0]);
+}
+
+function handleAffirmationFileSelect(event){
+  const file = event.target?.files?.[0];
+  if (file) handleAffirmationFileUpload(file);
+}
+
+async function handleAffirmationFileUpload(file){
+  const msgEl = document.getElementById('fileUploadMsg');
+  if (!file) return;
+  const isText = file.type === 'text/plain';
+  const isPdf = file.type === 'application/pdf';
+  const isDocx = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (!isText && !isPdf && !isDocx){
+    if (msgEl){
+      msgEl.textContent = 'Please upload a .txt, .pdf, or .docx file.';
+      msgEl.className = 'save-msg err';
+    }
+    return;
+  }
+  try {
+    let text = '';
+    if (isText){
+      text = await file.text();
+    } else if (isPdf){
+      text = await extractAffirmationsFromPDF(file);
+    } else if (isDocx){
+      text = await extractAffirmationsFromDOCX(file);
+    }
+    if (!text || !text.trim()){
+      if (msgEl){
+        msgEl.textContent = 'No text found in file. Please try another file or paste your affirmations instead.';
+        msgEl.className = 'save-msg err';
+      }
+      return;
+    }
+    state.affirmations = parseAffirmationsFromText(text);
+    if (state.affirmations.length < MIN_AFFIRMATIONS){
+      if (msgEl){
+        msgEl.textContent = `Only found ${state.affirmations.length} affirmation${state.affirmations.length === 1 ? '' : 's'} — need at least ${MIN_AFFIRMATIONS}. Please paste more or upload another file.`;
+        msgEl.className = 'save-msg err';
+      }
+      return;
+    }
+    if (msgEl){
+      msgEl.textContent = `Loaded ${state.affirmations.length} affirmation${state.affirmations.length === 1 ? '' : 's'} from your file.`;
+      msgEl.className = 'save-msg';
+    }
+    showStep(3);
+    renderAffList();
+  } catch (err){
+    if (msgEl){
+      msgEl.textContent = 'Error reading file. Please try another file or paste your affirmations instead.';
+      msgEl.className = 'save-msg err';
+    }
+  }
+}
+
+async function extractAffirmationsFromPDF(file){
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    if (typeof pdfjsLib !== 'undefined'){
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++){
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      return text;
+    }
+    return '';
+  } catch (err){
+    return '';
+  }
+}
+
+async function extractAffirmationsFromDOCX(file){
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    if (typeof JSZip !== 'undefined'){
+      const zip = await JSZip.loadAsync(arrayBuffer);
+      const docXml = await zip.file('word/document.xml')?.async('text');
+      if (!docXml) return '';
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(docXml, 'text/xml');
+      const texts = Array.from(doc.querySelectorAll('w\\:t, w\\:p')).map(el => {
+        if (el.tagName.endsWith(':t')) return el.textContent;
+        return Array.from(el.querySelectorAll('w\\:t')).map(t => t.textContent).join('') + '\n';
+      });
+      return texts.join('');
+    }
+    return '';
+  } catch (err){
+    return '';
+  }
+}
+
+function loadAndConfigureAffirmationInput(){
+  const pasted = document.getElementById('affirmationPasteText')?.value.trim();
+  if (affirmationMode === 'generate'){
+    state.goal = document.getElementById('quizGoal').value.trim();
+    state.count = affirmationGenerateCount;
+  } else if (affirmationMode === 'import' && pasted){
+    state.affirmations = parseAffirmationsFromText(pasted);
+    if (state.affirmations.length < MIN_AFFIRMATIONS){
+      const msg = document.getElementById('affListMsg');
+      if (msg){
+        msg.textContent = `Need at least ${MIN_AFFIRMATIONS} affirmations — found ${state.affirmations.length}.`;
+        msg.className = 'save-msg err';
+      }
+      return false;
+    }
+    showStep(3);
+    renderAffList();
+    return true;
+  }
+  return true;
+}
+
+/* After generateAffirmations() is called, check if we're in import mode and handle pasted text */
+function handleAffirmationInputBeforeGenerate(){
+  if (affirmationMode === 'import'){
+    const pasted = document.getElementById('affirmationPasteText')?.value.trim();
+    if (pasted){
+      state.affirmations = parseAffirmationsFromText(pasted);
+      if (state.affirmations.length < MIN_AFFIRMATIONS){
+        const msg = document.getElementById('affListMsg');
+        if (msg){
+          msg.textContent = `Need at least ${MIN_AFFIRMATIONS} affirmations — found ${state.affirmations.length}. Paste more or switch to Generate.`;
+          msg.className = 'save-msg err';
+        }
+        return false;
+      }
+      state.count = state.affirmations.length;
+      showStep(3);
+      renderAffList();
+      return true;
+    }
+  }
+  return false;
+}
 
 /* ---------------- step 4: voice choice ----------------
    One question, three answers, one card each:
