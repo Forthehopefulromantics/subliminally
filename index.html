@@ -2864,7 +2864,7 @@
           </div>
 
           <!-- Add My Own section -->
-          <div class="affirmation-mode-section" id="affirmationImportSection" style="display:none;">
+          <div class="affirmation-mode-section" id="affirmationImportSection">
             <div class="quiz-q">
               <label>Already have your affirmations?</label>
               <p class="quiz-help">Paste them below or upload a file and we'll add them for you.</p>
@@ -2878,7 +2878,7 @@
                 <textarea id="affirmationPasteText" rows="6" placeholder="1. I am wealthy.&#10;2. I am confident.&#10;3. I am loved.&#10;&#10;Or paste as bullet points or plain text — we'll parse it all."></textarea>
               </div>
             </div>
-            <div id="affirmationUploadTab" class="affirmation-tab-content" style="display:none;">
+            <div id="affirmationUploadTab" class="affirmation-tab-content">
               <div class="quiz-q">
                 <div class="file-upload-area" id="fileUploadArea" ondrop="handleAffirmationFileDrop(event)" ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" onmouseleave="this.classList.remove('drag-over')">
                   <p>Upload a file</p>
@@ -2927,7 +2927,7 @@
             <div class="session-length-scale"><span>5 min</span><span>8 hr</span></div>
             <div class="length-msg" id="lengthMsg"></div>
           </div>
-          <details class="more-options">
+          <details class="more-options" id="fineTuneOptions">
             <summary>Fine-tune this <em>intensity, tone, a focus tag, how many lines</em></summary>
             <div class="more-options-body">
               <div class="quiz-q">

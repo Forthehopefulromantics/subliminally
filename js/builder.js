@@ -931,6 +931,12 @@ function selectAffirmationMode(mode){
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('sel'));
     document.querySelector('[data-tab="paste"]').classList.add('sel');
   }
+  // Intensity, tone, tag and line count only steer the generator.
+  const fineTune = document.getElementById('fineTuneOptions');
+  if (fineTune){
+    fineTune.hidden = mode !== 'generate';
+    if (fineTune.hidden) fineTune.open = false;
+  }
   updateAffirmationButtonText();
   answered(event && event.target);
 }
