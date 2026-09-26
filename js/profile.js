@@ -329,26 +329,58 @@ async function deleteMySubliminal(id){
   loadMyLibrary({ force: true });
 }
 /* ---------- cloning your voice ----------
-   One sample, read once, and the studio can generate any line in that voice.
-   Record it, listen back, record it again if it isn't right — nothing leaves the
-   device until "Create my voice" is pressed with the confirmation ticked. Then
-   the sample goes to /api/voice-clone and is never stored here; only the
-   resulting voice, held server-side against this account, is kept. */
-const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not someday, and not once everything lines up — now, in the ordinary middle of things. I speak to myself the way I would speak to someone I love. I keep what I promised myself I would keep, on the days it is easy and on the days it is not.";
-/* Shorter than this and there is not enough of a voice to copy. The server has
-   its own floor in bytes; this one is in seconds of what was actually recorded. */
-const VOICE_CLONE_MIN_SECONDS = 8;
+   At least a minute of somebody's own voice — recorded here, or taken from an
+   audio or video file they already have — and the studio can generate any line
+   in that voice. Nothing leaves the device until "Create My Voice" is pressed
+   with the confirmation ticked.
+
+   Every sample, recorded or uploaded, is decoded here and turned into one plain
+   format before it is sent: 16-bit PCM WAV, mono, 22.05 kHz, at most 90 seconds
+   (see prepareVoiceSample). That is what ElevenLabs reads without question, it
+   fits under the 4.5 MB a Vercel function will accept, and it is what
+   /api/voice-clone measures to check the minute is really there. The sample is
+   never stored; only the resulting voice, held server-side against this
+   account, is kept.
+
+   Every step that waits on something — the microphone, the recorder handing
+   over its audio, decoding, the network — has a time limit, and every path ends
+   in the next screen or in a message with a way forward. Nothing here can leave
+   the card on a spinner. */
+const VOICE_CLONE_SAMPLE = "I am becoming the person I said I would be. Not someday, and not once everything lines up — now, in the ordinary middle of things. I speak to myself the way I would speak to someone I love. I keep what I promised myself I would keep, on the days it is easy and on the days it is not. I am allowed to take up space. I am allowed to rest without earning it. The life I want is not waiting somewhere far away; I build it in small choices, one after another, and I notice every one of them. When I stumble, I begin again, gently, without keeping score. I trust myself a little more each day, because I keep showing up.";
+/* Instant Voice Cloning needs at least a minute of speech to sound like the
+   person. The server checks the same minute on the audio it receives. */
+const VOICE_CLONE_MIN_SECONDS = 60;
+const VOICE_CLONE_MIN_TOLERANCE = 0.5;   // 1:00 on the clock can decode to 59.9s
+const VOICE_CLONE_MIN_VOICED = 15;       // seconds clearly above the room, of that minute
+const VOICE_CLONE_SEND_SECONDS = 90;     // more than this does not improve an instant clone
+const VOICE_CLONE_RATE = 22050;
+const VOICE_CLONE_MAX_RECORD_SECONDS = 180;
+/* An upload is decoded whole, in memory. These keep a long 4K video from
+   taking the tab down on a phone. */
+const VOICE_CLONE_MAX_UPLOAD_BYTES = 300 * 1024 * 1024;
+const VOICE_CLONE_MAX_UPLOAD_SECONDS = 10 * 60;
+/* Time limits. Past these something is wrong, and saying so beats waiting. */
+const VOICE_CLONE_MIC_TIMEOUT_MS = 20000;      // includes the permission prompt
+const VOICE_CLONE_STOP_TIMEOUT_MS = 5000;      // recorder handing over its audio
+const VOICE_CLONE_DECODE_TIMEOUT_MS = 45000;
+const VOICE_CLONE_UPLOAD_TIMEOUT_MS = 80000;   // the route gives ElevenLabs 50s of its 60
+const VOICE_CLONE_AUTH_TIMEOUT_MS = 10000;
+const VOICE_CLONE_SHORT_TEXT = 'We need at least 1 minute of your voice to create your AI voice. Keep recording or choose a longer file.';
+
 let voiceCloneRecorder = null, voiceCloneStream = null,
     voiceCloneTimer = null, voiceCloneStart = 0;
+/* 'record' or 'upload': which of the two ways in is open. */
+let voiceCloneSource = 'record';
 /* True while the microphone is being opened — which on a phone is a permission
    prompt, and a second press of Start during it used to open a second stream. */
 let voiceCloneStarting = false;
-/* True between Stop and the take being ready: the recording is being checked. */
-let voiceCloneChecking = false;
-/* The finished, checked recording, waiting to be listened to and confirmed:
-   { blob, url, seconds, type }. Kept after a failed upload so trying again does
-   not mean reading the passage again, and only let go of by Re-record, a voice
-   being created, or the card being put away. */
+/* What is being worked on between Stop (or choosing a file) and the take being
+   ready, shown as the label; null when nothing is. */
+let voiceCloneChecking = null;
+/* The finished, prepared sample, waiting to be listened to and confirmed:
+   { blob (WAV), url, seconds, voicedSeconds, source, fileName }. Kept after a
+   failed upload so trying again does not mean recording again. A take under a
+   minute is kept too, so it can be listened to, but cannot be sent. */
 let voiceCloneTake = null;
 /* True while the sample is on its way to the provider. */
 let voiceCloneBusy = false;
@@ -360,6 +392,10 @@ let voiceCloneConsented = false;
 let voiceCloneReplacing = false;
 /* renderVoiceClone awaits the catalogue; a newer render makes an older one moot. */
 let voiceCloneRenderSeq = 0;
+/* Bumped by anything that throws away the take in progress (Cancel, Record
+   Again, Remove, the card closing), so a decode still running for the old one
+   cannot land on top of the new one. */
+let voiceCloneAttempt = 0;
 
 /* Where this card is drawn. Settings is one mount point and the builder's
    "Use my voice" panel is the other; the recorder, the confirmation and the
@@ -391,6 +427,8 @@ function voiceCloneHeldElsewhere(bodyId){
 }
 function unmountVoiceClone(){
   if (voiceCloneRecorder) cancelVoiceClone();
+  voiceCloneAttempt++;
+  voiceCloneChecking = null;
   discardVoiceCloneTake();
   voiceCloneHost = { bodyId: 'voiceCloneBody', msgId: 'voiceCloneMsg' };
   voiceCloneConsented = false;
@@ -416,36 +454,75 @@ function discardVoiceCloneTake(){
   if (voiceCloneTake && voiceCloneTake.url){ try { URL.revokeObjectURL(voiceCloneTake.url); } catch(e){} }
   voiceCloneTake = null;
 }
-function voiceCloneClock(secs){ return `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`; }
-function voiceCloneCanCreate(){ return !!(voiceCloneTake && voiceCloneConsented && !voiceCloneBusy); }
+function voiceCloneClock(secs){
+  secs = Math.max(0, Math.floor(secs));
+  return `${Math.floor(secs/60)}:${String(secs%60).padStart(2,'0')}`;
+}
+function voiceCloneLongEnough(seconds){ return seconds >= VOICE_CLONE_MIN_SECONDS - VOICE_CLONE_MIN_TOLERANCE; }
+function voiceCloneCanCreate(){
+  return !!(voiceCloneTake && voiceCloneTake.ok && voiceCloneConsented && !voiceCloneBusy);
+}
+/* A promise that gives up. `code` is what it rejects with, so the caller can
+   say which step it was. */
+function voiceCloneWithin(ms, promise, code){
+  let timer;
+  const limit = new Promise((_, reject) => {
+    timer = setTimeout(() => { const e = new Error(code); e.code = code; reject(e); }, ms);
+  });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+}
+function voiceCloneEscape(text){
+  return String(text || '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
 
 const VOICE_CLONE_HEADER = `
-  <h4 class="voice-clone-title">Clone Your Voice</h4>
-  <p class="voice-clone-sub">Create subliminals that sound like you.</p>
-  <p class="voice-clone-tip">Find a quiet room, then read the passage below in your natural speaking voice — no music, TV or background noise. About 30 seconds is plenty.</p>`;
+  <h4 class="voice-clone-title">Create Your AI Voice</h4>
+  <p class="voice-clone-sub">Give us at least 1 minute of your natural speaking voice so we can create your personal AI voice.</p>
+  <p class="voice-clone-tip">Find a quiet space and speak naturally. Avoid music, TV, other people talking, heavy background noise, or audio effects.</p>`;
+
+function voiceCloneOptionsHtml(){
+  const rec = voiceCloneSource === 'record';
+  return `
+    <div class="voice-clone-options" role="tablist">
+      <button class="mini-btn ${rec ? 'candlebtn' : 'ghostbtn'}" role="tab" aria-selected="${rec}" onclick="setVoiceCloneSource('record')">🎙 Record Your Voice</button>
+      <button class="mini-btn ${rec ? 'ghostbtn' : 'candlebtn'}" role="tab" aria-selected="${!rec}" onclick="setVoiceCloneSource('upload')">⬆ Upload Audio or Video</button>
+    </div>`;
+}
+function setVoiceCloneSource(source){
+  if (voiceCloneBusy || voiceCloneRecorder || voiceCloneStarting || voiceCloneChecking) return;
+  if (source === voiceCloneSource) return;
+  voiceCloneSource = source === 'upload' ? 'upload' : 'record';
+  voiceCloneAttempt++;
+  discardVoiceCloneTake();
+  voiceCloneConsented = false;
+  sayVoiceClone('');
+  renderVoiceClone();
+}
 
 async function renderVoiceClone(){
   const seq = ++voiceCloneRenderSeq;
   const body = voiceCloneBodyEl();
   if (!body) return;
   if (voiceCloneBusy){
-    body.innerHTML = '<div class="voice-clone-actions"><span class="voice-rec-label">Creating your voice — this takes a moment…</span></div>';
+    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions"><span class="voice-rec-dot"></span><span class="voice-rec-label">Creating your voice — this usually takes under a minute…</span></div>`;
     return;
   }
   if (voiceCloneChecking){
-    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions"><span class="voice-rec-label">Checking your recording…</span></div>`;
+    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions"><span class="voice-rec-label">${voiceCloneEscape(voiceCloneChecking)}</span></div>`;
     return;
   }
   if (voiceCloneRecorder || voiceCloneStarting){
-    const secs = voiceCloneRecorder ? Math.floor((Date.now() - voiceCloneStart) / 1000) : 0;
+    const secs = voiceCloneRecorder ? (Date.now() - voiceCloneStart) / 1000 : 0;
     body.innerHTML = `
+      ${VOICE_CLONE_HEADER}
       <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
+      <p class="voice-clone-tip">Read the passage, then keep talking naturally — about your day, anything — until the timer passes 1:00.</p>
       <div class="voice-clone-actions">
         ${voiceCloneRecorder ? `
         <span class="voice-rec-dot"></span>
-        <span class="voice-rec-label">Recording… take your time.</span>
-        <span class="voice-rec-time" data-vc="time">${voiceCloneClock(secs)}</span>
-        <button class="mini-btn candlebtn" onclick="finishVoiceClone()">Stop Recording</button>
+        <span class="voice-rec-label">Recording…</span>
+        <span class="voice-rec-time" data-vc="time">${voiceCloneTimerText(secs)}</span>
+        <button class="mini-btn candlebtn" data-vc="stop" onclick="finishVoiceClone()">${voiceCloneLongEnough(secs) ? 'Done — review it' : 'Stop'}</button>
         <button class="mini-btn ghostbtn" onclick="cancelVoiceClone()">Cancel</button>` : `
         <span class="voice-rec-label">Waiting for the microphone…</span>`}
       </div>`;
@@ -453,25 +530,32 @@ async function renderVoiceClone(){
   }
   if (voiceCloneTake){
     /* Listen back, then confirm. The button that sends it anywhere stays
-       disabled until the confirmation is ticked — and the sentence ticked is the
-       one the server checks the sample against. */
+       disabled until the sample is long enough and the confirmation is ticked —
+       and the sentence ticked is the one the server checks the sample against. */
     const consent = await voiceConsentStatement();
     if (seq !== voiceCloneRenderSeq || !voiceCloneTake) return;
     const live = voiceCloneBodyEl();
     if (!live) return;
+    const t = voiceCloneTake;
+    const upload = t.source === 'upload';
     live.innerHTML = `
       ${VOICE_CLONE_HEADER}
+      ${voiceCloneOptionsHtml()}
+      ${upload ? `<div class="voice-clone-file"><span class="voice-clone-file-name">${voiceCloneEscape(t.fileName)}</span><span class="voice-rec-time">${voiceCloneClock(Math.round(t.seconds))}</span></div>` : ''}
       <div class="voice-clone-review">
         <audio controls preload="auto" playsinline data-vc="preview"></audio>
-        <span class="voice-rec-time">${voiceCloneClock(voiceCloneTake.seconds)}</span>
+        <span class="voice-rec-time">${t.ok ? voiceCloneClock(Math.round(t.seconds)) : `${voiceCloneClock(Math.round(t.seconds))} / 1:00 minimum`}</span>
       </div>
       <label class="voice-clone-consent">
-        <input type="checkbox" data-vc="consent" ${voiceCloneConsented ? 'checked' : ''} onchange="setVoiceCloneConsent(this.checked)">
-        <span>${consent}</span>
+        <input type="checkbox" data-vc="consent" ${voiceCloneConsented ? 'checked' : ''} ${t.ok ? '' : 'disabled'} onchange="setVoiceCloneConsent(this.checked)">
+        <span>${voiceCloneEscape(consent)}</span>
       </label>
       <div class="voice-clone-actions">
         <button class="mini-btn candlebtn" data-vc="create" ${voiceCloneCanCreate() ? '' : 'disabled'} onclick="createVoiceClone()">Create My Voice</button>
-        <button class="mini-btn ghostbtn" onclick="reRecordVoiceClone()">Re-record</button>
+        ${upload
+          ? '<button class="mini-btn ghostbtn" onclick="removeVoiceCloneUpload()">Remove and choose another</button>'
+          : '<button class="mini-btn ghostbtn" onclick="reRecordVoiceClone()">Record Again</button>'}
+        ${voiceCloneReplacing ? '<button class="mini-btn ghostbtn" onclick="cancelReplaceVoice()">Keep my current voice</button>' : ''}
       </div>`;
     wireVoiceClonePreview(live.querySelector('[data-vc="preview"]'));
     return;
@@ -483,25 +567,47 @@ async function renderVoiceClone(){
   if (mine && !voiceCloneReplacing){
     live.innerHTML = `
       <div class="voice-clone-have">
-        <span><b>Your Voice is Ready ✦</b> — pick <b>${mine.name || 'My voice'}</b> when you choose a voice.</span>
+        <span><b>Your voice is ready ✓</b> — pick <b>${voiceCloneEscape(mine.name || 'My voice')}</b> when you choose a voice.</span>
+        <button class="mini-btn ghostbtn" data-vc="test" onclick="testClonedVoice()">Hear a test affirmation</button>
         <button class="mini-btn ghostbtn" onclick="beginReplaceVoice()">Record it again</button>
         <button class="mini-btn ghostbtn" onclick="removeClonedVoice()">Remove it</button>
+      </div>
+      <audio data-vc="test-audio" playsinline preload="none"></audio>`;
+    return;
+  }
+  const keep = voiceCloneReplacing ? '<button class="mini-btn ghostbtn" onclick="cancelReplaceVoice()">Keep my current voice</button>' : '';
+  if (voiceCloneSource === 'upload'){
+    live.innerHTML = `
+      ${VOICE_CLONE_HEADER}
+      ${voiceCloneOptionsHtml()}
+      <p class="voice-clone-tip">Choose a recording or a video of you speaking — at least 1 minute, just your voice. From a video only the sound is used; the video itself is never uploaded.</p>
+      <input type="file" data-vc="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.mp4,.mov,.webm,.ogg,.oga,.flac,.caf,.3gp" hidden onchange="chooseVoiceCloneFile(this)">
+      <div class="voice-clone-actions">
+        <button class="mini-btn candlebtn" onclick="pickVoiceCloneFile()">Choose a file</button>
+        ${keep}
       </div>`;
     return;
   }
   live.innerHTML = `
     ${VOICE_CLONE_HEADER}
+    ${voiceCloneOptionsHtml()}
     <div class="voice-clone-sample">${VOICE_CLONE_SAMPLE}</div>
     <div class="voice-clone-actions">
       <button class="mini-btn candlebtn" onclick="startVoiceClone()">Start Recording</button>
-      ${voiceCloneReplacing ? '<button class="mini-btn ghostbtn" onclick="cancelReplaceVoice()">Keep my current voice</button>' : ''}
+      <span class="voice-rec-time">0:00 / 1:00 minimum</span>
+      ${keep}
     </div>`;
+}
+function voiceCloneTimerText(secs){
+  return voiceCloneLongEnough(secs) ? `${voiceCloneClock(secs)} ✓` : `${voiceCloneClock(secs)} / 1:00 minimum`;
 }
 
 /* ---------- listening back ----------
    The player on the card is given the take and nothing else: its own element,
    the take's own URL, full volume, not muted. Pressing it quiets anything else
-   the app might be playing, so what is heard is only the recording. */
+   the app might be playing, so what is heard is only the recording. What plays
+   is the WAV that will be sent — so what they approve is what the voice is made
+   from. */
 function wireVoiceClonePreview(el){
   if (!el || !voiceCloneTake) return;
   el.src = voiceCloneTake.url;
@@ -519,8 +625,7 @@ function wireVoiceClonePreview(el){
   });
   el.addEventListener('ended', () => voiceCloneAudioSession(null));
   el.addEventListener('error', () => {
-    console.error('[voice-clone] the recording would not play back', el.error && el.error.code, voiceCloneTake && voiceCloneTake.type);
-    sayVoiceClone("This recording won't play back on this device — tap Re-record and try again.", 'err');
+    console.error('[voice-clone] the prepared sample would not play back', el.error && el.error.code);
   });
   el.load();
 }
@@ -560,13 +665,16 @@ function beginReplaceVoice(){
   renderVoiceClone();
 }
 function cancelReplaceVoice(){
+  if (voiceCloneBusy) return;
   voiceCloneReplacing = false;
+  voiceCloneAttempt++;
   discardVoiceCloneTake();
   sayVoiceClone('');
   renderVoiceClone();
 }
 function reRecordVoiceClone(){
-  if (voiceCloneBusy) return;
+  if (voiceCloneBusy || voiceCloneChecking) return;
+  voiceCloneAttempt++;
   discardVoiceCloneTake();
   voiceCloneConsented = false;
   sayVoiceClone('');
@@ -574,12 +682,12 @@ function reRecordVoiceClone(){
 }
 
 /* ---------- recording ----------
-   The format is chosen for playing back on the same device and for the voice
-   service to read. Safari — every browser on iPhone and iPad, and the app itself
-   there — records AAC in MP4 natively; it can also be asked for WebM now, but a
-   WebM take from its recorder often will not play back in its own player, which
-   is a recording that shows a length and makes no sound. So on WebKit MP4 comes
-   first; everywhere else WebM/Opus, which is what those browsers play best. */
+   The recorder's own format does not matter much any more — every take is
+   decoded and re-encoded as WAV before it goes anywhere — but it does have to be
+   one this browser can decode. Safari (every browser on iPhone and iPad, and the
+   app itself there) records AAC in MP4 natively and decodes it; its WebM output
+   often will not decode in its own Web Audio. So on WebKit MP4 comes first;
+   everywhere else WebM/Opus. */
 function voiceCloneIsWebKit(){
   return /^Apple/.test(navigator.vendor || '') || /iPad|iPhone|iPod/.test(navigator.userAgent || '');
 }
@@ -594,27 +702,35 @@ function pickVoiceCloneMime(){
 }
 
 async function startVoiceClone(){
-  if (voiceCloneRecorder || voiceCloneStarting || voiceCloneBusy) return;
+  if (voiceCloneRecorder || voiceCloneStarting || voiceCloneBusy || voiceCloneChecking) return;
   sayVoiceClone('');
   if (!sb || !currentUser){ sayVoiceClone('Sign in first.', 'err'); return; }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
-    sayVoiceClone("This browser can't record audio.", 'err');
+    sayVoiceClone("This browser can't record audio — choose Upload Audio or Video instead.", 'err');
     renderVoiceClone();
     return;
   }
+  voiceCloneSource = 'record';
   voiceCloneAudioSession(null);   // a session left on "playback" can keep the microphone shut
   voiceCloneStarting = true;
+  const attempt = ++voiceCloneAttempt;
   renderVoiceClone();
   let stream;
-  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch(e){
+  try {
+    stream = await voiceCloneWithin(VOICE_CLONE_MIC_TIMEOUT_MS,
+      navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }),
+      'mic_timeout');
+  } catch(e){
     voiceCloneStarting = false;
-    console.error('[voice-clone] microphone refused:', e && e.name, e && e.message);
-    sayVoiceClone('Microphone access is needed to record the sample — allow it in your browser or device settings, then try again.', 'err');
+    console.error('[voice-clone] microphone refused:', e && (e.code || e.name), e && e.message);
+    sayVoiceClone(e && e.code === 'mic_timeout'
+      ? "The microphone didn't start — check nothing else is using it, then try again."
+      : 'Microphone access is needed to record — allow it in your browser or device settings, then try again.', 'err');
     renderVoiceClone();
     return;
   }
   voiceCloneStarting = false;
+  if (attempt !== voiceCloneAttempt){ stream.getTracks().forEach(t => t.stop()); return; }
   const track = stream.getAudioTracks()[0];
   if (!track || track.readyState !== 'live'){
     stream.getTracks().forEach(t => t.stop());
@@ -631,7 +747,7 @@ async function startVoiceClone(){
     catch(e2){
       stream.getTracks().forEach(t => t.stop());
       console.error('[voice-clone] MediaRecorder could not start:', e2);
-      sayVoiceClone("This browser can't record audio.", 'err');
+      sayVoiceClone("This browser can't record audio — choose Upload Audio or Video instead.", 'err');
       renderVoiceClone();
       return;
     }
@@ -640,21 +756,35 @@ async function startVoiceClone(){
      recorder can never add its audio to the next one. */
   const chunks = [];
   rec.ondataavailable = ev => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-  rec.onerror = ev => console.error('[voice-clone] recorder error:', ev && (ev.error || ev));
+  rec.onerror = ev => {
+    console.error('[voice-clone] recorder error:', ev && (ev.error || ev));
+    // A recorder that errors stops by itself; take what it has rather than wait.
+    if (voiceCloneRecorder === rec) finishVoiceClone();
+  };
   rec._chunks = chunks;
   rec._mime = mime;
   // The microphone going away mid-take (a call, another app) ends the take there.
   track.onended = () => { if (voiceCloneRecorder === rec) finishVoiceClone(); };
   voiceCloneStream = stream;
   voiceCloneRecorder = rec;
-  rec.start();
+  try { rec.start(); }
+  catch(e){
+    voiceCloneRecorder = null;
+    stopVoiceCloneStream();
+    console.error('[voice-clone] recorder would not start:', e);
+    sayVoiceClone("Recording couldn't start on this device — try again, or choose Upload Audio or Video.", 'err');
+    renderVoiceClone();
+    return;
+  }
   voiceCloneStart = Date.now();
   renderVoiceClone();
   voiceCloneTimer = setInterval(() => {
-    const secs = Math.floor((Date.now() - voiceCloneStart) / 1000);
+    const secs = (Date.now() - voiceCloneStart) / 1000;
     const el = voiceClonePart('time');
-    if (el) el.textContent = voiceCloneClock(secs);
-    if (secs >= 120) finishVoiceClone();  // well past what cloning needs
+    if (el) el.textContent = voiceCloneTimerText(secs);
+    const stop = voiceClonePart('stop');
+    if (stop) stop.textContent = voiceCloneLongEnough(secs) ? 'Done — review it' : 'Stop';
+    if (secs >= VOICE_CLONE_MAX_RECORD_SECONDS) finishVoiceClone();  // well past what cloning needs
   }, 250);
 }
 function stopVoiceCloneStream(){
@@ -665,136 +795,313 @@ function cancelVoiceClone(){
   if (!voiceCloneRecorder) return;
   const rec = voiceCloneRecorder;
   voiceCloneRecorder = null;
-  rec.onstop = null; rec.ondataavailable = null;
-  try { rec.stop(); } catch(e){}
+  voiceCloneAttempt++;
+  rec.onstop = null; rec.ondataavailable = null; rec.onerror = null;
+  try { if (rec.state !== 'inactive') rec.stop(); } catch(e){}
   stopVoiceCloneStream();
   renderVoiceClone();
 }
-/* Stopping keeps the take for listening back — once it has been checked for
-   actual sound. Nothing is uploaded here. The microphone is released only after
-   the recorder has handed over its last audio. */
+/* Stopping keeps the take for listening back, once it has been decoded, checked
+   for actual sound and turned into the WAV that will be sent. Nothing is
+   uploaded here.
+
+   This is where the card used to hang on "Checking your recording…". The
+   handler that did the checking was only ever reached through the recorder's
+   stop event, and had no time limit and no catch: a recorder that had already
+   stopped by itself (iOS does this on an interruption) never fires stop again;
+   decoding a take can stall in WebKit; and anything that threw left the card
+   on that label for good. Now the recorder gets a few seconds to hand over its
+   audio, the decode has its own limit, and every outcome lands somewhere. */
 function finishVoiceClone(){
   if (!voiceCloneRecorder) return;
-  const timedSeconds = Math.round((Date.now() - voiceCloneStart) / 1000);
+  const timedSeconds = (Date.now() - voiceCloneStart) / 1000;
   const rec = voiceCloneRecorder;
   voiceCloneRecorder = null;
   clearInterval(voiceCloneTimer); voiceCloneTimer = null;
-  voiceCloneChecking = true;
+  const attempt = voiceCloneAttempt;
+  voiceCloneChecking = 'Checking your recording…';
   renderVoiceClone();
-  rec.onstop = async () => {
+
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(watchdog);
+    rec.onstop = null;
     stopVoiceCloneStream();
     const chunks = rec._chunks || [];
     const declared = rec.mimeType || rec._mime || '';
     const blob = new Blob(chunks, declared ? { type: declared } : undefined);
-    const result = await checkVoiceCloneTake(blob, declared, timedSeconds);
-    voiceCloneChecking = false;
-    if (!result.ok){
-      console.error('[voice-clone] recording rejected:', result.reason, result.detail || '');
-      sayVoiceClone(voiceCloneErrorText(result.reason), 'err');
-      renderVoiceClone();
-      return;
-    }
-    discardVoiceCloneTake();
-    voiceCloneTake = { blob: result.blob, url: URL.createObjectURL(result.blob), seconds: result.seconds, type: result.blob.type };
-    voiceCloneConsented = false;
-    sayVoiceClone('');
-    renderVoiceClone();
+    console.log('[voice-clone] recording finished', { bytes: blob.size, type: declared, chunks: chunks.length, timedSeconds: +timedSeconds.toFixed(1) });
+    acceptVoiceCloneMedia(blob, { source: 'record', timedSeconds, attempt });
   };
-  try { rec.stop(); }
-  catch(e){
-    voiceCloneChecking = false;
-    stopVoiceCloneStream();
+  rec.onstop = settle;
+  // If stop never comes, go with whatever audio was handed over.
+  const watchdog = setTimeout(() => {
+    console.warn('[voice-clone] the recorder did not report stopping; using what it handed over');
+    settle();
+  }, VOICE_CLONE_STOP_TIMEOUT_MS);
+  try {
+    if (rec.state === 'inactive') settle();   // stopped already; stop() would fire nothing
+    else rec.stop();
+  } catch(e){
     console.error('[voice-clone] recorder would not stop:', e);
-    sayVoiceClone(voiceCloneErrorText('sample_empty'), 'err');
+    settle();
+  }
+}
+
+/* ---------- uploading a file ---------- */
+function pickVoiceCloneFile(){
+  if (voiceCloneBusy || voiceCloneChecking) return;
+  const input = voiceClonePart('file');
+  if (input){ input.value = ''; input.click(); }
+}
+function chooseVoiceCloneFile(input){
+  const file = input && input.files && input.files[0];
+  if (!file || voiceCloneBusy || voiceCloneChecking) return;
+  sayVoiceClone('');
+  console.log('[voice-clone] file chosen', { name: file.name, bytes: file.size, type: file.type });
+  if (!file.size){
+    sayVoiceClone('That file is empty — choose another one.', 'err');
+    return;
+  }
+  if (file.size > VOICE_CLONE_MAX_UPLOAD_BYTES){
+    sayVoiceClone('That file is too large to use on this device — choose a shorter clip (a few minutes at most).', 'err');
+    return;
+  }
+  voiceCloneSource = 'upload';
+  discardVoiceCloneTake();
+  voiceCloneConsented = false;
+  const attempt = ++voiceCloneAttempt;
+  voiceCloneChecking = /^video\//.test(file.type) || /\.(mov|mp4|m4v|webm|3gp)$/i.test(file.name || '')
+    ? `Getting the audio from ${file.name || 'your video'}…`
+    : `Checking ${file.name || 'your file'}…`;
+  renderVoiceClone();
+  acceptVoiceCloneMedia(file, { source: 'upload', fileName: file.name || 'Your file', attempt });
+}
+function removeVoiceCloneUpload(){
+  if (voiceCloneBusy || voiceCloneChecking) return;
+  voiceCloneAttempt++;
+  discardVoiceCloneTake();
+  voiceCloneConsented = false;
+  sayVoiceClone('');
+  renderVoiceClone();
+  // Straight back to the picker: removing it is nearly always to choose another.
+  setTimeout(pickVoiceCloneFile, 0);
+}
+
+/* Recording or file, the same road: decode, check, convert, then the review
+   screen or a message. Always clears the "checking" state, whatever happens. */
+async function acceptVoiceCloneMedia(media, { source, timedSeconds, fileName, attempt }){
+  let result;
+  try {
+    result = await prepareVoiceSample(media, { source, timedSeconds });
+  } catch(e){
+    result = { ok: false, reason: (e && e.code) || 'sample_unreadable', detail: (e && e.message) || String(e) };
+  } finally {
+    if (attempt === voiceCloneAttempt) voiceCloneChecking = null;
+  }
+  if (attempt !== voiceCloneAttempt) return;   // cancelled or replaced meanwhile
+  if (!result.ok && !result.blob){
+    console.error('[voice-clone] sample rejected:', result.reason, result.detail || '');
+    sayVoiceClone(voiceCloneErrorText(result.reason, source), 'err');
     renderVoiceClone();
+    return;
   }
+  discardVoiceCloneTake();
+  voiceCloneTake = {
+    ok: result.ok, blob: result.blob, url: URL.createObjectURL(result.blob),
+    seconds: result.seconds, voicedSeconds: result.voicedSeconds, source, fileName,
+  };
+  voiceCloneConsented = false;
+  console.log('[voice-clone] sample ready', { ok: result.ok, seconds: result.seconds, voicedSeconds: result.voicedSeconds, wavBytes: result.blob.size });
+  if (!result.ok){
+    console.error('[voice-clone] sample rejected:', result.reason, result.detail || '');
+    sayVoiceClone(voiceCloneErrorText(result.reason, source), 'err');
+  } else {
+    sayVoiceClone('');
+  }
+  renderVoiceClone();
 }
 
-/* ---------- is there a voice in it? ----------
-   A take can show a length and hold nothing: a muted or borrowed microphone
-   records silence for as long as you like. So the audio itself is decoded and
-   measured. Where this browser cannot decode its own recording, it is at least
-   loaded the way the player will load it, so one that cannot be played is never
-   offered as a sample. */
-async function checkVoiceCloneTake(blob, declared, timedSeconds){
-  if (!blob || blob.size < 2048) return { ok: false, reason: 'sample_empty', detail: `${blob ? blob.size : 0} bytes` };
-  let bytes;
-  try { bytes = new Uint8Array(await blob.arrayBuffer()); }
-  catch(e){ return { ok: false, reason: 'sample_empty', detail: String(e) }; }
-  /* The label a recorder puts on a take is not always the truth (older Safari
-     leaves it blank), and the player and the voice service both go by it. */
-  const sniffed = typeof sniffAudioMime === 'function' ? sniffAudioMime(bytes) : '';
-  const type = sniffed && (declared || '').split(';')[0] !== sniffed ? sniffed : (declared || sniffed || 'audio/mp4');
-  const typed = blob.type === type ? blob : new Blob([bytes], { type });
+/* ---------- turning anything into a sample ----------
+   Decoded here, in the browser: a recording from MediaRecorder (MP4/AAC on
+   iPhone, WebM/Opus elsewhere) or any audio or video file this browser can
+   play. Video is handled the same way — decoding a video file gives its sound
+   track — so the video itself never leaves the device.
 
-  let decoded = null;
-  try { decoded = await decodeVoiceCloneAudio(bytes.buffer.slice(0)); }
-  catch(e){ console.warn('[voice-clone] could not decode the take here, checking it plays instead:', e && (e.message || e)); }
-  if (decoded){
-    const level = measureVoiceCloneLevel(decoded);
-    const seconds = Math.round(decoded.duration) || timedSeconds;
-    if (level.peak < 0.01 || level.voicedSeconds < 1){
-      return { ok: false, reason: 'sample_silent', detail: JSON.stringify(level) };
+   Out comes { ok, blob (WAV), seconds, voicedSeconds } — ok:false with a blob
+   for a take that is real but under a minute (so it can still be listened to),
+   or { ok:false, reason } with no blob when there is nothing usable. */
+async function prepareVoiceSample(media, { source, timedSeconds } = {}){
+  if (!media || !media.size){
+    return { ok: false, reason: 'sample_empty', detail: `${media ? media.size : 0} bytes` };
+  }
+  /* A file says how long it is before it is decoded, so a clip that is plainly
+     too short or too long is turned away without reading it all into memory. */
+  if (source === 'upload'){
+    const meta = await probeVoiceCloneDuration(media);
+    console.log('[voice-clone] file duration from metadata:', meta);
+    if (meta && meta > VOICE_CLONE_MAX_UPLOAD_SECONDS){
+      return { ok: false, reason: 'upload_too_long', detail: `${meta}s` };
     }
-    if (seconds < VOICE_CLONE_MIN_SECONDS) return { ok: false, reason: 'sample_too_short', detail: `${seconds}s` };
-    return { ok: true, blob: typed, seconds };
+    if (meta && !voiceCloneLongEnough(meta)){
+      return { ok: false, reason: 'sample_too_short', detail: `${meta}s from metadata` };
+    }
   }
-  if (timedSeconds < VOICE_CLONE_MIN_SECONDS) return { ok: false, reason: 'sample_too_short', detail: `${timedSeconds}s` };
-  const url = URL.createObjectURL(typed);
-  const playable = await probeVoiceClonePlayable(url);
-  URL.revokeObjectURL(url);
-  if (playable === false) return { ok: false, reason: 'sample_unplayable', detail: type };
-  return { ok: true, blob: typed, seconds: timedSeconds };
+  let bytes;
+  try { bytes = await voiceCloneWithin(VOICE_CLONE_DECODE_TIMEOUT_MS, media.arrayBuffer(), 'decode_timeout'); }
+  catch(e){ return { ok: false, reason: e && e.code === 'decode_timeout' ? 'decode_timeout' : 'sample_unreadable', detail: String(e) }; }
+  if (!bytes || bytes.byteLength < 1024){
+    return { ok: false, reason: 'sample_empty', detail: `${bytes ? bytes.byteLength : 0} bytes` };
+  }
+  let decoded;
+  try { decoded = await voiceCloneWithin(VOICE_CLONE_DECODE_TIMEOUT_MS, decodeVoiceCloneAudio(bytes), 'decode_timeout'); }
+  catch(e){
+    console.error('[voice-clone] could not decode', source, media.type || '(no type)', media.size, 'bytes:', e && (e.code || e.name), e && e.message);
+    return { ok: false, reason: e && e.code === 'decode_timeout' ? 'decode_timeout' : (source === 'upload' ? 'upload_unreadable' : 'sample_unreadable'), detail: String(e) };
+  }
+  if (!decoded || !decoded.length || !decoded.duration){
+    return { ok: false, reason: source === 'upload' ? 'upload_no_audio' : 'sample_empty', detail: 'decoded to nothing' };
+  }
+  const seconds = decoded.duration;
+  console.log('[voice-clone] decoded', { seconds: +seconds.toFixed(2), rate: decoded.sampleRate, channels: decoded.numberOfChannels, timedSeconds });
+  if (source === 'upload' && seconds > VOICE_CLONE_MAX_UPLOAD_SECONDS){
+    return { ok: false, reason: 'upload_too_long', detail: `${seconds}s` };
+  }
+  const mono = await voiceCloneMono(decoded);
+  const level = measureVoiceCloneLevel(mono, VOICE_CLONE_RATE);
+  if (level.peak < 0.01 || level.voicedSeconds < 1){
+    return { ok: false, reason: source === 'upload' ? 'upload_no_audio' : 'sample_silent', detail: JSON.stringify(level) };
+  }
+  /* Where the voice starts: a video that opens on ten seconds of nothing should
+     not spend ten of the ninety seconds sent on it. Only trimmed when what is
+     left is still over the minute, so the length the server measures is never
+     less than the length shown here. */
+  let start = Math.max(0, level.firstVoicedSample - Math.round(0.3 * VOICE_CLONE_RATE));
+  if (!voiceCloneLongEnough((mono.length - start) / VOICE_CLONE_RATE)) start = 0;
+  const end = Math.min(mono.length, start + VOICE_CLONE_SEND_SECONDS * VOICE_CLONE_RATE);
+  const blob = encodeVoiceCloneWav(mono.subarray(start, end), VOICE_CLONE_RATE);
+  const out = { blob, seconds, voicedSeconds: level.voicedSeconds };
+  if (!voiceCloneLongEnough(seconds)) return { ...out, ok: false, reason: 'sample_too_short', detail: `${seconds.toFixed(1)}s` };
+  if (level.voicedSeconds < VOICE_CLONE_MIN_VOICED) return { ok: false, reason: 'sample_silent', detail: JSON.stringify(level) };
+  return { ...out, ok: true };
 }
+/* A file's length from its own header, via the media element. null when this
+   device will not say (it still gets decoded and measured properly). */
+function probeVoiceCloneDuration(file){
+  return new Promise(resolve => {
+    const isVideo = /^video\//.test(file.type) || /\.(mov|mp4|m4v|webm|3gp)$/i.test(file.name || '');
+    const el = document.createElement(isVideo ? 'video' : 'audio');
+    const url = URL.createObjectURL(file);
+    let done = false;
+    const finish = v => {
+      if (done) return; done = true; clearTimeout(timer);
+      try { el.removeAttribute('src'); el.load(); } catch(e){}
+      URL.revokeObjectURL(url);
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish(null), 8000);
+    el.muted = true;
+    el.preload = 'metadata';
+    el.setAttribute('playsinline', '');
+    el.onloadedmetadata = () => finish(isFinite(el.duration) && el.duration > 0 ? el.duration : null);
+    el.onerror = () => finish(null);
+    el.src = url;
+    try { el.load(); } catch(e){ finish(null); }
+  });
+}
+/* Decoded straight at the rate that is sent where the browser allows it, which
+   also keeps a long file's decoded size down. */
 function decodeVoiceCloneAudio(buffer){
   const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   if (!Ctx) return Promise.reject(new Error('no OfflineAudioContext'));
-  const ctx = new Ctx(1, 44100, 44100);
+  let ctx;
+  try { ctx = new Ctx(1, VOICE_CLONE_RATE, VOICE_CLONE_RATE); }
+  catch(e){ ctx = new Ctx(1, 44100, 44100); }
   return new Promise((resolve, reject) => {
     // The callback form too: older Safari never returns the promise.
     const p = ctx.decodeAudioData(buffer, resolve, reject);
     if (p && p.then) p.then(resolve, reject);
   });
 }
-/* The loudest moment, and how many seconds are clearly above the room. */
-function measureVoiceCloneLevel(audio){
-  const frame = Math.max(1, Math.round(audio.sampleRate * 0.02));
-  let peak = 0, voicedFrames = 0;
-  for (let c = 0; c < audio.numberOfChannels; c++){
-    const data = audio.getChannelData(c);
-    for (let i = 0; i < data.length; i += frame){
-      let sum = 0;
-      const end = Math.min(data.length, i + frame);
-      for (let j = i; j < end; j++){ const v = data[j]; sum += v * v; const a = v < 0 ? -v : v; if (a > peak) peak = a; }
-      if (c === 0 && Math.sqrt(sum / (end - i)) > 0.01) voicedFrames++;
+/* One channel at VOICE_CLONE_RATE: channels averaged, then resampled by the
+   browser where it can (it filters properly), by hand where it cannot. */
+async function voiceCloneMono(audio){
+  const n = audio.numberOfChannels, len = audio.length;
+  let mono = new Float32Array(len);
+  for (let c = 0; c < n; c++){
+    const d = audio.getChannelData(c);
+    for (let i = 0; i < len; i++) mono[i] += d[i] / n;
+  }
+  if (audio.sampleRate === VOICE_CLONE_RATE) return mono;
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const outLen = Math.ceil(len * VOICE_CLONE_RATE / audio.sampleRate);
+  try {
+    const ctx = new Ctx(1, outLen, VOICE_CLONE_RATE);
+    const src = ctx.createBufferSource();
+    const buf = ctx.createBuffer(1, len, audio.sampleRate);
+    buf.getChannelData(0).set(mono);
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    const rendered = await voiceCloneWithin(VOICE_CLONE_DECODE_TIMEOUT_MS, new Promise((resolve, reject) => {
+      const p = ctx.startRendering();
+      ctx.oncomplete = e => resolve(e.renderedBuffer);
+      if (p && p.then) p.then(resolve, reject);
+    }), 'decode_timeout');
+    return rendered.getChannelData(0);
+  } catch(e){
+    console.warn('[voice-clone] resampling by hand:', e && (e.message || e));
+    const ratio = audio.sampleRate / VOICE_CLONE_RATE;
+    const out = new Float32Array(outLen);
+    for (let i = 0; i < outLen; i++){
+      // Average the source samples this one covers: a crude low-pass, enough for speech.
+      const a = Math.floor(i * ratio), b = Math.min(len, Math.max(a + 1, Math.floor((i + 1) * ratio)));
+      let s = 0; for (let j = a; j < b; j++) s += mono[j];
+      out[i] = s / (b - a);
+    }
+    return out;
+  }
+}
+/* The loudest moment, how many seconds are clearly above the room, and where
+   the first of them is. /api/voice-clone measures the WAV the same way. */
+function measureVoiceCloneLevel(data, rate){
+  const frame = Math.max(1, Math.round(rate * 0.02));
+  let peak = 0, voicedFrames = 0, firstVoicedSample = 0, seen = false;
+  for (let i = 0; i < data.length; i += frame){
+    let sum = 0;
+    const end = Math.min(data.length, i + frame);
+    for (let j = i; j < end; j++){ const v = data[j]; sum += v * v; const a = v < 0 ? -v : v; if (a > peak) peak = a; }
+    if (Math.sqrt(sum / (end - i)) > 0.01){
+      voicedFrames++;
+      if (!seen){ seen = true; firstVoicedSample = i; }
     }
   }
-  return { peak: +peak.toFixed(4), voicedSeconds: +(voicedFrames * 0.02).toFixed(1) };
+  return { peak: +peak.toFixed(4), voicedSeconds: +(voicedFrames * 0.02).toFixed(1), firstVoicedSample };
 }
-/* true: plays. false: this device refuses it. null: could not tell (a phone that
-   loads nothing until pressed) — not held against the take. */
-function probeVoiceClonePlayable(url){
-  return new Promise(resolve => {
-    const a = document.createElement('audio');
-    let done = false;
-    const finish = ok => {
-      if (done) return; done = true; clearTimeout(timer);
-      try { a.removeAttribute('src'); a.load(); } catch(e){}
-      resolve(ok);
-    };
-    const timer = setTimeout(() => finish(null), 5000);
-    a.muted = true;
-    a.preload = 'metadata';
-    a.onloadedmetadata = () => finish(true);
-    a.oncanplay = () => finish(true);
-    a.onerror = () => finish(false);
-    a.src = url;
-    try { a.load(); } catch(e){ finish(null); }
-  });
+/* 16-bit PCM WAV, mono. */
+function encodeVoiceCloneWav(samples, rate){
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + samples.length * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0, o = 44; i < samples.length; i++, o += 2){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
 }
 
 function createVoiceClone(){
   if (!voiceCloneTake || voiceCloneBusy) return;
+  if (!voiceCloneTake.ok){
+    sayVoiceClone(VOICE_CLONE_SHORT_TEXT, 'err');
+    return;
+  }
   if (!voiceCloneConsented){
     sayVoiceClone('Tick the confirmation first — a voice is only ever made from your own.', 'err');
     return;
@@ -808,13 +1115,17 @@ const VOICE_CLONE_MESSAGES = {
   upgrade_required:      null,   // filled in below, it quotes the price
   not_configured:        "Voice cloning isn't switched on yet.",
   consent_required:      'Tick the confirmation first — a voice is only ever made from your own.',
-  sample_empty:          "That recording came out empty — tap Re-record and read the passage again.",
-  sample_silent:         "We couldn't hear your voice in that recording. Check your microphone isn't muted or in use by another app, then record again.",
-  sample_unplayable:     "That recording won't play on this device — record it again.",
-  unsupported_format:    "The voice service couldn't read that recording's format — tap Re-record and try again.",
-  sample_too_short:      'That recording was too short — read the sample paragraph all the way through.',
-  sample_too_long:       'That recording is too long — about a minute is plenty.',
-  quota_exceeded:        "The voice service is out of cloning credits this month — your recording wasn't used, and nothing was charged.",
+  sample_empty:          "That recording came out empty — tap Record Again and try once more.",
+  sample_silent:         "We couldn't hear enough of your voice in that. Check your microphone isn't muted or in use by another app, speak close to it, and try again.",
+  sample_unreadable:     "This device couldn't read that recording — tap Record Again, or choose Upload Audio or Video.",
+  upload_unreadable:     "We couldn't read the audio in that file — try an MP3, M4A, WAV, MP4 or MOV.",
+  upload_no_audio:       "That file doesn't seem to have any sound we can use — choose one with you speaking.",
+  upload_too_long:       'That file is longer than 10 minutes — trim it to a few minutes of you speaking, or choose another.',
+  decode_timeout:        'Getting the audio ready took too long on this device — try again, or use a shorter file.',
+  unsupported_format:    "The recording couldn't be prepared in a format the voice service reads — try again.",
+  sample_too_short:      VOICE_CLONE_SHORT_TEXT,
+  sample_too_long:       'That sample was too large to send — try again with a shorter recording.',
+  quota_exceeded:        "The voice service is out of cloning credits right now — your recording wasn't used, and nothing was charged.",
   rate_limited:          'The voice service is busy — try again in a minute.',
   rejected:              "The voice service couldn't use that recording — try again somewhere quieter.",
   invalid_voice:         "The voice service couldn't use that recording — try again somewhere quieter.",
@@ -824,13 +1135,14 @@ const VOICE_CLONE_MESSAGES = {
   voice_limit_reached:   "The voice service has no room for another voice right now. Your recording is kept — contact support and we'll sort it out.",
   save_failed:           "Your voice was made but couldn't be saved to your account, so nothing was kept. Your recording is still here — press Create My Voice to try again.",
   provider_failed:       'The voice service had a problem creating your voice — press Create My Voice to try again.',
-  timeout:               'The voice service took too long — try again in a moment.',
-  network:               "Couldn't reach the voice service — check your connection and try again.",
-  not_signed_in:         'Sign in first.',
+  timeout:               "Creating your voice took too long, so we stopped waiting. Your recording is kept — press Create My Voice to try again.",
+  network:               "Couldn't reach the voice service — check your connection, then press Create My Voice to try again.",
+  not_signed_in:         'Your sign-in has expired — sign in again, then press Create My Voice.',
 };
-function voiceCloneErrorText(code){
+function voiceCloneErrorText(code, source){
   if (code === 'upgrade_required') return `Cloning your voice comes with Ritual — ${tierPriceText('ritual')}.`;
-  return VOICE_CLONE_MESSAGES[code] || "Couldn't clone your voice — try again in a moment.";
+  if (code === 'sample_silent' && source === 'upload') return VOICE_CLONE_MESSAGES.upload_no_audio;
+  return VOICE_CLONE_MESSAGES[code] || "Couldn't create your voice — press Create My Voice to try again.";
 }
 /* A route that died before it could answer in JSON still has a status to go by. */
 function voiceCloneCodeForStatus(status){
@@ -839,63 +1151,134 @@ function voiceCloneCodeForStatus(status){
   if (status === 504 || status === 408) return 'timeout';
   return 'clone_failed';
 }
+/* The session token, without waiting forever: supabase-js can hold getSession()
+   behind its own lock while it refreshes. */
+async function voiceCloneToken(){
+  const out = await voiceCloneWithin(VOICE_CLONE_AUTH_TIMEOUT_MS, sb.auth.getSession(), 'auth_timeout');
+  return out && out.data && out.data.session && out.data.session.access_token;
+}
 
-async function uploadVoiceClone(take){
-  if (!sb || !currentUser){ sayVoiceClone('Sign in first.', 'err'); return; }
-  if (!take || !take.blob || take.blob.size < 2048){
-    sayVoiceClone(voiceCloneErrorText('sample_empty'), 'err');
-    return;
-  }
-  voiceCloneBusy = true;
-  sayVoiceClone('');
-  renderVoiceClone();
-  /* On any failure the take is still there, so the person can press Create
-     again — or listen and re-record — without reading the passage again. The
-     tick stays too: nothing about what they agreed to has changed. */
-  const failed = (code, technical) => {
-    console.error('[voice-clone] clone failed:', code, technical || '');
-    voiceCloneBusy = false;
-    renderVoiceClone();
-    sayVoiceClone(voiceCloneErrorText(code), 'err');
-  };
+/* The request itself. Always resolves: { ok:true } or { code }. */
+async function sendVoiceCloneSample(take){
   let token;
-  try { token = (await sb.auth.getSession()).data.session?.access_token; }
-  catch(e){ failed('not_signed_in', e); return; }
-  if (!token){ failed('not_signed_in'); return; }
+  try { token = await voiceCloneToken(); }
+  catch(e){ console.error('[voice-clone] no session token:', e && (e.code || e.message)); }
+  if (!token) return { code: 'not_signed_in' };
   const headers = {
-    'Content-Type': take.type || take.blob.type || 'audio/mp4',
+    'Content-Type': 'audio/wav',
     Authorization: `Bearer ${token}`,
     // The confirmation travels with the sample, and the route checks it against
     // its own copy of the sentence before spending anything.
     'X-Voice-Consent': await voiceConsentStatement(),
   };
   if (voiceCloneReplacing) headers['X-Voice-Replace'] = '1';
-  let res;
-  try { res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: take.blob }); }
-  catch(e){ failed('network', e); return; }
-  const out = await res.json().catch(() => ({}));
-  if (!res.ok){ failed(out.error || voiceCloneCodeForStatus(res.status), { status: res.status, body: out }); return; }
+  console.log('[voice-clone] sending sample', { bytes: take.blob.size, seconds: +take.seconds.toFixed(1), replacing: voiceCloneReplacing });
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), VOICE_CLONE_UPLOAD_TIMEOUT_MS);
+  const started = Date.now();
+  try {
+    let res;
+    try { res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: take.blob, signal: abort.signal }); }
+    catch(e){
+      const code = e && e.name === 'AbortError' ? 'timeout' : 'network';
+      console.error('[voice-clone] request failed:', code, e && e.message, `after ${Date.now() - started}ms`);
+      return { code };
+    }
+    // Reading the body is covered by the same abort, so it cannot hang either.
+    const text = await res.text().catch(e => { console.error('[voice-clone] response unreadable:', e); return ''; });
+    let out = {};
+    try { out = JSON.parse(text); } catch(e){}
+    if (!res.ok){
+      console.error('[voice-clone] /api/voice-clone answered', res.status, text.slice(0, 400));
+      return { code: out.error || voiceCloneCodeForStatus(res.status) };
+    }
+    if (!out.created && !out.reused){
+      console.error('[voice-clone] /api/voice-clone answered', res.status, 'without a voice:', text.slice(0, 400));
+      return { code: 'clone_failed' };
+    }
+    console.log('[voice-clone] voice created', res.status, out, `in ${Date.now() - started}ms`);
+    return { ok: true };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-  voiceCloneBusy = false;
+/* One upload at a time: the flag is set before the first await and only cleared
+   in finally, and the button is gone while it is set, so a second tap cannot
+   start a second clone. */
+async function uploadVoiceClone(take){
+  if (voiceCloneBusy) return;
+  if (!sb || !currentUser){ sayVoiceClone('Sign in first.', 'err'); return; }
+  if (!take || !take.ok || !take.blob || take.blob.size < 1024){
+    sayVoiceClone(voiceCloneErrorText(take && !take.ok ? 'sample_too_short' : 'sample_empty'), 'err');
+    return;
+  }
+  voiceCloneBusy = true;
+  sayVoiceClone('');
+  renderVoiceClone();
+  let outcome;
+  try { outcome = await sendVoiceCloneSample(take); }
+  catch(e){
+    console.error('[voice-clone] clone failed unexpectedly:', e);
+    outcome = { code: 'clone_failed' };
+  } finally {
+    voiceCloneBusy = false;
+  }
+
+  if (!outcome || !outcome.ok){
+    /* The take is still there, so the person can press Create again — or
+       listen and record again — without recording the minute again. The tick
+       stays too: nothing about what they agreed to has changed. */
+    renderVoiceClone();
+    sayVoiceClone(voiceCloneErrorText(outcome && outcome.code), 'err');
+    return;
+  }
   voiceCloneReplacing = false;
   voiceCloneConsented = false;
   discardVoiceCloneTake();
   forgetVoiceCatalogue();          // the picker asks again, and finds the voice
-  await loadVoiceCatalogue();
+  try { await loadVoiceCatalogue(); } catch(e){ console.error('[voice-clone] catalogue reload failed:', e); }
   if (voiceCloneHost.bodyId === 'builderVoiceCloneBody' && typeof onMyVoiceReady === 'function'){
     // Recorded from the builder: the panel closes and the voice they just made
-    // is the voice selected, which is what they were asking for.
-    onMyVoiceReady();
+    // is the voice selected, with Continue ready.
+    try { await onMyVoiceReady(); }
+    catch(e){ console.error('[voice-clone] could not select the new voice:', e); }
     return;
   }
-  renderVoiceClone();
-  sayVoiceClone('Your Voice is Ready ✦', 'ok');
+  await renderVoiceClone();
+  sayVoiceClone('Your voice is ready ✓', 'ok');
+}
+
+/* One line, generated in the voice just made, so it can be heard working. */
+let voiceCloneTesting = false;
+async function testClonedVoice(){
+  if (voiceCloneTesting) return;
+  const btn = voiceClonePart('test');
+  const el = voiceClonePart('test-audio');
+  if (typeof synthesizeLine !== 'function' || !el) return;
+  voiceCloneTesting = true;
+  if (btn) btn.disabled = true;
+  sayVoiceClone('Generating a test affirmation in your voice…');
+  try {
+    const url = await voiceCloneWithin(45000, synthesizeLine('I am safe, and I am becoming who I said I would be.', MY_CLONED_VOICE), 'timeout');
+    el.src = url;
+    voiceCloneAudioSession('playback');
+    el.onended = () => voiceCloneAudioSession(null);
+    await el.play().catch(() => {});
+    sayVoiceClone('Your voice is ready ✓', 'ok');
+  } catch(e){
+    console.error('[voice-clone] test affirmation failed:', e && (e.code || e.message));
+    sayVoiceClone(typeof clonedVoiceErrorText === 'function' ? clonedVoiceErrorText(e && (e.code || e.message)) : "Couldn't generate a test just now.", 'err');
+  } finally {
+    voiceCloneTesting = false;
+    if (btn) btn.disabled = false;
+  }
 }
 async function removeClonedVoice(){
   const msg = voiceCloneMsgEl();
   if (msg){ msg.textContent = 'Removing…'; msg.className = 'save-msg'; }
   try {
-    const token = (await sb.auth.getSession()).data.session?.access_token;
+    const token = await voiceCloneToken();
     const res = await fetch(`${API_BASE}/api/voice-clone`, {
       method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
     });

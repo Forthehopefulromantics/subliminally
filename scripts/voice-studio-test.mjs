@@ -202,9 +202,28 @@ async function callTts(body, token = 'good-token'){
   await tts({ method: 'POST', headers: { authorization: token ? 'Bearer ' + token : '' }, body }, res);
   return res;
 }
-async function callClone({ method = 'POST', token = 'good-token', consent, replace, sample = 'x'.repeat(4096) } = {}){
+/* What the page sends: 16-bit PCM WAV, mono, 22.05 kHz — speech-like tone
+   bursts with pauses, or silence. */
+function makeWav(seconds, { rate = 22050, silent = false } = {}){
+  const n = Math.round(seconds * rate);
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write('RIFF', 0, 'latin1'); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8, 'latin1');
+  buf.write('fmt ', 12, 'latin1'); buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(rate, 24); buf.writeUInt32LE(rate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36, 'latin1'); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++){
+    const t = i / rate;
+    const talking = !silent && (t % 1.5) < 1.0;   // a second of voice, half a second of pause
+    const v = talking ? 0.3 * Math.sin(2 * Math.PI * 180 * t) : 0.001 * Math.sin(i);
+    buf.writeInt16LE(Math.round(v * 32767), 44 + i * 2);
+  }
+  return buf;
+}
+const GOOD_WAV = makeWav(75);
+
+async function callClone({ method = 'POST', token = 'good-token', consent, replace, sample = GOOD_WAV, contentType = 'audio/wav' } = {}){
   const res = mockRes();
-  const headers = { authorization: token ? 'Bearer ' + token : '', 'content-type': 'audio/webm' };
+  const headers = { authorization: token ? 'Bearer ' + token : '', 'content-type': contentType };
   if (consent) headers['x-voice-consent'] = consent;
   if (replace) headers['x-voice-replace'] = '1';
   const req = {
@@ -219,7 +238,7 @@ async function callClone({ method = 'POST', token = 'good-token', consent, repla
   await voiceClone(req, res);
   return res;
 }
-const CONSENT = 'I confirm this is my voice, or I have the necessary rights and consent to use this voice, and I consent to creating an AI voice clone.';
+const CONSENT = 'I confirm this recording is my own voice, that I have permission to clone it, and that I consent to Subliminally creating an AI version of my voice. I am not uploading anyone else\'s voice.';
 const LINES = ['I am safe.', 'I keep what I promised myself.', 'I am becoming who I said I would be.'];
 
 /* ---------------- who may generate ---------------- */
@@ -386,13 +405,14 @@ check('  ...and nothing reached the provider', elevenCalls.length, 0);
 
 reset();
 const beforeClone = Date.now();
-r = await callClone({ consent: CONSENT, sample: 'voice-bytes-'.repeat(400) });
+r = await callClone({ consent: CONSENT });
 const add = elevenCalls.find(c => c.url.endsWith('/voices/add'));
 check('the sample reaches ElevenLabs Instant Voice Cloning', [r.code, !!add, add && add.method], [200, true, 'POST']);
 check('  ...from the server, with the server key', add.key, 'el_test_stub');
 check('  ...named by account id, not email', add.form.get('name'), 'subliminally-user-abc');
 check('  ...never the email address', JSON.stringify([...add.form.keys()].map(k => String(add.form.get(k)))).includes('kyla@'), false);
-check('  ...carrying the recording itself', (await add.form.get('files').text()).startsWith('voice-bytes-'), true);
+check('  ...carrying the recording itself', Buffer.from(await add.form.get('files').arrayBuffer()).equals(GOOD_WAV), true);
+check('  ...as a WAV file', [add.form.get('files').name, add.form.get('files').type], ['sample.wav', 'audio/wav']);
 check('the returned voice_id is saved', db.voiceProfile.provider_voice_id, MY_CLONE);
 check('  ...for the signed-in user', db.voiceProfile.user_id, 'user-abc');
 check('  ...with a consent timestamp from this request', Date.parse(db.voiceProfile.consent_at) >= beforeClone - 1000, true);
@@ -449,18 +469,22 @@ check('a voice that cannot be saved to the account is reported', [r.code, r.body
 check('  ...and removed at the provider rather than left orphaned',
   elevenCalls.some(c => c.method === 'DELETE' && c.url.endsWith('/voices/' + MY_CLONE)), true);
 
-/* Safari's recorder makes MP4 audio; the label on the upload is not trusted, the
-   bytes are. */
-reset();
-{
-  const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(4096, 1)]);
-  const res = mockRes();
-  const req = { method: 'POST', headers: { authorization: 'Bearer good-token', 'content-type': 'audio/webm', 'x-voice-consent': CONSENT },
-                on(ev, fn){ if (ev === 'data') fn(mp4); if (ev === 'end') fn(); return req; }, destroy(){} };
-  await voiceClone(req, res);
-  const file = elevenCalls[0] && elevenCalls[0].form && elevenCalls[0].form.get('files');
-  check('an MP4 sample mislabelled as WebM is sent as what it is', [res.code, file && file.name, file && file.type], [200, 'sample.m4a', 'audio/mp4']);
+/* The minute is checked on the audio the server received, not on the page's
+   timer — and nothing short, silent or unreadable reaches the provider. */
+for (const [label, sample, code] of [
+  ['a 45 second sample', makeWav(45), 'sample_too_short'],
+  ['a minute of silence', makeWav(70, { silent: true }), 'sample_silent'],
+  ['an MP4 the page did not convert', Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(8192, 1)]), 'unsupported_format'],
+  ['an empty body', Buffer.alloc(0), 'unsupported_format'],
+]){
+  reset();
+  r = await callClone({ consent: CONSENT, sample });
+  check(`${label} is refused as ${code}`, [r.code >= 400, r.body.error], [true, code]);
+  check('  ...and nothing reached the provider', elevenCalls.length, 0);
 }
+reset();
+r = await callClone({ consent: CONSENT, sample: makeWav(59.7) });
+check('1:00 on the clock that decodes to 59.7s is accepted', [r.code, !!r.body.created], [200, true]);
 
 /* ---------------- the key never reaches the browser ---------------- */
 {

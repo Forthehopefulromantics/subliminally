@@ -829,6 +829,10 @@
   .voice-clone-tip{ font-size:12.5px; color:var(--haze); line-height:1.55; margin:0 0 14px; }
   .voice-clone-review{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
   .voice-clone-review audio{ flex:1 1 auto; min-width:0; max-width:100%; height:36px; }
+  /* Record or upload: the two ways a sample comes in. */
+  .voice-clone-options{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 14px; }
+  .voice-clone-file{ display:flex; align-items:center; gap:10px; margin:0 0 10px; font-size:13px; color:var(--moonlight); min-width:0; }
+  .voice-clone-file-name{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .profile-settings-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:640px){ .profile-settings-grid{ grid-template-columns:1fr; } }
   .profile-field-card{ background:var(--veil); border:1px solid var(--dusk); border-radius:16px; padding:18px; }
@@ -3440,7 +3444,7 @@
 
       <h3 class="profile-subhead">Your voice</h3>
       <div class="voice-clone-card" id="voiceCloneCard">
-        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Read the passage below once and your voice becomes one of the voices you can choose when you build a subliminal.</p>
+        <p class="voice-clone-intro">Saying your affirmations out loud is still the practice — hearing yourself say it is what makes it land. This is for the nights you want the session without the recording. Give it a minute of your voice and it becomes one of the voices you can choose when you build a subliminal.</p>
         <div class="voice-clone-body" id="voiceCloneBody"></div>
         <div class="save-msg" id="voiceCloneMsg"></div>
       </div>
@@ -3665,7 +3669,7 @@
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20260926a"></script>
+<script src="js/builder.js?v=20260926c"></script>
 <script src="js/billing.js?v=20260923c"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
@@ -3676,7 +3680,7 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20260923c"></script>
-<script src="js/profile.js?v=20260926b"></script>
+<script src="js/profile.js?v=20260926c"></script>
 <script src="js/mix-settings.js?v=20260923c"></script>
 <script src="js/player.js?v=20260923c"></script>
 <script src="js/journal.js"></script>
