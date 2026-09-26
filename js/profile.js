@@ -76,7 +76,12 @@ async function renderLibraryPlanLimit(used){
   const host = document.getElementById('myLibraryPlanLimit');
   if (!host) return;
   if (used == null || !currentUser){ host.innerHTML = ''; return; }
-  host.innerHTML = planLimitMarkup(used, await getMyTier());
+  const tier = await getMyTier();
+  /* Only a plan with a ceiling gets the bar. An unlimited plan has nothing to
+     count, and its "Unlimited subliminals" card sat above the saved list looking
+     like a button that did nothing. */
+  if (!(tierLibraryCap(tier) < Infinity)){ host.innerHTML = ''; return; }
+  host.innerHTML = planLimitMarkup(used, tier);
 }
 
 async function loadMyLibrary(options){

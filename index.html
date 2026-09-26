@@ -2813,10 +2813,6 @@
         <button class="btn btn-primary" onclick="openAuthModal()">Log in or create an account</button>
       </div>
       <div id="myLibraryPanel" style="display:none;">
-        <!-- How much room this plan gives you, and how much of it is used. Drawn
-             for every tier — "Unlimited subliminals" is something a Ritual member
-             paid for and should get to read. Filled in by loadMyLibrary() off the
-             rows it already fetched, so it costs no extra query. -->
         <!-- Starting a new one belongs above what you've already made, and stays
              there however long the list gets. Hidden by loadMyLibrary() only
              when the list is empty, where the empty state says the same thing. -->
@@ -2828,6 +2824,9 @@
           </span>
           <span class="lib-create-arrow" aria-hidden="true">→</span>
         </button>
+        <!-- How much room a capped plan gives you, and how much of it is used.
+             Left empty on an unlimited plan. Filled in by loadMyLibrary() off the
+             rows it already fetched, so it costs no extra query. -->
         <div id="myLibraryPlanLimit"></div>
         <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
       </div>
@@ -3677,7 +3676,7 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20260923c"></script>
-<script src="js/profile.js?v=20260926a"></script>
+<script src="js/profile.js?v=20260926b"></script>
 <script src="js/mix-settings.js?v=20260923c"></script>
 <script src="js/player.js?v=20260923c"></script>
 <script src="js/journal.js"></script>
