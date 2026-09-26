@@ -78,10 +78,10 @@ function habitPractiseDays(){
 function habitCyclesDone(){
   return habitCycleStart ? Math.floor(habitPractiseDays() / HABIT_CYCLE_DAYS) : 0;
 }
-/* Which day of the current cycle they are on, 1-based, for "Day 4 of 21". */
+/* Which day of the current cycle they are on, 0-based, for "Day 0 of 21" when brand new, "Day 1 of 21" after first day practised. */
 function habitCycleDay(){
   if (!habitCycleStart) return null;
-  return (habitPractiseDays() % HABIT_CYCLE_DAYS) + 1;
+  return habitPractiseDays() % HABIT_CYCLE_DAYS;
 }
 /* How many habits this person may hold in total, across all three lists.
    `null` means the old behaviour: fifteen in each list, no total. */
@@ -673,7 +673,7 @@ function habitElId(prefix, time){ return prefix + time[0].toUpperCase() + time.s
 function habitFullText(spacesTotal, inThisList){
   if (spacesTotal === null) return `${HABIT_SLOTS} of ${HABIT_SLOTS} — this ritual is full.`;
   if (spacesTotal >= HABIT_SLOTS) return `${spacesTotal} of ${HABIT_SLOTS} — every space earned.`;
-  const left = HABIT_CYCLE_DAYS - ((habitCycleDay() || 1) - 1);
+  const left = HABIT_CYCLE_DAYS - (habitCycleDay() ?? 0);
   return `${habitsCache.length} of ${spacesTotal} spaces used · ${HABIT_SPACES_PER_CYCLE} more after this cycle`
     + (left > 0 ? ` (${left} day${left === 1 ? '' : 's'} of practice to go)` : '');
 }

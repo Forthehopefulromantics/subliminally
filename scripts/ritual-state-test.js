@@ -168,7 +168,7 @@ check('legacy row — streak still counts', ctx.routineStreak('morning'), 2);
 setUp([morning], { m1:[SUN, MON] }, new Date(2026, 8, 21, 21, 0, 0));
 vm.runInContext(`habitCycleStart = '${SUN}';`, ctx);
 check('cycle — practise days', ctx.habitPractiseDays(), 2);
-check('cycle — day of 21', ctx.habitCycleDay(), 3);
+check('cycle — day of 21', ctx.habitCycleDay(), 2);
 check('cycle — Saturday (not applicable) not counted', ctx.habitPractiseDays(), 2);
 // A habit ticked on the evening it was created still counts, even though the
 // cycle's first morning is the next day.
@@ -194,7 +194,7 @@ setUp([morning], {}, new Date(2026, 8, 21, 9, 0, 0));          // Monday, nothin
 vm.runInContext(`habitCycleStart = '${SUN}';`, ctx);
 check('new tracker — streak', ctx.routineStreak('morning'), 0);
 check('new tracker — practise days', ctx.habitPractiseDays(), 0);
-check('new tracker — cycle day', ctx.habitCycleDay(), 1);
+check('new tracker — cycle day', ctx.habitCycleDay(), 0);
 check('new tracker — spaces', ctx.habitSpacesTotal(), 3);
 // Reading it again changes nothing: it is derived from check-ins, never from
 // how long ago the habit was created or how many times the page was opened.
