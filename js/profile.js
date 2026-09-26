@@ -95,7 +95,23 @@ async function loadMyLibrary(options){
      subliminal stays open and playable, and only saving another one is gated —
      which is what the note under the bar says. */
   renderLibraryPlanLimit(error ? null : (subs || []).length);
-  if (error || !subs || !subs.length){ list.innerHTML = '<div class="library-empty">Nothing saved yet — build one and hit "Save to my library."</div>'; return; }
+  const createCard = document.getElementById('myLibraryCreate');
+  if (error){
+    if (createCard) createCard.style.display = '';
+    list.innerHTML = '<div class="library-empty">Your subliminals couldn\'t load just now — try again in a moment.</div>';
+    return;
+  }
+  /* Empty is its own welcome with its own button, so the card above steps aside
+     rather than asking the same thing twice. */
+  if (createCard) createCard.style.display = (subs && subs.length) ? '' : 'none';
+  if (!subs || !subs.length){
+    list.innerHTML = `<div class="lib-first">
+      <h3>Your subliminals will live here <span aria-hidden="true">✦</span></h3>
+      <p>Create your first personalized subliminal and come back anytime to listen or make adjustments.</p>
+      <button type="button" class="btn btn-primary" onclick="startNewSubliminal()">Create My First Subliminal</button>
+    </div>`;
+    return;
+  }
   list.innerHTML = subs.map(s => {
     const mins = Math.round((s.duration_seconds||0)/60);
     const when = new Date(s.created_at).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});

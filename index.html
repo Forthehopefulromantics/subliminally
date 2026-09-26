@@ -1670,6 +1670,27 @@
   .library-card .yt-badge{ font-size:10.5px; color:#FF6B6B; margin-top:8px; font-weight:500; }
   .library-yt-cta{ text-align:center; margin-top:28px; }
   .library-empty{ text-align:center; font-size:13px; color:var(--haze); padding:20px 0; }
+  /* "Create New Subliminal" on Mine: a cream card in the day sky, a veil card at
+     night -- the same tokens the saved cards below it use, lifted by a candle
+     edge so it reads as the thing to do without outshouting what's saved. */
+  .lib-create{ display:flex; align-items:center; gap:16px; width:100%; text-align:left; cursor:pointer; font:inherit; color:inherit;
+    background:var(--veil); border:1px solid var(--dusk); border-left:3px solid var(--candle); border-radius:18px; padding:18px 20px; margin-bottom:14px;
+    transition:transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+  .lib-create:hover{ transform:translateY(-1px); border-color:var(--candle); box-shadow:0 6px 18px rgba(227,190,127,.18); }
+  .lib-create:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  .lib-create-plus{ flex:none; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:var(--candle); color:#241C0E; font-size:20px; line-height:1; }
+  .lib-create-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .lib-create-title{ font-family:var(--serif); font-size:17px; color:var(--moonlight); }
+  .lib-create-star{ color:var(--candle); }
+  .lib-create-sub{ font-size:12.5px; color:var(--haze); }
+  .lib-create-arrow{ flex:none; color:var(--candle); font-size:18px; }
+  @media (max-width:480px){ .lib-create{ padding:16px; gap:12px; } .lib-create-arrow{ display:none; } }
+  .lib-first{ text-align:center; background:var(--veil); border:1px solid var(--dusk); border-radius:24px; padding:36px 24px; }
+  .lib-first h3{ font-family:var(--serif); font-size:21px; color:var(--moonlight); }
+  .lib-first h3 span{ color:var(--candle); }
+  .lib-first p{ font-size:13.5px; color:var(--haze); margin:10px auto 0; max-width:380px; }
+  .lib-first .btn{ margin-top:22px; }
 
   /* ---------- onboarding slideshow ----------
      One question to a screen, the way a phone would do it, on the web as well.
@@ -2796,6 +2817,17 @@
              for every tier — "Unlimited subliminals" is something a Ritual member
              paid for and should get to read. Filled in by loadMyLibrary() off the
              rows it already fetched, so it costs no extra query. -->
+        <!-- Starting a new one belongs above what you've already made, and stays
+             there however long the list gets. Hidden by loadMyLibrary() only
+             when the list is empty, where the empty state says the same thing. -->
+        <button type="button" class="lib-create" id="myLibraryCreate" onclick="startNewSubliminal()">
+          <span class="lib-create-plus" aria-hidden="true">＋</span>
+          <span class="lib-create-text">
+            <span class="lib-create-title">Create New Subliminal <span class="lib-create-star" aria-hidden="true">✦</span></span>
+            <span class="lib-create-sub">Build a personalized subliminal from your own affirmations or generate new ones.</span>
+          </span>
+          <span class="lib-create-arrow" aria-hidden="true">→</span>
+        </button>
         <div id="myLibraryPlanLimit"></div>
         <div class="profile-list" id="myLibraryList"><div class="library-empty">Loading…</div></div>
       </div>
@@ -2864,7 +2896,7 @@
           </div>
 
           <!-- Add My Own section -->
-          <div class="affirmation-mode-section" id="affirmationImportSection" style="display:none;">
+          <div class="affirmation-mode-section" id="affirmationImportSection">
             <div class="quiz-q">
               <label>Already have your affirmations?</label>
               <p class="quiz-help">Paste them below or upload a file and we'll add them for you.</p>
@@ -3634,7 +3666,7 @@
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20260923e"></script>
+<script src="js/builder.js?v=20260926a"></script>
 <script src="js/billing.js?v=20260923c"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
@@ -3645,7 +3677,7 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20260923c"></script>
-<script src="js/profile.js?v=20260923c"></script>
+<script src="js/profile.js?v=20260926a"></script>
 <script src="js/mix-settings.js?v=20260923c"></script>
 <script src="js/player.js?v=20260923c"></script>
 <script src="js/journal.js"></script>
