@@ -1174,21 +1174,30 @@ const MY_CLONED_VOICE = 'mine';  // resolved to this person's own voice, server-
 /* Shown if the catalogue cannot be reached. The server holds the real one and
    accepts nothing else, so a stale copy here fails the clone rather than cloning
    on the wrong words. */
-const VOICE_CONSENT_FALLBACK = 'I confirm this is my voice, or I have the necessary rights and consent to use this voice, and I consent to creating an AI voice clone.';
+const VOICE_CONSENT_FALLBACK = 'I confirm this recording is my own voice, that I have permission to clone it, and that I consent to Subliminally creating an AI version of my voice. I am not uploading anyone else\'s voice.';
 
 let voiceCatalogue = { presets: FALLBACK_PRESET_VOICES, myVoice: null, consentStatement: VOICE_CONSENT_FALLBACK, provider: null, loaded: false };
 let voiceCataloguePromise = null;
+const VOICE_CATALOGUE_TIMEOUT_MS = 10000;
 async function loadVoiceCatalogue(){
   if (voiceCataloguePromise) return voiceCataloguePromise;
   voiceCataloguePromise = (async () => {
     if (!sb || !currentUser) return voiceCatalogue;
+    /* Never waits forever: the clone card and the picker both await this, and
+       a hung request here used to leave whatever was on screen there for good. */
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), VOICE_CATALOGUE_TIMEOUT_MS);
     try {
-      const token = (await sb.auth.getSession()).data.session?.access_token;
+      const session = await Promise.race([
+        sb.auth.getSession(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('auth_timeout')), VOICE_CATALOGUE_TIMEOUT_MS)),
+      ]);
+      const token = session && session.data && session.data.session && session.data.session.access_token;
       if (!token) return voiceCatalogue;
       // POST rather than GET so the native app's cross-origin preflight is the
       // same shape as every other call it makes.
-      const res = await fetch(`${API_BASE}/api/voices`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return voiceCatalogue;
+      const res = await fetch(`${API_BASE}/api/voices`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: abort.signal });
+      if (!res.ok){ console.error('[voices] catalogue answered', res.status); return voiceCatalogue; }
       const out = await res.json();
       voiceCatalogue = {
         presets: (out.presets && out.presets.length) ? out.presets : FALLBACK_PRESET_VOICES,
@@ -1197,10 +1206,16 @@ async function loadVoiceCatalogue(){
         provider: out.provider || null,
         loaded: true,
       };
-    } catch (e){ /* keep the fallback names; previews read on the device */ }
+    } catch (e){
+      // Keep the fallback names; previews read on the device.
+      console.error('[voices] catalogue unavailable:', e && (e.name === 'AbortError' ? 'timed out' : e.message));
+    } finally { clearTimeout(timer); }
     return voiceCatalogue;
   })();
-  return voiceCataloguePromise;
+  const pending = voiceCataloguePromise;
+  // A catalogue that never arrived is asked for again next time, not kept.
+  pending.then(c => { if (!c.loaded && voiceCataloguePromise === pending) voiceCataloguePromise = null; });
+  return pending;
 }
 /* Called after a voice is cloned or removed, so the picker stops being wrong. */
 function forgetVoiceCatalogue(){ voiceCataloguePromise = null; }
@@ -1479,7 +1494,7 @@ async function chooseClonedVoice(){
   closeMyVoicePanel();
   setSelectedVoice(VOICE_CLONE);
   // Already made once, so it is never asked for again -- it is simply chosen.
-  sayInVoicePicker('Your Voice is Ready ✦', 'ok');
+  sayInVoicePicker('Your voice is ready ✓', 'ok');
   advanceAfterPick();
 }
 
@@ -1535,7 +1550,7 @@ async function renderVoiceCards(){
   const cloneTitle = clone.querySelector('h4');
   const cloneDesc = clone.querySelector('p');
   if (cloneTitle) cloneTitle.textContent = cat.myVoice ? (cat.myVoice.name || 'My voice') : 'Clone your voice';
-  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your Voice is Ready ✦' : 'Create an AI version of your voice';
+  if (cloneDesc) cloneDesc.textContent = cat.myVoice ? 'Your voice is ready ✓' : 'Create an AI version of your voice';
 
   primeSerenityPreview();
   renderMyVoicePanel();
@@ -1677,11 +1692,14 @@ async function onMyVoiceReady(){
   /* The clone now exists, so the choice they made when they tapped the card is
      finally committable -- and from here Continue takes them to the next build
      step, never to the affirmation-by-affirmation recorder. */
-  setSelectedVoice(VOICE_CLONE);
-  await renderVoiceCards();
+  setSelectedVoice(VOICE_CLONE);    // lights the card and enables Continue
   /* Nothing is read in the new voice here. ElevenLabs is only asked for speech
      when the subliminal is generated (prepareClonedVoice), never for a preview. */
-  sayInVoicePicker('Your Voice is Ready ✦', 'ok');
+  sayInVoicePicker('Your voice is ready ✓', 'ok');
+  // Redrawing the cards checks the plan again; a failure there must not take
+  // back the voice that was just made, or the message saying so.
+  try { await renderVoiceCards(); }
+  catch(e){ console.error('[voice-clone] could not redraw the voice cards:', e); }
 }
 async function openMyVoicePanel(){
   const panel = document.getElementById('myVoicePanel');
@@ -1769,7 +1787,7 @@ const TTS_MESSAGES = {
   not_signed_in:    'Sign in to use Serenity — this device reads it for now.',
   upgrade_required: 'Serenity comes with Ritual — using this device\'s voice for now.',
   not_configured:   'Serenity isn\'t switched on yet — using this device\'s voice.',
-  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Clone your voice" to read the passage once.',
+  no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Clone your voice" and give it a minute of your voice.',
   invalid_voice:    'That voice isn\'t available any more — choose another one, or this device reads it.',
   consent_required: 'Tick the confirmation first, then your voice can be created.',
   quota_exceeded:   'Serenity has run out of time this month — this device reads it for now, and it\'ll be back.',
@@ -1795,7 +1813,7 @@ const CLONE_RETRY = ' Nothing was played in another voice — tap Play to try ag
 const CLONE_TTS_MESSAGES = {
   not_signed_in:    'Sign in to hear this in your cloned voice.',
   upgrade_required: 'Your cloned voice comes with Ritual.',
-  no_cloned_voice:  'Your voice hasn\'t been created yet — read the passage once and it will be ready.',
+  no_cloned_voice:  'Your voice hasn\'t been created yet — give it a minute of your voice and it will be ready.',
   invalid_voice:    'Your cloned voice couldn\'t be found — create it again from the voice step.',
   nothing_to_say:   'There are no affirmations to read yet — go back and add at least one.',
   too_long:         'One of your affirmations is too long to read as one clip — shorten it and generate again.',
@@ -2044,7 +2062,7 @@ async function runClonedVoicePrepare(){
       state.selectedVoice = VOICE_CLONE;
       showStep(4);
       paintVoiceCards(VOICE_CLONE);
-      sayInVoicePicker('One more step — read the passage below and your voice is ready.', 'err');
+      sayInVoicePicker('One more step — give us at least 1 minute of your voice below and it will be ready.', 'err');
       openMyVoicePanel();
     }
     return false;
@@ -2459,7 +2477,7 @@ function startNextPhase(){
   if (voice === VOICE_CLONE && state.aiVoiceId !== MY_CLONED_VOICE){
     showStep(4);
     paintVoiceCards(VOICE_CLONE);
-    sayInVoicePicker('One more step — read the passage below and your voice is ready.', 'err');
+    sayInVoicePicker('One more step — give us at least 1 minute of your voice below and it will be ready.', 'err');
     openMyVoicePanel();
     return;
   }

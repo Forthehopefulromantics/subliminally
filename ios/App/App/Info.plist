@@ -27,7 +27,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Subliminally uses your microphone so you can record affirmations in your own voice.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Subliminally can use a photo from your library as your account avatar.</string>
+	<string>Subliminally can use a photo from your library as your account avatar, or a recording or video of you speaking to create your AI voice.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Subliminally can use your camera to take a photo for your account avatar.</string>
 	<key>CFBundleURLTypes</key>

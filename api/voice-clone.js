@@ -29,6 +29,7 @@ import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, isConfigured } from '../lib/elevenlabs.js';
 import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
+import { checkVoiceSample } from '../lib/voice-sample.js';
 
 // The sample arrives as raw audio, not JSON; cloning at the provider can take
 // most of a minute, so the function is given room to finish.
@@ -36,8 +37,10 @@ export const config = { api: { bodyParser: false }, maxDuration: 60 };
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
-// Enough for a minute or so of speech, which is all instant cloning needs.
-const MAX_SAMPLE_BYTES = 8 * 1024 * 1024;
+// Vercel refuses a request body over 4.5 MB before this function ever runs. The
+// page sends at most 90 seconds of 22.05 kHz mono WAV (~4 MB), so this is a
+// ceiling that is actually reachable, not a promise the platform will break.
+const MAX_SAMPLE_BYTES = 4.4 * 1024 * 1024;
 
 const HTTP_FOR_CODE = {
   quota_exceeded: 429,
@@ -53,21 +56,9 @@ const HTTP_FOR_CODE = {
   verification_required: 422,
   unsupported_format: 415,
   sample_too_short: 400,
+  sample_silent: 400,
   save_failed: 500,
 };
-
-/* What the sample actually is, from its first bytes. The browser's label is not
-   always right — Safari has sent MP4 audio with no type, or the wrong one — and
-   the provider goes by the file name it is handed. */
-function sniffSample(buf) {
-  if (buf.length > 4 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return { type: 'audio/webm', ext: 'webm' };
-  if (buf.length > 12 && buf.toString('latin1', 4, 8) === 'ftyp') return { type: 'audio/mp4', ext: 'm4a' };
-  if (buf.length > 4 && buf.toString('latin1', 0, 4) === 'OggS') return { type: 'audio/ogg', ext: 'ogg' };
-  if (buf.length > 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WAVE') return { type: 'audio/wav', ext: 'wav' };
-  if (buf.length > 4 && buf.toString('latin1', 0, 4) === 'fLaC') return { type: 'audio/flac', ext: 'flac' };
-  if (buf.length > 3 && buf.toString('latin1', 0, 3) === 'ID3') return { type: 'audio/mpeg', ext: 'mp3' };
-  return null;
-}
 
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
@@ -159,19 +150,24 @@ export default async function handler(req, res) {
   let sample;
   try { sample = await readRawBody(req); }
   catch (e) {
+    console.error('voice-clone: sample not received', user.id, (e && e.message) || e);
     res.status(413).json({ error: 'sample_too_long' });
     return;
   }
-  if (!sample || sample.length < 2048) {
-    res.status(400).json({ error: 'sample_too_short' });
+  const declared = req.headers['content-type'] || '';
+  console.log('voice-clone: sample received', user.id, { bytes: sample ? sample.length : 0, declared, replacing });
+
+  /* The length is checked here, on the audio, not taken from the page's timer.
+     The page converts every recording and upload to 16-bit PCM WAV first (see
+     js/profile.js prepareVoiceSample), so anything else is refused rather than
+     guessed at. */
+  const checked = checkVoiceSample(sample);
+  if (!checked.ok) {
+    console.error('voice-clone: sample rejected', user.id, checked.code, checked.detail, { bytes: sample ? sample.length : 0, declared });
+    res.status(HTTP_FOR_CODE[checked.code] || 400).json({ error: checked.code });
     return;
   }
-
-  const declared = req.headers['content-type'] || '';
-  const sniffed = sniffSample(sample);
-  const contentType = sniffed ? sniffed.type : (declared || 'audio/webm');
-  const ext = sniffed ? sniffed.ext
-    : contentType.includes('mp4') ? 'm4a' : contentType.includes('ogg') ? 'ogg' : contentType.includes('mpeg') ? 'mp3' : 'webm';
+  console.log('voice-clone: sample ok', user.id, checked);
 
   try {
     // Replace rather than accumulate: one voice per person, always the latest.
@@ -181,14 +177,16 @@ export default async function handler(req, res) {
       name: `subliminally-${user.id}`,
       description: 'Cloned from a Subliminally voice sample, with the speaker\'s confirmation.',
       sample,
-      contentType,
-      fileName: `sample.${ext}`,
+      contentType: 'audio/wav',
+      fileName: 'sample.wav',
     });
+    console.log('voice-clone: ElevenLabs returned a voice', user.id, voiceId);
 
     /* A voice that cannot be recorded against its owner is a voice nobody can
        use or remove, so it does not stay at the provider either. */
     try {
       await saveVoiceProfile({ userId: user.id, providerVoiceId: voiceId, displayName: 'My voice', consentAt });
+      console.log('voice-clone: voice saved to user_voice_profiles', user.id);
     } catch (saveErr) {
       console.error('voice-clone error: save_failed', (saveErr && saveErr.message) || saveErr);
       await deleteVoice(voiceId);
@@ -205,8 +203,10 @@ export default async function handler(req, res) {
     res.status(200).json({ created: true, displayName: 'My voice' });
   } catch (err) {
     const code = err instanceof VoiceProviderError ? err.code : 'clone_failed';
-    console.error('voice-clone error:', code, err && err.status, (err && err.detail) || (err && err.message) || err,
-      { bytes: sample.length, contentType, declared });
+    // The provider's own HTTP status and body, so the real reason is in the log.
+    console.error('voice-clone error:', code, 'ElevenLabs status:', err && err.status,
+      'ElevenLabs body:', (err && err.detail) || (err && err.message) || err,
+      { bytes: sample.length, seconds: checked.seconds, declared });
     res.status(HTTP_FOR_CODE[code] || 500).json({ error: code });
   }
 }
