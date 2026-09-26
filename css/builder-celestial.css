@@ -187,6 +187,32 @@ body[data-sky="day"] #flow-section .flow-card{
 }
 #flow-section .ambience-remove-btn[hidden]{ display:none; }
 
+/* ---------- the intensity cards ---------- */
+#flow-section .intensity-cards{ display:flex; flex-direction:column; gap:12px; }
+#flow-section .intensity-card{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:16px; align-items:start; row-gap:6px;
+  padding:16px 18px; border-radius:14px; text-align:left; cursor:pointer;
+  background:var(--bc-card)!important; border:1px solid var(--bc-line)!important; box-shadow:var(--bc-shadow);
+  transition:all .2s ease;
+}
+#flow-section .intensity-card:hover{ border-color:var(--bc-sel-line)!important; }
+#flow-section .intensity-card.sel{ background:var(--bc-card-sel)!important; border:2px solid var(--bc-sel-line)!important; padding:15px 17px; }
+#flow-section .intensity-card::after{
+  content:''; grid-column:2; grid-row:1/span 3; align-self:center; justify-self:end;
+  width:28px; height:28px; border-radius:50%; border:1.5px solid var(--bc-check-line); box-sizing:border-box; background:none;
+}
+#flow-section .intensity-card.sel::after{ background:var(--bc-accent) var(--bc-check) center/16px no-repeat; border-color:var(--bc-accent); }
+#flow-section .intensity-card h5{
+  grid-column:1; font-family:var(--serif); font-weight:400; font-size:18px; color:var(--bc-ink); margin:0;
+}
+#flow-section .intensity-card .intensity-label{
+  grid-column:1; font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--bc-kicker); margin:0;
+}
+#flow-section .intensity-card p{
+  grid-column:1; font-size:13.5px; color:var(--bc-muted); margin:0; line-height:1.35;
+}
+#flow-section .intensity-special{ color:var(--bc-accent); margin-left:4px; }
+
 /* ---------- Continue ---------- */
 #flow-section .flow-nav > .candlebtn,
 #flow-section .flow-nav > div > .candlebtn{ background:var(--bc-cta)!important; color:var(--bc-cta-ink)!important; }
