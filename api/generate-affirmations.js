@@ -5,6 +5,19 @@ import { faithFraming } from '../lib/faith-language.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+function getIntensityGuidance(intensity) {
+  const intensityMap = {
+    grounded: `Affirmation intensity: GROUNDED
+Write believable, supportive affirmations that feel within reach. These should feel encouraging and real, not hyperbolic. Use language like "I am becoming," "I am building," "I trust," "I am creating." Focus on progress, steady growth, and sustainable confidence.`,
+    bold: `Affirmation intensity: BOLD
+Write big, confident affirmations that stretch what feels possible. These should feel ambitious and empowering. Use language like "I naturally," "I attract," "My life keeps," "Opportunities find me." Push beyond what feels comfortable but still believable.`,
+    delusional: `Affirmation intensity: DELUSIONAL (Dream-life energy)
+Write wildly ambitious, unapologetic affirmations with larger-than-life energy. These are pure dream-life confidence. Use language like "Everything always," "I am the kind of person," "Money finds me," "I am wildly successful," "My dream life is unfolding," "I receive opportunities that seem unreal." This is fantasy-forward confidence. For dating/attraction, focus on the user's experience and desirability, not controlling others.`,
+  };
+
+  return intensityMap[intensity] || intensityMap['bold'];
+}
+
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -16,7 +29,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { count, freqLabel, toneLabel, goal, faith, faithWord } = req.body || {};
+  const { count, freqLabel, toneLabel, goal, faith, faithWord, intensity } = req.body || {};
   // Standard subliminals contain at most ten affirmations. EFT keeps its own
   // separate 11-line structure and never calls this route.
   const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 5), 10);
@@ -25,11 +38,15 @@ export default async function handler(req, res) {
      section is left out rather than filled with a guess. */
   const framing = faithFraming(faith, faithWord);
 
+  // Intensity guidance for the model
+  const intensityGuidance = getIntensityGuidance(intensity);
+
   const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
 Frequency association (mood only, not medical): ${freqLabel || 'none'}
 Desired voice/tone: ${toneLabel || 'warm'}
 What the person said they want help with: "${goal || 'not specified'}"
-Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim.
+${intensityGuidance}
+Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim. Avoid generic statements like "I am worthy" or "I am confident" — be specific and vivid instead. Vary sentence structure and starters — don't begin every line with "I am".
 Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.${framing ? '\n\n' + framing : ''}`;
 
   try {

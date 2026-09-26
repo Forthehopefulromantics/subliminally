@@ -114,7 +114,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, intention:null, goal:'', tone:null, count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+let state = { freq:null, intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 /* Three phases rather than eight bars: choosing everything (frequency through
    ambience), recording it, and hearing it. The line after the current phase
@@ -455,6 +455,31 @@ INTENTIONS.forEach(([k,label])=>{
   intentionChips.appendChild(c);
 });
 paintIntentionChips();
+
+// Intensity cards
+const intensityData = [
+  { id: 'grounded', label: 'Grounded', description: 'Believable, supportive affirmations that still feel within reach.' },
+  { id: 'bold', label: 'Bold', description: 'Big, confident affirmations that stretch what feels possible.' },
+  { id: 'delusional', label: 'Delusional ✦', description: 'Dream-life energy. Wildly ambitious, unapologetic, and larger than life.' }
+];
+const intensityCards = document.getElementById('intensityCards');
+function paintIntensityCards(){ syncSelectionByData('#intensityCards .intensity-card', 'intensity', state.intensity); }
+intensityData.forEach(item => {
+  const card = document.createElement('button');
+  card.className = 'intensity-card';
+  card.type = 'button';
+  card.setAttribute('data-intensity', item.id);
+  card.setAttribute('role', 'radio');
+  card.setAttribute('aria-checked', state.intensity === item.id);
+  card.innerHTML = `<h5>${item.label}</h5><p class="intensity-label">Intensity</p><p>${item.description}</p>`;
+  card.onclick = () => {
+    state.intensity = item.id;
+    paintIntensityCards();
+  };
+  intensityCards.appendChild(card);
+});
+paintIntensityCards();
+
 const toneChips = document.getElementById('toneChips');
 function paintToneChips(){ syncSelectionByData('#toneChips .chip', 'key', state.tone); }
 [["gentle","Gentle & nurturing"],["bold","Bold & direct"],["calm","Calm & neutral"]].forEach(([k,label])=>{
@@ -720,7 +745,7 @@ async function callClaudeForAffirmations(){
   const response = await fetch(API_BASE + "/api/generate-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal, ...faithForGenerator() })
+    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal, intensity: state.intensity, ...faithForGenerator() })
   });
   if (!response.ok) return null;
   const data = await response.json();
