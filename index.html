@@ -45,6 +45,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.11.0/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.11.0/pdf.worker.min.js';</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --midnight:#0D0B18; --midnight-2:#12101F; --veil:#1C1830; --dusk:#262040;
@@ -353,6 +356,38 @@
   .soothing-picker{ margin-top:18px; }
   .soothing-picker label{ font-size:12.5px; color:var(--haze); display:block; margin-bottom:8px; }
   .mixer{ margin-top:16px; background:rgba(255,255,255,0.03); border-radius:14px; padding:14px 16px; border:1px solid rgba(255,255,255,0.06); align-self:stretch; width:100%; box-sizing:border-box; }
+
+  /* Affirmation mode choice cards */
+  .affirmation-mode-choice{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:20px; }
+  @media (max-width:560px){ .affirmation-mode-choice{ grid-template-columns:1fr; } }
+  .affirmation-choice-card{ background:var(--dusk); border:1px solid transparent; border-radius:16px; padding:18px 16px; cursor:pointer; text-align:left; transition:all .2s; display:flex; flex-direction:column; gap:8px; }
+  .affirmation-choice-card:hover{ background:rgba(185,167,232,0.12); border-color:rgba(185,167,232,0.3); }
+  .affirmation-choice-card.sel{ background:rgba(227,190,127,0.12); border-color:var(--candle); }
+  .affirmation-choice-card .choice-icon{ font-size:26px; display:block; }
+  .affirmation-choice-card h3{ font-family:var(--serif); font-size:16px; color:var(--moonlight); margin:0; }
+  .affirmation-choice-card p{ font-size:12.5px; color:var(--haze); margin:0; line-height:1.4; }
+
+  .affirmation-mode-section{ display:none; }
+  .affirmation-mode-section.active{ display:block; }
+
+  /* Import tabs */
+  .affirmation-import-tabs{ display:flex; gap:8px; margin-bottom:16px; border-bottom:1px solid var(--dusk); }
+  .tab-btn{ background:none; border:none; color:var(--haze); font-size:13px; padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; transition:color .2s, border-color .2s; }
+  .tab-btn:hover{ color:var(--moonlight); }
+  .tab-btn.sel{ color:var(--candle); border-bottom-color:var(--candle); }
+
+  .affirmation-tab-content{ display:none; }
+  .affirmation-tab-content.active{ display:block; }
+
+  /* File upload area */
+  .file-upload-area{ background:rgba(185,167,232,0.06); border:2px dashed rgba(185,167,232,0.3); border-radius:12px; padding:24px 16px; text-align:center; cursor:pointer; transition:all .2s; }
+  .file-upload-area:hover{ background:rgba(185,167,232,0.1); border-color:rgba(185,167,232,0.5); }
+  .file-upload-area.drag-over{ background:rgba(185,167,232,0.16); border-color:var(--lilac); }
+  .file-upload-area p{ margin:0; font-size:14px; color:var(--moonlight); }
+  .file-upload-area p:first-child{ font-weight:500; }
+  .upload-hint{ font-size:12px; color:var(--haze); margin-top:4px !important; }
+  .file-select-btn{ background:var(--dusk); border:1px solid rgba(185,167,232,0.3); color:var(--moonlight); padding:8px 14px; border-radius:8px; font-size:12px; cursor:pointer; margin-top:12px; transition:all .2s; }
+  .file-select-btn:hover{ background:rgba(185,167,232,0.08); border-color:var(--lilac); }
 
   .record-panel{ display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:6px 0; }
   .record-line{ font-family:var(--serif); font-style:italic; font-size:18px; color:var(--moonlight); max-width:440px; line-height:1.4; }
@@ -2794,15 +2829,68 @@
         <div class="flow-nav"><span></span><button class="mini-btn candlebtn" id="toStep1" disabled onclick="nextStep()">Continue</button></div>
       </div>
 
-      <!-- STEP 1: quiz / prompt -->
+      <!-- STEP 1: quiz / prompt / affirmations -->
       <div class="flow-step" data-step="1">
-        <div class="flow-title">What should this ritual do for you?</div>
-        <div class="flow-sub">One honest prompt is enough — we'll build the rest.</div>
+        <div class="flow-title">Add your affirmations</div>
+        <div class="flow-sub">Choose how you'd like to build your affirmation list.</div>
         <div class="flow-body">
-          <div class="quiz-q">
-            <label id="quizGoalLabel">Describe what you want, in your own words</label>
-            <textarea id="quizGoal" rows="3" placeholder="e.g. I want to feel less anxious about money and actually believe I'm capable of building something stable..."></textarea>
+          <!-- Affirmation mode choice -->
+          <div class="affirmation-mode-choice" id="affirmationModeChoice">
+            <button class="affirmation-choice-card sel" data-mode="generate" onclick="selectAffirmationMode('generate')">
+              <span class="choice-icon">✨</span>
+              <h3>Generate for Me</h3>
+              <p>Tell us what you want to manifest and we'll help write your affirmations.</p>
+            </button>
+            <button class="affirmation-choice-card" data-mode="import" onclick="selectAffirmationMode('import')">
+              <span class="choice-icon">📝</span>
+              <h3>Add My Own</h3>
+              <p>Paste or upload affirmations you already love.</p>
+            </button>
           </div>
+
+          <!-- Generate for Me section -->
+          <div class="affirmation-mode-section active" id="affirmationGenerateSection">
+            <div class="quiz-q">
+              <label id="quizGoalLabel">What do you want to affirm?</label>
+              <textarea id="quizGoal" rows="3" placeholder="Example: I want to feel confident, financially abundant, loved, disciplined, and successful."></textarea>
+            </div>
+            <div class="quiz-q">
+              <label>How many affirmations?</label>
+              <div class="chip-grid" id="affirmationCountChips">
+                <button class="chip sel" data-count="5" onclick="selectAffirmationCount(5)">5 affirmations</button>
+                <button class="chip" data-count="10" onclick="selectAffirmationCount(10)">10 affirmations</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add My Own section -->
+          <div class="affirmation-mode-section" id="affirmationImportSection" style="display:none;">
+            <div class="quiz-q">
+              <label>Already have your affirmations?</label>
+              <p class="quiz-help">Paste them below or upload a file and we'll add them for you.</p>
+            </div>
+            <div class="affirmation-import-tabs" id="affirmationImportTabs">
+              <button class="tab-btn sel" data-tab="paste" onclick="switchAffirmationTab('paste')">Paste Affirmations</button>
+              <button class="tab-btn" data-tab="upload" onclick="switchAffirmationTab('upload')">Upload File</button>
+            </div>
+            <div id="affirmationPasteTab" class="affirmation-tab-content active">
+              <div class="quiz-q">
+                <textarea id="affirmationPasteText" rows="6" placeholder="1. I am wealthy.&#10;2. I am confident.&#10;3. I am loved.&#10;&#10;Or paste as bullet points or plain text — we'll parse it all."></textarea>
+              </div>
+            </div>
+            <div id="affirmationUploadTab" class="affirmation-tab-content" style="display:none;">
+              <div class="quiz-q">
+                <div class="file-upload-area" id="fileUploadArea" ondrop="handleAffirmationFileDrop(event)" ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" onmouseleave="this.classList.remove('drag-over')">
+                  <p>Upload a file</p>
+                  <p class="upload-hint">Drag and drop or click to select</p>
+                  <input type="file" id="affirmationFileInput" accept=".txt,.pdf,.docx" onchange="handleAffirmationFileSelect(event)" style="display:none;">
+                  <button type="button" onclick="document.getElementById('affirmationFileInput').click()" class="file-select-btn">Choose File</button>
+                </div>
+                <div id="fileUploadMsg" class="save-msg" style="margin-top:10px;"></div>
+              </div>
+            </div>
+          </div>
+
           <div class="quiz-q">
             <label>How do you want to use this ritual tonight?</label>
             <div class="length-chip-grid" id="ritualModeChips" style="grid-template-columns:repeat(3,1fr);">
