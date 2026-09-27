@@ -314,7 +314,11 @@ function affirmationShortfall(){
   const have = state.affirmations.filter(a => String(a).trim().length > 0).length;
   return Math.max(0, MIN_AFFIRMATIONS - have);
 }
-function nextStep(){
+function nextStep(serenityCleared){
+  if (step === 4 && serenityCleared !== true && selectedVoiceFromState() === VOICE_SERENITY){
+    serenityAllowedToContinue().then(ok => { if (ok && step === 4) nextStep(true); });
+    return;
+  }
   if (step === 3){
     const msg = document.getElementById('affListMsg');
     const short = affirmationShortfall();
@@ -1292,9 +1296,10 @@ function answered(el){
    answer, so a card that can be chosen chooses and moves on.
 
    Serenity and a cloned voice are premium; recording yourself is free on every
-   account. A free account tapping either premium card gets the existing upgrade
-   sheet and *keeps whatever it had chosen* — nothing is half-selected behind a
-   paywall, so continuing can never send somebody into a voice they cannot use.
+   account. A free account tapping Clone gets the existing upgrade sheet and
+   keeps whatever it had chosen. Serenity is selected for anybody; the upgrade
+   sheet waits until they try to continue with it (serenityAllowedToContinue),
+   so continuing can still never send somebody into a voice they cannot use.
 
    The Serenity demo is the exception, and it is not on this path at all: it is a
    separate control inside the card (toggleSerenityPreview) which plays one
@@ -1433,25 +1438,34 @@ function previewVoicePick(choice){
   paintVoiceCards(choice);
 }
 
-/* Tapping the Serenity CARD asks for Serenity to read the affirmations, which is
-   the premium thing. The paywall opens and the card does not light up: Serenity
-   only becomes the voice once the plan actually allows it. Pressing the small
-   Preview button instead is a different handler entirely and never comes here. */
+/* Tapping the Serenity CARD selects Serenity, for every account, in the frame the
+   tap arrived in. Choosing is not using: the plan is checked when somebody tries
+   to go on with it (serenityAllowedToContinue), not here -- a free account that
+   was refused here saw the card flash and go dark, which read as a dead button.
+   Pressing the small Preview button is a different handler entirely and never
+   comes here. */
 async function chooseSerenity(){
+  closeMyVoicePanel();
+  sayInVoicePicker('');
+  setSelectedVoice(VOICE_SERENITY);
+  if (!currentUser) return;
+  // Only an account that can use it is moved on; anybody else continues when
+  // they choose to, and meets the paywall then.
+  if (tierHasFeature(await getMyTier(), 'studio_voice') && state.selectedVoice === VOICE_SERENITY) advanceAfterPick();
+}
+
+/* The paywall for Serenity sits on going on with it, not on choosing it. The
+   choice is left exactly as it is either way -- nobody is quietly moved back to
+   recording their own voice. */
+async function serenityAllowedToContinue(){
   if (!currentUser){
     sayInVoicePicker('Create a free account first, then Serenity can read your affirmations.', 'err');
-    return;
+    return false;
   }
-  previewVoicePick(VOICE_SERENITY);
   const tier = await getMyTier();
-  if (!tierHasFeature(tier, 'studio_voice')){
-    paintVoiceCards();   // back to whatever is actually chosen
-    openUpgradeModal('studio_voice', { tier, trigger: 'voice_card' });
-    return;
-  }
-  closeMyVoicePanel();
-  setSelectedVoice(VOICE_SERENITY);
-  advanceAfterPick();
+  if (tierHasFeature(tier, 'studio_voice')) return true;
+  openUpgradeModal('studio_voice', { tier, trigger: 'voice_continue' });
+  return false;
 }
 
 /* A personal AI version of someone's own voice. Premium, and — the first time —
@@ -2433,7 +2447,11 @@ function pickLayerVoiceMode(btn){
   answered(btn);
 }
 
-function startNextPhase(){
+function startNextPhase(serenityCleared){
+  if (serenityCleared !== true && selectedVoiceFromState() === VOICE_SERENITY){
+    serenityAllowedToContinue().then(ok => { if (ok && step === 5) startNextPhase(true); });
+    return;
+  }
   state.affirmations = state.affirmations.filter(a=>a.trim().length>0);
   if (!state.affirmations.length){
     if (state.visualizationMode) state.affirmations = [buildVisualizationFallback()];
