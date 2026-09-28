@@ -2115,7 +2115,7 @@
       padding:26px 22px calc(18px + env(safe-area-inset-bottom)); animation:sheetUp .26s ease; }
   }
   @keyframes sheetUp{ from{ transform:translateY(14%); opacity:.6; } to{ transform:translateY(0); opacity:1; } }
-  body.paywall-open{ overflow:hidden; }
+  /* Scroll locking follows open overlays in scroll.css. */
 
   /* One discovery card, low down on Today. It is a today-card like any other —
      the same border, padding and rhythm — with a soft wash behind it. */
@@ -2325,6 +2325,7 @@
     .record-line-loading{ animation:none; }
   }
 </style>
+<link rel="stylesheet" href="/css/scroll.css?v=20260928a" />
 </head>
 <body>
 

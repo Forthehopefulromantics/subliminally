@@ -1,5 +1,5 @@
 /* Immersive listening — a Sanctuary-night layer over the existing audio engine. */
-body.player-open{ overflow:hidden; }
+/* Scroll locking follows the visible player in scroll.css. */
 .immersive-player{ position:fixed; inset:0; z-index:1200; display:none; overflow:hidden;
   color:#f8f2ff; background:#100d2d; isolation:isolate; }
 .immersive-player.open{ display:block; }
