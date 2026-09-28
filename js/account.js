@@ -637,7 +637,6 @@ function openOnboardingModal(){
   obAvatarPicked = false;
   obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
   obEl('onboardOverlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
   obPaintSky();
   obRenderChips();
   if (typeof renderFaithChips === 'function') renderFaithChips();
@@ -648,7 +647,6 @@ function openOnboardingModal(){
 }
 function closeOnboardingModal(){
   obEl('onboardOverlay').classList.remove('open');
-  document.body.style.overflow = '';
 }
 /* Onboarding holds an unsaved name and avatar in the same `higherSelf` the rest
    of the app reads, so anything that refills that object from the database has
