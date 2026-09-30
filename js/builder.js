@@ -1223,6 +1223,13 @@ async function loadVoiceCatalogue(){
 }
 /* Called after a voice is cloned or removed, so the picker stops being wrong. */
 function forgetVoiceCatalogue(){ voiceCataloguePromise = null; }
+/* A clone the server has just confirmed saved. Written straight into the
+   catalogue rather than asked for again, so the result is on screen at once and
+   a slow or failed catalogue request afterwards cannot make it look undone. */
+function noteMyVoiceCreated(name){
+  voiceCatalogue = { ...voiceCatalogue, myVoice: { ...(voiceCatalogue.myVoice || {}), key: MY_CLONED_VOICE, name: name || 'My voice' } };
+  voiceCataloguePromise = Promise.resolve(voiceCatalogue);
+}
 async function myVoiceProfile(){ return (await loadVoiceCatalogue()).myVoice; }
 async function voiceConsentStatement(){ return (await loadVoiceCatalogue()).consentStatement; }
 
@@ -1702,14 +1709,13 @@ function closeMyVoicePanel(){
 async function onMyVoiceReady(){
   if (!document.getElementById('voiceClone')) return;
   closeMyVoicePanel();
-  forgetVoiceCatalogue();
   /* The clone now exists, so the choice they made when they tapped the card is
      finally committable -- and from here Continue takes them to the next build
      step, never to the affirmation-by-affirmation recorder. */
   setSelectedVoice(VOICE_CLONE);    // lights the card and enables Continue
   /* Nothing is read in the new voice here. ElevenLabs is only asked for speech
      when the subliminal is generated (prepareClonedVoice), never for a preview. */
-  sayInVoicePicker('Your voice is ready ✦', 'ok');
+  sayInVoicePicker('✓ Your AI voice is ready', 'ok');
   // Redrawing the cards checks the plan again; a failure there must not take
   // back the voice that was just made, or the message saying so.
   try { await renderVoiceCards(); }

@@ -371,6 +371,12 @@ const VOICE_CLONE_STOP_TIMEOUT_MS = 5000;      // recorder handing over its audi
 const VOICE_CLONE_DECODE_TIMEOUT_MS = 45000;
 const VOICE_CLONE_UPLOAD_TIMEOUT_MS = 80000;   // the route gives ElevenLabs 50s of its 60
 const VOICE_CLONE_AUTH_TIMEOUT_MS = 10000;
+/* The last word on a clone: however the steps above behave, "Creating your
+   voice…" is never on screen longer than this. Token (10s) + consent (10s) +
+   the request (80s), with room to spare. */
+const VOICE_CLONE_WATCHDOG_MS = 110000;
+const VOICE_CLONE_FAILED_TEXT = "We couldn't create your voice. Please try again.";
+const VOICE_CLONE_READY_TEXT = '✓ Your AI voice is ready';
 const VOICE_CLONE_SHORT_TEXT = 'We need at least 1 minute of your voice to create your AI voice. Keep recording or choose a longer file.';
 
 let voiceCloneRecorder = null, voiceCloneStream = null,
@@ -391,6 +397,9 @@ let voiceCloneChecking = null;
 let voiceCloneTake = null;
 /* True while the sample is on its way to the provider. */
 let voiceCloneBusy = false;
+/* Where a busy clone is: 'uploading' (the sample is still going up) or
+   'cloning' (it has arrived and the server is making the voice). */
+let voiceClonePhase = null;
 /* The last Create that failed, kept so the card can say exactly what failed
    (request, status, code) and offer Try Again with the same take. Cleared by a
    new take or a success. { code, status, detail } */
@@ -516,7 +525,8 @@ async function renderVoiceClone(){
   const body = voiceCloneBodyEl();
   if (!body) return;
   if (voiceCloneBusy){
-    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions" role="status"><span class="voice-rec-dot"></span><span class="voice-rec-label">Creating your voice…</span></div>`;
+    const label = voiceClonePhase === 'uploading' ? 'Uploading your recording…' : 'Creating your voice…';
+    body.innerHTML = `${VOICE_CLONE_HEADER}<div class="voice-clone-actions" role="status"><span class="voice-rec-dot"></span><span class="voice-rec-label" data-vc="busy-label">${label}</span></div>`;
     return;
   }
   if (voiceCloneChecking){
@@ -1251,59 +1261,77 @@ async function voiceCloneToken(){
   return out && out.data && out.data.session && out.data.session.access_token;
 }
 
-/* The request itself. Always resolves: { ok:true } or { code }. */
-async function sendVoiceCloneSample(take){
+/* The request itself. Always resolves: { ok:true } or { code, status }.
+
+   XMLHttpRequest rather than fetch for one reason: it says when the upload has
+   finished, so the card can tell "still uploading" from "the server is making
+   the voice" — and the console can say which of the two a slow clone was stuck
+   in. It also always ends in exactly one of load / error / abort / timeout. */
+async function sendVoiceCloneSample(take, onPhase){
+  const t0 = Date.now();
+  const step = (...a) => console.log(`[voice-clone] +${Date.now() - t0}ms`, ...a);
+  step('clone request started');
   let token;
   try { token = await voiceCloneToken(); }
   catch(e){ console.error('[voice-clone] no session token:', e && (e.code || e.message)); }
   if (!token) return { code: 'not_signed_in' };
+  let consent;
+  try { consent = await voiceCloneWithin(VOICE_CLONE_AUTH_TIMEOUT_MS, voiceConsentStatement(), 'consent_timeout'); }
+  catch(e){ console.error('[voice-clone] consent sentence unavailable:', e && (e.code || e.message)); }
+  if (!consent) consent = VOICE_CONSENT_FALLBACK;
   /* multipart/form-data, the sample as a file with its real type and a name
      whose extension matches it. The browser sets the Content-Type (with the
      boundary) itself. */
   const fileName = voiceCloneUploadName(take);
+  const file = voiceCloneTypedBlob(take.blob, fileName);
   const form = new FormData();
-  form.append('sample', voiceCloneTypedBlob(take.blob, fileName), fileName);
-  const headers = {
-    Authorization: `Bearer ${token}`,
+  form.append('sample', file, fileName);
+  step('uploading sample', { bytes: file.size, type: file.type || '(none)', fileName, raw: !!take.raw,
+    seconds: +(take.seconds || 0).toFixed(1), replacing: voiceCloneReplacing });
+
+  return new Promise(resolve => {
+    const xhr = new XMLHttpRequest();
+    let settled = false;
+    const done = (out) => { if (!settled){ settled = true; resolve(out); } };
+    xhr.open('POST', `${API_BASE}/api/voice-clone`);
+    xhr.timeout = VOICE_CLONE_UPLOAD_TIMEOUT_MS;
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     // The confirmation travels with the sample, and the route checks it against
     // its own copy of the sentence before spending anything.
-    'X-Voice-Consent': await voiceConsentStatement(),
-  };
-  if (voiceCloneReplacing) headers['X-Voice-Replace'] = '1';
-  console.log('[voice-clone] sending sample', { bytes: take.blob.size, type: take.blob.type, fileName, raw: !!take.raw, seconds: +(take.seconds || 0).toFixed(1), replacing: voiceCloneReplacing });
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), VOICE_CLONE_UPLOAD_TIMEOUT_MS);
-  const started = Date.now();
-  try {
-    let res;
-    try { res = await fetch(`${API_BASE}/api/voice-clone`, { method: 'POST', headers, body: form, signal: abort.signal }); }
-    catch(e){
-      const code = e && e.name === 'AbortError' ? 'timeout' : 'network';
-      console.error('[voice-clone] request failed:', code, e && e.message, `after ${Date.now() - started}ms`);
-      return { code, status: 0 };
-    }
-    // Reading the body is covered by the same abort, so it cannot hang either.
-    const text = await res.text().catch(e => { console.error('[voice-clone] response unreadable:', e); return ''; });
-    let out = {};
-    try { out = JSON.parse(text); } catch(e){}
-    if (!res.ok){
-      console.error('[voice-clone] /api/voice-clone answered', res.status, text.slice(0, 400));
-      return { code: out.error || voiceCloneCodeForStatus(res.status), status: res.status };
-    }
-    if (!out.created && !out.reused){
-      console.error('[voice-clone] /api/voice-clone answered', res.status, 'without a voice:', text.slice(0, 400));
-      return { code: 'clone_failed', status: res.status };
-    }
-    console.log('[voice-clone] voice created', res.status, out, `in ${Date.now() - started}ms`);
-    return { ok: true };
-  } finally {
-    clearTimeout(timer);
-  }
+    xhr.setRequestHeader('X-Voice-Consent', consent);
+    if (voiceCloneReplacing) xhr.setRequestHeader('X-Voice-Replace', '1');
+    xhr.upload.onload = () => { step('upload finished — waiting for the voice'); onPhase('cloning'); };
+    xhr.onload = () => {
+      const text = xhr.responseText || '';
+      let out = {};
+      try { out = JSON.parse(text); } catch(e){}
+      step('response', xhr.status, text.slice(0, 400));
+      if (xhr.status < 200 || xhr.status >= 300){
+        console.error('[voice-clone] /api/voice-clone answered', xhr.status, out.error || text.slice(0, 200));
+        return done({ code: out.error || voiceCloneCodeForStatus(xhr.status), status: xhr.status });
+      }
+      if (!out.created && !out.reused){
+        console.error('[voice-clone] /api/voice-clone answered', xhr.status, 'without a voice');
+        return done({ code: 'clone_failed', status: xhr.status });
+      }
+      done({ ok: true, out });
+    };
+    xhr.onerror = () => { console.error('[voice-clone] request failed: network', `after ${Date.now() - t0}ms`); done({ code: 'network', status: 0 }); };
+    xhr.ontimeout = () => { console.error('[voice-clone] request failed: timeout', `after ${Date.now() - t0}ms`); done({ code: 'timeout', status: 0 }); };
+    xhr.onabort = () => done({ code: 'timeout', status: 0 });
+    xhr.onloadend = () => done({ code: 'network', status: xhr.status || 0 });   // never reached if one of the above answered
+    try { xhr.send(form); }
+    catch(e){ console.error('[voice-clone] request could not be sent:', e); done({ code: 'network', status: 0 }); }
+  });
 }
 
 /* One upload at a time: the flag is set before the first await and only cleared
    in finally, and the button is gone while it is set, so a second tap cannot
-   start a second clone. */
+   start a second clone.
+
+   Every way out of here lands on the success card or the error card:
+   idle → uploading → cloning → success, or … → error. The watchdog is the
+   backstop for anything that manages not to answer at all. */
 async function uploadVoiceClone(take){
   if (voiceCloneBusy) return;
   if (!sb || !currentUser){ sayVoiceClone('Sign in first.', 'err'); return; }
@@ -1312,15 +1340,24 @@ async function uploadVoiceClone(take){
     return;
   }
   voiceCloneBusy = true;
+  voiceClonePhase = 'uploading';
   sayVoiceClone('');
   renderVoiceClone();
+  const setPhase = (phase) => {
+    if (!voiceCloneBusy) return;
+    voiceClonePhase = phase;
+    const label = voiceClonePart('busy-label');
+    if (label) label.textContent = phase === 'uploading' ? 'Uploading your recording…' : 'Creating your voice…';
+  };
   let outcome;
-  try { outcome = await sendVoiceCloneSample(take); }
-  catch(e){
-    console.error('[voice-clone] clone failed unexpectedly:', e);
-    outcome = { code: 'clone_failed' };
+  try {
+    outcome = await voiceCloneWithin(VOICE_CLONE_WATCHDOG_MS, sendVoiceCloneSample(take, setPhase), 'timeout');
+  } catch(e){
+    console.error('[voice-clone] clone did not finish:', (e && (e.code || e.message)) || e);
+    outcome = { code: (e && e.code) || 'clone_failed' };
   } finally {
     voiceCloneBusy = false;
+    voiceClonePhase = null;
   }
 
   if (!outcome || !outcome.ok){
@@ -1329,16 +1366,20 @@ async function uploadVoiceClone(take){
        too: nothing about what they agreed to has changed. What failed is shown
        on the card, not only in the console. */
     voiceCloneFailure = { code: (outcome && outcome.code) || 'clone_failed', status: (outcome && outcome.status) || 0 };
-    renderVoiceClone();
-    sayVoiceClone(voiceCloneErrorText(voiceCloneFailure.code), 'err');
+    console.error('[voice-clone] failed:', voiceCloneFailureDetail(voiceCloneFailure));
+    try { await renderVoiceClone(); } catch(e){ console.error('[voice-clone] could not redraw the card:', e); }
+    sayVoiceClone(voiceCloneFailureText(voiceCloneFailure.code), 'err');
     return;
   }
+
+  /* The voice exists and is saved — say so now. Nothing after this line is
+     allowed to put the spinner back or hide the result: the catalogue is told
+     about the voice directly instead of being asked again first. */
   voiceCloneFailure = null;
   voiceCloneReplacing = false;
   voiceCloneConsented = false;
   discardVoiceCloneTake();
-  forgetVoiceCatalogue();          // the picker asks again, and finds the voice
-  try { await loadVoiceCatalogue(); } catch(e){ console.error('[voice-clone] catalogue reload failed:', e); }
+  if (typeof noteMyVoiceCreated === 'function') noteMyVoiceCreated((outcome.out && outcome.out.displayName) || 'My voice');
   if (voiceCloneHost.bodyId === 'builderVoiceCloneBody' && typeof onMyVoiceReady === 'function'){
     // Recorded from the builder: the panel closes and the voice they just made
     // is the voice selected, with Continue ready.
@@ -1346,8 +1387,18 @@ async function uploadVoiceClone(take){
     catch(e){ console.error('[voice-clone] could not select the new voice:', e); }
     return;
   }
-  await renderVoiceClone();
-  sayVoiceClone('Your voice is ready ✦', 'ok');
+  try { await renderVoiceClone(); } catch(e){ console.error('[voice-clone] could not redraw the card:', e); }
+  sayVoiceClone(VOICE_CLONE_READY_TEXT, 'ok');
+}
+
+/* The words for a failed clone. Something the person can fix before sending
+   (too short, the tick, signing in) says what to fix; anything that went wrong
+   making the voice says one plain thing, and the technical reason goes in the
+   Details line and the console. */
+const VOICE_CLONE_FIXABLE = new Set(['upgrade_required', 'consent_required', 'sample_empty', 'sample_silent', 'sample_too_short',
+  'sample_too_long', 'unsupported_format', 'sample_no_audio', 'not_signed_in']);
+function voiceCloneFailureText(code){
+  return VOICE_CLONE_FIXABLE.has(code) ? voiceCloneErrorText(code) : VOICE_CLONE_FAILED_TEXT;
 }
 
 /* One line, generated in the voice just made, so it can be heard working. */
