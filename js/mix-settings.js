@@ -4,6 +4,10 @@ let activeMixId = null, restoringMix = false, mixSaveTimer = null;
 let mixWriteQueue = Promise.resolve(), mixRevision = 0;
 let activeCoverPath = null;
 let pendingMixSave = null;
+/* True while the Adjust Sounds sheet is open: what is on it is a preview until
+   Save Changes writes every layer at once (js/audio-editor.js). */
+let mixAutosavePaused = false;
+const SOOTHING_VARIANTS = ['pad','chimes','hum'];
 /* The cover the player is wearing. A built-in ships with the app and needs no
    round trip; an upload needs a signed link, which expires, so it is fetched
    each time the player opens. The placeholder is what you press when there is
@@ -37,6 +41,8 @@ function readMixSettings(){
   // The ambience layered under the main one (a meditation sound under a nature
   // sound, or the other way round) travels with the mix, like the levels do.
   if (typeof state !== 'undefined' && state && state.bgLayer && state.bgLayer !== 'none') mix.bgLayer = state.bgLayer;
+  // So does the soothing pad, which had nowhere to be saved before.
+  if (typeof state !== 'undefined' && state && SOOTHING_VARIANTS.includes(state.soothingLayer)) mix.soothingLayer = state.soothingLayer;
   return mix;
 }
 function mixMessage(text){
@@ -63,6 +69,7 @@ function restoreMixSettings(id, settings){
 function queueMixSave(){
   if(restoringMix) return;
   syncListeningMix();
+  if(mixAutosavePaused){ if(typeof paintAudioEditor==='function') paintAudioEditor(); return; }
   if(!activeMixId){ mixMessage('Sound levels will be included when you save this subliminal.'); return; }
   pendingMixSave = {id:activeMixId,userId:currentUser && currentUser.id,mix:readMixSettings(),revision:++mixRevision};
   mixMessage('Saving sound levels…');

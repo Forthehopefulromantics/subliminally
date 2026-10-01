@@ -801,8 +801,11 @@
   /* The actions sit under the row rather than beside it. Three links squeezed
      in next to the title left about ten characters for the title, which wrapped
      "888 Personalized" onto two lines on a phone. */
-  .lib-actions{ display:flex; gap:16px; margin-top:9px; padding-top:9px;
+  .lib-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:9px; padding-top:9px;
     border-top:1px solid rgba(255,255,255,.06); }
+  /* The one action people come back for, so it is a button rather than a link. */
+  .profile-item .lib-actions .lib-adjust{ text-decoration:none; color:var(--candle); border:1px solid var(--candle);
+    border-radius:999px; padding:5px 12px; font-weight:600; }
 
   .profile-item-affs{ margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); display:flex; flex-direction:column; gap:5px; }
   .profile-item-affs p{ font-family:var(--serif); font-style:italic; font-size:13px; color:var(--haze); }
@@ -3209,7 +3212,9 @@
               <button class="mini-btn ghostbtn" id="rerecordBtn" onclick="rerecordVoice()" style="display:none;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>Re-record
               </button>
-              <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save to my library</button>
+              <button class="mini-btn ghostbtn" id="saveBtn" onclick="saveSubliminal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg><span id="saveBtnLabel">Save to my library</span></button>
+              <button class="mini-btn ghostbtn" id="saveAsNewBtn" onclick="saveSubliminal({ asNew: true })" style="display:none;">Save as new</button>
+              <button class="mini-btn ghostbtn" id="finalAdjustBtn" onclick="openAudioEditor(editingExistingId)" style="display:none;">Adjust Sounds</button>
               <button class="mini-btn ghostbtn" onclick="saveMixAdjustments()">Save adjustments</button>
               <button class="mini-btn ghostbtn" onclick="chooseListeningCover()">Choose cover photo</button>
             </div>
@@ -3669,8 +3674,8 @@
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20260926d"></script>
-<script src="js/billing.js?v=20260923c"></script>
+<script src="js/builder.js?v=20261001a"></script>
+<script src="js/billing.js?v=20261001a"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
@@ -3680,9 +3685,10 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20260923c"></script>
-<script src="js/profile.js?v=20260926e"></script>
-<script src="js/mix-settings.js?v=20260923c"></script>
-<script src="js/player.js?v=20260923c"></script>
+<script src="js/profile.js?v=20261001a"></script>
+<script src="js/mix-settings.js?v=20261001a"></script>
+<script src="js/player.js?v=20261001a"></script>
+<script src="js/audio-editor.js?v=20261001a"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>

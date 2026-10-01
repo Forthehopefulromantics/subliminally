@@ -120,3 +120,58 @@ body.player-open{ overflow:hidden; }
   .ip-affirmation.entering{ opacity:1; transform:translateY(-50%); }
   .ip-affirmation.departing,.ip-affirmation.leaving{ display:none; }
 }
+
+/* ---------- Adjust Sounds: a saved subliminal's layers, edited in place ----------
+   The same night sheet as the ambience picker, and the same candle-gold
+   selected treatment as .ps-chip.sel, so a chosen layer reads the way every
+   other chosen thing in the player does — with a check, never colour alone. */
+.ip-adjust{ width:100%; display:grid; grid-template-columns:38px 1fr; grid-template-rows:auto auto; column-gap:13px; align-items:center;
+  text-align:left; cursor:pointer; border:1px solid rgba(239,209,142,.42); border-radius:18px; padding:11px 14px;
+  color:#fff; background:linear-gradient(135deg,rgba(198,167,238,.18),rgba(239,208,141,.12)); font:inherit; }
+.ip-adjust[hidden]{ display:none; }
+.ip-adjust svg{ grid-row:1 / span 2; width:38px; height:38px; padding:9px; border-radius:13px; color:#f4d99b;
+  background:linear-gradient(145deg,rgba(196,150,240,.32),rgba(244,177,187,.18)); }
+.ip-adjust span{ font-size:14px; font-weight:600; color:#f6dcaa; }
+.ip-adjust small{ font-size:11px; color:#c5b6dd; }
+.audio-editor{ z-index:1350; }
+body.audio-editor-open #upgradeOverlay{ z-index:1400; }
+.ae-panel{ max-height:92dvh; }
+.ae-head-copy small{ display:block; color:#efd18e; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; }
+.ae-head-copy h3{ margin:2px 0 0; }
+.ae-body{ overflow-y:auto; padding:0 18px 18px; display:grid; gap:18px; }
+.ae-loading{ padding:28px 0; text-align:center; color:#c5b6dd; }
+.ae-intro{ margin:0; font-size:12.5px; line-height:1.5; color:#d6c8e6; border:1px solid rgba(185,167,232,.28);
+  border-radius:14px; padding:10px 12px; background:rgba(255,255,255,.03); }
+.ae-section h4{ margin:0; font-family:var(--serif); font-size:17px; font-weight:400; color:#fff8f1; }
+.ae-hint{ margin:3px 0 0; font-size:11.5px; color:#b9aacd; }
+.ae-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.ae-chip, .ae-card{ position:relative; border:1px solid rgba(255,255,255,.13); background:rgba(255,255,255,.035);
+  color:#ece2f7; font:inherit; cursor:pointer; transition:background .18s, border-color .18s; }
+.ae-chip{ border-radius:999px; padding:8px 14px; font-size:12px; }
+.ae-chip span{ margin-left:6px; font-size:10px; color:#b9aacd; }
+.ae-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; margin-top:10px; }
+.ae-card{ border-radius:15px; padding:11px 26px 11px 12px; text-align:left; min-height:52px; }
+.ae-card b{ display:block; font-size:13.5px; font-weight:500; }
+.ae-card small{ display:block; margin-top:2px; font-size:10.5px; color:#b9aacd; }
+.ae-chip.sel, .ae-card.sel{ color:#2d2148; border-color:#efd18e; background:#efd18e; box-shadow:0 0 0 2px rgba(239,209,142,.14); font-weight:600; }
+.ae-chip.sel span, .ae-card.sel small{ color:#5a4777; }
+.ae-card.sel::after{ content:'✓'; position:absolute; top:9px; right:10px; font-size:13px; color:#2d2148; }
+.ae-chip.sel::before{ content:'✓ '; }
+.ae-chip:focus-visible, .ae-card:focus-visible{ outline:2px solid #efd18e; outline-offset:2px; }
+.ae-family + .ae-family{ margin-top:12px; }
+.ae-family-label{ display:block; margin-top:10px; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:#ae9fc5; }
+.ae-mix{ margin-top:10px; }
+.ae-foot{ border-top:1px solid rgba(255,255,255,.08); padding:11px 18px max(14px,env(safe-area-inset-bottom)); display:grid; gap:9px;
+  background:linear-gradient(180deg,rgba(22,15,50,.6),#161032 40%); }
+.ae-status{ margin:0; min-height:16px; font-size:12px; color:#d6c8e6; }
+.ae-status.ok{ color:#f2d394; }
+.ae-status.err{ color:#f3a9bd; }
+.ae-actions, .ae-new-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:flex-end; }
+.ae-new-row[hidden]{ display:none; }
+.ae-new-row input{ flex:1 1 180px; min-width:0; border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:10px 12px;
+  color:#fff; background:rgba(0,0,0,.16); font:inherit; font-size:13px; }
+.ae-ghost{ border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:11px 15px; background:rgba(255,255,255,.04);
+  color:#ece2f7; font:inherit; font-size:12px; cursor:pointer; }
+.ae-preview{ margin-right:auto; }
+.ae-actions .ps-use:disabled{ opacity:.55; cursor:default; }
+@media (max-width:420px){ .ae-preview{ margin-right:0; flex:1 1 100%; } }

@@ -102,7 +102,8 @@ function mountImmersivePlayer(){
             </button>
             <span class="ip-track-text"><small>Your Subliminal</small><h2 id="ipTitle">Your Subliminal</h2></span>
           </div>
-          <button class="ip-ambience-card" onclick="openAmbienceLibrary()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
+          <button class="ip-ambience-card" onclick="openPlayerAmbience()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
+          <button class="ip-adjust" id="ipAdjustBtn" onclick="openAudioEditor(activeMixId)" hidden>${svgIcon('sound')}<span>Adjust Sounds</span><small>Brainwave · frequency · ambience · volumes</small></button>
           <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup()}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
           <div><div class="ip-progress-track"><div class="ip-progress-fill" id="ipProgress"></div></div><div class="ip-times"><span id="ipElapsed">0:00</span><span id="ipRemaining">−20:00</span></div></div>
           <div class="ip-controls">
@@ -141,8 +142,16 @@ function openImmersivePlayer(){
   document.body.classList.add('player-open');
   document.getElementById('ipTitle').textContent = currentPlayerTitle();
   showImmersiveAffirmation((document.getElementById('finalLine')||{}).textContent || (state.affirmations||[])[0] || 'Breathe in. Your session is beginning.');
+  const adjust = document.getElementById('ipAdjustBtn'); if (adjust) adjust.hidden = !activeMixId;
   refreshListeningCover(); syncListeningMix(); renderPlayerSelectionState(); updateImmersivePlayer();
   clearInterval(playerUiTimer); playerUiTimer = setInterval(updateImmersivePlayer,500);
+}
+/* On a saved subliminal, the ambience card opens Adjust Sounds, where every
+   layer is changed and saved together. Before the first save there is nothing
+   to save onto, so it keeps the quick picker. */
+function openPlayerAmbience(){
+  if (typeof activeMixId !== 'undefined' && activeMixId && typeof openAudioEditor === 'function') openAudioEditor(activeMixId);
+  else openAmbienceLibrary();
 }
 function closeImmersivePlayer(){
   const el=document.getElementById('immersivePlayer'); if(el){el.classList.remove('open');el.setAttribute('aria-hidden','true');}

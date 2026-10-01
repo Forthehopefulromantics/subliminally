@@ -2936,20 +2936,34 @@ function prepareFinal(){
   const titleMsg = document.getElementById('finalTitleMsg');
   titleMsg.textContent = '';
   titleInput.classList.remove('needs-title');
-  if (editingExistingId || contentAlreadySaved){
-    // Any change to something already saved has to be re-titled and saved as its own,
-    // new subliminal — so the field starts empty rather than inheriting the old title.
-    titleInput.value = '';
-    titleInput.placeholder = "You've changed this one — give it a new title to save it";
+  if (editingExistingId){
+    // A saved subliminal is edited in place: it keeps its title, and Save
+    // updates the same row. "Save as new" is the only way to make a copy.
+    titleInput.value = state.playerTitle || '';
+    titleInput.placeholder = 'Name this subliminal';
   } else {
     titleInput.value = '';
     titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
   }
+  paintFinalSaveButtons();
 
   /* The one place the session's voice is generated: as this screen opens, for a
      subliminal just built and for one loaded out of the library. Not per play, and
      not per minute of the length they chose. */
   prepareSessionVoice();
+}
+/* Which save the final screen offers: a fresh build saves to the library; a
+   saved one saves its changes in place, and can be copied on purpose. */
+function paintFinalSaveButtons(){
+  const editing = !!editingExistingId;
+  const save = document.getElementById('saveBtn');
+  const label = document.getElementById('saveBtnLabel');
+  if (label) label.textContent = editing ? 'Save changes' : 'Save to my library';
+  if (save) save.setAttribute('aria-label', editing ? 'Save changes to this subliminal' : 'Save to my library');
+  ['saveAsNewBtn','finalAdjustBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = editing ? 'inline-flex' : 'none';
+  });
 }
 /* Sends you back to the recording step to redo your voice on this subliminal.
    Existing recordings come along, so lines you don't touch stay exactly as they
@@ -3035,6 +3049,24 @@ function changeFinalFrequency(hzStr){
       finalToneLayer2.frequency.linearRampToValueAtTime(delta !== null ? match.hz + delta : match.hz * 1.003, now + 1.2);
     }
   }
+}
+
+/* The brainwave (binaural) layer, changed on a finished subliminal. Between two
+   bands the right-ear oscillator is retuned in place. Turning the beat on or
+   off changes the shape of the tone graph (two hard-panned oscillators versus
+   one centred pair), so a playing session restarts to pick it up — the voice
+   it restarts is the same audio already in hand, never regenerated. */
+function changeFinalBrainwave(prevBand){
+  if (!finalPlaying || !finalCtx || !finalTone) return;
+  const band = state.binauralBand && BINAURAL_BANDS[state.binauralBand] ? state.binauralBand : null;
+  const prev = prevBand && BINAURAL_BANDS[prevBand] ? prevBand : null;
+  if (band === prev) return;
+  if (band && prev && finalToneLayer2){
+    const baseHz = state.freq ? state.freq.hz : 528;
+    finalToneLayer2.frequency.linearRampToValueAtTime(baseHz + BINAURAL_BANDS[band].hz, finalCtx.currentTime + 1.2);
+    return;
+  }
+  restartListening();
 }
 
 /* The same idea for the ambience: a second picker on the finished subliminal,
@@ -3269,10 +3301,16 @@ async function pickSoothingLayer(btn){
     }
   }
 
-  state.soothingLayer = variant;
-  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
+  setSoothingLayer(variant);
   answered(btn);
-  document.getElementById('soothingMixRow').style.display = variant === 'none' ? 'none' : 'flex';
+}
+/* The answer, its chips, its fader row and the live pad, together — shared by
+   the builder step, a reopened subliminal and the Adjust Sounds sheet. */
+function setSoothingLayer(variant){
+  state.soothingLayer = variant && variant !== 'none' ? variant : 'none';
+  syncSelectionByData('#soothingChips .length-chip', 'variant', state.soothingLayer);
+  const row = document.getElementById('soothingMixRow');
+  if (row) row.style.display = state.soothingLayer === 'none' ? 'none' : 'flex';
   if (finalPlaying) restartSoothingLayer();
 }
 function restartSoothingLayer(){
