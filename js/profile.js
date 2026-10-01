@@ -153,8 +153,9 @@ async function loadMyLibrary(options){
         </div>
       </div>
       <div class="lib-actions">
+        <button class="lib-adjust" onclick="openAudioEditor('${s.id}')" aria-label="Adjust the sounds of ${titleVal || 'this subliminal'}">Adjust Sounds</button>
         <button onclick="pickCoverFor('${s.id}')">Cover</button>
-        <button onclick="loadSavedIntoBuilder('${s.id}')">Load &amp; adjust</button>
+        <button onclick="loadSavedIntoBuilder('${s.id}')">Open in builder</button>
         <button onclick="deleteMySubliminal('${s.id}')">Delete</button>
       </div>
     </div>`;
@@ -216,6 +217,11 @@ async function loadSavedIntoBuilder(id, opts){
   const savedLayer = s.mix_settings && s.mix_settings.bgLayer;
   state.bgLayer = savedLayer && typeof ambienceFamily === 'function' && ambienceFamily(savedLayer)
     && ambienceFamily(savedLayer) !== ambienceFamily(state.bg) ? savedLayer : 'none';
+  /* The soothing pad travels in mix_settings too. Missing means none, so an
+     older subliminal never inherits the pad of the one opened before it. */
+  const savedSoothing = s.mix_settings && s.mix_settings.soothingLayer;
+  setSoothingLayer(SOOTHING_VARIANTS.includes(savedSoothing) ? savedSoothing : 'none');
+  syncSelectionByData('#binauralChips .length-chip', 'band', s.binaural_band || 'none');
   state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
   const restoredMinutes = Math.min(480, Math.max(5, state.targetLengthMinutes));
   document.getElementById('sessionLengthSlider').value = restoredMinutes;
@@ -249,7 +255,8 @@ async function loadSavedIntoBuilder(id, opts){
         if (!res.ok) throw new Error('the audio file came back ' + res.status);
         const blob = await res.blob();
         if (!blob.size) throw new Error('the audio file is empty');
-        recordings.push({ url: URL.createObjectURL(blob), blob });
+        // `path` marks the take as already saved: saving again reuses it.
+        recordings.push({ url: URL.createObjectURL(blob), blob, path });
       } catch(e){
         recordings.push(null);
         recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');
@@ -282,6 +289,7 @@ async function loadSavedIntoBuilder(id, opts){
         const res = await fetch(signed.signedUrl);
         const blob = await res.blob();
         customTrackBlob = blob;
+        customTrackBlob.savedPath = s.custom_track_url;   // already in storage
         document.getElementById('customTrackName').textContent = 'Your uploaded track';
       } catch(e){ console.error('custom track reload failed:', e); }
     }
@@ -307,7 +315,7 @@ async function loadSavedIntoBuilder(id, opts){
       try {
         const res = await fetch(signed.signedUrl);
         const blob = await res.blob();
-        layerRecordings.push({ url: URL.createObjectURL(blob), blob });
+        layerRecordings.push({ url: URL.createObjectURL(blob), blob, path });
       } catch(e){ layerRecordings.push(null); }
     }
   }

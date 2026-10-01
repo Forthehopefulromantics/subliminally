@@ -602,20 +602,49 @@ async function getMySubscriberRow(){
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
 
-async function saveSubliminal(){
+/* Uploads whichever takes are new and keeps the storage path of every take
+   that was already saved, so saving a reopened subliminal never re-uploads —
+   let alone re-records — a voice that has not changed. */
+async function uploadVoiceTakes(takes, folder, label){
+  const paths = [];
+  let anyUploaded = false, anySaved = false;
+  for (let i = 0; i < takes.length; i++){
+    const take = takes[i];
+    if (!take || !take.blob){ paths.push(null); continue; }
+    if (take.path){ paths.push(take.path); anySaved = true; continue; }
+    const mime = take.blob.type || 'audio/webm';
+    const path = `${folder}/${i}.${extForMime(mime)}`;
+    const { error: upErr } = await sb.storage.from('recordings').upload(path, take.blob, { contentType: mime });
+    if (upErr){ console.error(label + ' upload failed for line', i, upErr); paths.push(null); continue; }
+    take.path = path; // store the storage path; we generate a signed URL when loading it back
+    paths.push(path);
+    anyUploaded = true;
+  }
+  return { paths, ok: anyUploaded || anySaved };
+}
+
+/* Saving. A fresh build is inserted. A subliminal that is already saved — just
+   saved, or reopened from the library — is UPDATED in place: same row, same
+   title unless it was changed here, same voice files. Only `{ asNew: true }`
+   (the "Save as new" button) makes a second row. */
+async function saveSubliminal(opts){
+  const asNew = !!(opts && opts.asNew);
+  const updatingId = asNew ? null : editingExistingId;
   const msg = document.getElementById('saveMsg');
   if (!currentUser){ openAuthModal(); return; }
   if (!sb){ msg.textContent = 'Accounts aren\'t connected yet.'; msg.className='save-msg err'; return; }
 
   const titleInput = document.getElementById('finalTitleInput');
   const titleMsg = document.getElementById('finalTitleMsg');
-  const title = titleInput.value.trim();
+  let title = titleInput.value.trim();
+  if (asNew && title && title === (state.playerTitle || '')) title = '';
   if (!title){
     titleInput.classList.add('needs-title');
-    titleMsg.textContent = editingExistingId
-      ? "Give this edited version its own title before saving — it'll be saved as a new subliminal."
+    titleMsg.textContent = asNew
+      ? 'Give the new copy its own title — the original keeps its name.'
       : 'Give it a title first.';
     titleMsg.className = 'length-msg err';
+    if (asNew) titleInput.value = '';
     titleInput.focus();
     return;
   }
@@ -636,16 +665,19 @@ async function saveSubliminal(){
     return;
   }
 
-  const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
-  const subCap = TIER_SUBLIMINAL_CAPS[myTier];
-  /* Being full only ever stops a *new* save. Everything already in the library
-     stays openable and playable — see renderLibraryPlanLimit, which says so on
-     the library page itself rather than leaving it to be discovered here. */
-  if ((count || 0) >= subCap){
-    msg.textContent = `You've saved ${count} subliminals — that's the room a ${myTier === 'none' ? 'free account has' : TIER_LABEL[myTier] + ' has'}. Everything here keeps playing; it's saving another that needs more space.`;
-    msg.className = 'save-msg err';
-    openUpgradeModal('library_space', { tier: myTier, trigger: 'save_library_full' });
-    return;
+  if (!updatingId){
+    const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+    const subCap = TIER_SUBLIMINAL_CAPS[myTier];
+    /* Being full only ever stops a *new* save. Everything already in the library
+       stays openable and playable — see renderLibraryPlanLimit, which says so on
+       the library page itself rather than leaving it to be discovered here.
+       Saving changes to one that is already saved is never blocked by this. */
+    if ((count || 0) >= subCap){
+      msg.textContent = `You've saved ${count} subliminals — that's the room a ${myTier === 'none' ? 'free account has' : TIER_LABEL[myTier] + ' has'}. Everything here keeps playing; it's saving another that needs more space.`;
+      msg.className = 'save-msg err';
+      openUpgradeModal('library_space', { tier: myTier, trigger: 'save_library_full' });
+      return;
+    }
   }
 
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
@@ -654,29 +686,21 @@ async function saveSubliminal(){
   let recordingUploadFailed = false;
   if (state.voiceMode === 'own' && recordings.some(r => r)){
     msg.textContent = 'Uploading your voice…'; msg.className = 'save-msg';
-    const folder = `${currentUser.id}/${Date.now()}`;
-    recordingUrls = [];
-    let anyUploaded = false;
-    for (let i = 0; i < recordings.length; i++){
-      if (!recordings[i] || !recordings[i].blob){ recordingUrls.push(null); continue; }
-      const mime = recordings[i].blob.type || 'audio/webm';
-      const path = `${folder}/${i}.${extForMime(mime)}`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, recordings[i].blob, { contentType: mime });
-      if (upErr){ console.error('recording upload failed for line', i, upErr); recordingUrls.push(null); continue; }
-      recordingUrls.push(path); // store the storage path; we generate a signed URL when loading it back
-      anyUploaded = true;
-    }
-    if (!anyUploaded) recordingUploadFailed = true;
+    const takes = await uploadVoiceTakes(recordings, `${currentUser.id}/${Date.now()}`, 'recording');
+    recordingUrls = takes.paths;
+    if (!takes.ok) recordingUploadFailed = true;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
   let customTrackStoragePath = null;
-  if (customTrackBlob){
+  if (customTrackBlob && customTrackBlob.savedPath){
+    customTrackStoragePath = customTrackBlob.savedPath;   // already in storage
+  } else if (customTrackBlob){
     msg.textContent = 'Uploading your track…'; msg.className = 'save-msg';
     const ext = (customTrackBlob.name || 'track.mp3').split('.').pop();
     const path = `${currentUser.id}/${Date.now()}.${ext}`;
     const { error: ctErr } = await sb.storage.from('custom-tracks').upload(path, customTrackBlob, { contentType: customTrackBlob.type || 'audio/mpeg' });
-    if (!ctErr) customTrackStoragePath = path;
+    if (!ctErr){ customTrackStoragePath = path; try { customTrackBlob.savedPath = path; } catch(e){} }
     else console.error('custom track upload failed:', ctErr);
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
@@ -685,23 +709,12 @@ async function saveSubliminal(){
   let layerRecordingUrls = null;
   if (layerVoiceEnabled && state.layerVoiceMode === 'own' && layerRecordings.some(r => r)){
     msg.textContent = 'Uploading your second voice layer…'; msg.className = 'save-msg';
-    const layerFolder = `${currentUser.id}/${Date.now()}-layer`;
-    layerRecordingUrls = [];
-    for (let i = 0; i < layerRecordings.length; i++){
-      if (!layerRecordings[i] || !layerRecordings[i].blob){ layerRecordingUrls.push(null); continue; }
-      const mime = layerRecordings[i].blob.type || 'audio/webm';
-      const path = `${layerFolder}/${i}.${extForMime(mime)}`;
-      const { error: upErr } = await sb.storage.from('recordings').upload(path, layerRecordings[i].blob, { contentType: mime });
-      if (upErr){ console.error('layer recording upload failed for line', i, upErr); layerRecordingUrls.push(null); continue; }
-      layerRecordingUrls.push(path);
-    }
+    layerRecordingUrls = (await uploadVoiceTakes(layerRecordings, `${currentUser.id}/${Date.now()}-layer`, 'layer recording')).paths;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
-  forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
-  const { data: savedSubliminal, error } = await sb.from('subliminals').insert({
+  const row = {
     mix_settings: readMixSettings(),
-    user_id: currentUser.id,
     title: title,
     frequency_hz: state.freq ? state.freq.hz : null,
     affirmations: state.affirmations,
@@ -719,10 +732,15 @@ async function saveSubliminal(){
     // Remember which voice built this one, so reopening it sounds the same.
     ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
     layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
-  }).select('id').single();
-  if (error){
+  };
+  forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
+  await flushMixSave();
+  const { data: savedSubliminal, error } = updatingId
+    ? await sb.from('subliminals').update(row).eq('id', updatingId).eq('user_id', currentUser.id).select('id').single()
+    : await sb.from('subliminals').insert({ ...row, user_id: currentUser.id, cover_path: activeCoverPath || null }).select('id').single();
+  if (error || !savedSubliminal){
     console.error('saveSubliminal error:', error);
-    msg.textContent = `Couldn't save: ${error.message}`;
+    msg.textContent = `Couldn't save: ${error ? error.message : 'nothing was updated.'}`;
     msg.className = 'save-msg err';
     return;
   }
@@ -730,13 +748,19 @@ async function saveSubliminal(){
     msg.textContent = 'Saved — but your voice recording failed to upload, so this one will replay with the AI voice. (If this keeps happening, the recordings storage bucket may not be set up yet.)';
     msg.className = 'save-msg err';
   } else {
-    msg.textContent = 'Saved to your library.'; msg.className = 'save-msg ok';
+    msg.textContent = updatingId ? 'Changes saved to this subliminal.'
+      : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
+      : 'Saved to your library.';
+    msg.className = 'save-msg ok';
   }
-  // This is now its own saved subliminal — if they keep tweaking and save again,
-  // treat it as a fresh save rather than an edit of the thing they just made.
+  /* From now on this screen is editing the row just written, so the next save
+     updates it instead of making another. */
+  const isFirstSave = !updatingId && !asNew;
   editingExistingId = savedSubliminal.id;
   activeMixId = savedSubliminal.id;
   contentAlreadySaved = true;
-  pickCoverFor(savedSubliminal.id);
+  state.playerTitle = title;
+  if (typeof paintFinalSaveButtons === 'function') paintFinalSaveButtons();
+  if (isFirstSave) pickCoverFor(savedSubliminal.id);
 }
 
