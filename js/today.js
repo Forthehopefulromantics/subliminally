@@ -54,7 +54,7 @@ async function rollOverDayIfNeeded(){
     renderTodayRitual();
     renderWeekStrip();
     renderTodayPage_Page();
-    applySky();              // yesterday's choice of sky expires with yesterday
+    applySky();              // re-check the sky against the clock
     renderHigherSelfCard();  // and what she says is read off the new day's list
   }
   if (document.getElementById('habitsPanel').style.display !== 'none') renderHabits();

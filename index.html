@@ -1245,6 +1245,15 @@
     background:radial-gradient(circle at 40% 36%, #FFF7D6, #F7D267 60%, #F0B44F);
     box-shadow:0 0 54px rgba(247,210,103,.55); opacity:calc(1 - var(--star)); transition:opacity .7s ease; }
   @media (prefers-reduced-motion:reduce){ .drift, .stars i{ animation:none !important; } }
+  /* When the clock turns day into night (or back) on an open page, everything
+     that reads the palette fades across with the sky instead of snapping. On
+     only for the moment of the change -- sky.js adds and removes the class --
+     so it never slows hover states or fights the cards' own transitions. */
+  @media (prefers-reduced-motion:no-preference){
+    html.sky-turning body, html.sky-turning body *, html.sky-turning body *::before, html.sky-turning body *::after{
+      transition:background-color .7s ease, background .7s ease, color .7s ease, border-color .7s ease,
+        box-shadow .7s ease, fill .7s ease, stroke .7s ease, opacity .7s ease, filter .7s ease !important; }
+  }
 
   /* ---- what the sky does to everything in front of it ----
      Retuning the palette tokens is what re-colours the whole app at once: every

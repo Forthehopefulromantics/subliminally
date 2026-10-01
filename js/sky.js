@@ -6,24 +6,41 @@
    see the ones loaded before it. Order matters — see index.html. */
 
 /* ---------- day and night ----------
-   The sky follows the clock on its own. Tapping the switch overrides it, but
-   only until tomorrow — otherwise one tap at lunchtime leaves you on a blue
-   sky at midnight with no obvious way back. */
+   The sky follows the device's own clock: day from 6:00 AM to 6:59 PM, night
+   from 7:00 PM to 5:59 AM. getHours() reads the browser's local timezone, so
+   the sky follows you when you travel rather than staying on Houston time.
+
+   Tapping the switch still overrides it, but only until the clock next crosses
+   a boundary -- otherwise one tap at lunchtime leaves you on a blue sky at
+   midnight with no obvious way back. An override saved by an older build (it
+   was keyed to the date, not to a boundary) is ignored and cleared, so nobody
+   stays stuck on the sky they picked last week. */
 const SKY_KEY = 'fthr_sky';
-function skyByClock(){ return new Date().getHours() >= 6 && new Date().getHours() < 18 ? 'day' : 'night'; }
+const DAY_STARTS = 6;     // 6:00 AM
+const NIGHT_STARTS = 19;  // 7:00 PM
+function skyAt(d){ const h = d.getHours(); return h >= DAY_STARTS && h < NIGHT_STARTS ? 'day' : 'night'; }
+function skyByClock(){ return skyAt(new Date()); }
+/* The next moment the clock changes the sky. Built with setHours so a DST
+   change in between lands on the right wall-clock time. */
+function nextSkyChange(from){
+  const d = new Date(from || Date.now());
+  const h = d.getHours();
+  if (h < DAY_STARTS) d.setHours(DAY_STARTS, 0, 0, 0);
+  else if (h < NIGHT_STARTS) d.setHours(NIGHT_STARTS, 0, 0, 0);
+  else { d.setDate(d.getDate() + 1); d.setHours(DAY_STARTS, 0, 0, 0); }
+  return d;
+}
 function skyOverride(){
   try {
     const raw = localStorage.getItem(SKY_KEY);
     if (!raw) return null;
     const o = JSON.parse(raw);
-    return (o && o.date === localDateStr() && (o.mode === 'day' || o.mode === 'night')) ? o.mode : null;
+    if (o && (o.mode === 'day' || o.mode === 'night') && typeof o.until === 'number' && Date.now() < o.until) return o.mode;
+    localStorage.removeItem(SKY_KEY);   // expired, or the old date-keyed shape
+    return null;
   } catch(e){ return null; }
 }
-/* Light by default. It used to follow the clock, which meant the app was dark
-   for most of the hours anyone opens it, and dark was never the decision — it
-   was just what 6pm did. The switch still works, and still lasts until
-   tomorrow. */
-function currentSky(){ return skyOverride() || 'day'; }
+function currentSky(){ return skyOverride() || skyByClock(); }
 
 const SUN_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
 const MOON_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8z"/></svg>';
@@ -72,9 +89,19 @@ function buildSky(){
 }
 
 /* Paint the sky and label the switch with where it would take you, not where
-   you already are. */
+   you already are. When the sky actually changes on a page that is already
+   showing, everything fades across together rather than snapping. */
+let paintedSky = null;
+let skyFadeTimer = null;
 function applySky(){
   const mode = currentSky();
+  const changed = paintedSky !== null && paintedSky !== mode;
+  if (changed){
+    document.documentElement.classList.add('sky-turning');
+    clearTimeout(skyFadeTimer);
+    skyFadeTimer = setTimeout(() => document.documentElement.classList.remove('sky-turning'), 900);
+  }
+  paintedSky = mode;
   document.body.setAttribute('data-sky', mode);
   buildSky();
   const btn = document.getElementById('skyToggle');
@@ -86,19 +113,36 @@ function applySky(){
   }
   const card = document.getElementById('higherSelfCard');
   if (card) card.dataset.sky = mode;
+  scheduleSkyChange();
 }
+
+/* Wake exactly at the next boundary, so 6:59 PM turns into night at 7:00 PM
+   rather than up to a minute later. The minute check in today.js and the
+   visibility check below cover a laptop that slept through the boundary or a
+   timezone that changed underneath us. */
+let skyChangeTimer = null;
+function scheduleSkyChange(){
+  clearTimeout(skyChangeTimer);
+  const wait = nextSkyChange().getTime() - Date.now() + 500;
+  // Browsers clamp very long timeouts; the minute check picks up the rest.
+  skyChangeTimer = setTimeout(applySky, Math.min(Math.max(wait, 1000), 6 * 3600 * 1000));
+}
+
 // The sky belongs to every page, so it goes up as soon as the document does
-// rather than waiting for anyone to sign in.
+// rather than waiting for anyone to sign in. This script loads at the end of
+// <body>, so the body is already there: paint now, before first render, so the
+// page never flashes the wrong sky, then again once the rest is parsed.
+if (document.body) applySky();
 document.addEventListener('DOMContentLoaded', applySky);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) applySky(); });
 
 function toggleSky(){
   const next = currentSky() === 'day' ? 'night' : 'day';
   // Matching the clock again is the same as having no choice stored, so the
   // sky goes back to following it by itself.
   try {
-    if (next === 'day') localStorage.removeItem(SKY_KEY);   // 'day' is the default, so it needs nothing stored
-    else localStorage.setItem(SKY_KEY, JSON.stringify({ mode: next, date: localDateStr() }));
+    if (next === skyByClock()) localStorage.removeItem(SKY_KEY);
+    else localStorage.setItem(SKY_KEY, JSON.stringify({ mode: next, until: nextSkyChange().getTime() }));
   } catch(e){}
   applySky();
 }
-
