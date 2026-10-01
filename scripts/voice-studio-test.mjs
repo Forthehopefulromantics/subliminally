@@ -23,6 +23,8 @@ const SERENITY = 'PrH4gjaYIM8R16R889Vf'; // the one AI voice on offer — lib/vo
 const SARAH = 'EXAVITQu4vr4xnSDxMaL';   // retired, still resolvable — LEGACY_PRESET_VOICES
 let MY_CLONE = 'voice_clone_of_kyla';
 let clonesMade = 0;
+// The clones that exist at the provider, as its voice list would show them.
+let providerVoices = [];
 
 let fails = 0;
 function check(label, got, want){
@@ -50,6 +52,7 @@ function reset(){
   db.clonedVoiceId = null;
   db.clips = []; db.generations = []; db.objects = new Map();
   elevenCalls = []; nextElevenResponse = null; failProfileSave = false;
+  providerVoices = [];
 }
 
 function reply(body, opts){
@@ -175,7 +178,18 @@ globalThis.fetch = async (url, opts) => {
     if (u.includes('/voices/add')){
       // A new clone is a new voice at the provider, never the same id back.
       MY_CLONE = `voice_clone_of_kyla_${++clonesMade}`;
+      providerVoices.push({ voice_id: MY_CLONE, name: o.body.get('name'), category: 'cloned',
+                            created_at_unix: Math.floor(Date.now() / 1000) + clonesMade });
       return reply({ voice_id: MY_CLONE });
+    }
+    if (method === 'GET' && /\/v[12]\/voices(\?|$)/.test(u)){
+      const search = new URL(u).searchParams.get('search');
+      return reply({ voices: providerVoices.filter(v => !search || v.name.includes(search)) });
+    }
+    if (method === 'DELETE' && u.includes('/voices/')){
+      const id = decodeURIComponent(u.split('/voices/')[1]);
+      providerVoices = providerVoices.filter(v => v.voice_id !== id);
+      return reply({ ok: true });
     }
     if (u.includes('/voices/')) return reply({ ok: true });
   }
@@ -466,8 +480,46 @@ reset();
 failProfileSave = true;
 r = await callClone({ consent: CONSENT });
 check('a voice that cannot be saved to the account is reported', [r.code, r.body.error], [500, 'save_failed']);
-check('  ...and removed at the provider rather than left orphaned',
-  elevenCalls.some(c => c.method === 'DELETE' && c.url.endsWith('/voices/' + MY_CLONE)), true);
+check('  ...one voice was cloned for it', elevenCalls.filter(c => c.url.includes('/voices/add')).length, 1);
+check('  ...and the voice is kept at the provider so Try Again can recover it',
+  elevenCalls.some(c => c.method === 'DELETE' && c.url.endsWith('/voices/' + MY_CLONE)), false);
+
+/* Try Again after that: the clone ElevenLabs already made is found and saved.
+   No second voice is created. */
+{
+  const unsaved = MY_CLONE;
+  failProfileSave = false;
+  elevenCalls = [];
+  r = await callClone({ consent: CONSENT });
+  check('Try Again after a failed save succeeds', [r.code, r.body.created, r.body.recovered], [200, true, true]);
+  check('  ...without creating another voice at ElevenLabs', elevenCalls.filter(c => c.url.includes('/voices/add')).length, 0);
+  check('  ...saving the voice the first attempt made', db.voiceProfile && db.voiceProfile.provider_voice_id, unsaved);
+  check('  ...and mirrored onto the profile', db.clonedVoiceId, unsaved);
+  check('  ...leaving exactly one voice at the provider', providerVoices.map(v => v.voice_id), [unsaved]);
+}
+
+/* Several strays from earlier attempts: the newest is used, the rest removed. */
+reset();
+providerVoices = [
+  { voice_id: 'stray_old', name: 'subliminally-user-abc', category: 'cloned', created_at_unix: 100 },
+  { voice_id: 'stray_new', name: 'subliminally-user-abc', category: 'cloned', created_at_unix: 200 },
+  { voice_id: 'someone_else', name: 'subliminally-user-xyz', category: 'cloned', created_at_unix: 300 },
+];
+r = await callClone({ consent: CONSENT });
+check('duplicates from earlier attempts: the newest is recovered', [r.code, db.voiceProfile && db.voiceProfile.provider_voice_id], [200, 'stray_new']);
+check('  ...the other duplicate is removed, nobody else\'s voice is touched', providerVoices.map(v => v.voice_id).sort(), ['someone_else', 'stray_new']);
+check('  ...and nothing new was cloned', elevenCalls.filter(c => c.url.includes('/voices/add')).length, 0);
+
+/* If the voice list can't be read, cloning still goes ahead. */
+reset();
+{
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, o) => (String(url).includes('api.elevenlabs.io') && (!o || !o.method || o.method === 'GET'))
+    ? reply('down', { status: 503 }) : realFetch(url, o);
+  r = await callClone({ consent: CONSENT });
+  globalThis.fetch = realFetch;
+  check('an unreadable voice list does not block a clone', [r.code, r.body.created, r.body.recovered], [200, true, false]);
+}
 
 /* The minute is checked on the audio the server received, not on the page's
    timer — and nothing short, silent or unreadable reaches the provider. */
