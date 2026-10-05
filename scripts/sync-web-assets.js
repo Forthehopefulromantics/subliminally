@@ -29,7 +29,7 @@ const FILES_TO_COPY = [
 // the website ships it: it is the copy that plays when the ambience_tracks
 // lookup has not come back yet, and the one that plays on a phone with no
 // signal. Roughly 1.5 MB for the five of them.
-const DIRS_TO_COPY = ['img', 'js', 'audio'];
+const DIRS_TO_COPY = ['img', 'js', 'css', 'audio'];
 
 fs.mkdirSync(WWW, { recursive: true });
 

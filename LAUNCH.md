@@ -26,6 +26,41 @@ delete a cloned voice when an account goes. It is never sent to the browser —
 `isConfigured()` returns a boolean and nothing more. If it is ever unset the
 routes reply 503 and the app falls back to the device voice, exactly as before.
 
+### Visualization — built, waiting on one migration
+
+A conversation-led "future memory": a few questions, one scene written by the
+model, edited by the person, narrated once by Serenity, kept. It lives in its own
+files (`js/visualize.js`, `js/visualize-player.js`, `css/visualize.css`,
+`api/visualization.js`, `lib/visualization/`) and shares nothing with the
+subliminal builder except the audio output helper and the ambience bed.
+
+1. **Run `supabase/migrations/20261005_visualizations.sql`.** It creates
+   `visualizations`, `visualization_narrations` (the ledger the daily limit is
+   read off), `visualization_settings`, and the private `visualization-audio`
+   bucket. Until it is run the page opens but cannot save anything.
+2. **The daily limit is data, not code.** `daily_visualization_narration_limit`
+   in `visualization_settings` (seeded to `1`). Change it with
+   `update visualization_settings set value = '2'::jsonb where key = 'daily_visualization_narration_limit';`
+   — no deploy. `0` closes narration for everyone. If the row is absent the server
+   uses `VISUALIZATION_DAILY_NARRATION_LIMIT`, then 1. Only a *finished* narration
+   counts; a failed one does not. "Today" is the person's own day (their browser's
+   timezone).
+3. **Serenity narration is a Ritual feature**, like every studio voice: the check
+   is in `lib/visualization/narrate.js`, before anything is sent to ElevenLabs.
+   Writing and editing stories is open to any signed-in account.
+4. Uses `ANTHROPIC_API_KEY` and `ELEVENLABS_API_KEY` (already set). Optional:
+   `VISUALIZATION_MODEL` (default `claude-sonnet-4-6`, what the other writers use)
+   and `VISUALIZATION_TTS_MODEL` (default `eleven_multilingual_v2`, chosen for
+   expressive long-form reading; it costs about twice `eleven_turbo_v2_5` per
+   character, so a 5-minute narration is roughly 4,000 characters — that is the
+   number to price against).
+5. One route, `api/visualization.js`, serves every action (question, write,
+   revise, narrate, usage, delete) so the project stays under Vercel's function
+   limit; narration needs `maxDuration` of 120 s, set in the file.
+
+Tests: `npm run test:visualization` (server, no network) and, with the repo served
+on :8123, `npm run test:visualization-e2e` (iPhone-sized Chromium).
+
 ### The V1 voice picker
 
 Three cards, and only three:
@@ -236,6 +271,7 @@ Run in order in the Supabase SQL editor. All are safe to re-run.
 | `20261001_habit_onboarding.sql` | already in the database — applied directly on 2026-09-19, not from this folder |
 | `20261002_drop_unused_habit_counters.sql` | run 2026-09-20 |
 | `20261003_elevenlabs_voices.sql` | run 2026-09-21 — before `ELEVENLABS_API_KEY` was set, as it had to be |
+| `20261005_visualizations.sql` | **not run yet** — see Visualization above |
 
 This table stopped being updated after `20260921`; the ones between it and
 `20260929` are in the database (their columns and tables are there). `20260929`

@@ -83,6 +83,7 @@ if (sb){
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
     if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
     if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
+    if (currentUser && location.hash === '#visualize'){ document.body.setAttribute('data-view','visualize'); renderVisualizeState(); }
     // Reopened on #sanctuary: set the view before rendering, so the stage is
     // measured while it is on screen rather than while it is still display:none.
     if (currentUser && location.hash === '#sanctuary' && SANCTUARY_ENABLED){ document.body.setAttribute('data-view','sanctuary'); renderSanctuaryHome(); }

@@ -1171,13 +1171,14 @@ function renderAccountArea(){
   }
   renderNavLinks();
   // Logging out from Today would leave you staring at a hidden page.
-  if (!currentUser && document.body.getAttribute('data-view') === 'today') showMarketingHome();
+  if (!currentUser && ['today', 'visualize'].includes(document.body.getAttribute('data-view'))) showMarketingHome();
   renderJournalState();
   renderRitualsState();
   renderProfileState();
   renderMyLibraryState();
   applyPricingVisibility();
   if (document.body.getAttribute('data-view') === 'today') renderTodayPage();
+  if (document.body.getAttribute('data-view') === 'visualize' && typeof renderVisualizeState === 'function') renderVisualizeState();
 }
 /* Two different navs for two different people. A member gets the four places
    the practice lives; a visitor gets the marketing set. Pricing and the
@@ -1190,6 +1191,7 @@ function renderNavLinks(){
         ['Rituals', 'showRitualsPage()'],
         ['Journal', 'showJournalPage()'],
         ['Subliminals', 'showLibraryPage()'],
+        ['Visualize', 'showVisualizePage()'],
       ]
     : [
         ['Build yours', 'showBuildPage()'],

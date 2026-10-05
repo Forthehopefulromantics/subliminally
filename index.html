@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="/css/player.css" />
 <link rel="stylesheet" href="/css/listening-fixes.css?v=20260923d" />
 <link rel="stylesheet" href="/css/builder-celestial.css?v=20260923e" />
+<link rel="stylesheet" href="/css/visualize.css?v=20261005a" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
 <meta property="og:type" content="website" />
@@ -552,6 +553,7 @@
   body[data-view="library"] > nav ~ section:not(#library),
   body[data-view="journal"] > nav ~ section:not(#journal),
   body[data-view="rituals"] > nav ~ section:not(#rituals),
+  body[data-view="visualize"] > nav ~ section:not(#visualize),
   body[data-view="today"] > nav ~ section:not(#today),
   body[data-view="sanctuary"] > nav ~ section:not(#sanctuary),
   /* The builder is its own page now, so it's not part of the scroll down the
@@ -563,6 +565,7 @@
   body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
   body[data-view="rituals"] > footer,
+  body[data-view="visualize"] > footer,
   body[data-view="today"] > footer,
   body[data-view="sanctuary"] > footer,
   body[data-view="build"] > footer,
@@ -573,6 +576,7 @@
   body:not([data-view="library"]) #library{ display:none !important; }
   body:not([data-view="journal"]) #journal{ display:none !important; }
   body:not([data-view="rituals"]) #rituals{ display:none !important; }
+  body:not([data-view="visualize"]) #visualize{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
 
   /* ---- the Sanctuary ----
@@ -2641,6 +2645,7 @@
       <button onclick="showJournalPage()">Journal</button>
       <button onclick="showRitualsPage()">Rituals</button>
       <button onclick="showLibraryPage()">Subliminals</button>
+      <button onclick="showVisualizePage()">Visualize</button>
       <button onclick="showReprogramPage()">The Science</button>
       <button onclick="showProfilePage()">Profile</button>
     </div>
@@ -3416,6 +3421,16 @@
   </div>
 </section>
 
+<!-- Visualization. Everything inside #vizRoot is drawn by js/visualize.js; the
+     sky, cards and type come from the same tokens as every other page, so it
+     follows the app's Day/Night theme without any rules of its own. -->
+<section class="journal-section viz-section" id="visualize">
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
+    <div class="viz-root" id="vizRoot"></div>
+  </div>
+</section>
+
 <section class="profile-section" id="profile">
   <div class="wrap page-head">
     <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
@@ -3711,6 +3726,8 @@
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>
 <script src="js/sanctuary.js"></script>
+<script src="js/visualize.js?v=20261005a"></script>
+<script src="js/visualize-player.js?v=20261005a"></script>
 <script src="js/boot.js"></script>
 </body>
 </html>
