@@ -1458,7 +1458,13 @@
   .sess-art{ position:relative; width:100%; aspect-ratio:1; border-radius:13px;
     background:var(--dusk); background-size:cover; background-position:center;
     display:grid; place-items:center; border:2px solid transparent; }
-  .sess-card.sel .sess-art{ border-color:var(--candle); }
+  /* Selected is a soft candle glow round the cover and the gold title -- no
+     frame. The 2px border is always there and only ever changes colour, and the
+     glow is a shadow, so choosing a card never moves or resizes anything. */
+  .sess-art{ transition:box-shadow .25s ease, border-color .25s ease; }
+  .sess-card.sel .sess-art{ border-color:rgba(227,190,127,.55);
+    box-shadow:0 0 0 1px rgba(227,190,127,.10), 0 0 18px rgba(227,190,127,.28); }
+  .sess-card, .sess-card:focus{ outline:none; -webkit-tap-highlight-color:transparent; }
   .sess-play{ width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
     background:rgba(12,9,26,.55); color:#FFF7EE; font-size:11px; backdrop-filter:blur(2px); }
   /* A cover you haven't chosen yet was a slab of night-blue grey in the middle
@@ -1466,7 +1472,8 @@
      is warm and the disc is the same orange as everything else you can press. */
   body[data-sky="day"] .sess-art{
     background-color:#F6EADC; box-shadow:inset 0 0 0 1px rgba(62,42,72,.07); }
-  body[data-sky="day"] .sess-card.sel .sess-art{ border-color:#C0552B; }
+  body[data-sky="day"] .sess-card.sel .sess-art{ border-color:rgba(192,85,43,.6);
+    box-shadow:0 0 0 1px rgba(192,85,43,.08), 0 0 16px rgba(192,85,43,.22); }
   body[data-sky="day"] .sess-play{ background:rgba(255,253,248,.82); color:#C0552B;
     box-shadow:0 2px 8px rgba(84,64,120,.18); }
   body[data-sky="day"] .sess-len{ color:#6B6190; }
@@ -2246,7 +2253,7 @@
 
   .voice-card.sel, .freq-card3.sel, .bg-card.sel, .chip.sel,
   .ob-chip.sel, .ho-card.sel, .ho-time.sel, .ask-chip.sel,
-  .layer-voice-options button.sel, .sess-card.sel{
+  .layer-voice-options button.sel{
     box-shadow:inset 0 0 0 1px currentColor, 0 0 0 1px rgba(255,255,255,.04);
     font-weight:600;
   }
@@ -2286,7 +2293,7 @@
   .chip:focus-visible, .length-chip:focus-visible,
   .ob-chip:focus-visible, .ho-card:focus-visible, .ho-time:focus-visible,
   .ask-chip:focus-visible, .layer-voice-options button:focus-visible,
-  .sess-card:focus-visible, .avatar-opt:focus-visible, .av-opt:focus-visible{
+  .avatar-opt:focus-visible, .av-opt:focus-visible{
     outline:2px solid var(--candle);
     outline-offset:2px;
   }

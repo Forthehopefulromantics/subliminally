@@ -157,7 +157,13 @@ function renderTodaySession(lastSub){
       <button class="btn btn-primary" onclick="showBuildPage()">Start</button>`;
     return;
   }
-  if (!todaySubChosen) todaySubChosen = (lastSub && lastSub.id) || todaySubs[0].id;
+  /* What is shown as chosen is what Play it will play. If one of these is the
+     session already playing -- started from here or from the library -- that
+     is the chosen one, so the two can never disagree. */
+  if (finalPlaying && libraryNowPlayingId && todaySubs.some(s => s.id === libraryNowPlayingId))
+    todaySubChosen = libraryNowPlayingId;
+  if (!todaySubChosen || !todaySubs.some(s => s.id === todaySubChosen))
+    todaySubChosen = (lastSub && lastSub.id) || todaySubs[0].id;
 
   card.innerHTML = `
     <div class="today-card-label">${evening ? 'Tonight' : 'Today'}</div>
@@ -166,7 +172,7 @@ function renderTodaySession(lastSub){
       ${todaySubs.map(s => {
         const mins = Math.round((s.duration_seconds || 0) / 60);
         const on = s.id === todaySubChosen;
-        const playing = finalPlaying && libraryNowPlayingId === s.id;
+        const playing = finalPlaying && !finalPaused && libraryNowPlayingId === s.id;
         return `<button type="button" class="sess-card${on ? ' sel' : ''}" role="radio"
             aria-checked="${on}" onclick="chooseTodaySub('${s.id}')">
           <span class="sess-art" id="sessArt-${s.id}">
@@ -179,8 +185,8 @@ function renderTodaySession(lastSub){
     </div>
     <div class="sess-actions">
       <button class="btn btn-primary" onclick="playTodaySubliminal()">
-        <span class="sess-btn-mark" aria-hidden="true">${finalPlaying && !finalPaused ? PAUSE_MARK : PLAY_MARK}</span>
-        ${finalPlaying ? (finalPaused ? 'Resume' : 'Pause') : 'Play it'}</button>
+        <span class="sess-btn-mark" aria-hidden="true">${todayChosenIsPlaying() && !finalPaused ? PAUSE_MARK : PLAY_MARK}</span>
+        ${todayChosenIsPlaying() ? (finalPaused ? 'Resume' : 'Pause') : 'Play it'}</button>
       <button class="btn btn-ghost" onclick="resetFlow(); showBuildPage(); showStep(0);">
         <span class="sess-btn-mark" aria-hidden="true">${PLUS_MARK}</span>Build a new one</button>
       <button class="btn btn-ghost" onclick="showLibraryPage(); setLibraryTab('mine');">
@@ -399,29 +405,45 @@ async function showTodaySubCover(id, path){
   host.classList.add('has-art');
 }
 
+/* A tap on a cover is the choice and the play together. Choosing one and then
+   having to find a second button to hear it was two steps for one intention,
+   and the card already carries the play mark. A tap on the one already playing
+   pauses or resumes it, the same as the button below does. */
 function chooseTodaySub(id){
   todaySubChosen = id;
-  renderTodaySession(null);
+  playTodaySubliminal();
 }
 
-/* Play whichever is chosen, without leaving Today. The tick comes from
-   light_ledger like every other quest — playing it is what checks it off, and
-   awardLight already refuses to pay twice in a day. */
-function playTodaySubliminal(){
+/* Is the session the player is running the one this card has chosen? Only then
+   is the button a pause; otherwise it is the way to switch to the chosen one. */
+function todayChosenIsPlaying(){
+  return finalPlaying && libraryNowPlayingId && libraryNowPlayingId === todaySubChosen;
+}
+
+/* Play whichever is chosen. The tick comes from light_ledger like every other
+   quest — playing it is what checks it off, and awardLight already refuses to
+   pay twice in a day. It plays the saved subliminal as it was saved: its
+   recordings, voice, sounds, frequency, levels, length and cover, loaded by
+   playFromLibrary, which also stops whatever was playing first, so only one
+   session ever sounds at a time. */
+async function playTodaySubliminal(){
   /* Pause, not stop. Everywhere else in the app the second press on a playing
      session pauses it and keeps your place; this card used to be the one
-     button that threw the session away. */
-  if (finalPlaying){ toggleImmersivePlayback(); renderTodaySession(null); renderTodayJourney(); return; }
+     button that threw the session away. Only for the chosen one, though --
+     pressing Play it with a different card chosen used to pause whatever was
+     on instead of playing the card it was pointing at. */
+  if (todayChosenIsPlaying()){ toggleImmersivePlayback(); renderTodaySession(null); renderTodayJourney(); return; }
   if (typeof primeAudio === 'function') primeAudio();   // inside the tap
   const id = todaySubChosen || (todaySubs[0] && todaySubs[0].id);
   if (!id){ showBuildPage(); return; }
+  todaySubChosen = id;
+  renderTodaySession(null);
   /* Loading a saved subliminal takes a moment, and a button that looks
      unchanged for that moment reads as a button that did nothing. */
   const card = document.getElementById('todaySessionCard');
   const btn = card && card.querySelector('.btn-primary');
   if (btn){ btn.textContent = 'Starting…'; btn.disabled = true; }
-  if (typeof playFromLibrary === 'function'){
-    playFromLibrary(id);
-    setTimeout(() => { renderTodaySession(null); renderTodayJourney(); }, 900);
-  } else showBuildPage();
+  if (typeof playFromLibrary !== 'function'){ showBuildPage(); return; }
+  try { await playFromLibrary(id); }
+  finally { renderTodaySession(null); renderTodayJourney(); }
 }

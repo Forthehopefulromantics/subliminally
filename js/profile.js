@@ -1536,20 +1536,37 @@ async function playFromLibrary(id){
   if (btn) btn.classList.add('is-loading');
   if (now) now.textContent = 'Loading…';
 
+  /* One load at a time, and only the last one asked for plays. Two quick taps
+     on two different covers used to run two loads into the same player state at
+     once -- the second one's recordings could land under the first one's title,
+     and whichever finished last started, which was not always the one you
+     tapped last. */
+  const ticket = ++libraryPlayTicket;
+  const previous = libraryLoading;
+  let release;
+  libraryLoading = new Promise(r => { release = r; });
   try {
-    await loadSavedIntoBuilder(id, { stayHere: true });
-  } catch (e){
-    if (now) now.textContent = 'Could not load this one.';
+    await previous;
+    if (ticket !== libraryPlayTicket){ if (btn) btn.classList.remove('is-loading'); return; }
+    try {
+      await loadSavedIntoBuilder(id, { stayHere: true });
+    } catch (e){
+      if (now) now.textContent = 'Could not load this one.';
+      if (btn) btn.classList.remove('is-loading');
+      if (ticket === libraryPlayTicket) libraryNowPlayingId = null;
+      return;
+    }
     if (btn) btn.classList.remove('is-loading');
-    libraryNowPlayingId = null;
-    return;
-  }
-  if (btn) btn.classList.remove('is-loading');
-  playFinal();
-  reflectLibraryPlaying();
+    if (ticket !== libraryPlayTicket) return;
+    if (finalPlaying) stopFinal();
+    playFinal();
+    reflectLibraryPlaying();
+  } finally { release(); }
 }
 
 let libraryNowPlayingId = null;
+let libraryPlayTicket = 0;
+let libraryLoading = Promise.resolve();
 
 /* The card shows what the player is doing, so you do not have to go and look.
    Driven off finalPlaying rather than a second copy of the state. */
