@@ -781,6 +781,7 @@ async function runGenerateAffirmations(){
    before anything is sent, so a double tap or a re-entrant call is a no-op. */
 let affBusy = false;
 let affEpoch = 0;                // bumped by resetFlow so a late answer cannot land in a new build
+let affLastError = null;         // {code, error} when the server said why (sign in / daily limit)
 let affRejected = [];            // lines thrown away this build, so they are not written again
 const STALE_AFF_REQUEST = Symbol('stale');
 
@@ -794,13 +795,15 @@ function currentAffirmationLines(){
 async function requestAffirmations(mode, extra){
   if (affBusy) return STALE_AFF_REQUEST;
   affBusy = true;
+  affLastError = null;
   const epoch = affEpoch;
   setAffirmationControlsBusy(true);
   try{
     const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "";
+    const token = (typeof sb !== 'undefined' && sb) ? (await sb.auth.getSession()).data.session?.access_token : null;
     const response = await fetch(API_BASE + "/api/generate-affirmations", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({
         mode, goal: state.goal, category: affirmationCategoryLabel(), toneLabel,
         intensity: state.intensity, rejected: affRejected.slice(-20),
@@ -809,7 +812,13 @@ async function requestAffirmations(mode, extra){
       })
     });
     if (epoch !== affEpoch) return STALE_AFF_REQUEST;
-    if (!response.ok) return null;
+    if (!response.ok){
+      /* Sign-in and the daily limit are answers, not outages: say which. */
+      const why = await response.json().catch(() => ({}));
+      affLastError = why && why.code ? why : null;
+      if (affLastError && affLastError.code === 'auth' && typeof openAuthModal === 'function') openAuthModal('signup');
+      return null;
+    }
     const data = await response.json();
     if (epoch !== affEpoch) return STALE_AFF_REQUEST;
     const list = Array.isArray(data.affirmations) ? data.affirmations.filter(a => typeof a === 'string' && a.trim()) : [];
@@ -839,7 +848,9 @@ function setAffirmationLoadingError(retry){
   dots.style.display = retry ? 'none' : '';
   err.style.display = retry ? 'block' : 'none';
   document.getElementById('loadingTitle').textContent = retry ? "That didn't come through" : 'Writing your affirmations…';
-  document.getElementById('loadingSub').textContent = retry ? 'Nothing you entered was lost.' : 'Shaping them around what you told us.';
+  document.getElementById('loadingSub').textContent = retry
+    ? ((affLastError && affLastError.error) || 'Nothing you entered was lost.')
+    : 'Shaping them around what you told us.';
   affirmationRetry = retry;
 }
 let affirmationRetry = null;
@@ -858,6 +869,7 @@ function showAffListMessage(msg, isErr){
   el.className = isErr ? 'save-msg err' : 'save-msg';
 }
 const AFF_FAIL_MSG = "Couldn't reach the writer just now — your affirmations are unchanged. Tap to try again.";
+function affFailMessage(){ return (affLastError && affLastError.error) || AFF_FAIL_MSG; }
 
 /* The Regenerate button in the review step. Tapping and visualization have
    their own flows and keep the old behaviour. */
@@ -872,7 +884,7 @@ async function regenerateAllAffirmations(){
   });
   restore();
   if (lines === STALE_AFF_REQUEST) return;
-  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  if (!lines){ showAffListMessage(affFailMessage(), true); return; }
   state.affirmations = lines;
   renderAffList();
 }
@@ -885,7 +897,7 @@ async function improveAffirmations(){
   const lines = await requestAffirmations('improve', { current });
   restore();
   if (lines === STALE_AFF_REQUEST) return;
-  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  if (!lines){ showAffListMessage(affFailMessage(), true); return; }
   state.affirmations = lines;
   renderAffList();
 }
@@ -896,7 +908,7 @@ async function regenerateOneAffirmation(i){
   showAffListMessage('');
   const lines = await requestAffirmations('regenerate_one', { current, rejectedLine: rejectedLine || 'I am...' });
   if (lines === STALE_AFF_REQUEST) return;
-  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  if (!lines){ showAffListMessage(affFailMessage(), true); return; }
   if (rejectedLine) affRejected.push(rejectedLine);
   state.affirmations[i] = lines[0];
   renderAffList();

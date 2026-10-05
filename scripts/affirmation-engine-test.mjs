@@ -10,7 +10,10 @@ import { readFileSync } from 'node:fs';
 import { cleanRequest, buildResponsesRequest, readAffirmations, affirmationModel, DEFAULT_AFFIRMATION_MODEL }
   from '../lib/affirmation-engine.js';
 import { AFFIRMATION_SYSTEM_PROMPT } from '../lib/affirmation-prompt.js';
-import handler from '../api/generate-affirmations.js';
+process.env.SUPABASE_URL = 'https://sb.test';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+const { default: handler } = await import('../api/generate-affirmations.js');
+const { UNIT_COST, DAILY_UNITS } = await import('../lib/affirmation-quota.js');
 
 let n = 0;
 const ok = (name, fn) => Promise.resolve().then(fn).then(() => { n++; console.log('  ok  ' + name); });
@@ -18,19 +21,31 @@ const ok = (name, fn) => Promise.resolve().then(fn).then(() => { n++; console.lo
 const reply = (arr) => ({ output: [{ content: [{ type: 'output_text', text: JSON.stringify({ affirmations: arr }) }] }] });
 const six = ['One of them.', 'Two of them.', 'Three of them.', 'Four of them.', 'Five of them.'];
 
-function run(body, { key = 'sk-test', env = {}, upstream } = {}) {
+/* A stand-in for everything the route talks to: OpenAI, Supabase auth, the
+   subscribers table and the quota function. `used` is today's units. */
+function run(body, { key = 'sk-test', env = {}, upstream, signedIn = true, tier = null, used = 0, quotaDown = false } = {}) {
   const saved = { ...process.env }, realFetch = globalThis.fetch;
   if (key) process.env.OPENAI_API_KEY = key; else delete process.env.OPENAI_API_KEY;
   Object.assign(process.env, env);
-  const calls = [];
+  const calls = [], spends = [];
+  const json = (v, ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => v, text: async () => '' });
   globalThis.fetch = async (url, init) => {
+    if (url.includes('/auth/v1/user')) return signedIn ? json({ id: 'u1' }) : json({}, false);
+    if (url.includes('/rest/v1/subscribers')) return json(tier ? [{ tier, status: 'active' }] : []);
+    if (url.includes('/rpc/spend_affirmation_units')) {
+      if (quotaDown) return json({}, false);
+      const b = JSON.parse(init.body); spends.push(b);
+      if (b.p_cost < 0) { used = Math.max(0, used + b.p_cost); return json(used); }
+      if (used + b.p_cost > b.p_limit) return json(-1);
+      used += b.p_cost; return json(used);
+    }
     calls.push({ url, init, body: JSON.parse(init.body) });
     return upstream ? upstream(calls.length) : { ok: true, json: async () => reply(six), text: async () => '' };
   };
   const res = { code: 0, body: null, headers: {},
     setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, end() { return this; } };
-  return handler({ method: 'POST', headers: {}, body }, res)
-    .then(() => ({ res, calls }))
+  return handler({ method: 'POST', headers: signedIn ? { authorization: 'Bearer tok' } : {}, body }, res)
+    .then(() => ({ res, calls, spends, used }))
     .finally(() => { globalThis.fetch = realFetch; process.env = saved; });
 }
 
@@ -124,6 +139,39 @@ await ok('empty goal and no category -> 400, nothing sent', async () => {
   const { res, calls } = await run({ goal: '  ' });
   assert.equal(res.code, 400); assert.equal(calls.length, 0);
   assert.equal(cleanRequest({ goal: '', category: 'Wealth' }).req.goal, 'Affirmations for Wealth');
+});
+
+await ok('signed-out callers get 401 and OpenAI is never called', async () => {
+  const { res, calls, spends } = await run({ goal: 'g' }, { signedIn: false });
+  assert.equal(res.code, 401); assert.equal(res.body.code, 'auth');
+  assert.equal(calls.length, 0); assert.equal(spends.length, 0);
+});
+await ok('a set spends 3 units and a single rewrite 1', async () => {
+  assert.equal((await run({ goal: 'g' })).used, UNIT_COST.generate);
+  const one = await run({ mode: 'regenerate_one', goal: 'g', current: six, rejectedLine: 'x' },
+    { upstream: () => ({ ok: true, json: async () => reply(['Fresh.']), text: async () => '' }) });
+  assert.equal(one.used, UNIT_COST.regenerate_one);
+});
+await ok('over the free daily limit -> 429, OpenAI never called', async () => {
+  const { res, calls } = await run({ goal: 'g' }, { used: DAILY_UNITS.free - 2 });
+  assert.equal(res.code, 429); assert.equal(res.body.code, 'quota'); assert.equal(calls.length, 0);
+});
+await ok('paid accounts get the larger limit', async () => {
+  const { res, spends } = await run({ goal: 'g' }, { tier: 'ritual', used: DAILY_UNITS.free });
+  assert.equal(res.code, 200); assert.equal(spends[0].p_limit, DAILY_UNITS.paid);
+});
+await ok('an upstream failure refunds the units', async () => {
+  const r = await run({ goal: 'g' }, { upstream: () => ({ ok: false, status: 500, text: async () => '', json: async () => ({}) }) });
+  assert.equal(r.res.code, 502); assert.equal(r.used, 0);
+});
+await ok('a quota system that cannot answer fails closed', async () => {
+  const { res, calls } = await run({ goal: 'g' }, { quotaDown: true });
+  assert.equal(res.code, 503); assert.equal(calls.length, 0);
+});
+await ok('worst-case month stays under a dollar on a mini-tier model', () => {
+  const perUnit = 0.0015 / 3;                       // ~$0.0015 a full set (see lib/affirmation-quota.js)
+  assert.ok(DAILY_UNITS.free * perUnit * 31 < 1);
+  assert.ok(DAILY_UNITS.paid * perUnit * 31 < 1);
 });
 
 console.log(`\n${n} passed`);

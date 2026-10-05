@@ -117,8 +117,15 @@ Two things that will bite:
 - `OPENAI_API_KEY` — server-side only; the browser never sees it. Without it the
   route answers 500 and the builder shows its "try again" screen.
 - `AFFIRMATION_MODEL` — which model writes the affirmations. Change it and
-  redeploy, no code change. Unset, it falls back to `DEFAULT_AFFIRMATION_MODEL`
+  redeploy, no code change. Unset, it falls back to `DEFAULT_AFFIRMATION_MODEL` (`gpt-4.1-mini`)
   in `lib/affirmation-engine.js`. Use a model that supports Structured Outputs.
+
+Every call needs a signed-in account and spends from a daily budget
+(`lib/affirmation-quota.js`: Free 24 units, paid 60; a set is 3 units, one
+rewritten line 1). At `gpt-4.1-mini` pricing that caps one account near $0.36 a
+month on Free and $0.90 on a paid plan. Apply
+`supabase/migrations/20261005_affirmation_usage.sql` or every call is refused.
+Also set a monthly spend limit on the OpenAI project as the hard backstop.
 
 The writing instructions live in `lib/affirmation-prompt.js`. The EFT and
 visualization routes still use `ANTHROPIC_API_KEY`. Run `npm run test:affirmations`
