@@ -761,6 +761,10 @@ async function saveSubliminal(opts){
   contentAlreadySaved = true;
   state.playerTitle = title;
   if (typeof paintFinalSaveButtons === 'function') paintFinalSaveButtons();
-  if (isFirstSave) pickCoverFor(savedSubliminal.id);
+  if (isFirstSave){
+    /* A cover chosen before saving went in with the row; only ask if there is none. */
+    if (activeCoverPath){ coverPathById[savedSubliminal.id] = activeCoverPath; }
+    else pickCoverFor(savedSubliminal.id);
+  }
 }
 
