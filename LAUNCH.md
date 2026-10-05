@@ -109,6 +109,22 @@ Two things that will bite:
   after that on every device is free. If the file is ever deleted from the
   bucket, the next press regenerates it and stores it again.
 
+### Affirmation writer (OpenAI)
+
+`/api/generate-affirmations` calls the OpenAI Responses API. Set these in Vercel →
+`subliminally` → Settings → Environment Variables (all environments, then redeploy):
+
+- `OPENAI_API_KEY` — server-side only; the browser never sees it. Without it the
+  route answers 500 and the builder shows its "try again" screen.
+- `AFFIRMATION_MODEL` — which model writes the affirmations. Change it and
+  redeploy, no code change. Unset, it falls back to `DEFAULT_AFFIRMATION_MODEL`
+  in `lib/affirmation-engine.js`. Use a model that supports Structured Outputs.
+
+The writing instructions live in `lib/affirmation-prompt.js`. The EFT and
+visualization routes still use `ANTHROPIC_API_KEY`. Run `npm run test:affirmations`
+after touching either file. Apply `supabase/migrations/20261005_affirmation_feedback.sql`
+for the Love this / Not for me ratings (the builder ignores a missing table).
+
 ### RevenueCat webhook
 
 Set `REVENUECAT_WEBHOOK_AUTH` in Vercel → `subliminally` → Settings →

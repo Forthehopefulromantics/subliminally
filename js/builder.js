@@ -355,6 +355,9 @@ function nextStep(serenityCleared){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
+  affEpoch++; affBusy = false; affRejected = [];
+  setAffirmationControlsBusy(false);
+  setAffirmationLoadingError(null);
   state = { freq:null, intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   affirmationMode = 'generate';
   affirmationGenerateCount = 5;
@@ -678,7 +681,17 @@ function applyModeCopy(mode){
 
 
 /* ---------------- AFFIRMATION GENERATION ---------------- */
+/* One press, one generation. The tier check and the faith lookup below are
+   awaited before a request exists, so the busy flag alone would leave a gap a
+   second tap could walk through. */
+let affStarting = false;
 async function generateAffirmations(){
+  if (affStarting || affBusy) return;
+  affStarting = true;
+  try{ await runGenerateAffirmations(); }
+  finally{ affStarting = false; }
+}
+async function runGenerateAffirmations(){
   /* Handle import mode first — if user pasted affirmations, use those */
   if (affirmationMode === 'import'){
     if (handleAffirmationInputBeforeGenerate()) return;
@@ -735,12 +748,214 @@ async function generateAffirmations(){
     return;
   }
 
-  let lines = null;
-  try{ lines = state.eftMode ? await callClaudeForEftAffirmations() : await callClaudeForAffirmations(); }catch(err){ lines = null; }
-  if (!lines || !lines.length) lines = state.eftMode ? buildEftFallbackList() : buildFallbackList();
-  state.affirmations = lines.slice(0, state.count);
+  if (state.eftMode){
+    let lines = null;
+    try{ lines = await callClaudeForEftAffirmations(); }catch(err){ lines = null; }
+    if (!lines || !lines.length) lines = buildEftFallbackList();
+    state.affirmations = lines.slice(0, state.count);
+    renderAffList();
+    showStep(3);
+    return;
+  }
+
+  /* Standard subliminals: the lines come from OpenAI or not at all. There is no
+     generic stand-in list any more -- a failure goes back to the person with a
+     retry, and the goal they typed is still in the box. */
+  setAffirmationLoadingError(null);
+  const lines = await requestAffirmations('generate', { count: state.count });
+  if (lines === STALE_AFF_REQUEST) return;
+  if (!lines){
+    setAffirmationLoadingError(() => generateAffirmations());
+    return;
+  }
+  state.affirmations = lines;
+  affRejected = [];
   renderAffList();
   showStep(3);
+}
+
+/* ---------------- OpenAI-written affirmations: the four actions ----------------
+   Generate, Regenerate all, Regenerate one and Make these better are the only
+   things that reach /api/generate-affirmations. Rendering, reopening a saved
+   subliminal and editing never do. One request at a time: `affBusy` is checked
+   before anything is sent, so a double tap or a re-entrant call is a no-op. */
+let affBusy = false;
+let affEpoch = 0;                // bumped by resetFlow so a late answer cannot land in a new build
+let affRejected = [];            // lines thrown away this build, so they are not written again
+const STALE_AFF_REQUEST = Symbol('stale');
+
+function affirmationCategoryLabel(){
+  const hit = INTENTIONS.find(([k]) => k === state.intention);
+  return hit ? hit[1] : '';
+}
+function currentAffirmationLines(){
+  return state.affirmations.map(a => String(a).trim()).filter(Boolean);
+}
+async function requestAffirmations(mode, extra){
+  if (affBusy) return STALE_AFF_REQUEST;
+  affBusy = true;
+  const epoch = affEpoch;
+  setAffirmationControlsBusy(true);
+  try{
+    const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "";
+    const response = await fetch(API_BASE + "/api/generate-affirmations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode, goal: state.goal, category: affirmationCategoryLabel(), toneLabel,
+        intensity: state.intensity, rejected: affRejected.slice(-20),
+        feedback: affirmationFeedbackForPrompt(),
+        ...faithForGenerator(), ...extra
+      })
+    });
+    if (epoch !== affEpoch) return STALE_AFF_REQUEST;
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (epoch !== affEpoch) return STALE_AFF_REQUEST;
+    const list = Array.isArray(data.affirmations) ? data.affirmations.filter(a => typeof a === 'string' && a.trim()) : [];
+    return list.length ? list : null;
+  }catch(err){
+    return epoch !== affEpoch ? STALE_AFF_REQUEST : null;
+  }finally{
+    if (epoch === affEpoch){ affBusy = false; setAffirmationControlsBusy(false); }
+  }
+}
+/* Everything that starts a request is disabled while one is out, including the
+   per-line buttons, which renderAffList draws with the class below. */
+function setAffirmationControlsBusy(busy){
+  ['generateBtn','regenerateBtn','improveBtn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.disabled = busy;
+  });
+  document.querySelectorAll('.aff-tool-btn').forEach(b => { b.disabled = busy; });
+  const list = document.getElementById('affList');
+  if (list) list.classList.toggle('aff-list-busy', busy);
+}
+/* Step 2 is the loading screen; on failure it becomes the retry screen. */
+function setAffirmationLoadingError(retry){
+  const dots = document.getElementById('loadingDots');
+  const err = document.getElementById('loadingError');
+  if (!dots || !err) return;
+  dots.style.display = retry ? 'none' : '';
+  err.style.display = retry ? 'block' : 'none';
+  document.getElementById('loadingTitle').textContent = retry ? "That didn't come through" : 'Writing your affirmations…';
+  document.getElementById('loadingSub').textContent = retry ? 'Nothing you entered was lost.' : 'Shaping them around what you told us.';
+  affirmationRetry = retry;
+}
+let affirmationRetry = null;
+function retryAffirmations(){ if (affirmationRetry) affirmationRetry(); }
+
+function listBusyLabel(btnId, label){
+  const b = document.getElementById(btnId);
+  const prev = b ? b.textContent : '';
+  if (b) b.textContent = label;
+  return () => { if (b) b.textContent = prev; };
+}
+function showAffListMessage(msg, isErr){
+  const el = document.getElementById('affListMsg');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = isErr ? 'save-msg err' : 'save-msg';
+}
+const AFF_FAIL_MSG = "Couldn't reach the writer just now — your affirmations are unchanged. Tap to try again.";
+
+/* The Regenerate button in the review step. Tapping and visualization have
+   their own flows and keep the old behaviour. */
+async function regenerateAllAffirmations(){
+  if (state.eftMode || state.visualizationMode) return generateAffirmations();
+  if (affBusy) return;
+  const current = currentAffirmationLines();
+  const restore = listBusyLabel('regenerateBtn', 'Writing…');
+  showAffListMessage('');
+  const lines = await requestAffirmations('regenerate_all', {
+    count: Math.min(Math.max(current.length, MIN_AFFIRMATIONS), 10), current
+  });
+  restore();
+  if (lines === STALE_AFF_REQUEST) return;
+  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  state.affirmations = lines;
+  renderAffList();
+}
+async function improveAffirmations(){
+  if (affBusy) return;
+  const current = currentAffirmationLines();
+  if (!current.length) return;
+  const restore = listBusyLabel('improveBtn', 'Improving…');
+  showAffListMessage('');
+  const lines = await requestAffirmations('improve', { current });
+  restore();
+  if (lines === STALE_AFF_REQUEST) return;
+  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  state.affirmations = lines;
+  renderAffList();
+}
+async function regenerateOneAffirmation(i){
+  if (affBusy) return;
+  const rejectedLine = String(state.affirmations[i] || '').trim();
+  const current = currentAffirmationLines();
+  showAffListMessage('');
+  const lines = await requestAffirmations('regenerate_one', { current, rejectedLine: rejectedLine || 'I am...' });
+  if (lines === STALE_AFF_REQUEST) return;
+  if (!lines){ showAffListMessage(AFF_FAIL_MSG, true); return; }
+  if (rejectedLine) affRejected.push(rejectedLine);
+  state.affirmations[i] = lines[0];
+  renderAffList();
+}
+function moveAffirmation(i, dir){
+  const j = i + dir;
+  if (j < 0 || j >= state.affirmations.length) return;
+  const a = state.affirmations;
+  [a[i], a[j]] = [a[j], a[i]];
+  renderAffList();
+}
+
+/* ---- lightweight feedback: Love this / Not for me ----
+   Kept on this device per account, and sent back with later requests so the
+   writer can lean toward what was loved. Signed-in accounts also have each
+   rating written to affirmation_feedback so the styles people prefer can be
+   studied later; nothing trains on it. */
+const AFF_FEEDBACK_KEY = 'subliminally.affFeedback.v1';
+function readAffFeedback(){
+  try{
+    const all = JSON.parse(localStorage.getItem(AFF_FEEDBACK_KEY) || '{}');
+    const mine = all[currentUser ? currentUser.id : 'anon'];
+    return Array.isArray(mine) ? mine : [];
+  }catch(e){ return []; }
+}
+function writeAffFeedback(list){
+  try{
+    const all = JSON.parse(localStorage.getItem(AFF_FEEDBACK_KEY) || '{}');
+    all[currentUser ? currentUser.id : 'anon'] = list.slice(-60);
+    localStorage.setItem(AFF_FEEDBACK_KEY, JSON.stringify(all));
+  }catch(e){}
+}
+function affirmationRating(line){
+  const hit = readAffFeedback().filter(f => f.t === line).pop();
+  return hit ? hit.r : null;
+}
+function affirmationFeedbackForPrompt(){
+  const fb = readAffFeedback();
+  const pick = r => fb.filter(f => f.r === r).slice(-6).map(f => f.t);
+  return { liked: pick('up'), disliked: pick('down') };
+}
+function rateAffirmation(i, rating){
+  const line = String(state.affirmations[i] || '').trim();
+  if (!line) return;
+  const fb = readAffFeedback().filter(f => f.t !== line);
+  const toggledOff = affirmationRating(line) === rating;
+  if (!toggledOff){
+    fb.push({ t: line, r: rating, intensity: state.intensity, tone: state.tone });
+    if (rating === 'down' && !affRejected.includes(line)) affRejected.push(line);
+  }
+  writeAffFeedback(fb);
+  if (!toggledOff && currentUser && typeof sb !== 'undefined'){
+    try{
+      Promise.resolve(sb.from('affirmation_feedback').insert({
+        user_id: currentUser.id, affirmation: line, rating, intensity: state.intensity, tone: state.tone || null
+      })).catch(() => {});
+    }catch(e){}
+  }
+  renderAffList();
 }
 /* What the three generating endpoints are told about the saved faith answer:
    the id, and for 'other' the word this person typed for what they reach
@@ -750,23 +965,11 @@ function faithForGenerator(){
   if (typeof myFaith === 'undefined' || !myFaith || !myFaith.id) return {};
   return { faith: myFaith.id, faithWord: myFaith.id === 'other' ? (myFaith.own || null) : null };
 }
-async function callClaudeForAffirmations(){
-  const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
-  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
-  const response = await fetch(API_BASE + "/api/generate-affirmations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ count: state.count, freqLabel, toneLabel, goal: state.goal, intensity: state.intensity, ...faithForGenerator() })
-  });
-  if (!response.ok) return null;
-  const data = await response.json();
-  return Array.isArray(data.affirmations) ? data.affirmations : null;
-}
 /* Builds the 11-line EFT structure: setup statement (from setupFeeling), then the
    10-tap round (Karate Chop, 8 core points including Top of Head, Karate Chop again —
    the kcReminder line
    is reused for both the opening and closing tap). Hits its own endpoint so it never
-   touches /api/generate-affirmations, which the regular flow still uses untouched. */
+   touches /api/generate-affirmations. */
 async function callClaudeForEftAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
   const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
@@ -900,15 +1103,39 @@ function renderAffList(){
       // Removing a line would break the one-line-per-tapping-point mapping, so it's
       // disabled in EFT mode — the count has to stay at exactly nine.
       const rm = document.createElement('button'); rm.className='aff-remove'; rm.textContent='✕';
+      rm.setAttribute('aria-label', 'Delete this affirmation');
       rm.onclick = ()=>{ state.affirmations.splice(i,1); renderAffList(); };
       row.appendChild(rm);
+      row.appendChild(affirmationTools(i, line));
     }
     list.appendChild(row);
   });
   document.getElementById('addAffBtn').style.display = (state.eftMode || state.visualizationMode) ? 'none' : '';
+  const improveBtn = document.getElementById('improveBtn');
+  if (improveBtn) improveBtn.style.display = (state.eftMode || state.visualizationMode) ? 'none' : '';
   // Once there are enough lines again, stop saying there aren't.
   const listMsg = document.getElementById('affListMsg');
   if (listMsg && !affirmationShortfall()){ listMsg.textContent = ''; listMsg.className = 'save-msg'; }
+}
+/* The per-line controls under each affirmation: reorder, rate, rewrite just this one. */
+function affirmationTools(i, line){
+  const tools = document.createElement('div'); tools.className = 'aff-tools';
+  const btn = (label, aria, onclick, extra) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'aff-tool-btn' + (extra || '');
+    b.textContent = label; b.setAttribute('aria-label', aria); b.onclick = onclick;
+    b.disabled = affBusy;
+    return b;
+  };
+  const up = btn('↑', 'Move up', () => moveAffirmation(i, -1)); up.disabled = affBusy || i === 0;
+  const down = btn('↓', 'Move down', () => moveAffirmation(i, 1)); down.disabled = affBusy || i === state.affirmations.length - 1;
+  const rating = affirmationRating(String(line).trim());
+  const love = btn('♥ Love this', 'Love this one', () => rateAffirmation(i, 'up'), rating === 'up' ? ' on' : '');
+  const nope = btn('Not for me', 'Not for me', () => rateAffirmation(i, 'down'), rating === 'down' ? ' on' : '');
+  love.setAttribute('aria-pressed', rating === 'up'); nope.setAttribute('aria-pressed', rating === 'down');
+  const redo = btn('↻ Rewrite this one', 'Rewrite just this affirmation', () => regenerateOneAffirmation(i));
+  [up, down, love, nope, redo].forEach(b => tools.appendChild(b));
+  return tools;
 }
 function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
 

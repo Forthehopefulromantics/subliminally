@@ -14,7 +14,8 @@
     "cap:ios": "npm run cap:sync && cap open ios",
     "cap:android": "npm run cap:sync && cap open android",
     "test:mix": "node scripts/mix-settings-test.cjs",
-    "test:audio-editor": "node scripts/audio-editor-e2e.cjs"
+    "test:audio-editor": "node scripts/audio-editor-e2e.cjs",
+    "test:affirmations": "node scripts/affirmation-engine-test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
