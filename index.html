@@ -272,6 +272,13 @@
   .aff-row-script textarea{ width:100%; font-size:15px; line-height:1.7; min-height:220px; }
   .aff-remove{ background:none; border:none; color:var(--haze); cursor:pointer; font-size:14px; padding:2px 4px; }
   .aff-remove:hover{ color:#E39A9A; }
+  .aff-row{ flex-wrap:wrap; }
+  .aff-tools{ flex-basis:100%; display:flex; flex-wrap:wrap; gap:6px; padding-left:24px; }
+  .aff-tool-btn{ font-size:11px; color:var(--haze); background:none; border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:3px 9px; cursor:pointer; }
+  .aff-tool-btn:hover:not(:disabled){ color:var(--moonlight); border-color:var(--lilac); }
+  .aff-tool-btn.on{ color:var(--lilac); border-color:var(--lilac); }
+  .aff-tool-btn:disabled{ opacity:.4; cursor:default; }
+  .aff-list-busy{ opacity:.6; pointer-events:none; }
   .aff-add{ font-size:12px; color:var(--lilac); background:none; border:1px dashed var(--lilac); border-radius:10px; padding:7px 12px; cursor:pointer; align-self:flex-start; }
   .loading-dots{ display:flex; gap:6px; justify-content:center; padding:26px 0; }
   .loading-dots span{ width:8px; height:8px; border-radius:50%; background:var(--lilac); animation:loadPulse 1.2s ease-in-out infinite; }
@@ -3013,7 +3020,15 @@
       <div class="flow-step" data-step="2">
         <div class="flow-title" id="loadingTitle">Writing your affirmations…</div>
         <div class="flow-sub" id="loadingSub">Shaping them around what you told us.</div>
-        <div class="flow-body"><div class="loading-dots"><span></span><span></span><span></span></div></div>
+        <div class="flow-body">
+          <div class="loading-dots" id="loadingDots"><span></span><span></span><span></span></div>
+          <div id="loadingError" style="display:none; text-align:center;">
+            <div style="display:flex; gap:8px; justify-content:center; padding:18px 0;">
+              <button class="mini-btn ghostbtn" onclick="prevStep()">← Back to edit</button>
+              <button class="mini-btn candlebtn" onclick="retryAffirmations()">Try again ✦</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- STEP 3: review -->
@@ -3028,7 +3043,8 @@
         <div class="flow-nav">
           <button class="flow-back" onclick="prevStep()">← Back</button>
           <div style="display:flex; gap:8px;">
-            <button class="mini-btn ghostbtn" id="regenerateBtn" onclick="generateAffirmations()">↻ Regenerate</button>
+            <button class="mini-btn ghostbtn" id="improveBtn" onclick="improveAffirmations()">✦ Make these better</button>
+            <button class="mini-btn ghostbtn" id="regenerateBtn" onclick="regenerateAllAffirmations()">↻ Regenerate</button>
             <button class="mini-btn candlebtn" onclick="nextStep()">Continue →</button>
           </div>
         </div>

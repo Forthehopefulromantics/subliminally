@@ -1,89 +1,56 @@
 export const config = { api: { bodyParser: true } };
 
 import { applyCors } from '../lib/cors.js';
-import { faithFraming } from '../lib/faith-language.js';
+import { cleanRequest, buildResponsesRequest, readAffirmations, callOpenAI } from '../lib/affirmation-engine.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
+import { UNIT_COST, dailyLimit, spendUnits } from '../lib/affirmation-quota.js';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+/* The one route behind every affirmation action in the builder: generate,
+   regenerate all, regenerate one, make these better (body.mode). The key is
+   read here, on the server, and never leaves it. The model is AFFIRMATION_MODEL
+   (see lib/affirmation-engine.js). EFT and visualization have their own routes.
 
-function getIntensityGuidance(intensity) {
-  const intensityMap = {
-    grounded: `Affirmation intensity: GROUNDED
-Write believable, supportive affirmations that feel within reach. These should feel encouraging and real, not hyperbolic. Use language like "I am becoming," "I am building," "I trust," "I am creating." Focus on progress, steady growth, and sustainable confidence.`,
-    bold: `Affirmation intensity: BOLD
-Write big, confident affirmations that stretch what feels possible. These should feel ambitious and empowering. Use language like "I naturally," "I attract," "My life keeps," "Opportunities find me." Push beyond what feels comfortable but still believable.`,
-    delusional: `Affirmation intensity: DELUSIONAL (Dream-life energy)
-Write wildly ambitious, unapologetic affirmations with larger-than-life energy. These are pure dream-life confidence. Use language like "Everything always," "I am the kind of person," "Money finds me," "I am wildly successful," "My dream life is unfolding," "I receive opportunities that seem unreal." This is fantasy-forward confidence. For dating/attraction, focus on the user's experience and desirability, not controlling others.`,
-  };
-
-  return intensityMap[intensity] || intensityMap['bold'];
-}
-
+   Every call costs money, so it is for signed-in accounts only and spends from
+   a daily budget (lib/affirmation-quota.js) before OpenAI is asked anything.
+   A call that fails upstream gives its units back. */
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') {
     res.status(405).send('Method not allowed');
     return;
   }
-  if (!ANTHROPIC_API_KEY) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
     res.status(500).json({ error: 'Server is not configured with an API key yet.' });
     return;
   }
 
-  const { count, freqLabel, toneLabel, goal, faith, faithWord, intensity } = req.body || {};
-  // Standard subliminals contain at most ten affirmations. EFT keeps its own
-  // separate 11-line structure and never calls this route.
-  const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 5), 10);
-  /* Their saved answer in Settings, as framing rather than a word list. Null
-     when they have not answered or the answer is not one we know, and then the
-     section is left out rather than filled with a guess. */
-  const framing = faithFraming(faith, faithWord);
+  const user = await whoIsCalling(bearerToken(req)).catch(() => null);
+  if (!user) {
+    res.status(401).json({ error: 'Create a free account to write affirmations with AI.', code: 'auth' });
+    return;
+  }
 
-  // Intensity guidance for the model
-  const intensityGuidance = getIntensityGuidance(intensity);
+  const { req: clean, error } = cleanRequest(req.body);
+  if (error) {
+    res.status(400).json({ error });
+    return;
+  }
 
-  const prompt = `Write ${safeCount} short, first-person, present-tense affirmations for a bedtime affirmation app.
-Frequency association (mood only, not medical): ${freqLabel || 'none'}
-Desired voice/tone: ${toneLabel || 'warm'}
-What the person said they want help with: "${goal || 'not specified'}"
-${intensityGuidance}
-Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim. Avoid generic statements like "I am worthy" or "I am confident" — be specific and vivid instead. Vary sentence structure and starters — don't begin every line with "I am".
-Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.${framing ? '\n\n' + framing : ''}`;
-
+  const cost = UNIT_COST[clean.mode];
+  let spent = false;
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Anthropic API error:', response.status, errText);
-      res.status(502).json({ error: 'Affirmation generation failed upstream.' });
+    const limit = dailyLimit(hasPremiumAccess(await tierForUser(user.id)));
+    if ((await spendUnits(user.id, cost, limit)) < 0) {
+      res.status(429).json({ error: "You've used today's AI affirmations. They refresh tomorrow, and you can still edit or add your own lines.", code: 'quota' });
       return;
     }
-
-    const data = await response.json();
-    const text = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n');
-    const clean = text.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean);
-
-    if (!Array.isArray(parsed)) {
-      res.status(502).json({ error: 'Unexpected response shape.' });
-      return;
-    }
-
-    res.status(200).json({ affirmations: parsed.filter((x) => typeof x === 'string') });
+    spent = true;
+    const data = await callOpenAI(buildResponsesRequest(clean), { apiKey });
+    res.status(200).json({ affirmations: readAffirmations(data, clean) });
   } catch (err) {
-    console.error('generate-affirmations error:', err);
-    res.status(500).json({ error: 'Something went wrong generating affirmations.' });
+    console.error('generate-affirmations error:', err.message, err.detail || '');
+    if (spent) await spendUnits(user.id, -cost, 0).catch(() => {});
+    res.status(spent ? 502 : 503).json({ error: 'Something went wrong generating affirmations.' });
   }
 }
