@@ -242,10 +242,27 @@ async function recordPlayerSession(completed,elapsedSeconds){
   if(playerSessionSaved||!elapsedSeconds)return;playerSessionSaved=true;
   if(sb&&currentUser){try{await sb.from('listening_sessions').insert({user_id:currentUser.id,subliminal_id:editingExistingId||null,seconds_listened:Math.round(elapsedSeconds),completed:!!completed,ambience_key:state.bg||null,loop_mode:playerPrefs.loopMode});}catch(e){}}
 }
+function mediaSessionArtwork(){
+  const img=document.getElementById('listeningCover');
+  const src=img&&!img.hidden&&img.src;
+  if(src)return [{src,sizes:'512x512'}];
+  return [{src:new URL('favicon.svg',location.href).href,sizes:'any',type:'image/svg+xml'}];
+}
+function refreshMediaSessionMetadata(){
+  if(!('mediaSession'in navigator)||typeof MediaMetadata==='undefined')return;
+  try{navigator.mediaSession.metadata=new MediaMetadata({title:currentPlayerTitle(),artist:'Subliminally',album:'Subliminally by FTHR',artwork:mediaSessionArtwork()});}catch(e){}
+}
 function setupMediaSession(){
   if(!('mediaSession'in navigator))return;
-  try{navigator.mediaSession.metadata=new MediaMetadata({title:currentPlayerTitle(),artist:'Your Subliminal',album:'Subliminally'});}catch(e){}
-  const handlers={play:()=>{if(finalPaused)resumeFinal();else if(!finalPlaying)playFinal();},pause:()=>pauseFinal(),stop:()=>stopFinal(),previoustrack:()=>seekFinalAffirmation(-1),nexttrack:()=>seekFinalAffirmation(1)};
+  refreshMediaSessionMetadata();
+  const handlers={
+    play:()=>{if(finalPaused)resumeFinal();else if(!finalPlaying)playFinal();},
+    pause:()=>pauseFinal(),
+    stop:()=>stopFinal(),
+    seekto:d=>{if(d&&d.seekTime!=null)seekFinalTo(d.seekTime);},
+    previoustrack:()=>seekFinalAffirmation(-1),
+    nexttrack:()=>seekFinalAffirmation(1)
+  };
   Object.entries(handlers).forEach(([a,h])=>{try{navigator.mediaSession.setActionHandler(a,h);}catch(e){}});
 }
 document.addEventListener('DOMContentLoaded',mountImmersivePlayer);

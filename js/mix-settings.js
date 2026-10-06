@@ -16,6 +16,7 @@ function showListeningCover(url){
   const img=document.getElementById('listeningCover'),empty=document.getElementById('listeningCoverEmpty');
   if(img){ if(url){img.src=url;img.hidden=false;} else {img.removeAttribute('src');img.hidden=true;} }
   if(empty)empty.hidden=!!url;
+  if(typeof finalPlaying!=='undefined'&&finalPlaying&&typeof refreshMediaSessionMetadata==='function')refreshMediaSessionMetadata();
 }
 async function refreshListeningCover(){
   const path=activeCoverPath,id=activeMixId;
