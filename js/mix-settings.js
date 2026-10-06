@@ -27,6 +27,7 @@ function showListeningCover(cover){
     } else { img.onerror=null; img.removeAttribute('srcset'); img.removeAttribute('src'); img.hidden=true; }
   }
   if(empty)empty.hidden=!!cover;
+  if(typeof finalPlaying!=='undefined'&&finalPlaying&&typeof refreshMediaSessionMetadata==='function')refreshMediaSessionMetadata();
 }
 async function refreshListeningCover(){
   const path=activeCoverPath,id=activeMixId;

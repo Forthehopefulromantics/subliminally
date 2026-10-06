@@ -3213,6 +3213,7 @@ function pauseFinal(){
   }, 150);
   stopSilentKeeper();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  updateMediaSessionPosition();
 }
 function resumeFinal(){
   if (!finalPlaying || !finalPaused) return;
@@ -3233,6 +3234,7 @@ function resumeFinal(){
   const session = finalSession;
   waiters.forEach(fn => { const t = setTimeout(() => { if (session === finalSession) fn(); }, 0); finalTimeouts.push(t); });
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  updateMediaSessionPosition();
 }
 function seekFinalAffirmation(delta){
   const lines = state.affirmations || [];
@@ -3544,21 +3546,101 @@ function startCustomTrackPlayback(){
    long as the session does. It costs nothing audible and it is the difference
    between the app working and not working for anyone whose phone is on silent —
    which, for a thing you use at bedtime, is most people. */
-const SILENT_WAV =
-  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQQAAAAAAAAA';
+/* The keeper is the session's one real, file-backed media element: the thing iOS
+   holds on to when the screen locks or another app comes forward, and the
+   element the lock screen's controls attach to. It used to be a two-sample
+   file, which loops so fast that iOS can decide nothing is playing; it is now
+   a few seconds long, with a signal a single bit above digital silence. */
+function buildSilentWavUri(seconds, rate){
+  const n = Math.floor(seconds * rate), bytes = new Uint8Array(44 + n * 2);
+  const view = new DataView(bytes.buffer);
+  const tag = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+  tag(0, 'RIFF'); view.setUint32(4, 36 + n * 2, true); tag(8, 'WAVE'); tag(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true); tag(36, 'data'); view.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) view.setInt16(44 + i * 2, i % 2 ? 2 : -2, true);
+  let bin = ''; for (let i = 0; i < bytes.length; i += 4096) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 4096));
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
 let silentKeeper = null;
 
 function startSilentKeeper(){
   try {
     if (!silentKeeper){
-      silentKeeper = new Audio(SILENT_WAV);
+      silentKeeper = new Audio(buildSilentWavUri(4, 8000));
       silentKeeper.loop = true;
-      silentKeeper.volume = 0.02;   // not 0: iOS treats a truly silent element as nothing playing
+      silentKeeper.volume = 0.05;   // not 0: iOS treats a truly silent element as nothing playing
       silentKeeper.setAttribute('playsinline', '');
+      silentKeeper.addEventListener('pause', handleUnexpectedMediaPause);
     }
     const p = silentKeeper.play();
     if (p && p.catch) p.catch(() => {});
   } catch(e){}
+}
+
+/* ---------- interruptions ----------
+   Nothing in this app pauses a session because the page was hidden, locked or
+   navigated away from: the engine lives at the top of the page and the session
+   is only ended by stopFinal / finishFinal. What *can* happen is that the
+   system pauses the media elements itself (a call, Siri, an alarm, headphones
+   unplugged) and the context goes with them. That is treated as a real pause,
+   so the lock-screen Play button and the in-app one both resume the same
+   session -- same elements, same position -- instead of there being a timer
+   running over silence. */
+function handleUnexpectedMediaPause(ev){
+  // A pause event is queued, so one left over from a stop that a restart has since
+  // answered (or from a retired output element) must not pause the new session.
+  const el = ev && ev.target;
+  if (el && (!el.paused || (el !== silentKeeper && el !== (finalCtx && finalCtx.__outEl)))) return;
+  if (finalPlaying && !finalPaused) pauseFinal();
+}
+let finalRecoverTimer = null;
+function recoverFinalAudio(){
+  if (!finalPlaying || finalPaused) return;
+  try { if (finalCtx && finalCtx.state !== 'closed' && finalCtx.state !== 'running'){ const p = finalCtx.resume(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
+  [silentKeeper, finalCtx && finalCtx.__outEl].forEach(el => {
+    if (!el || !el.paused) return;
+    try { const p = el.play(); if (p && p.catch) p.catch(()=>{}); } catch(e){}
+  });
+  // Still not running a moment later: the system refused. Say so, so Play can resume it.
+  clearTimeout(finalRecoverTimer);
+  finalRecoverTimer = setTimeout(() => {
+    if (finalPlaying && !finalPaused && finalCtx && finalCtx.state !== 'running') pauseFinal();
+  }, 1500);
+}
+/* Coming back to the page is only a moment to look at the session, never a
+   reason to restart it: the clock is wall time, so the position is right. */
+function syncFinalAfterForeground(){
+  if (!finalPlaying) return;
+  recoverFinalAudio();
+  updateSessionTimerLabel();
+  if (typeof updateImmersivePlayer === 'function') updateImmersivePlayer();
+  updateMediaSessionPosition();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncFinalAfterForeground(); });
+window.addEventListener('pageshow', syncFinalAfterForeground);
+
+/* ---------- lock screen ---------- */
+function mediaSessionTotalSeconds(){
+  return Math.max(60, (state.targetLengthMinutes || (typeof playerPrefs !== 'undefined' && playerPrefs.duration) || 20) * 60);
+}
+function updateMediaSessionPosition(){
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !finalPlaying) return;
+  const total = mediaSessionTotalSeconds();
+  try {
+    navigator.mediaSession.setPositionState({ duration: total, playbackRate: 1, position: Math.min(total, getFinalElapsedMs() / 1000) });
+  } catch(e){}
+}
+/* Lock-screen scrubbing moves the session clock; the voice carries on from where
+   it is, and no layer is restarted. */
+function seekFinalTo(seconds){
+  if (!finalPlaying) return;
+  const target = Math.max(0, Math.min(mediaSessionTotalSeconds(), Number(seconds) || 0)) * 1000;
+  finalPausedTotal += getFinalElapsedMs() - target;
+  updateSessionTimerLabel();
+  if (typeof updateImmersivePlayer === 'function') updateImmersivePlayer();
+  updateMediaSessionPosition();
 }
 function stopSilentKeeper(){
   if (!silentKeeper) return;
@@ -3616,6 +3698,7 @@ function audioOut(ctx){
     el.srcObject = md.stream;
     el.setAttribute('playsinline', '');
     el.autoplay = true;
+    el.addEventListener('pause', handleUnexpectedMediaPause);
     bus.connect(md);
     ctx.__outEl = el; ctx.__outMd = md;
     const p = el.play();
@@ -3641,6 +3724,8 @@ function primeAudio(){
   if (!holdPaused) startSilentKeeper();
   if (!finalCtx || finalCtx.state === 'closed'){
     finalCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const ownCtx = finalCtx;
+    ownCtx.onstatechange = () => { if (ownCtx === finalCtx && ownCtx.state !== 'running') recoverFinalAudio(); };
   }
   if (finalCtx.state === 'suspended' && !holdPaused) finalCtx.resume().catch(()=>{});
   try {
@@ -3694,9 +3779,10 @@ function playFinal(){
   document.getElementById('finalPlayBtn').disabled = false;
   document.getElementById('finalPlayBtn').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px; margin-right:6px;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Playing…';
   updateSessionTimerLabel();
-  finalTimerInterval = setInterval(updateSessionTimerLabel, 1000);
+  finalTimerInterval = setInterval(() => { updateSessionTimerLabel(); updateMediaSessionPosition(); }, 1000);
   if (typeof setupMediaSession === 'function') setupMediaSession();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+  updateMediaSessionPosition();
 
   // Reuses the context opened by the tap when there is one, rather than making
   // a fresh suspended one that will never be allowed to start.
@@ -4147,6 +4233,7 @@ function finishFinal(){
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  clearTimeout(finalRecoverTimer);
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   updateSessionTimerLabel();
   document.getElementById('finalPlayBtn').disabled = false;
@@ -4189,6 +4276,7 @@ function stopFinal(){
   stopSilentKeeper();
   closeAudioOut(finalCtx);
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
+  clearTimeout(finalRecoverTimer);
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   try { window.speechSynthesis.cancel(); } catch(e){}
