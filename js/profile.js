@@ -162,7 +162,7 @@ async function loadMyLibrary(options){
   }).join('');
   // After the markup, not during: each one is a signed-link round trip, and the
   // list should be readable before the pictures arrive.
-  subs.forEach(s => { if (s.cover_path) showCover(s.id, s.cover_path); });
+  subs.forEach(s => { coverPathById[s.id] = s.cover_path || null; if (s.cover_path) showCover(s.id, s.cover_path); });
 }
 
 function startEditLibraryTitle(id){
@@ -1573,74 +1573,210 @@ setInterval(() => { if (libraryNowPlayingId) reflectLibraryPlaying(); }, 1000);
    is playing. Not a second player: the stop button calls the same stopFinal()
    every other control does. */
 /* ---------- cover art ----------
-   Eight covers that ship with the app, cut from artwork Kyla already owns, and
-   an upload for anyone who wants their own picture.
+   Eight covers that ship with the app, and an upload for anyone who wants their
+   own picture.
 
    The built-in ones are the main path on purpose. They need no storage bucket,
    no signed link and no network — "Bucket not found" was the whole of the
    upload experience until the migration is run, and a picture you choose from a
    shelf is a better first experience than one you have to go and find anyway.
 
-   Both end up in the same column: a built-in is stored as `builtin:night`, an
+   Both end up in the same column: a built-in is stored as `builtin:<id>`, an
    upload as the path to the file. The prefix is what tells them apart, so
-   nothing else in the app has to care which kind it is. */
-const BUILTIN_COVERS = [
-  { key:'sunrise', name:'Sunrise' },
-  { key:'night',   name:'Night sky' },
-  { key:'clouds',  name:'Above the clouds' },
-  { key:'garden',  name:'The garden' },
-  { key:'bedroom', name:'The bedroom' },
-  { key:'waters',  name:'The waters' },
-  { key:'mirror',  name:'The mirror' },
-  { key:'home',    name:'The whole house' },
-];
-const COVER_PX = 512;
+   nothing else in the app has to care which kind it is. No schema change: the
+   new ids are just new values for the same text column.
 
+   LEGACY_COVERS are the earlier set. They are no longer offered, but saved
+   subliminals may still point at them (and the ambience cards use some of the
+   same files), so they keep resolving and their files stay put. */
+const BUILTIN_COVERS = [
+  { key:'celestial-confidence', name:'Confidence', file:'confidence' },
+  { key:'celestial-abundance',  name:'Abundance',  file:'abundance' },
+  { key:'celestial-love',       name:'Love',       file:'love' },
+  { key:'celestial-peace',      name:'Peace',      file:'peace' },
+  { key:'celestial-sleep',      name:'Sleep',      file:'sleep' },
+  { key:'celestial-focus',      name:'Focus',      file:'focus' },
+  { key:'celestial-becoming',   name:'Becoming',   file:'becoming' },
+  { key:'celestial-connection', name:'Connection', file:'connection' },
+];
+const LEGACY_COVERS = ['sunrise','night','clouds','garden','bedroom','waters','mirror','home'];
+const COVER_PX = 512;          // size an uploaded photo is saved at
+const COVER_FULL_PX = 1254;    // size of the shipped artwork
+const COVER_THUMB_PX = 512;    // the pre-scaled copy used for small displays
+const coverPathById = {};      // what each saved subliminal is wearing, as last seen
+
+/* Everything a surface needs to draw a built-in, or null when the path is an
+   upload or is not one of ours. `srcset` lets the browser take the 512px copy
+   for small displays and the full 1254px file for large or dense ones, so a
+   thumbnail is never a blurry enlargement and a big display is never a small
+   file stretched. */
+function builtinCover(path){
+  const key = String(path || '').startsWith('builtin:') ? String(path).slice('builtin:'.length) : '';
+  const c = BUILTIN_COVERS.find(x => x.key === key);
+  if (c){
+    return { key, name:c.name, width:COVER_FULL_PX, height:COVER_FULL_PX,
+      src:`img/covers/${c.file}-512.webp`,
+      srcset:`img/covers/${c.file}-512.webp ${COVER_THUMB_PX}w, img/covers/${c.file}.webp ${COVER_FULL_PX}w` };
+  }
+  if (LEGACY_COVERS.includes(key)){
+    return { key, name:key, src:`img/covers/${key}.webp`, srcset:'' };
+  }
+  return null;
+}
 function builtinCoverUrl(path){
-  const key = String(path || '').slice('builtin:'.length);
-  return BUILTIN_COVERS.some(c => c.key === key) ? `img/covers/${key}.webp` : null;
+  const c = builtinCover(path);
+  return c ? c.src : null;
+}
+/* Paint a cover onto an <img>. `sizes` is how wide the caller draws it. */
+function applyCoverToImg(img, cover, sizes){
+  if (cover.width){ img.width = cover.width; img.height = cover.height; }
+  else { img.removeAttribute('width'); img.removeAttribute('height'); }
+  if (cover.srcset){ img.sizes = sizes || '64px'; img.srcset = cover.srcset; } else img.removeAttribute('srcset');
+  img.src = cover.src;
 }
 
+/* `id` is a saved subliminal's id, or null while the one in the builder has not
+   been saved yet: then the choice rides along in activeCoverPath and the normal
+   save writes it with the row. */
 function pickCoverFor(id){
   closeCoverPicker();
-  const pop = document.createElement('div');
-  pop.className = 'cover-pop'; pop.id = 'coverPop';
-  pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Choose a cover');
-  pop.innerHTML = `
-    <div class="cover-pop-grid">
-      ${BUILTIN_COVERS.map(c => `
-        <button type="button" onclick="setBuiltinCover('${id}','${c.key}')" title="${c.name}">
-          <img src="img/covers/${c.key}.webp" alt="${c.name}" loading="lazy">
-        </button>`).join('')}
-    </div>
-    <div class="cover-pop-foot">
-      <button type="button" onclick="pickCoverUpload('${id}')">Use my own picture…</button>
-      <button type="button" onclick="closeCoverPicker()">Cancel</button>
+  const pending = !id;
+  const known = pending ? activeCoverPath : (coverPathById[id] !== undefined ? coverPathById[id]
+    : (id === activeMixId ? activeCoverPath : undefined));
+  const wrap = document.createElement('div');
+  wrap.className = 'cover-pop-back'; wrap.id = 'coverPop';
+  wrap._restoreFocus = document.activeElement;
+  wrap.innerHTML = `
+    <div class="cover-pop" role="dialog" aria-modal="true" aria-labelledby="coverPopTitle">
+      <h3 class="cover-pop-title" id="coverPopTitle">Choose a cover</h3>
+      <div class="cover-pop-grid" role="radiogroup" aria-labelledby="coverPopTitle">
+        ${BUILTIN_COVERS.map(c => `
+          <button type="button" class="cover-opt" role="radio" aria-checked="false" tabindex="-1"
+            data-cover="${c.key}" aria-label="${c.name}">
+            <span class="cover-opt-art">
+              <img src="img/covers/${c.file}-512.webp"
+                srcset="img/covers/${c.file}-512.webp ${COVER_THUMB_PX}w, img/covers/${c.file}.webp ${COVER_FULL_PX}w"
+                sizes="(max-width:520px) 44vw, 160px" width="${COVER_FULL_PX}" height="${COVER_FULL_PX}"
+                alt="" loading="lazy" decoding="async">
+              <span class="cover-opt-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+              </span>
+            </span>
+            <span class="cover-opt-name" aria-hidden="true">${c.name}</span>
+          </button>`).join('')}
+      </div>
+      <p class="cover-pop-note" id="coverPopCustom" hidden>You're using your own photo. Choosing a cover above replaces it.</p>
+      <p class="cover-pop-status" id="coverPopStatus" role="status" aria-live="polite"></p>
+      <div class="cover-pop-foot">
+        ${pending
+          ? '<span class="cover-pop-hint">Save this subliminal to use your own picture.</span>'
+          : '<button type="button" class="mini-btn" id="coverPopUpload">Use my own picture…</button>'}
+        <button type="button" class="mini-btn" id="coverPopDone">Done</button>
+      </div>
     </div>`;
-  document.body.appendChild(pop);
-  const first = pop.querySelector('button'); if (first) first.focus();
-  setTimeout(() => document.addEventListener('click', coverPopOutside), 0);
+  document.body.appendChild(wrap);
+  wrap._current = known;
+  paintCoverPickerSelection(wrap, known);
+  wrap.addEventListener('click', e => {
+    if (e.target === wrap) return closeCoverPicker();
+    const opt = e.target.closest('.cover-opt');
+    if (opt) setBuiltinCover(id, opt.dataset.cover);
+    else if (e.target.closest('#coverPopDone')) closeCoverPicker();
+    else if (e.target.closest('#coverPopUpload')) pickCoverUpload(id);
+  });
+  wrap.addEventListener('keydown', coverPopKeys);
+  const sel = wrap.querySelector('.cover-opt[tabindex="0"]') || wrap.querySelector('.cover-opt');
+  if (sel) sel.focus();
+  /* Opened from a list that does not know the current cover: ask, and update the
+     ring when the answer lands. The picker is usable in the meantime. */
+  if (known === undefined && id && sb && currentUser){
+    sb.from('subliminals').select('cover_path').eq('id', id).eq('user_id', currentUser.id).maybeSingle()
+      .then(({ data }) => {
+        if (!wrap.isConnected || wrap._current !== undefined) return;
+        const p = (data && data.cover_path) || null;
+        coverPathById[id] = p; wrap._current = p; paintCoverPickerSelection(wrap, p);
+      });
+  }
 }
-function coverPopOutside(e){
-  const pop = document.getElementById('coverPop');
-  if (pop && !pop.contains(e.target)) closeCoverPicker();
+function paintCoverPickerSelection(wrap, path){
+  const key = String(path || '').startsWith('builtin:') ? String(path).slice('builtin:'.length) : null;
+  const opts = wrap.querySelectorAll('.cover-opt');
+  let any = false;
+  opts.forEach(o => {
+    const on = o.dataset.cover === key;
+    o.setAttribute('aria-checked', on ? 'true' : 'false');
+    o.classList.toggle('is-selected', on);
+    o.tabIndex = on ? 0 : -1;
+    if (on) any = true;
+  });
+  if (!any && opts[0]) opts[0].tabIndex = 0;
+  const custom = wrap.querySelector('#coverPopCustom');
+  if (custom) custom.hidden = !(path && !key);
+}
+function coverPopKeys(e){
+  const wrap = document.getElementById('coverPop'); if (!wrap) return;
+  if (e.key === 'Escape'){ e.preventDefault(); return closeCoverPicker(); }
+  const opts = Array.from(wrap.querySelectorAll('.cover-opt'));
+  const i = opts.indexOf(document.activeElement);
+  if (i >= 0 && /^Arrow|^Home$|^End$/.test(e.key)){
+    e.preventDefault();
+    const cols = Math.max(1, getComputedStyle(wrap.querySelector('.cover-pop-grid')).gridTemplateColumns.split(' ').length);
+    let n = i;
+    if (e.key === 'ArrowRight') n = Math.min(opts.length - 1, i + 1);
+    else if (e.key === 'ArrowLeft') n = Math.max(0, i - 1);
+    else if (e.key === 'ArrowDown') n = Math.min(opts.length - 1, i + cols);
+    else if (e.key === 'ArrowUp') n = Math.max(0, i - cols);
+    else if (e.key === 'Home') n = 0;
+    else if (e.key === 'End') n = opts.length - 1;
+    opts.forEach((o, k) => { o.tabIndex = k === n ? 0 : -1; });
+    opts[n].focus();
+  } else if (e.key === 'Tab'){
+    const f = Array.from(wrap.querySelectorAll('button')).filter(b => b.tabIndex >= 0 && !b.disabled);
+    if (!f.length) return;
+    const a = f.indexOf(document.activeElement);
+    if (e.shiftKey && a <= 0){ e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && a === f.length - 1){ e.preventDefault(); f[0].focus(); }
+  }
 }
 function closeCoverPicker(){
   const pop = document.getElementById('coverPop');
-  if (pop) pop.remove();
-  document.removeEventListener('click', coverPopOutside);
+  if (!pop) return;
+  const back = pop._restoreFocus;
+  pop.remove();
+  if (back && back.isConnected && back.focus) back.focus();
+}
+function coverPopSay(t){
+  const s = document.getElementById('coverPopStatus'); if (s) s.textContent = t;
 }
 
+/* Choosing only ever writes cover_path. Nothing here touches the audio, the
+   affirmations, the recordings or the mix, and nothing starts or stops playback. */
 async function setBuiltinCover(id, key){
-  closeCoverPicker();
-  const msg = document.getElementById('libTitleMsg-' + id);
+  const value = 'builtin:' + key;
+  const pop = document.getElementById('coverPop');
+  if (!id){
+    /* Not saved yet: the save writes activeCoverPath with the new row. */
+    activeCoverPath = value; refreshListeningCover();
+    if (pop){ pop._current = value; paintCoverPickerSelection(pop, value); }
+    coverPopSay('Cover chosen — it will be saved with your subliminal');
+    return;
+  }
   if (!sb || !currentUser) return;
+  const previous = pop ? pop._current : undefined;
+  if (pop){ pop._current = value; paintCoverPickerSelection(pop, value); }
   const { error } = await sb.from('subliminals')
-    .update({ cover_path: 'builtin:' + key }).eq('id', id).eq('user_id', currentUser.id);
-  if (error){ mixMessage(describeCoverError(error)); if(msg)msg.textContent=describeCoverError(error); return; }
-  showCover(id, 'builtin:' + key, true);
+    .update({ cover_path: value }).eq('id', id).eq('user_id', currentUser.id);
+  if (error){
+    const m = describeCoverError(error);
+    if (pop && previous !== undefined){ pop._current = previous; paintCoverPickerSelection(pop, previous); }
+    coverPopSay(m); mixMessage(m);
+    const msg = document.getElementById('libTitleMsg-' + id); if (msg) msg.textContent = m;
+    return;
+  }
+  coverPathById[id] = value;
+  showCover(id, value, true);
   ['todaySubs','todaySubCovers','myLibrary'].forEach(forgetFetch);
-  mixMessage('Cover saved');
+  coverPopSay('Cover saved'); mixMessage('Cover saved');
 }
 
 /* The one error anyone actually hits, said in words that name the fix. */
@@ -1709,6 +1845,7 @@ async function uploadCover(id, file){
       .update({ cover_path: path }).eq('id', id).eq('user_id', currentUser.id);
     if (dbErr) throw dbErr;
     say('Cover saved');
+    coverPathById[id] = path;
     ['todaySubs','todaySubCovers','myLibrary'].forEach(forgetFetch);
     await showCover(id, path, true);
   } catch (e){
@@ -1717,21 +1854,29 @@ async function uploadCover(id, file){
 }
 
 /* A built-in is a file that ships with the app, so it needs no round trip. An
-   upload needs a signed link, which expires, so it is fetched at render time. */
+   upload needs a signed link, which expires, so it is fetched at render time.
+
+   If the picture will not load, the card falls back to its plain tile. The
+   saved value is left exactly as it was: a failed image is a display problem,
+   not a decision to change what the person chose. */
 async function showCover(id, path, bust){
+  coverPathById[id] = path || null;
   if(id===activeMixId){activeCoverPath=path;refreshListeningCover();}
   const img = document.getElementById('libCoverImg-' + id);
   if (!path || !img) return;
-  const builtin = builtinCoverUrl(path);
   const wrap = document.getElementById('libCover-' + id);
+  img.onerror = () => { img.style.display = 'none'; if (wrap) wrap.classList.remove('has-art'); };
+  const builtin = builtinCover(path);
   if (builtin){
-    img.src = builtin; img.style.display = 'block';
+    applyCoverToImg(img, builtin, '46px');
+    img.style.display = 'block';
     if (wrap) wrap.classList.add('has-art');
     return;
   }
   if (!sb) return;
   const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
   if (error || !data) return;
+  img.removeAttribute('srcset'); img.removeAttribute('width'); img.removeAttribute('height');
   img.src = data.signedUrl + (bust ? '&t=' + Date.now() : '');
   img.style.display = 'block';
   if (wrap) wrap.classList.add('has-art');

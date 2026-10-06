@@ -387,16 +387,19 @@ async function showTodaySubCover(id, path){
   const host = document.getElementById('sessArt-' + id);
   if (!host || !path) return;
   const builtin = (typeof builtinCoverUrl === 'function') ? builtinCoverUrl(path) : null;
-  if (builtin){
-    host.style.backgroundImage = `url("${builtin}")`;
-    host.classList.add('has-art');
-    return;
-  }
+  /* A background cannot report that it failed, so probe with an Image first. If
+     the file will not load the tile stays plain and the saved choice untouched. */
+  const paint = url => new Promise(res => {
+    const probe = new Image();
+    probe.onload = () => { host.style.backgroundImage = `url("${url}")`; host.classList.add('has-art'); res(); };
+    probe.onerror = () => { host.style.backgroundImage = ''; host.classList.remove('has-art'); res(); };
+    probe.src = url;
+  });
+  if (builtin) return paint(builtin);
   if (!sb) return;
   const { data, error } = await sb.storage.from('covers').createSignedUrl(path, 3600);
   if (error || !data) return;
-  host.style.backgroundImage = `url("${data.signedUrl}")`;
-  host.classList.add('has-art');
+  return paint(data.signedUrl);
 }
 
 function chooseTodaySub(id){

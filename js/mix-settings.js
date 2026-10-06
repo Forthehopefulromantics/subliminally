@@ -12,10 +12,21 @@ const SOOTHING_VARIANTS = ['pad','chimes','hum'];
    round trip; an upload needs a signed link, which expires, so it is fetched
    each time the player opens. The placeholder is what you press when there is
    no cover yet, so choosing one is never a hidden feature. */
-function showListeningCover(url){
+function showListeningCover(cover){
   const img=document.getElementById('listeningCover'),empty=document.getElementById('listeningCoverEmpty');
-  if(img){ if(url){img.src=url;img.hidden=false;} else {img.removeAttribute('src');img.hidden=true;} }
-  if(empty)empty.hidden=!!url;
+  if(img){
+    if(cover){
+      /* Same file the picker and the cards use. The player cover is small, so the
+         browser takes the 512px copy; it only reaches for the 1254px one on a
+         larger or denser display. If it will not load, the placeholder shows and
+         the saved choice is left alone. */
+      img.onerror=()=>{ img.hidden=true; if(empty)empty.hidden=false; };
+      if(cover.srcset) applyCoverToImg(img,cover,'58px');
+      else { img.removeAttribute('srcset'); img.removeAttribute('width'); img.removeAttribute('height'); img.src=cover.src; }
+      img.hidden=false;
+    } else { img.onerror=null; img.removeAttribute('srcset'); img.removeAttribute('src'); img.hidden=true; }
+  }
+  if(empty)empty.hidden=!!cover;
   if(typeof finalPlaying!=='undefined'&&finalPlaying&&typeof refreshMediaSessionMetadata==='function')refreshMediaSessionMetadata();
 }
 async function refreshListeningCover(){
@@ -23,14 +34,14 @@ async function refreshListeningCover(){
   if(!document.getElementById('listeningCover'))return;
   showListeningCover(null);
   if(!path)return;
-  let url=builtinCoverUrl(path);
-  if(!url && sb){
+  let cover=builtinCover(path);
+  if(!cover && sb){
     const {data,error}=await sb.storage.from('covers').createSignedUrl(path,3600);
     if(error || !data)return;
-    url=data.signedUrl;
+    cover={src:data.signedUrl,srcset:''};
   }
   if(id!==activeMixId || path!==activeCoverPath)return;
-  if(url)showListeningCover(url);
+  if(cover)showListeningCover(cover);
 }
 function readMixSettings(){
   const mix = {};
@@ -132,8 +143,9 @@ function syncListeningMix(){
 }
 function restartListening(){ stopFinal(); playFinal(); renderNowBar(); }
 function chooseListeningCover(){
-  if(activeMixId) pickCoverFor(activeMixId);
-  else mixMessage('Save this subliminal to your library first, then choose a cover.');
+  /* Before the first save there is no row to write to; the choice waits in
+     activeCoverPath and the save stores it with the new subliminal. */
+  pickCoverFor(activeMixId || null);
 }
 /* A refresh, a close, or a swipe away must not lose the fader you just moved:
    both events flush the pending write, and flushMixSave is a no-op when there
