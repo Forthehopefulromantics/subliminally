@@ -67,6 +67,18 @@ function reply(body, opts){
     arrayBuffer: async () => (o.bytes || new TextEncoder().encode(text)).buffer,
   };
 }
+/* A real, whole mp3: the route now refuses audio it cannot prove is complete. */
+import { execFileSync } from 'node:child_process';
+import { readFileSync as readFs, mkdtempSync as mkTmp } from 'node:fs';
+import { tmpdir as osTmp } from 'node:os';
+import pathMod from 'node:path';
+let WHOLE_MP3;
+{
+  const f = pathMod.join(mkTmp(pathMod.join(osTmp(), 'vs-')), 'speech.mp3');
+  let ff = 'ffmpeg'; try { ff = (await import('ffmpeg-static')).default || ff; } catch {}
+  execFileSync(ff, ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=4', '-ac', '1', '-ar', '44100', '-b:a', '64k', f]);
+  WHOLE_MP3 = new Uint8Array(readFs(f));
+}
 function paramsOf(url){ return new URL(url).searchParams; }
 function eqValue(params, key){ return (params.get(key) || '').replace(/^eq\./, ''); }
 function inValues(params, key){
@@ -155,6 +167,10 @@ globalThis.fetch = async (url, opts) => {
   }
   if (u.includes('/storage/v1/object/tts-cache/')){
     const path = u.split('/storage/v1/object/tts-cache/')[1];
+    if (method === 'HEAD'){
+      if (!db.objects.has(path)) return reply('', { status: 404 });
+      return reply('', { headers: { 'content-length': String(Buffer.from(db.objects.get(path)).length) } });
+    }
     if (method === 'POST'){ db.objects.set(path, o.body); return reply({ Key: path }); }
     // Reading an object straight back is how the Serenity demo is served.
     if (method === 'GET'){
@@ -174,7 +190,7 @@ globalThis.fetch = async (url, opts) => {
     elevenCalls.push({ url: u, method, key: o.headers && o.headers['xi-api-key'], body,
                        form: (typeof FormData !== 'undefined' && o.body instanceof FormData) ? o.body : null });
     if (nextElevenResponse) return reply(nextElevenResponse.body || 'error', { status: nextElevenResponse.status });
-    if (u.includes('/text-to-speech/')) return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
+    if (u.includes('/text-to-speech/')) return reply('', { bytes: WHOLE_MP3 });
     if (u.includes('/voices/add')){
       // A new clone is a new voice at the provider, never the same id back.
       MY_CLONE = `voice_clone_of_kyla_${++clonesMade}`;
@@ -647,7 +663,7 @@ const catRes = mockRes();
 await voices({ method: 'POST', headers: { authorization: 'Bearer good-token' } }, catRes);
 check('the catalogue offers one AI voice', catRes.body.presets.length, 1);
 check('  ...and it is Serenity', catRes.body.presets[0].key, 'serenity');
-check('  ...by key and name only', Object.keys(catRes.body.presets[0]).sort(), ['desc', 'key', 'name']);
+check('  ...by key, name and a one-way fingerprint only', Object.keys(catRes.body.presets[0]).sort(), ['desc', 'fingerprint', 'key', 'name']);
 check('  ...never by provider id', JSON.stringify(catRes.body).includes(SERENITY), false);
 check('  ...and never offers a retired voice', JSON.stringify(catRes.body).includes('sarah'), false);
 check('  ...says a voice of their own exists', catRes.body.myVoice.key, 'mine');

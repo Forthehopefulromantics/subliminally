@@ -128,7 +128,20 @@ stand-in Supabase and voice provider), `npm run test:track`,
 `npm run test:audio-validate`, `npm run test:mix`, `npm run test:audio-editor`
 (needs `PLAYWRIGHT_MODULE`), `node scripts/audio-lifecycle-test.cjs`.
 
-RESULTS_PLACEHOLDER
+| Suite | Result |
+|---|---|
+| `test:audio` (browser, 26 scenarios) | **26/26 passed** |
+| `test:track` (voice track renderer) | passed |
+| `test:audio-validate` (server mp3 validation) | passed |
+| `test:voice` (server routes with stubbed provider/storage; stub updated to return a real mp3 and answer HEAD, catalogue now carries a fingerprint) | all checks passed |
+| `test:mix` (mixer persistence; updated: an unchanged save now writes nothing, new failure wording) | passed |
+| `audio-editor-e2e` (Adjust Sounds, browser) | ALL PASSED |
+| `audio-lifecycle-test.cjs` (was already failing at HEAD; stubs repaired) | passed |
+| `test:voice-routing`, `test:ambience` | **already failing before this work** (crash on missing page elements); not repaired |
+
+Mapping to the requested scenarios (all in a real Chromium; see the device list below for what that does not cover):
+
+1 Serenity correct voice (pitch of each cue measured against the stored clip) · 2 own recording plays (pitch of the saved file) · 3 saved clone (`mine`) only · 4 no silent system TTS (generation failure, plan-lookup failure, expired links, auth not settled) · 5 plays beyond one second · 6/7 60 and 480 minutes (accelerated clock + real-time loop wrap) · 8 pause/resume/start over · 9 reload preserves settings, including a save that failed and was recovered from the device copy · 10 each fader sends only its own key · 11 switching and double-tapping never mix or overlap sessions · 12 clips requested once and reused (server-side reuse is covered by `test:voice`) · 13 failed generation shows an error · 15 sign out/in · plus 16/16b (interrupted context), 17/17b (upload failure blocks save; voice identity and pace saved).
 
 Not performed, and **not** to be treated as passed:
 
