@@ -200,51 +200,80 @@ async function renameLibraryItem(id){
    same way, but you are not thrown onto the builder page to find a second
    button. Everything before this point is identical either way -- there is one
    loader, not two. */
+let loadSavedSeq = 0;
 async function loadSavedIntoBuilder(id, opts){
   if (!sb || !currentUser) return;
+  /* Two loads can be in flight if somebody taps a second subliminal while the
+     first is still downloading its recordings. Only the latest may write the
+     builder's state; an earlier one stops where it is. */
+  const mySeq = ++loadSavedSeq;
+  const stale = () => { if (mySeq !== loadSavedSeq) throw new Error('superseded'); };
   await flushMixSave();
   const { data: s, error } = await sb.from('subliminals').select('*').eq('id', id).eq('user_id', currentUser.id).maybeSingle();
+  stale();
   if (error || !s) throw error || new Error('This subliminal could not be loaded.');
-  if (finalPlaying) stopFinal();
+  if (finalPlaying) stopFinal('load-other-subliminal');
+  cancelPendingStart();
+  stopVoiceTracks();
+  clearVoiceFailure();
   editingExistingId = id;
+  /* One resolved mix for everything below: the server's, with anything this
+     device adjusted but never got confirmed laid over it. */
+  const resolved = resolveSavedMix(id, s);
+  const mix = resolved.mix;
   state.playerTitle = s.title || 'Your Subliminal';
-  const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
-  state.freq = matchedFreq;
+  const freqHz = Number.isFinite(mix.freqHz) ? mix.freqHz : s.frequency_hz;
+  state.freq = FREQS.find(f => f.hz === freqHz) || null;
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
-  state.bg = s.background || 'none';
+  state.bg = typeof mix.bg === 'string' && mix.bg ? mix.bg : (s.background || 'none');
   /* The layer lives in mix_settings. Only a sound from the other family is a
      layer; anything else is ignored rather than allowed to double one up. */
-  const savedLayer = s.mix_settings && s.mix_settings.bgLayer;
+  const savedLayer = mix.bgLayer;
   state.bgLayer = savedLayer && typeof ambienceFamily === 'function' && ambienceFamily(savedLayer)
     && ambienceFamily(savedLayer) !== ambienceFamily(state.bg) ? savedLayer : 'none';
   /* The soothing pad travels in mix_settings too. Missing means none, so an
      older subliminal never inherits the pad of the one opened before it. */
-  const savedSoothing = s.mix_settings && s.mix_settings.soothingLayer;
-  setSoothingLayer(SOOTHING_VARIANTS.includes(savedSoothing) ? savedSoothing : 'none');
-  syncSelectionByData('#binauralChips .length-chip', 'band', s.binaural_band || 'none');
-  state.targetLengthMinutes = s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5;
+  setSoothingLayer(SOOTHING_VARIANTS.includes(mix.soothingLayer) ? mix.soothingLayer : 'none');
+  const band = mix.binauralBand !== undefined ? mix.binauralBand : s.binaural_band;
+  syncSelectionByData('#binauralChips .length-chip', 'band', band || 'none');
+  const minutes = Number.isFinite(mix.durationMinutes) && mix.durationMinutes > 0 ? mix.durationMinutes
+    : (s.duration_seconds ? Math.max(1, Math.round(s.duration_seconds/60)) : 5);
+  state.targetLengthMinutes = minutes;
   const restoredMinutes = Math.min(480, Math.max(5, state.targetLengthMinutes));
   document.getElementById('sessionLengthSlider').value = restoredMinutes;
   document.getElementById('sessionLengthVal').textContent = formatSessionLength(restoredMinutes);
   state.eftMode = !!s.eft_mode;
   state.eftRepeatCount = s.eft_repeat_count || null;
   state.visualizationMode = !!s.visualization_mode;
-  state.binauralBand = s.binaural_band || null;
+  state.binauralBand = band || null;
+  if (['entire','current','none'].includes(mix.loopMode) && typeof playerPrefs !== 'undefined') playerPrefs.loopMode = mix.loopMode;
+  /* The pace is restored BEFORE any voice is asked for: it is part of how a
+     line is read, and so part of which stored clip is the right one. */
+  applyPaceSettings(mix);
 
+  /* WHICH VOICE THIS SUBLIMINAL WAS SAVED WITH. voice_profile is the record of
+     it; rows from before it existed are read the old way (recordings present ->
+     recorded, ai_voice_id present -> that voice). A row that has neither is a
+     genuine device-voice subliminal from the earliest versions, or one whose
+     recording never uploaded; either way it is never quietly given a studio
+     voice, and the person is told what it is. */
+  const vp = s.voice_profile && typeof s.voice_profile === 'object' ? s.voice_profile : null;
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
-  if (hasRealRecordings){
+  const savedKind = vp && vp.kind ? vp.kind
+    : (hasRealRecordings ? 'recorded' : (s.ai_voice_id && s.ai_voice_id !== DEVICE_VOICE ? (s.ai_voice_id === MY_CLONED_VOICE ? 'clone' : 'serenity') : 'device'));
+  state.voiceFingerprint = vp && vp.fingerprint ? vp.fingerprint : null;
+  state.voiceLegacy = !vp;
+  recordings = [];
+  recordingLoadErrors = [];
+  if (savedKind === 'recorded'){
     /* Every way this can fail used to end in `null`, which is the same value as
-       "this line was never recorded". So a subliminal whose audio could not be
-       fetched — an expired link, a storage rule, a phone that dropped off the
-       network — came back looking like one you had never recorded, and the
-       player said "go back and hold the record button", which was untrue and
-       unfixable by doing what it asked. Load failures are now counted and told
-       apart from lines that genuinely have no recording. */
-    recordings = [];
-    recordingLoadErrors = [];
-    for (const path of s.recording_urls){
+       "this line was never recorded". Load failures are counted and told apart
+       from lines that genuinely have no recording. */
+    if (!hasRealRecordings) recordingLoadErrors.push('this recording was never uploaded');
+    for (const path of (s.recording_urls || [])){
       if (!path){ recordings.push(null); continue; }   // never recorded: not an error
       const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+      stale();
       if (sErr || !signed){
         recordings.push(null);
         recordingLoadErrors.push((sErr && sErr.message) || 'could not get a link to the audio');
@@ -254,29 +283,26 @@ async function loadSavedIntoBuilder(id, opts){
         const res = await fetch(signed.signedUrl);
         if (!res.ok) throw new Error('the audio file came back ' + res.status);
         const blob = await res.blob();
+        stale();
         if (!blob.size) throw new Error('the audio file is empty');
         // `path` marks the take as already saved: saving again reuses it.
         recordings.push({ url: URL.createObjectURL(blob), blob, path });
       } catch(e){
+        if (e && e.message === 'superseded') throw e;
         recordings.push(null);
         recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');
       }
     }
     state.voiceMode = 'own';
+    state.aiVoiceId = null;
     state.selectedVoice = VOICE_RECORD_OWN;
-    if (recordingLoadErrors.length){
-      console.warn('subliminal audio did not load:', recordingLoadErrors);
-    }
+    if (recordingLoadErrors.length) console.warn('subliminal audio did not load:', recordingLoadErrors);
   } else {
-    recordingLoadErrors = [];
-    // No recorded audio was saved for this one (or it was a studio voice
-    // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
-    state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
-    /* Reopening a saved subliminal has to put the voice picker back the way it
-       was built, or Continue would fork on a blank answer -- and a blank answer
-       used to mean the manual recorder. selectedVoiceFromState() reads it back
-       out of the two fields this row actually stores. */
+    state.aiVoiceId = savedKind === 'clone' ? MY_CLONED_VOICE
+      : savedKind === 'serenity' ? ((vp && vp.key) || s.ai_voice_id || SERENITY_VOICE)
+      : DEVICE_VOICE;
+    if (savedKind === 'serenity' && s.ai_voice_id && s.ai_voice_id !== DEVICE_VOICE) state.aiVoiceId = s.ai_voice_id;
     state.selectedVoice = selectedVoiceFromState();
   }
 
@@ -320,8 +346,8 @@ async function loadSavedIntoBuilder(id, opts){
     }
   }
 
+  restoreMixSettings(id, mix, { unsynced: resolved.unsynced });
   prepareFinal();
-  restoreMixSettings(id, s.mix_settings);
   activeCoverPath = s.cover_path || null;
   refreshListeningCover();
   if (!(opts && opts.stayHere)){
@@ -1524,13 +1550,19 @@ async function playFromLibrary(id){
   if (!sb || !currentUser){ openAuthModal(); return; }
   /* First thing, before anything is awaited: the tap is the only moment a
      browser will let audio begin, and loading the subliminal ends it. */
-  primeAudio();
   const btn = document.getElementById('libPlay-' + id);
   const now = document.getElementById('libNow-' + id);
 
   // Pressing play on the one already playing stops it, the way a playlist does.
   if (finalPlaying && libraryNowPlayingId === id){ toggleImmersivePlayback(); openImmersivePlayer(); return; }
-  if (finalPlaying) stopFinal();
+  /* Whatever was playing or starting is stopped FIRST, and the new context is
+     opened after: the other way round, the freshly "primed" context was the one
+     stopFinal() then closed, and the session started later outside the tap, on a
+     context the phone would not let make a sound. */
+  if (finalPlaying) stopFinal('switch-subliminal');
+  cancelPendingStart();
+  primeAudio();
+  clearVoiceFailure();
 
   libraryNowPlayingId = id;
   if (btn) btn.classList.add('is-loading');
@@ -1539,12 +1571,14 @@ async function playFromLibrary(id){
   try {
     await loadSavedIntoBuilder(id, { stayHere: true });
   } catch (e){
+    if (e && e.message === 'superseded') return;   // another subliminal was tapped meanwhile
     if (now) now.textContent = 'Could not load this one.';
     if (btn) btn.classList.remove('is-loading');
     libraryNowPlayingId = null;
     return;
   }
   if (btn) btn.classList.remove('is-loading');
+  if (libraryNowPlayingId !== id) return;
   playFinal();
   reflectLibraryPlaying();
 }

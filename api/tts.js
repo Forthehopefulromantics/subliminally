@@ -35,9 +35,14 @@ import {
   MODEL_ID, VoiceProviderError, clampSpeed, isConfigured, synthesizeSpeech,
 } from '../lib/elevenlabs.js';
 import {
-  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, findCachedClips, hashesFor, normalizeLine,
-  rateLimitFor, recordGenerations, rememberClip, signClipUrl, storagePathFor, touchClips, uploadClip,
+  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, clipSize, findCachedClips, hashesFor, markClipFailed, normalizeLine,
+  rateLimitFor, recordGenerations, rememberClip, signClipUrl, storagePathFor, touchClips, uploadClip, voiceFingerprint,
 } from '../lib/tts-store.js';
+import { validateSpeechClip } from '../lib/audio-validate.js';
+
+/* A cached row is only a promise. Before it is handed out the file has to exist
+   and be big enough to be speech; if not, only that line is made again. */
+const MIN_CLIP_BYTES = 1500;
 
 /* Generating several lines takes longer than the default ceiling allows, and a
    function cut off half way through has spent the credits without keeping the
@@ -76,6 +81,8 @@ const HTTP_FOR_CODE = {
   provider_auth: 502,
   rejected: 502,
   provider_failed: 502,
+  audio_invalid: 502,
+  audio_truncated: 502,
 };
 
 function readJsonBody(req) {
@@ -172,6 +179,18 @@ export default async function handler(req, res) {
 
   const wanted = clips.filter((c) => c.clipKey);
   const cached = await findCachedClips(user.id, wanted.map((c) => c.clipKey));
+  await Promise.all(wanted.map(async (c) => {
+    const hit = cached.get(c.clipKey);
+    if (!hit) return;
+    const size = await clipSize(hit.storage_path);
+    if (size < MIN_CLIP_BYTES) {
+      console.error('cached clip missing or too small, regenerating', c.clipKey, size);
+      cached.delete(c.clipKey);
+      markClipFailed(hit.id, size ? 'too_small' : 'missing_file');
+    } else {
+      hit.byte_size = size;
+    }
+  }));
   const misses = wanted.filter((c) => !cached.has(c.clipKey));
 
   /* Nothing is generated until the whole request is known to be within the
@@ -198,6 +217,7 @@ export default async function handler(req, res) {
       clip.storagePath = hit.storage_path;
       clip.cached = true;
       clip.rowId = hit.id;
+      clip.byteSize = hit.byte_size;
       ledger.push({ userId: user.id, providerVoiceId: voice.providerVoiceId, textHash: clip.textHash, characterCount: clip.text.length, cacheHit: true });
       continue;
     }
@@ -206,7 +226,16 @@ export default async function handler(req, res) {
       const storagePath = storagePathFor(user.id, clip.clipKey);
       await once(`${user.id}|${clip.clipKey}`, async () => {
         const audio = await synthesizeSpeech({ providerVoiceId: voice.providerVoiceId, text: clip.text, speed });
+        const check = validateSpeechClip(audio, clip.text);
+        if (!check.ok) {
+          console.error('provider audio rejected:', check.reason, check.bytes, check.durationMs);
+          throw new VoiceProviderError('audio_invalid', check.reason);
+        }
+        clip.byteSize = check.bytes;
+        clip.durationMs = check.durationMs;
         await uploadClip(storagePath, audio);
+        // Never call it stored until it can be read back at the size it was sent.
+        if ((await clipSize(storagePath)) < check.bytes) throw new VoiceProviderError('audio_invalid', 'upload_incomplete');
         await rememberClip({
           userId: user.id,
           providerVoiceId: voice.providerVoiceId,
@@ -216,6 +245,8 @@ export default async function handler(req, res) {
           modelId: MODEL_ID,
           characterCount: clip.text.length,
           storagePath,
+          byteSize: check.bytes,
+          durationMs: check.durationMs,
         });
       });
       clip.storagePath = storagePath;
@@ -258,11 +289,12 @@ export default async function handler(req, res) {
 
   res.status(200).json({
     voiceKey: requested,
+    voiceFingerprint: voiceFingerprint(voice.providerVoiceId),
     speed,
     characterCount: ledger.reduce((n, r) => n + (r.cacheHit ? 0 : r.characterCount), 0),
     generated: ledger.filter((r) => !r.cacheHit).length,
     reused: ledger.filter((r) => r.cacheHit).length,
     warning: fatal || null,
-    clips: clips.map((c) => ({ index: c.index, text: c.text, url: c.url || null, cached: !!c.cached, error: c.error || null })),
+    clips: clips.map((c) => ({ index: c.index, text: c.text, url: c.url || null, cached: !!c.cached, bytes: c.byteSize || null, durationMs: c.durationMs || null, status: c.url ? 'ready' : 'failed', error: c.error || null })),
   });
 }

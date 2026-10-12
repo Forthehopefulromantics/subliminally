@@ -18,6 +18,8 @@ import { bearerToken, whoIsCalling, tierForUser } from '../lib/supabase-auth.js'
 import { DEVICE_VOICE_KEY, MY_VOICE_KEY, publicPresetVoices } from '../lib/voices.js';
 import { VOICE_CLONE_CONSENT, getVoiceProfile } from '../lib/user-voices.js';
 import { isConfigured } from '../lib/elevenlabs.js';
+import { resolvePresetVoice } from '../lib/voices.js';
+import { voiceFingerprint } from '../lib/tts-store.js';
 
 export default async function handler(req, res) {
   if (applyCors(req, res)) return;
@@ -40,14 +42,17 @@ export default async function handler(req, res) {
     deviceVoiceKey: DEVICE_VOICE_KEY,
     myVoiceKey: MY_VOICE_KEY,
     tier,
-    presets: publicPresetVoices(),
+    presets: publicPresetVoices().map((p) => {
+      const r = resolvePresetVoice(p.key);
+      return r ? { ...p, fingerprint: voiceFingerprint(r.providerVoiceId) } : p;
+    }),
     // The page shows this sentence and sends it back with the sample; the clone
     // route accepts nothing else, so the two can never drift apart.
     consentStatement: VOICE_CLONE_CONSENT,
     // The voice id itself is not in here. The page only ever needs to know that
     // there is one, and what to call it.
     myVoice: profile
-      ? { key: MY_VOICE_KEY, name: profile.display_name || 'My voice', desc: 'your voice', createdAt: profile.created_at || null }
+      ? { key: MY_VOICE_KEY, fingerprint: voiceFingerprint(profile.provider_voice_id), name: profile.display_name || 'My voice', desc: 'your voice', createdAt: profile.created_at || null }
       : null,
   });
 }

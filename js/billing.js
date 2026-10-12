@@ -588,16 +588,38 @@ function estimateSessionSeconds(){
   return (state.affirmations.length || 1) * 4;
 }
 
-async function getMySubscriberRow(){
+async function getMySubscriberRow(opts){
   if (!sb || !currentUser) return null;
   /* Which plan you are on is asked for constantly -- by the builder on every
      step, by each page as it opens, by the pricing block. It changes when you
      buy something and at almost no other time, so it is worth remembering for
-     longer than anything else here. `forgetFetch('tier')` after a purchase. */
-  return fetchOnce('tier', async () => {
-    const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
-    return data; // null if they've never subscribed
-  }, 300000);
+     longer than anything else here. `forgetFetch('tier')` after a purchase.
+
+     A FAILED lookup is not an answer. It used to be returned as "no row", which
+     fetchOnce then remembered for five minutes as "no plan" -- so one dropped
+     request made a paying member's Serenity subliminals read in the phone's own
+     voice until the cache expired. A failure now throws out of fetchOnce (which
+     does not cache it); the display callers below get null, the playback path
+     asks for `strict` and gets the error. */
+  try {
+    return await fetchOnce('tier', async () => {
+      const { data, error } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
+      if (error) throw error;
+      return data; // null if they've never subscribed
+    }, 300000);
+  } catch (e) {
+    console.warn('plan lookup failed:', e && e.message);
+    if (opts && opts.strict) throw new Error('tier_unavailable');
+    return null;
+  }
+}
+
+/* The plan, or an error. For the one question where "I could not find out" must
+   never be treated as "no plan": may this account play its generated voice. */
+async function getMyTierStrict(){
+  const subRow = await getMySubscriberRow({ strict: true });
+  const validStatuses = ['active', 'trialing'];
+  return normalizeTier(subRow && validStatuses.includes(subRow.status) && subRow.tier ? subRow.tier : 'none');
 }
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
@@ -607,20 +629,56 @@ const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
    let alone re-records — a voice that has not changed. */
 async function uploadVoiceTakes(takes, folder, label){
   const paths = [];
-  let anyUploaded = false, anySaved = false;
+  let anyUploaded = false, anySaved = false, failed = 0;
   for (let i = 0; i < takes.length; i++){
     const take = takes[i];
     if (!take || !take.blob){ paths.push(null); continue; }
     if (take.path){ paths.push(take.path); anySaved = true; continue; }
+    if (!take.blob.size){ console.error(label + ' take', i, 'is empty'); failed++; paths.push(null); continue; }
     const mime = take.blob.type || 'audio/webm';
     const path = `${folder}/${i}.${extForMime(mime)}`;
-    const { error: upErr } = await sb.storage.from('recordings').upload(path, take.blob, { contentType: mime });
-    if (upErr){ console.error(label + ' upload failed for line', i, upErr); paths.push(null); continue; }
+    /* Two attempts, and then proof: a take is only counted as saved once the
+       stored file can be reached again. An upload that "succeeded" into nothing
+       is how a subliminal ended up with no voice at all. */
+    let stored = false;
+    for (let attempt = 0; attempt < 2 && !stored; attempt++){
+      const { error: upErr } = await sb.storage.from('recordings').upload(path, take.blob, { contentType: mime, upsert: true });
+      if (upErr){ console.error(label + ' upload failed for line', i, upErr); continue; }
+      try {
+        const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 60);
+        if (sErr || !signed) throw sErr || new Error('no link');
+        const head = await fetch(signed.signedUrl, { method: 'HEAD' }).catch(() => null);
+        if (head && head.status >= 400) throw new Error('stored file answered ' + head.status);
+        stored = true;
+      } catch (e){ console.error(label + ' could not be read back for line', i, e); }
+    }
+    if (!stored){ failed++; paths.push(null); continue; }
     take.path = path; // store the storage path; we generate a signed URL when loading it back
     paths.push(path);
     anyUploaded = true;
   }
-  return { paths, ok: anyUploaded || anySaved };
+  return { paths, ok: (anyUploaded || anySaved) && failed === 0, failed };
+}
+
+/* Who reads this subliminal, written down as a fact about the row instead of
+   inferred later from which columns happen to be empty. It is what lets a reload
+   know the difference between "this was recorded and the file is missing" and
+   "this was always the device voice". The fingerprint is a short hash of the
+   provider's voice id (never the id): if the voice behind 'serenity' or 'mine'
+   ever changes, the subliminal notices instead of playing in the new one. */
+function buildVoiceProfile(){
+  const kind = state.voiceMode === 'own' ? 'recorded'
+    : isDeviceVoiceId(state.aiVoiceId) ? 'device'
+    : state.aiVoiceId === MY_CLONED_VOICE ? 'clone' : 'serenity';
+  const studio = kind === 'serenity' || kind === 'clone';
+  return {
+    v: 1, kind,
+    key: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
+    fingerprint: studio ? (voiceFingerprints[state.aiVoiceId] || state.voiceFingerprint || null) : null,
+    pace: typeof affirmationPace !== 'undefined' ? affirmationPace : null,
+    speed: typeof paceNow === 'function' ? paceNow().speed : null,
+    savedAt: new Date().toISOString(),
+  };
 }
 
 /* Saving. A fresh build is inserted. A subliminal that is already saved — just
@@ -690,6 +748,16 @@ async function saveSubliminal(opts){
     recordingUrls = takes.paths;
     if (!takes.ok) recordingUploadFailed = true;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
+    /* Nothing is saved on top of a recording that did not reach storage. The
+       old behaviour saved the row anyway "to replay with the AI voice" — which in
+       practice meant the phone's own voice reading a subliminal that was meant to
+       be in the person's. Their takes are still in memory here; Save again
+       retries only the ones that failed. */
+    if (recordingUploadFailed){
+      msg.textContent = 'Your voice recording couldn\'t be uploaded, so nothing was saved and nothing was changed. Check your connection and tap Save again — your recording is still here.';
+      msg.className = 'save-msg err';
+      return;
+    }
   }
 
   let customTrackStoragePath = null;
@@ -731,23 +799,29 @@ async function saveSubliminal(opts){
     binaural_band: state.binauralBand || null,
     // Remember which voice built this one, so reopening it sounds the same.
     ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
-    layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
+    layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null,
+    voice_profile: buildVoiceProfile()
   };
   forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
   await flushMixSave();
-  const { data: savedSubliminal, error } = updatingId
-    ? await sb.from('subliminals').update(row).eq('id', updatingId).eq('user_id', currentUser.id).select('id').single()
-    : await sb.from('subliminals').insert({ ...row, user_id: currentUser.id, cover_path: activeCoverPath || null }).select('id').single();
+  const writeRow = (r) => updatingId
+    ? sb.from('subliminals').update(r).eq('id', updatingId).eq('user_id', currentUser.id).select('id').single()
+    : sb.from('subliminals').insert({ ...r, user_id: currentUser.id, cover_path: activeCoverPath || null }).select('id').single();
+  let { data: savedSubliminal, error } = await writeRow(row);
+  /* The voice_profile column arrives with 20261012_audio_reliability.sql. Until
+     that has been run, saving must keep working exactly as it did. */
+  if (error && /voice_profile/.test(error.message || '')){
+    console.warn('voice_profile column missing; saving without it');
+    const { voice_profile, ...legacyRow } = row;
+    ({ data: savedSubliminal, error } = await writeRow(legacyRow));
+  }
   if (error || !savedSubliminal){
     console.error('saveSubliminal error:', error);
     msg.textContent = `Couldn't save: ${error ? error.message : 'nothing was updated.'}`;
     msg.className = 'save-msg err';
     return;
   }
-  if (recordingUploadFailed){
-    msg.textContent = 'Saved — but your voice recording failed to upload, so this one will replay with the AI voice. (If this keeps happening, the recordings storage bucket may not be set up yet.)';
-    msg.className = 'save-msg err';
-  } else {
+  {
     msg.textContent = updatingId ? 'Changes saved to this subliminal.'
       : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
       : 'Saved to your library.';
@@ -758,6 +832,8 @@ async function saveSubliminal(opts){
   const isFirstSave = !updatingId && !asNew;
   editingExistingId = savedSubliminal.id;
   activeMixId = savedSubliminal.id;
+  mixBaseline[savedSubliminal.id] = mixClone(row.mix_settings); mixServerRev[savedSubliminal.id] = updatingId ? (mixServerRev[savedSubliminal.id] || 0) : 0;
+  mixCacheWrite(currentUser.id, savedSubliminal.id, row.mix_settings, false);
   contentAlreadySaved = true;
   state.playerTitle = title;
   if (typeof paintFinalSaveButtons === 'function') paintFinalSaveButtons();

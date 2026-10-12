@@ -23,6 +23,11 @@
     single(){this.mode='single';return this;} maybeSingle(){this.mode='maybe';return this;}
     then(res,rej){ return Promise.resolve().then(()=>this.exec()).then(res,rej); }
     exec(){
+      // Test hook: localStorage.mockfail = [{table, op, n}] fails the next n matching calls.
+      try {
+        const fails=JSON.parse(localStorage.getItem('mockfail')||'[]'); const hit=fails.find(f=>f.table===this.t&&(!f.op||f.op===this.op)&&f.n>0);
+        if(hit){ hit.n--; localStorage.setItem('mockfail',JSON.stringify(fails)); return {data:null,error:{message:'injected failure'}}; }
+      } catch(e){}
       const db=load(); const rows=db.tables[this.t]=db.tables[this.t]||[]; let out;
       const match=r=>this.f.every(f=>f(r));
       if(this.op==='insert'||this.op==='upsert'){
@@ -46,7 +51,7 @@
   }
   const toDataUrl=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b);});
   const bucket=name=>({
-    async upload(path,blob){ const db=load(); db.storage[name+'/'+path]=await toDataUrl(blob); save(db); log({storage:name,op:'upload',path}); return {data:{path},error:null}; },
+    async upload(path,blob){ const uf=JSON.parse(localStorage.getItem('mockfail')||'[]'); const uh=uf.find(f=>f.table==='storage-upload'&&f.n>0); if(uh){ uh.n--; localStorage.setItem('mockfail',JSON.stringify(uf)); return {data:null,error:{message:'injected upload failure'}}; } const db=load(); db.storage[name+'/'+path]=await toDataUrl(blob); save(db); log({storage:name,op:'upload',path}); return {data:{path},error:null}; },
     async createSignedUrl(path){ const u=load().storage[name+'/'+path]; return u?{data:{signedUrl:u},error:null}:{data:null,error:{message:'not found'}}; },
     async createSignedUrls(paths){ const s=load().storage; return {data:paths.map(p=>({path:p,signedUrl:s[name+'/'+p]||null})),error:null}; },
     async remove(paths){ return {data:paths,error:null}; },
@@ -55,7 +60,21 @@
   window.supabase={ createClient(){ return {
     from:t=>new Q(t),
     storage:{from:bucket},
-    rpc:async()=>({data:null,error:null}),
+    rpc:async(name,args)=>{
+      if(name==='patch_subliminal_audio'){
+        if(localStorage.getItem('mock_no_rpc')==='1') return {data:null,error:{message:'function patch_subliminal_audio does not exist'}};
+        const fails=JSON.parse(localStorage.getItem('mockfail')||'[]'); const hit=fails.find(f=>f.table==='rpc'&&f.n>0);
+        if(hit){ hit.n--; localStorage.setItem('mockfail',JSON.stringify(fails)); return {data:null,error:{message:'injected rpc failure'}}; }
+        const db=load(); const row=(db.tables.subliminals||[]).find(r=>r.id===args.p_id&&r.user_id===user.id);
+        if(!row) return {data:null,error:{message:'subliminal not found'}};
+        const conflict=args.p_base_rev!=null&&args.p_base_rev<(row.audio_rev||0);
+        row.mix_settings=Object.assign({},row.mix_settings||{},JSON.parse(JSON.stringify(args.p_patch)));
+        row.audio_rev=(row.audio_rev||0)+1; row.audio_updated_at=new Date().toISOString();
+        save(db); log({table:'subliminals',op:'rpc:patch_subliminal_audio',patch:args.p_patch,base:args.p_base_rev});
+        return {data:[{audio_rev:row.audio_rev,mix_settings:row.mix_settings,conflict}],error:null};
+      }
+      return {data:null,error:null};
+    },
     functions:{invoke:async()=>({data:null,error:null})},
     channel(){ const c={on(){return c;},subscribe(){return c;}}; return c; }, removeChannel(){},
     auth:{

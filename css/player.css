@@ -175,3 +175,16 @@ body.audio-editor-open #upgradeOverlay{ z-index:1400; }
 .ae-preview{ margin-right:auto; }
 .ae-actions .ps-use:disabled{ opacity:.55; cursor:default; }
 @media (max-width:420px){ .ae-preview{ margin-right:0; flex:1 1 100%; } }
+
+/* A voice that could not be played: said plainly, with Retry, over whatever
+   screen the person is on. Nothing is played in another voice meanwhile. */
+.voice-failure-bar{ position:fixed; left:12px; right:12px; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:10050;
+  display:flex; gap:10px; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:16px;
+  background:rgba(30,18,48,.96); color:#f3eafc; border:1px solid rgba(255,190,200,.35); box-shadow:0 10px 30px rgba(0,0,0,.4);
+  font-size:13px; line-height:1.4; max-width:560px; margin:0 auto; }
+.voice-failure-bar[hidden]{ display:none; }
+.voice-failure-bar .vf-actions{ display:flex; gap:8px; flex:none; align-items:center; }
+.voice-failure-bar button{ font:inherit; font-size:12px; border-radius:999px; padding:7px 14px; border:1px solid rgba(255,255,255,.25);
+  background:rgba(255,255,255,.08); color:inherit; cursor:pointer; }
+.voice-failure-bar .vf-retry{ background:#e9d7ff; color:#2a1740; border-color:transparent; font-weight:600; }
+.voice-failure-bar .vf-dismiss{ padding:7px 10px; }
