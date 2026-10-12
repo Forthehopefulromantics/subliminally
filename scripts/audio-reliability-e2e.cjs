@@ -31,7 +31,10 @@ async function session(opts) {
   return s;
 }
 const waitTrack = (page, timeout = 15000) => page.waitForFunction(() => finalPlaying && voiceRun && voiceRun.main && voiceRun.main.src, null, { timeout });
-const pressPlay = (page, id = 'sub-1') => page.click('#libPlay-' + id);
+const pressPlay = async (page, id = 'sub-1') => {
+  await page.evaluate(() => typeof closeImmersivePlayer === 'function' && closeImmersivePlayer());   // minimise the player, as a person would, to reach the list
+  await page.click('#libPlay-' + id);
+};
 const speech = page => page.evaluate(() => window.__deviceSpeech.slice());
 const state_ = page => page.evaluate(() => ({ playing: finalPlaying, paused: finalPaused, ctx: finalCtx && finalCtx.state, elapsed: getFinalElapsedMs(), voice: state.aiVoiceId, mode: state.voiceMode }));
 const failureBar = page => page.evaluate(() => { const b = document.getElementById('voiceFailureBar'); return b && !b.hidden ? { text: b.querySelector('.vf-text').textContent, retry: !b.querySelector('.vf-retry').hidden, alt: !b.querySelector('.vf-alt').hidden && b.querySelector('.vf-alt').textContent } : null; });
@@ -307,11 +310,11 @@ function outputLevel(page, ms = 1500) {
 
       await s.page.reload(); await s.page.waitForFunction(() => document.body.getAttribute('data-auth') === 'in');
       await H.openLibrary(s.page);
-      await s.page.click('#libPlay-sub-1'); await waitTrack(s.page);
+      await pressPlay(s.page, 'sub-1'); await waitTrack(s.page);
       const got = await s.page.evaluate(() => ({ bg: document.getElementById('mixBg').value, voice: document.getElementById('mixVoice').value, loop: getPlayerLoopMode(), minutes: state.targetLengthMinutes, pace: affirmationPace, gap: affirmationGapMs, soothing: state.soothingLayer, layer: state.bgLayer, ambience: state.bg, aiVoice: state.aiVoiceId }));
       assert.deepEqual(got, { bg: '71', voice: '33', loop: 'current', minutes: 90, pace: 'drifting', gap: 4500, soothing: 'chimes', layer: 'rain', ambience: 'deep-mind', aiVoice: 'serenity' });
       // And the other subliminal opens with ITS settings, not these.
-      await s.page.click('#libPlay-sub-2'); await waitTrack(s.page);
+      await pressPlay(s.page, 'sub-2'); await waitTrack(s.page);
       const other2 = await s.page.evaluate(() => ({ bg: document.getElementById('mixBg').value, pace: affirmationPace, soothing: state.soothingLayer, layer: state.bgLayer }));
       assert.deepEqual(other2, { bg: '50', pace: 'steady', soothing: 'none', layer: 'none' });
     } finally { await s.browser.close(); }
@@ -329,7 +332,7 @@ function outputLevel(page, ms = 1500) {
       await s.page.evaluate(() => localStorage.setItem('mockfail', '[]'));
       await s.page.reload(); await s.page.waitForFunction(() => document.body.getAttribute('data-auth') === 'in');
       await H.openLibrary(s.page);
-      await s.page.click('#libPlay-sub-1'); await waitTrack(s.page);
+      await pressPlay(s.page, 'sub-1'); await waitTrack(s.page);
       assert.equal(await s.page.evaluate(() => document.getElementById('mixTone').value), '77', 'the unsaved change came back');
       await s.page.waitForFunction(() => /Sound levels saved/.test(document.querySelector('[data-mix-status]').textContent), null, { timeout: 8000 });
       assert.equal((await H.db(s.page)).tables.subliminals[0].mix_settings.mixTone, 77, 'and was sent to the server');
