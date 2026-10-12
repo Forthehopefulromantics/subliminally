@@ -188,3 +188,9 @@ body.audio-editor-open #upgradeOverlay{ z-index:1400; }
   background:rgba(255,255,255,.08); color:inherit; cursor:pointer; }
 .voice-failure-bar .vf-retry{ background:#e9d7ff; color:#2a1740; border-color:transparent; font-weight:600; }
 .voice-failure-bar .vf-dismiss{ padding:7px 10px; }
+
+/* The page-level rule that hides every other section in the Library/Today/etc.
+   views also matched the full-screen player, which is a <section> on <body>. With
+   the player "open" the Now bar is hidden too, so playing from the Library left
+   no visible Pause or Start Over. The open player is shown in every view. */
+body[data-view] > section#immersivePlayer.immersive-player.open{ display:block!important; }

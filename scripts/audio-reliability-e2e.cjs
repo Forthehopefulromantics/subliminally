@@ -251,14 +251,14 @@ function outputLevel(page, ms = 1500) {
       await pressPlay(s.page); await waitTrack(s.page);
       await s.page.waitForTimeout(1500);
       const before = await s.page.evaluate(() => ({ run: voiceRun, starts: __audioDiag().filter(e => e.ev === 'track_start').length }).starts);
-      await s.page.click('#nbPlay');
+      await s.page.click('#ipPlay');
       await s.page.waitForFunction(() => finalPaused);
       assert.equal((await state_(s.page)).ctx, 'suspended');
       const p1 = await s.page.evaluate(() => trackPosition(voiceRun.main));
       await s.page.waitForTimeout(1500);
       const p2 = await s.page.evaluate(() => trackPosition(voiceRun.main));
       assert.ok(Math.abs(p2 - p1) < 0.1, `position frozen while paused (${p1} -> ${p2})`);
-      await s.page.click('#nbPlay');
+      await s.page.click('#ipPlay');
       await s.page.waitForFunction(() => !finalPaused);
       await s.page.waitForTimeout(1200);
       const p3 = await s.page.evaluate(() => trackPosition(voiceRun.main));
@@ -273,7 +273,7 @@ function outputLevel(page, ms = 1500) {
     try {
       await pressPlay(s.page); await waitTrack(s.page); await s.page.waitForTimeout(2000);
       const requests = s.calls.tts.length;
-      await s.page.click('.nb-restart');
+      await s.page.click('.ip-control');
       await s.page.waitForFunction(() => finalPlaying && voiceRun && voiceRun.main && getFinalElapsedMs() < 1500);
       assert.equal(s.calls.tts.length, requests, 'Start Over reused the audio in hand');
       assert.ok(await outputLevel(s.page) > 0.01);
@@ -391,7 +391,7 @@ function outputLevel(page, ms = 1500) {
       assert.equal(s.calls.tts.length, 1, 'one batched request for all three lines, not one per line: ' + s.calls.tts.length);
       await s.page.evaluate(() => stopFinal());
       await pressPlay(s.page); await waitTrack(s.page);
-      await s.page.click('.nb-restart'); await s.page.waitForTimeout(800);
+      await s.page.click('.ip-control'); await s.page.waitForTimeout(800);
       assert.equal(s.calls.tts.length, 1, 'stop/play/start-over made no new requests');
     } finally { await s.browser.close(); }
   });
@@ -436,7 +436,7 @@ function outputLevel(page, ms = 1500) {
       assert.equal(st.playing, true, 'session kept'); assert.equal(st.paused, true);
       assert.match(await s.page.evaluate(() => document.getElementById('finalLine').textContent), /Tap play to continue/);
       await s.page.evaluate(() => { finalCtx.resume = window.__origResume; });
-      await s.page.click('#nbPlay');
+      await s.page.click('#ipPlay');
       await s.page.waitForFunction(() => finalPlaying && !finalPaused && finalCtx.state === 'running');
     } finally { await s.browser.close(); }
   });
