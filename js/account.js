@@ -565,7 +565,7 @@ const OB_CTA = {
   welcome: "Let's begin",
   'teach-mind': 'I understand',
   'teach-percent': 'I understand',
-  finish: 'Begin My Journey',
+  finish: "Let's Begin ✨",
 };
 
 const OB_DESIRES = [
@@ -723,27 +723,27 @@ function obPersonalize(){
      component. The greeting and "you're ready" are headings; what she says is
      in the bubble. This slide is the once that her name is established -- she
      says it here, and no bubble after it is labelled with it again. */
-  obEl('obIntroQ').textContent = name ? `Hi, ${name}.` : 'Hi there.';
+  obEl('obIntroQ').textContent = name
+    ? (her ? `Hi, ${name}. I'm ${her}.` : `Hi, ${name}.`)
+    : (her ? `Hi there. I'm ${her}.` : 'Hi there.');
   const intro = obEl('obIntroDialogue');
   if (intro && typeof higherSelfDialogue === 'function'){
     obPaintDialogue(intro, {
       avatar: obChosenAvatar(),
       emotion: 'welcoming',
-      message: `I'm ${her || 'your higher self'}. Let's build the version of you you've been imagining.`,
+      message: "I'm your Higher Self. I'm here to help you become everything you've dreamed of being. We've got a beautiful journey ahead of us.",
       speaker: her,
     });
     if (obChosenAvatar()) preloadHigherSelfEmotion(higherSelf.avatar, 'celebrating');
   }
 
-  obEl('obFinishQ').textContent = name ? `You're ready, ${name}.` : "You're ready.";
+  obEl('obFinishQ').textContent = name ? `This is just the beginning, ${name}.` : 'This is just the beginning.';
   const finish = obEl('obFinishDialogue');
   if (finish && typeof higherSelfDialogue === 'function'){
     obPaintDialogue(finish, {
       avatar: obChosenAvatar(),
       emotion: 'celebrating',
-      message: her
-        ? `${her} is waiting. Everything you just told me is saved to your account — on every device you sign in from.`
-        : 'Everything you just told me is saved to your account — on every device you sign in from.',
+      message: "I'm here to guide you toward becoming the best version of yourself. Everything you need is already within you. Let's bring it to life together.",
       speaker: her,
     });
   }
