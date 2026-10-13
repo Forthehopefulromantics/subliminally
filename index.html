@@ -1975,6 +1975,15 @@
   @media (prefers-reduced-motion: reduce){
     .hsd[data-state="loading"] .hsd-art::after{ animation:none; }
   }
+  /* Her two onboarding speeches are longer than a habit prompt, and her name
+     and theirs sit in the heading above. Long names wrap instead of clipping;
+     the bubble wraps its words; on iPad the slide is given room for the
+     portrait and bubble side by side. */
+  .ob-q{ overflow-wrap:anywhere; }
+  .hsd-bubble{ overflow-wrap:break-word; min-width:0; }
+  @media (min-width:640px){
+    .ob-slide[data-ob="intro"], .ob-slide[data-ob="finish"]{ max-width:640px; }
+  }
 
   /* ---------- habit tracker setup ----------
      The account questionnaire's shell, with the pieces this flow needs. */
@@ -2587,7 +2596,7 @@
     </section>
 
     <section class="ob-slide" data-ob="finish">
-      <h2 class="ob-q" id="obFinishQ">You're ready.</h2>
+      <h2 class="ob-q" id="obFinishQ">This is just the beginning.</h2>
       <div id="obFinishDialogue"></div>
       <dl class="ob-summary" id="obFinishSummary"></dl>
     </section>
@@ -2596,7 +2605,7 @@
 
   <div class="ob-foot">
     <div class="auth-msg" id="onboardMsg" role="status" aria-live="polite"></div>
-    <button type="button" class="ob-cta" id="obCta" onclick="obNext()">Begin My Journey</button>
+    <button type="button" class="ob-cta" id="obCta" onclick="obNext()">Continue</button>
     <button type="button" class="ob-skip" id="obSkip" onclick="skipOnboarding()">I'll personalize later</button>
   </div>
 </div>
