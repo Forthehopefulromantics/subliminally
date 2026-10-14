@@ -88,14 +88,18 @@ async function deleteRows(table, column, userId) {
 async function deleteClonedVoice(userId) {
   if (!ELEVENLABS_API_KEY) return;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=cloned_voice_id`, {
+    /* user_voice_profiles, never profiles.cloned_voice_id: the owner can UPDATE
+       their own profile row, so a value there is not proof the voice is theirs,
+       and deleting whatever it names would let one account delete another's
+       voice at the provider. The table has no client write policy. */
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/user_voice_profiles?user_id=eq.${userId}&select=provider_voice_id`, {
       headers: serviceHeaders(),
     });
     if (!res.ok) return;
     const rows = await res.json();
-    const voiceId = rows && rows[0] && rows[0].cloned_voice_id;
+    const voiceId = rows && rows[0] && rows[0].provider_voice_id;
     if (!voiceId) return;
-    await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+    await fetch(`https://api.elevenlabs.io/v1/voices/${encodeURIComponent(voiceId)}`, {
       method: 'DELETE',
       headers: { 'xi-api-key': ELEVENLABS_API_KEY },
     });

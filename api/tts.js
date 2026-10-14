@@ -28,14 +28,14 @@
 // back to the device voice, exactly as it behaved before.
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess, TierLookupError } from '../lib/supabase-auth.js';
 import { MY_VOICE_KEY, resolvePresetVoice } from '../lib/voices.js';
-import { getVoiceProfile } from '../lib/user-voices.js';
+import { getVoiceProfile, VoiceLookupError } from '../lib/user-voices.js';
 import {
   MODEL_ID, VoiceProviderError, clampSpeed, isConfigured, synthesizeSpeech,
 } from '../lib/elevenlabs.js';
 import {
-  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, findCachedClips, hashesFor, normalizeLine,
+  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, clipExists, findCachedClips, hashesFor, normalizeLine,
   rateLimitFor, recordGenerations, rememberClip, signClipUrl, storagePathFor, touchClips, uploadClip,
 } from '../lib/tts-store.js';
 
@@ -65,6 +65,7 @@ function once(key, work) {
 const FATAL_CODES = new Set(['quota_exceeded', 'rate_limited', 'provider_auth', 'not_configured']);
 
 const HTTP_FOR_CODE = {
+  temporarily_unavailable: 503,
   quota_exceeded: 429,
   rate_limited: 429,
   too_fast: 429,
@@ -136,7 +137,12 @@ export default async function handler(req, res) {
 
      Reading your own recording never arrives here at all: 'device' and a
      recorded line are played by the browser. */
-  const tier = await tierForUser(user.id);
+  let tier;
+  try { tier = await tierForUser(user.id); }
+  catch (err) {
+    if (err instanceof TierLookupError) { res.status(503).json({ error: 'temporarily_unavailable' }); return; }
+    throw err;
+  }
   if (!hasPremiumAccess(tier)) {
     res.status(403).json({ error: 'upgrade_required', detail: 'Studio voices come with Ritual.' });
     return;
@@ -158,7 +164,13 @@ export default async function handler(req, res) {
 
   // A cloned voice is also only ever your own — resolveVoice looks 'mine' up
   // against this caller's profile and nobody else's.
-  const voice = await resolveVoice(user.id, requested);
+  let voice;
+  try { voice = await resolveVoice(user.id, requested); }
+  catch (err) {
+    // Could not ask is not "no voice": nothing is generated, the caller tries again.
+    if (err instanceof VoiceLookupError) { res.status(503).json({ error: 'temporarily_unavailable' }); return; }
+    throw err;
+  }
   if (voice.error) { res.status(voice.error === 'invalid_voice' ? 400 : 409).json({ error: voice.error }); return; }
 
   /* One entry per line asked for, in the order they were asked for, so the player
@@ -172,6 +184,16 @@ export default async function handler(req, res) {
 
   const wanted = clips.filter((c) => c.clipKey);
   const cached = await findCachedClips(user.id, wanted.map((c) => c.clipKey));
+  /* `repair` is sent by the player after a stored clip failed to load (the file
+     was removed, or is unreadable). A row is only a claim that a file exists, so
+     for those requests each claim is checked, and a row whose file is gone is
+     treated as a miss and regenerated once instead of being served forever. */
+  if (body.repair === true) {
+    await Promise.all(wanted.map(async (c) => {
+      const row = cached.get(c.clipKey);
+      if (row && !(await clipExists(row.storage_path))) cached.delete(c.clipKey);
+    }));
+  }
   const misses = wanted.filter((c) => !cached.has(c.clipKey));
 
   /* Nothing is generated until the whole request is known to be within the
@@ -204,9 +226,17 @@ export default async function handler(req, res) {
     if (fatal) { clip.error = fatal; continue; }
     try {
       const storagePath = storagePathFor(user.id, clip.clipKey);
+      let reusedFile = false;
       await once(`${user.id}|${clip.clipKey}`, async () => {
-        const audio = await synthesizeSpeech({ providerVoiceId: voice.providerVoiceId, text: clip.text, speed });
-        await uploadClip(storagePath, audio);
+        /* The file may already be in the bucket without its row (a generation
+           that was cut off between the upload and the write). It was paid for
+           once; take it rather than paying again. */
+        if (body.repair !== true && await clipExists(storagePath)) {
+          reusedFile = true;
+        } else {
+          const audio = await synthesizeSpeech({ providerVoiceId: voice.providerVoiceId, text: clip.text, speed });
+          await uploadClip(storagePath, audio);
+        }
         await rememberClip({
           userId: user.id,
           providerVoiceId: voice.providerVoiceId,
@@ -219,8 +249,8 @@ export default async function handler(req, res) {
         });
       });
       clip.storagePath = storagePath;
-      clip.cached = false;
-      ledger.push({ userId: user.id, providerVoiceId: voice.providerVoiceId, textHash: clip.textHash, characterCount: clip.text.length, cacheHit: false });
+      clip.cached = reusedFile;
+      ledger.push({ userId: user.id, providerVoiceId: voice.providerVoiceId, textHash: clip.textHash, characterCount: clip.text.length, cacheHit: reusedFile });
     } catch (err) {
       const code = err instanceof VoiceProviderError ? err.code : 'generation_failed';
       console.error('tts line failed:', code, (err && err.detail) || (err && err.message) || err);

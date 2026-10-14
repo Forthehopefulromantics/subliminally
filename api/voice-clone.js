@@ -25,9 +25,9 @@
 //   SUPABASE_SERVICE_ROLE_KEY - Supabase -> Settings -> API -> service_role key
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess, TierLookupError } from '../lib/supabase-auth.js';
 import { VoiceProviderError, createInstantVoiceClone, deleteVoice, findClonesNamed, isConfigured, maskVoiceId } from '../lib/elevenlabs.js';
-import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile } from '../lib/user-voices.js';
+import { consentGiven, deleteVoiceProfile, getVoiceProfile, saveVoiceProfile, VoiceLookupError } from '../lib/user-voices.js';
 import { deleteClipsForVoice } from '../lib/tts-store.js';
 import { checkVoiceSample, parseWav } from '../lib/voice-sample.js';
 import { TranscodeError, sniffContainer, transcodeToWav } from '../lib/audio-transcode.js';
@@ -155,7 +155,12 @@ async function cloneVoice(req, { log, fail, answer, started }) {
 
      Same premium definition as /api/tts, from one place, so the two can never
      drift into disagreeing about who may spend credits. */
-  const tier = await tierForUser(user.id);
+  let tier;
+  try { tier = await tierForUser(user.id); }
+  catch (err) {
+    if (err instanceof TierLookupError) { answer(503, { error: 'temporarily_unavailable' }); return; }
+    throw err;
+  }
   if (!hasPremiumAccess(tier)) {
     answer(403, { error: 'upgrade_required', detail: 'Cloning your voice comes with Ritual.' });
     return;
@@ -174,7 +179,14 @@ async function cloneVoice(req, { log, fail, answer, started }) {
   /* Already have one? Then that is the voice, and nothing is generated. Replacing
      it is a deliberate act ("Record it again"), not a side effect of building
      another subliminal. */
-  const existing = await getVoiceProfile(user.id);
+  let existing;
+  try { existing = await getVoiceProfile(user.id); }
+  catch (err) {
+    /* Could not tell whether a voice exists. Carrying on would create (and pay
+       for) a second clone and retire the first. Nothing is sent to the provider. */
+    if (err instanceof VoiceLookupError) { answer(503, { error: 'temporarily_unavailable' }); return; }
+    throw err;
+  }
   const replacing = String(req.headers['x-voice-replace'] || '') === '1';
   if (existing && !replacing) {
     log('user already has a saved voice — reusing it, nothing sent to ElevenLabs', maskVoiceId(existing.provider_voice_id));

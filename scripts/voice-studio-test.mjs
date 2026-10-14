@@ -26,6 +26,11 @@ let clonesMade = 0;
 // The clones that exist at the provider, as its voice list would show them.
 let providerVoices = [];
 
+/* A believable mp3: the frame sync a decoder looks for, then enough bytes that it
+   is not mistaken for the empty/garbage answers api/tts now refuses to cache. */
+const MP3 = new Uint8Array(2048); MP3[0] = 0xff; MP3[1] = 0xfb;
+let outage = null;               // 'subscribers' | 'user_voice_profiles': that lookup answers 500
+
 let fails = 0;
 function check(label, got, want){
   const ok = JSON.stringify(got) === JSON.stringify(want);
@@ -43,6 +48,7 @@ const db = {
   objects: new Map(),            // storage
 };
 let elevenCalls = [];
+let nextTtsBytes = null;          // what the provider returns for the next line
 let nextElevenResponse = null;   // { status, body } to fail with
 let failProfileSave = false;     // Supabase refuses the voice profile write
 
@@ -51,7 +57,7 @@ function reset(){
   db.voiceProfile = null;
   db.clonedVoiceId = null;
   db.clips = []; db.generations = []; db.objects = new Map();
-  elevenCalls = []; nextElevenResponse = null; failProfileSave = false;
+  elevenCalls = []; nextElevenResponse = null; nextTtsBytes = null; outage = null; failProfileSave = false;
   providerVoices = [];
 }
 
@@ -89,6 +95,8 @@ globalThis.fetch = async (url, opts) => {
     return reply({ id: 'user-abc', email: 'kyla@example.com' });
   }
   /* which plan */
+  if (outage === 'subscribers' && u.includes('/rest/v1/subscribers')) return reply({ message: 'down' }, { status: 500 });
+  if (outage === 'user_voice_profiles' && u.includes('/rest/v1/user_voice_profiles')) return reply({ message: 'down' }, { status: 500 });
   if (u.includes('/rest/v1/subscribers')) return reply(db.tier ? [db.tier] : []);
   /* the voice of their own */
   if (u.includes('/rest/v1/user_voice_profiles')){
@@ -153,6 +161,11 @@ globalThis.fetch = async (url, opts) => {
     if (!db.objects.has(path)) return reply({ error: 'not found' }, { status: 404 });
     return reply({ signedURL: `/object/sign/tts-cache/${path}?token=stub` });
   }
+  if (u.includes('/storage/v1/object/authenticated/tts-cache/')){
+    const path = u.split('/storage/v1/object/authenticated/tts-cache/')[1];
+    if (!db.objects.has(path)) return reply('', { status: 404 });
+    return reply('', { headers: { 'content-length': String(db.objects.get(path).length || 2048) } });
+  }
   if (u.includes('/storage/v1/object/tts-cache/')){
     const path = u.split('/storage/v1/object/tts-cache/')[1];
     if (method === 'POST'){ db.objects.set(path, o.body); return reply({ Key: path }); }
@@ -163,7 +176,7 @@ globalThis.fetch = async (url, opts) => {
     }
   }
   if (u.includes('/object/sign/tts-cache/')){    // the signed link being read back
-    return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
+    return reply('', { bytes: MP3 });
   }
   if (u.includes('/storage/v1/object/tts-cache') && method === 'DELETE'){
     (body.prefixes || []).forEach(p => db.objects.delete(p));
@@ -174,7 +187,7 @@ globalThis.fetch = async (url, opts) => {
     elevenCalls.push({ url: u, method, key: o.headers && o.headers['xi-api-key'], body,
                        form: (typeof FormData !== 'undefined' && o.body instanceof FormData) ? o.body : null });
     if (nextElevenResponse) return reply(nextElevenResponse.body || 'error', { status: nextElevenResponse.status });
-    if (u.includes('/text-to-speech/')) return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
+    if (u.includes('/text-to-speech/')) return reply('', { bytes: nextTtsBytes || MP3 });
     if (u.includes('/voices/add')){
       // A new clone is a new voice at the provider, never the same id back.
       MY_CLONE = `voice_clone_of_kyla_${++clonesMade}`;
@@ -706,6 +719,64 @@ db.tier = null;
 r = await callTts({ voiceKey: 'serenity', lines: LINES });
 check('the demo does not unlock Serenity for a free account', [r.code, r.body.error], [403, 'upgrade_required']);
 check('  ...and nothing was generated', elevenCalls.length, 0);
+
+
+/* ============ stabilization regressions (see the audit report) ============ */
+
+/* R1. Empty or non-audio bytes from the provider are never cached or sold as a clip. */
+reset();
+nextTtsBytes = new Uint8Array(0);
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('R1 an empty provider answer is not served as audio', r.code === 200 && r.body.clips ? !!r.body.clips[0].url : false, false);
+check('R1   ...nothing was stored for it', [db.objects.size, db.clips.length], [0, 0]);
+reset();
+nextTtsBytes = new TextEncoder().encode('{"detail":"quota"}'.padEnd(2000, ' '));
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('R1 a JSON error body with a 200 is not stored as an mp3', db.objects.size, 0);
+
+/* R2. A subscription we could not READ is not a lapse. */
+reset(); outage = 'subscribers';
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('R2 subscription lookup down: 503 try-again, not 403 upgrade', [r.code, r.body.error], [503, 'temporarily_unavailable']);
+check('R2   ...and nothing was generated', elevenCalls.length, 0);
+
+/* R3. A voice profile we could not READ is not "no voice", and never causes a second paid clone. */
+reset(); db.voiceProfile = { id: 'vp-1', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+outage = 'user_voice_profiles';
+r = await callTts({ voiceKey: 'mine', lines: LINES });
+check('R3 profile lookup down: tts answers 503, not "no cloned voice"', [r.code, r.body.error], [503, 'temporarily_unavailable']);
+r = await callClone({ consent: CONSENT });
+check('R3 profile lookup down: clone route refuses, no provider call', [r.code, elevenCalls.length], [503, 0]);
+outage = null;
+
+/* R4. A file already in the bucket without its row is taken, not paid for again. */
+reset();
+{
+  const { hashesFor, storagePathFor } = await import(new URL('../lib/tts-store.js', import.meta.url).href);
+  const { MODEL_ID } = await import(new URL('../lib/elevenlabs.js', import.meta.url).href);
+  const { clipKey } = hashesFor({ text: LINES[0], providerVoiceId: SERENITY, speed: 1, modelId: MODEL_ID });
+  db.objects.set(storagePathFor('user-abc', clipKey), MP3);
+  r = await callTts({ voiceKey: 'serenity', speed: 1, lines: [LINES[0]] });
+  check('R4 an orphaned (paid-for) file is reused', [r.code, r.body.clips[0].cached, elevenCalls.length], [200, true, 0]);
+  check('R4   ...and its row is written back', db.clips.length, 1);
+
+  /* R5. A row whose file has gone: served as-is normally (cheap), repaired on request. */
+  db.objects.delete(storagePathFor('user-abc', clipKey));
+  elevenCalls = [];
+  r = await callTts({ voiceKey: 'serenity', speed: 1, lines: [LINES[0]], repair: true });
+  check('R5 repair: a row with no file is regenerated once', [r.code, !!r.body.clips[0].url, elevenCalls.length], [200, true, 1]);
+  elevenCalls = [];
+  r = await callTts({ voiceKey: 'serenity', speed: 1, lines: [LINES[0]], repair: true });
+  check('R5   ...and then it is a cache hit again', [r.body.clips[0].cached, elevenCalls.length], [true, 0]);
+}
+
+/* R6. Another user cannot reach this user's clips or voice. */
+reset(); db.voiceProfile = { id: 'vp-1', user_id: 'user-abc', provider: 'elevenlabs', provider_voice_id: MY_CLONE, display_name: 'My voice' };
+r = await callTts({ voiceKey: 'mine', lines: [LINES[0]] }, 'other-token');
+check('R6 another account asking for "mine" gets no cloned voice', [r.code, r.body.error], [409, 'no_cloned_voice']);
+check('R6   ...and nothing was generated', elevenCalls.length, 0);
+r = await callTts({ voiceKey: MY_CLONE, lines: [LINES[0]] }, 'other-token');
+check('R6 another account sending the raw provider id is refused', [r.code, r.body.error], [400, 'invalid_voice']);
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nall checks passed');
 process.exit(fails ? 1 : 0);
