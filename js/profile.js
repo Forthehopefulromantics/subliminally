@@ -592,10 +592,18 @@ async function renderVoiceClone(){
     wireVoiceClonePreview(live.querySelector('[data-vc="preview"]'));
     return;
   }
-  const mine = await myVoiceProfile();
+  let mine, lookupFailed = false;
+  try { mine = await myVoiceProfile(); } catch (e){ lookupFailed = true; }
   if (seq !== voiceCloneRenderSeq) return;
   const live = voiceCloneBodyEl();
   if (!live) return;
+  if (lookupFailed){
+    /* Not knowing is not "no voice": offering to record one would walk someone
+       who has a voice back through creating it. */
+    live.innerHTML = `<div class="voice-clone-have"><span>We couldn't load your voice just now.</span>
+      <button class="mini-btn ghostbtn" onclick="forgetVoiceCatalogue(); renderVoiceClone()">Try again</button></div>`;
+    return;
+  }
   if (mine && !voiceCloneReplacing){
     live.innerHTML = `
       <div class="voice-clone-have">

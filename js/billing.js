@@ -223,13 +223,29 @@ async function openStripeCheckout(tier, period, row){
       body: JSON.stringify({ link: row.link, tier, period }),
     });
     const body = await res.json().catch(() => ({}));
+    /* Two refusals are answers, not outages: already subscribed (a second
+       checkout would charge twice) and "could not check" (we do not know).
+       Opening the raw Payment Link for either would walk round the check. */
+    if (res.status === 409 && body.error === 'already_subscribed'){
+      forgetFetch('tier');
+      if (msg){ msg.textContent = 'You already have an active Ritual subscription — nothing more to buy. Pull to refresh if the app still shows Free.'; msg.className = 'save-msg ok'; }
+      if (typeof refreshPlanEverywhere === 'function') refreshPlanEverywhere();
+      return;
+    }
+    if (res.status === 503){
+      reportBillingIssue('checkout_unavailable', { status: 503 });
+      if (msg){ msg.textContent = 'We couldn\'t check your account just now — nothing was charged. Please try again in a moment.'; msg.className = 'save-msg err'; }
+      return;
+    }
     if (!res.ok || !body.url){
+      reportBillingIssue('checkout_session_failed', { status: res.status });
       console.warn('checkout session unavailable, opening the Payment Link instead:', body.error || res.status);
       fallback();
       return;
     }
     window.location.assign(body.url);
   } catch (e){
+    reportBillingIssue('checkout_session_error', { code: (e && e.name) || 'error' });
     console.warn('checkout session failed, opening the Payment Link instead:', e);
     fallback();
   }
@@ -413,6 +429,7 @@ async function purchaseTier(tier, period){
   } catch (e){
     if (e && e.userCancelled) { msg.textContent = ''; return; }
     console.error('Purchase failed:', e);
+    reportBillingIssue('purchase_failed', { code: (e && (e.code || e.name)) || 'error' });
     msg.textContent = (e && e.message) || 'Something went wrong with the purchase — try again.';
     msg.className = 'save-msg err';
   }
@@ -594,11 +611,28 @@ async function getMySubscriberRow(){
      step, by each page as it opens, by the pricing block. It changes when you
      buy something and at almost no other time, so it is worth remembering for
      longer than anything else here. `forgetFetch('tier')` after a purchase. */
-  return fetchOnce('tier', async () => {
-    const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
-    return data; // null if they've never subscribed
-  }, 300000);
+  const asking = currentUser.id;
+  try {
+    const row = await fetchOnce('tier', async () => {
+      const { data, error } = await sb.from('subscribers').select('*').eq('user_id', asking).maybeSingle();
+      /* A failed read is not an answer. It used to come back as "no row", which
+         is "free", and that was remembered for five minutes -- so one dropped
+         request locked a paying member out of what they pay for. Throwing here
+         keeps it out of the cache (see fetchOnce). */
+      if (error) throw error;
+      return data; // null if they've never subscribed
+    }, 300000);
+    lastKnownSubscriber = { userId: asking, row };
+    return row;
+  } catch (e){
+    reportBillingIssue('tier_lookup_failed', { code: (e && (e.code || e.name)) || 'unknown' });
+    /* Whatever this same account last read successfully beats guessing "free";
+       with nothing known, it is free for this call only and the next call asks
+       again. */
+    return lastKnownSubscriber && lastKnownSubscriber.userId === asking ? lastKnownSubscriber.row : null;
+  }
 }
+let lastKnownSubscriber = null;
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
 
@@ -740,12 +774,14 @@ async function saveSubliminal(opts){
     : await sb.from('subliminals').insert({ ...row, user_id: currentUser.id, cover_path: activeCoverPath || null }).select('id').single();
   if (error || !savedSubliminal){
     console.error('saveSubliminal error:', error);
+    reportSaveIssue('subliminal_failed', { code: (error && (error.code || error.status)) || 'no_row' });
     msg.textContent = `Couldn't save: ${error ? error.message : 'nothing was updated.'}`;
     msg.className = 'save-msg err';
     return;
   }
   if (recordingUploadFailed){
-    msg.textContent = 'Saved — but your voice recording failed to upload, so this one will replay with the AI voice. (If this keeps happening, the recordings storage bucket may not be set up yet.)';
+    reportSaveIssue('recording_upload_failed', {});
+    msg.textContent = 'Saved — but your voice recording failed to upload, so it is not stored yet. Check your connection and tap Save again to retry the upload.';
     msg.className = 'save-msg err';
   } else {
     msg.textContent = updatingId ? 'Changes saved to this subliminal.'

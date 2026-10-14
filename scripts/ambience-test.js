@@ -208,7 +208,7 @@ function fakeClip(ctx, { seconds = 8, padMs = 26, level = 0.072 } = {}){
   return { buffer: buf, pad, len };
 }
 
-const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange','countVal',
+const IDS = ['flowProgress','freqChips','intentionChips','intensityCards','toneChips','countRange','countVal',
   'eftPointsList','bgGrid','waveform','recBtn','freqGuideText','toStep1','toStep5','quizGoal',
   'sessionLengthSlider','sessionLengthVal','lengthMsg','durationChips','ritualModeChips',
   'ritualModeMsg','eftGuidePanel','visualizationGuidePanel','countRow','sessionLengthRow',
@@ -280,7 +280,7 @@ const ctx = {
   Audio: function(){ this.play = () => Promise.resolve(); this.pause = () => {};
                      this.setAttribute = () => {}; this.addEventListener = () => {}; },
 };
-ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
+ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx; ctx.addEventListener = ctx.addEventListener || function(){};
 vm.createContext(ctx);
 
 vm.runInContext(`
@@ -389,33 +389,38 @@ check('a stored URL wins once it has', get(`ambienceUrl('ocean-escape')`), 'http
 run(`window.AMBIENCE_URLS = {};`);
 
 /* ============================================================ */
-section('auditioning is not choosing');
-run(`state.bg = 'none'; ambienceCandidate = null; paintBgCards();`);
+section('tapping a card chooses it; the Preview button only auditions');
+run(`state.bg = 'none'; state.bgLayer = 'none'; ambienceCandidate = null; paintBgCards();`);
 stubDecode(get('previewCtx') || new FakeCtx());
 run(`document.querySelector('#bgGrid .bg-card-face[data-key="ocean-escape"]').onclick();`);
 await settle();
-check('tapping a card does NOT change the session', bgKey(), 'none');
-check('it does mark what is being listened to', candidate(), 'ocean-escape');
-check('and draws it as auditioning, not as chosen',
-  [cardAuditioning('ocean-escape'), cardSelected('ocean-escape')], [true, false]);
-check('the chosen card is still the chosen card', cardSelected('none'), true);
-check('the button says what it would do', confirmLabel(), 'Use Ocean Escape');
+check('tapping a card selects it (the regression: taps used to do nothing)', bgKey(), 'ocean-escape');
+check('and lights it as the chosen card', cardSelected('ocean-escape'), true);
+check('and the screen reader is told', faceAria('ocean-escape'), 'true');
+check('the old choice no longer wears the mark', cardSelected('none'), false);
+check('the button reports what is in use', [confirmLabel(), confirmDisabled()], ['Using Ocean Escape', true]);
 
 run(`document.querySelector('#bgGrid .bg-card-face[data-key="soft-asmr"]').onclick();`);
 await settle();
-check('auditioning a second one still changes nothing', bgKey(), 'none');
-check('only one card auditions at a time',
-  get(`document.querySelectorAll('#bgGrid .bg-card').filter(c => c.hasAttribute('data-auditioning')).map(c => c.dataset.key)`),
-  ['soft-asmr']);
+check('a sound from the other family layers instead of replacing',
+  get(`[state.bg, state.bgLayer]`), ['ocean-escape', 'soft-asmr']);
+check('both layered cards are lit', [cardSelected('ocean-escape'), cardSelected('soft-asmr')], [true, true]);
+
+run(`document.querySelector('#bgGrid .bg-preview-btn[data-key="rain"]').onclick();`);
+await settle();
+check('previewing another sound does NOT change the session',
+  get(`[state.bg, state.bgLayer]`), ['ocean-escape', 'soft-asmr']);
+check('it marks what is being listened to', candidate(), 'rain');
+check('and draws it as auditioning, not as chosen',
+  [cardAuditioning('rain'), cardSelected('rain')], [true, false]);
+check('the button says what it would do', [confirmLabel(), confirmDisabled()], ['Use Rain', false]);
 
 run(`confirmAmbience();`);
 await settle();
-check('confirming is the only thing that answers the question', bgKey(), 'soft-asmr');
-check('and the ring moves with it', [cardSelected('soft-asmr'), cardSelected('none')], [true, false]);
-check('the face carries the state for a screen reader', faceAria('soft-asmr'), 'true');
-check('the other faces say so too', faceAria('ocean-escape'), 'false');
-check('with nothing pending, the button is inert', [confirmLabel(), confirmDisabled()],
-  ['Using Soft ASMR', true]);
+check('confirming the audition is what chooses it (nature slot swaps, meditation kept)',
+  get(`[state.bg, state.bgLayer].sort()`), ['rain', 'soft-asmr']);
+check('and the ring moves with it', [cardSelected('rain'), cardSelected('ocean-escape')], [true, false]);
+check('with nothing pending, the button is inert', confirmDisabled(), true);
 
 /* ============================================================ */
 section('the highlight is re-derived, never painted at the tap site');
@@ -424,8 +429,8 @@ check('a full re-render keeps the chosen card lit', cardSelected('soft-asmr'), t
 run(`showStep(4); showStep(5);`);
 await settle();
 check('leaving and coming back keeps it lit', cardSelected('soft-asmr'), true);
-check('and re-opens with it as the candidate, so nothing is half-answered',
-  candidate(), 'soft-asmr');
+check('and re-opens with the main sound as the candidate, so nothing is half-answered',
+  candidate(), get('state.bg'));
 run(`clearSelection('.sel'); paintBgCards();`);
 check('even a hostile clear is undone by the next paint', cardSelected('soft-asmr'), true);
 

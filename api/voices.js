@@ -29,10 +29,16 @@ export default async function handler(req, res) {
   const user = await whoIsCalling(bearerToken(req));
   if (!user) { res.status(401).json({ error: 'not_signed_in' }); return; }
 
-  const [tier, profile] = await Promise.all([
-    tierForUser(user.id),
-    getVoiceProfile(user.id).catch(() => null),
-  ]);
+  /* If either lookup fails, say so (503) rather than describe an account with no
+     plan and no voice: the page would offer to clone again over a voice that
+     exists. The page treats a failed catalogue as "ask again", not as a lapse. */
+  let tier, profile;
+  try {
+    [tier, profile] = await Promise.all([tierForUser(user.id), getVoiceProfile(user.id)]);
+  } catch (err) {
+    res.status(503).json({ error: 'temporarily_unavailable' });
+    return;
+  }
 
   res.setHeader('Cache-Control', 'private, no-store');
   res.status(200).json({

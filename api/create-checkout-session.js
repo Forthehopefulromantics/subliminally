@@ -30,7 +30,7 @@
 export const config = { api: { bodyParser: true } };
 
 import { applyCors } from '../lib/cors.js';
-import { bearerToken, whoIsCalling } from '../lib/supabase-auth.js';
+import { bearerToken, whoIsCalling, tierForUser, hasPremiumAccess } from '../lib/supabase-auth.js';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const SITE_URL = (process.env.SITE_URL || 'https://www.subliminallybyfthr.com').replace(/\/+$/, '');
@@ -139,6 +139,25 @@ export default async function handler(req, res) {
   const user = await whoIsCalling(bearerToken(req));
   if (!user) {
     res.status(401).json({ error: 'Sign in first.' });
+    return;
+  }
+
+  /* Someone who already has a live subscription (Stripe, or one bought in the iOS
+     app) must not be sold a second one: that is two charges for one account, and
+     the only fix afterwards is a refund. The pricing screen hides the button for
+     members, but a stale tab, a second device or a direct call does not go
+     through the pricing screen. This only refuses the purchase; what a plan costs
+     or includes is untouched. If the subscription cannot be read, nothing is
+     sold either -- trying again in a moment is cheap, a duplicate charge is not.
+     Cancelled, expired and failed-payment accounts are not "live", so they can
+     resubscribe as before. */
+  try {
+    if (hasPremiumAccess(await tierForUser(user.id))) {
+      res.status(409).json({ error: 'already_subscribed' });
+      return;
+    }
+  } catch (err) {
+    res.status(503).json({ error: 'temporarily_unavailable' });
     return;
   }
 
