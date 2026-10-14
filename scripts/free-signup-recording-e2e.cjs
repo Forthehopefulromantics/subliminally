@@ -86,7 +86,8 @@ const status = page => page.textContent('#recStatus');
   /* ---------- 1. homepage, signed out ---------- */
   {
     const { ctx, page, errors } = await newPage(browser, { viewport: VIEWPORTS['iPhone SE (375x667)'], loggedIn: false });
-    assert.equal((await page.textContent('h1')).replace(/\s+/g, ' ').trim(), 'Your mind. Your voice. Your next chapter.');
+    assert.equal((await page.textContent('h1')).replace(/\s+/g, ' ').trim(), 'Your all in one wellness app.');
+    assert.equal((await page.textContent('.hero-tagline')).trim(), 'Your mind. Your voice. Your next chapter.');
     assert.equal((await page.textContent('#heroCta')).trim(), 'Create my free subliminal');
     assert.match(await page.textContent('.hero-free-note'), /Free forever plan\. No credit card required/);
     for (const id of ['howItWorks', 'freeFeatures', 'exploreRitual']) assert.ok(await page.isVisible('#' + id), id + ' visible');
