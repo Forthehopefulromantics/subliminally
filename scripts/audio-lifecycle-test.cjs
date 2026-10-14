@@ -9,7 +9,7 @@ const output = builder.slice(builder.indexOf('function audioOut('), builder.inde
 async function checkOutput(ios, rejected){
   const routes = new Set();
   const ctx = {destination:{kind:'speaker'}, createGain:()=>({gain:{},connect:n=>routes.add(n),disconnect:n=>n?routes.delete(n):routes.clear()}),createMediaStreamDestination:()=>({kind:'element',stream:{}})};
-  const sandbox={needsMediaElementOutput:()=>ios, Audio:class {setAttribute(){} play(){return rejected?Promise.reject(new Error('blocked')):Promise.resolve();} pause(){}}};
+  const sandbox={needsMediaElementOutput:()=>ios, handleUnexpectedMediaPause(){}, Audio:class {setAttribute(){} addEventListener(){} play(){return rejected?Promise.reject(new Error('blocked')):Promise.resolve();} pause(){}}};
   vm.createContext(sandbox); vm.runInContext(output,sandbox);
   sandbox.audioOut(ctx);
   assert.equal(routes.size,1,'only one output while play is pending');
@@ -32,7 +32,7 @@ async function checkOutput(ios, rejected){
     createGain:()=>({gain:{value:1},connect(){}}), createMediaElementSource:()=>({connect(){}}), createBufferSource:()=>({connect(){},start(){}}), createBuffer:()=>({}), __outBus:{}, __outEl:new El() };
   const synth = { speaking:false, paused:false, pause(){ log.push('speech.pause'); }, resume(){ log.push('speech.resume'); }, cancel(){} };
   const sandbox = { AmbienceBed:class{}, window:{speechSynthesis:synth}, navigator:{}, document:{getElementById:()=>null}, setTimeout, clearTimeout, Date, Promise, audioOut:()=>ctx.__outBus,
-    startSilentKeeper:()=>log.push('keeper.play'), stopSilentKeeper:()=>log.push('keeper.pause') };
+    updateMediaSessionPosition(){}, updateImmersivePlayer(){}, updateSessionTimerLabel(){}, startSilentKeeper:()=>log.push('keeper.play'), stopSilentKeeper:()=>log.push('keeper.pause') };
   vm.createContext(sandbox); vm.runInContext(src + '\nthis.api={pauseFinal,resumeFinal,finalCallback,finalLater,playClip,primeAudio,get paused(){return finalPaused;},start(c){finalCtx=c;finalPlaying=true;finalSession++;},stop(){finalPlaying=false;finalSession++;finalPauseWaiters=[];}};', sandbox);
   const api = sandbox.api, tick = ms => new Promise(r => setTimeout(r, ms));
   api.start(ctx);

@@ -145,7 +145,7 @@ function mk(id, cls, parent){
 }
 
 /* Everything builder.js reaches for, by id, at load and during the flow. */
-const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange','countVal',
+const IDS = ['flowProgress','freqChips','intentionChips','intensityCards','toneChips','countRange','countVal',
   'eftPointsList','bgGrid','waveform','recBtn','freqGuideText','toStep1','toStep5','quizGoal',
   'sessionLengthSlider','sessionLengthVal','lengthMsg','durationChips','ritualModeChips',
   'ritualModeMsg','eftGuidePanel','visualizationGuidePanel','countRow','sessionLengthRow',
@@ -226,7 +226,7 @@ const ctx = {
   Date, Math, JSON, Set, Map, Object, Array, Promise, String, Number, Boolean, Error,
   URL, TextEncoder, isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent,
 };
-ctx.window = ctx;
+ctx.window = ctx; ctx.addEventListener = ctx.addEventListener || function(){};
 ctx.globalThis = ctx;
 ctx.self = ctx;
 vm.createContext(ctx);
@@ -388,7 +388,7 @@ check('nothing was queued for recording', get('recordings.length'), 0);
 
 freshBuild();
 run(`chooseSerenity()`); await settle();
-run(`startNextPhase()`);
+run(`startNextPhase()`); await settle();   // the Serenity entitlement gate is async
 check('Continue skips the recorder as well', step(), 7);
 check('and Serenity is what it builds with', [get('state.voiceMode'), get('state.aiVoiceId')], ['ai', 'serenity']);
 
