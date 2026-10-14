@@ -5,7 +5,7 @@
    onclick handlers in index.html keep working, and what lets each file
    see the ones loaded before it. Order matters — see index.html. */
 
-function goTo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+function goTo(id){ if (id === 'pricing' && typeof showPricingPage === 'function'){ showPricingPage(); return; } const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 
 /* ---------------- DATA ---------------- */
 const FREQS = [
@@ -158,7 +158,16 @@ function showStep(n){
      and the index currently are. This is what makes the "..." placeholder in
      index.html unreachable rather than merely unlikely: there is no route onto
      step 6, present or future, that can skip it. */
-  if (n === 6) showRecordLine();
+  if (n !== 6) releaseMic();
+  if (n === 6){
+    showRecordLine();
+    // On a phone the step opens below the fold; bring the title, the words and
+    // the button up together rather than leaving the button to be hunted for.
+    if (window.matchMedia && window.matchMedia('(max-width:640px)').matches){
+      const t = document.getElementById('recordFlowTitle');
+      if (t && t.scrollIntoView) requestAnimationFrame(() => t.scrollIntoView({ block: 'start' }));
+    }
+  }
   /* The three voice cards are always on screen, so their locks — and the demo
      the Serenity one can play — are drawn as the step opens rather than as a
      side effect of picking something. */
@@ -2519,10 +2528,31 @@ function startNextPhase(serenityCleared){
 function beginRecordingPass(target){
   recordTarget = target;
   recIndex = 0;
-  if (target === 'layer') layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-  else recordings = new Array(state.affirmations.length).fill(null);
+  /* Coming back to this step -- Back from the next one, then Continue again --
+     must not throw away a voice that took time to record. The takes are kept
+     when this is still the same array for the same lines; anything else (new
+     lines, a different subliminal loaded in, a reset) starts clean. */
+  const lines = target === 'layer' ? state.layerAffirmations : state.affirmations;
+  const sig = JSON.stringify(lines);
+  const current = target === 'layer' ? layerRecordings : recordings;
+  const seen = recordingPass[target];
+  const keep = seen && seen.arr === current && seen.sig === sig && current.length === lines.length;
+  if (!keep){
+    discardTakes(current);
+    const fresh = new Array(lines.length).fill(null);
+    if (target === 'layer') layerRecordings = fresh; else recordings = fresh;
+    recordingPass[target] = { arr: fresh, sig };
+  }
+  recNote = ''; clearRecError();
   setRecordStepCopy(target);
   showStep(6);   // showStep draws the line; see showRecordLine()
+}
+const recordingPass = { primary: null, layer: null };
+/* Recordings made in this browser hold an object URL each; give them back when
+   the takes are thrown away. Takes loaded from the library are left alone. */
+function discardTakes(arr){
+  if (!Array.isArray(arr)) return;
+  arr.forEach(r => { if (r && r.duration && r.url){ try { URL.revokeObjectURL(r.url); } catch(e){} } });
 }
 
 function setRecordStepCopy(target){
@@ -2531,15 +2561,15 @@ function setRecordStepCopy(target){
   const breath = document.getElementById('recordBreathNote');
   if (target === 'layer'){
     title.textContent = "Record your second, layered voice";
-    sub.textContent = "This plays quietly underneath your main voice — press and hold, speak the line, then release.";
+    sub.textContent = "This plays quietly underneath your main voice — tap to start, speak the line, then tap again to stop.";
     breath.style.display = 'none';
   } else if (state.visualizationMode){
     title.textContent = "Read your visualization out loud";
-    sub.textContent = "Press and hold, read through the whole script in one take, then release when you're done.";
+    sub.textContent = "Tap to start, read through the whole script in one take, then tap again when you're done.";
     breath.style.display = '';
   } else {
     title.textContent = "Record in your own voice";
-    sub.textContent = "Press and hold, speak the line, then release.";
+    sub.textContent = "Tap to start, speak the line, then tap again to stop. You can listen back before you move on.";
     breath.style.display = '';
   }
 }
@@ -2595,10 +2625,10 @@ function showRecordLine(){
     document.getElementById('recStatus').textContent = 'one moment';
     document.getElementById('nextLineBtn').disabled = true;
     document.getElementById('skipBtn').disabled = true;
+    recBtn.setAttribute('aria-disabled', 'true');
     return;
   }
   lineEl.classList.remove('record-line-loading');
-  document.getElementById('skipBtn').disabled = false;
   /* An index past the end is a bug somewhere upstream, but it must not show up
      here as the word "undefined" in quotes. */
   if (recIndex < 0 || recIndex >= lines.length) recIndex = 0;
@@ -2616,11 +2646,12 @@ function showRecordLine(){
     : '';
   document.getElementById('recTapHint').style.display = isEftPoint ? 'block' : 'none';
   document.getElementById('recLine').classList.toggle('record-line-script', isScript);
-  document.getElementById('recStatus').textContent = 'press and hold to record';
-  document.getElementById('nextLineBtn').disabled = !arr[recIndex];
+  // A new line: whatever was said about the last one is not about this one.
+  recNote = ''; clearRecError();
+  paintRecUi();
 }
-function skipLine(){ advanceLine(); }
-function nextLine(){ advanceLine(); }
+function skipLine(){ releaseMic(); advanceLine(); }
+function nextLine(){ releaseMic(); advanceLine(); }
 function advanceLine(){
   const lines = activeRecordLines();
   if (recIndex < lines.length-1){ recIndex++; showRecordLine(); return; }
@@ -2728,103 +2759,267 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   });
 }
 
-let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
-/* True from the instant a press lands until the release, which is not the same
-   as "the button is showing as recording": the microphone has to be opened
-   first, and that is an await.
+let mediaRecorder, micStream, recCtx, analyser, dataArray, animId;
 
-   The gap mattered. A press on a phone fires touchstart and, on plenty of
-   browsers, a mouse event behind it; a double tap does the same. Both landed
-   inside that await, so two MediaRecorders started on two microphone streams
-   and both pushed into the one `audioChunks` array -- one line recorded twice,
-   overlapping, which is what came back doubled on playback. A flag set
-   synchronously closes the gap: the second press has nothing to start. */
-let recPressed = false;
-let recOpening = false;
+/* ---------------- THE RECORDER: tap to start, tap to stop ----------------
+   It used to be press-and-hold. Holding a button for the length of a sentence
+   is hard on a phone (a thumb slides off, Safari's toolbar eats the edge of the
+   screen) and impossible with a keyboard or a screen reader, so it is now one
+   button that toggles:
+
+     idle -> opening (waiting on the microphone) -> recording -> stopping -> idle
+
+   `recState` is the only truth about what the recorder is doing, and it moves
+   synchronously, so a double tap or a held Enter key cannot start a second
+   MediaRecorder while the first is still waiting on a permission prompt -- the
+   bug the old press-flag was written to close.
+
+   Everything that touches the hardware is released in one place. `recTake`
+   holds the live stream, recorder and timers of the take in progress; a take
+   ends through finishTake() whether it was stopped by the button, by leaving
+   the step, by the page being hidden, or by the browser ending the track, and
+   finishTake() always stops the tracks and closes the audio context.
+
+   Takes are written straight into the recordings array (`recordings` /
+   `layerRecordings`), which only resetFlow() and a changed set of lines ever
+   clear, so a take survives going back a step, moving between lines, and any
+   redraw of this screen. */
+const REC_MIN_MS = 400;                 // anything shorter is a stray tap, not a line
+const REC_MAX_MS = 10 * 60 * 1000;      // a whole visualization script fits; a forgotten take does not run forever
+let recState = 'idle';                  // 'idle' | 'opening' | 'stopping' | 'recording'
+let recTake = null;                     // the take in progress, if any
+let recToken = 0;                       // bumped to abandon an 'opening' that is no longer wanted
+let recNote = '';                       // a one-off message ("too short"), cleared by the next change
+let recErrorText = '';
+let recTimerId = null;
+let recLastToggle = 0;
 const recBtn = document.getElementById('recBtn');
-async function startRec(e){
+
+function recFormatTime(ms){
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function recEl(id){ return document.getElementById(id); }
+function currentTake(){ return activeRecordArray()[recIndex] || null; }
+
+/* The words for a failed getUserMedia. Safari, Chrome and Firefox all name these
+   differently; what matters to a person is "blocked", "missing" or "busy". */
+function recErrorMessage(err){
+  const name = (err && err.name) || String(err || '');
+  if (name === 'unsupported') return "This browser can't record audio. Try Safari or Chrome, or use Skip this line.";
+  if (/NotAllowed|PermissionDenied|Security/i.test(name))
+    return 'Microphone access is blocked. Allow it for this site in your browser settings (on iPhone: the aA button → Website Settings → Microphone), then tap the button again.';
+  if (/NotFound|DevicesNotFound|Overconstrained/i.test(name)) return 'No microphone was found on this device.';
+  if (/NotReadable|TrackStart|Abort/i.test(name)) return 'Your microphone is being used by another app. Close it, then tap the button again.';
+  if (name === 'empty') return 'Nothing was captured. Check your microphone and try again.';
+  return "Couldn't start recording. Tap the button to try again.";
+}
+function showRecError(err){
+  recErrorText = recErrorMessage(err);
+  paintRecUi();
+}
+function clearRecError(){ recErrorText = ''; }
+
+/* Draws every part of the recorder that depends on state: the button, the clock,
+   the status line, the error, the preview and the two buttons beside it. One
+   function, run after every change, so none of them can disagree. */
+function paintRecUi(){
+  if (!recBtn || !recordLinesReady()) return;
+  const take = currentTake();
+  const busy = recState !== 'idle';
+  const label = recEl('recBtnText');
+  recBtn.classList.toggle('recording', recState === 'recording');
+  // aria-disabled, not disabled: a disabled button drops keyboard focus, and the
+  // person who pressed Space to start would have to find it again to stop.
+  recBtn.setAttribute('aria-disabled', recState === 'opening' || recState === 'stopping' ? 'true' : 'false');
+  recBtn.setAttribute('aria-busy', busy && recState !== 'recording' ? 'true' : 'false');
+  const names = {
+    idle:      take ? ['Re-record', 'Re-record this line'] : ['Record', 'Start recording'],
+    opening:   ['…', 'Starting microphone'],
+    recording: ['Stop', 'Stop recording'],
+    stopping:  ['…', 'Saving recording'],
+  }[recState];
+  if (label) label.textContent = names[0];
+  recBtn.setAttribute('aria-label', names[1]);
+
+  const timer = recEl('recTimer');
+  if (timer){
+    const show = recState === 'recording' || (recState === 'idle' && take && take.duration);
+    timer.hidden = !show;
+    if (recState === 'idle' && take && take.duration) timer.textContent = recFormatTime(take.duration);
+  }
+  const status = recEl('recStatus');
+  if (status){
+    status.textContent = recNote
+      || (recState === 'opening' ? 'Starting the microphone… allow access if you are asked.'
+      : recState === 'recording' ? 'Recording… tap the button when you are done.'
+      : recState === 'stopping' ? 'Saving…'
+      : take ? `Saved${take.duration ? ' (' + recFormatTime(take.duration) + ')' : ''}. Listen back below, or tap to record it again.`
+      : 'Tap the button, say the line, then tap again to stop.');
+  }
+  const err = recEl('recError');
+  if (err){ err.hidden = !recErrorText; err.textContent = recErrorText; }
+
+  const wrap = recEl('recPreviewWrap'), audio = recEl('recPreview');
+  if (wrap && audio){
+    const showPreview = !!take && recState === 'idle';
+    wrap.hidden = !showPreview;
+    if (showPreview){
+      // Only touch src when the take changed, so a redraw never restarts playback.
+      if (audio.dataset.take !== take.url){ audio.src = take.url; audio.dataset.take = take.url; }
+    } else if (audio.dataset.take){
+      try { audio.pause(); } catch(e){}
+      audio.removeAttribute('src'); delete audio.dataset.take; try { audio.load(); } catch(e){}
+    }
+  }
+  const next = recEl('nextLineBtn'), skip = recEl('skipBtn');
+  if (next) next.disabled = !take || busy;
+  if (skip) skip.disabled = busy;
+}
+
+function stopRecStream(stream){
+  if (!stream) return;
+  try { stream.getTracks().forEach(t => { try { t.stop(); } catch(e){} }); } catch(e){}
+}
+function stopRecMeter(){
+  cancelAnimationFrame(animId); animId = null;
+  bars.forEach(b => { b.style.height = '4px'; b.classList.remove('live'); });
+  if (recCtx){ try { recCtx.close(); } catch(e){} recCtx = null; }
+  analyser = null;
+}
+function stopRecTimer(){ clearInterval(recTimerId); recTimerId = null; }
+
+function toggleRec(e){
   if (e && e.preventDefault) e.preventDefault();
-  if (recPressed || recOpening || recBtn.classList.contains('recording')) return;
-  recPressed = true;
+  // A held Enter key repeats click; a double tap lands twice. Neither is a second decision.
+  const now = Date.now();
+  if (now - recLastToggle < 300) return;
+  if (recState === 'opening' || recState === 'stopping') return;
+  recLastToggle = now;
+  if (recState === 'recording') stopRec(); else startRec();
+}
+
+async function startRec(){
+  if (recState !== 'idle' || !recordLinesReady()) return;
+  recNote = ''; clearRecError();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    showRecError({ name: 'unsupported' }); return;
+  }
+  recState = 'opening';
+  const token = ++recToken;
+  const audio = recEl('recPreview'); if (audio){ try { audio.pause(); } catch(e){} }
   stopAmbiencePreview();
   stopSerenityPreview();
   if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
   if (finalPlaying) stopFinal();
-  recOpening = true;
-  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}}); }
-  catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
-  finally { recOpening = false; }
-  /* Let go while the microphone was still opening. Nothing was recorded, so
-     the stream is handed straight back rather than left running. */
-  if (!recPressed){
-    micStream.getTracks().forEach(t=>t.stop());
-    document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
+  paintRecUi();
+
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, channelCount:1 } }); }
+  catch(err){
+    if (token !== recToken) return;      // abandoned while the prompt was up
+    recState = 'idle'; showRecError(err); return;
+  }
+  /* Left the screen (or the page was hidden) while the permission prompt was
+     open. Nothing was recorded, so the microphone is handed straight back. */
+  if (token !== recToken || step !== 6){
+    stopRecStream(stream);
+    if (token === recToken){ recState = 'idle'; paintRecUi(); }
     return;
   }
-  // Timed from when the microphone is actually live, so the wait for a
-  // permission prompt is never mistaken for a long recording.
-  holdStart = Date.now(); audioChunks=[];
-  const recMime = pickRecordingMime();
-  mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
-  const takeRecorder = mediaRecorder, takeStream = micStream, takeChunks = [];
-  const takeStarted = holdStart, takeIndex = recIndex, takeRecords = activeRecordArray();
-  mediaRecorder.ondataavailable = ev=>takeChunks.push(ev.data);
-  mediaRecorder.onstop = ()=>{
-    const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
-    const url = URL.createObjectURL(blob);
-    takeStream.getTracks().forEach(t=>t.stop());
-    const held = Date.now()-takeStarted;
-    if (held > 400){
-      takeRecords[takeIndex] = { url, blob };
-      document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
-      document.getElementById('nextLineBtn').disabled=false;
-    } else {
-      document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
-    }
-  };
-  mediaRecorder.start();
-  recBtn.classList.add('recording'); recBtn.textContent='●';
-  document.getElementById('recStatus').textContent="listening… release when you're done";
-  recCtx = new (window.AudioContext||window.webkitAudioContext)();
-  const src = recCtx.createMediaStreamSource(micStream);
-  analyser = recCtx.createAnalyser(); analyser.fftSize=64; src.connect(analyser);
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
-  animateBars();
+
+  const mime = pickRecordingMime();
+  let recorder;
+  try { recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+  catch(err){
+    try { recorder = new MediaRecorder(stream); }
+    catch(err2){ stopRecStream(stream); recState = 'idle'; showRecError(err2); return; }
+  }
+  const take = { recorder, stream, chunks: [], mime: recorder.mimeType || mime || 'audio/webm',
+                 index: recIndex, records: activeRecordArray(), started: Date.now() };
+  recTake = take; mediaRecorder = recorder; micStream = stream;
+  recorder.ondataavailable = ev => { if (ev.data && ev.data.size) take.chunks.push(ev.data); };
+  recorder.onstop = () => finishTake(take);
+  recorder.onerror = () => { take.failed = true; if (recTake === take) stopRec(); };
+  // A call, Siri or the OS revoking the microphone ends the track; keep what we have.
+  stream.getAudioTracks().forEach(t => t.addEventListener('ended', () => { if (recTake === take) stopRec(); }));
+  try { recorder.start(); }
+  catch(err){ recTake = null; stopRecStream(stream); recState = 'idle'; showRecError(err); return; }
+
+  recState = 'recording';
+  recTimerId = setInterval(() => {
+    const t = recEl('recTimer'); const ms = Date.now() - take.started;
+    if (t) t.textContent = recFormatTime(ms);
+    if (ms >= REC_MAX_MS){ recNote = 'That was a long one — saved at 10 minutes.'; stopRec(); }
+  }, 250);
+  try {   // the level meter is decoration; the take does not depend on it
+    recCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = recCtx.createMediaStreamSource(stream);
+    analyser = recCtx.createAnalyser(); analyser.fftSize = 64; src.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    animateBars();
+  } catch(e){ stopRecMeter(); }
+  paintRecUi();
+  const t0 = recEl('recTimer'); if (t0) t0.textContent = '0:00';
 }
 function animateBars(){
+  if (!analyser) return;
   analyser.getByteFrequencyData(dataArray);
   bars.forEach((bar,i)=>{ const v=dataArray[i%dataArray.length]||0; bar.style.height=Math.max(4,(v/255)*22)+'px'; bar.classList.add('live'); });
   animId = requestAnimationFrame(animateBars);
 }
+
+/* Ask the take in progress to finish. The recorder answers with `onstop`, which
+   runs finishTake(); if it is already inactive there is nothing to wait for. */
 function stopRec(){
-  // Released, whether or not the microphone ever opened -- startRec checks
-  // this after its await and gives the stream back if it did not.
-  if (!recPressed) return;
-  recPressed = false;
-  if (!recBtn.classList.contains('recording')) return;
-  recBtn.classList.remove('recording'); recBtn.textContent='HOLD';
-  cancelAnimationFrame(animId);
-  bars.forEach(b=>{ b.style.height='4px'; b.classList.remove('live'); });
-  if (mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-  if (recCtx){ try{ recCtx.close(); }catch(e){} recCtx = null; }
+  if (recState !== 'recording' || !recTake) return;
+  const take = recTake;
+  recState = 'stopping';
+  stopRecTimer(); stopRecMeter();
+  paintRecUi();
+  try {
+    if (take.recorder.state !== 'inactive') take.recorder.stop();
+    else finishTake(take);
+  } catch(e){ finishTake(take); }
 }
-/* Pointer events where they exist, which is one event per press however the
-   press was made. The mouse/touch pair below is the fallback, and only one of
-   the two sets is ever attached -- a browser that has both used to report a
-   single tap as a touch and a mouse press. */
-if (window.PointerEvent){
-  recBtn.addEventListener('pointerdown', startRec);
-  recBtn.addEventListener('pointerup', stopRec);
-  recBtn.addEventListener('pointercancel', stopRec);
-  recBtn.addEventListener('pointerleave', stopRec);
-} else {
-  recBtn.addEventListener('mousedown', startRec);
-  recBtn.addEventListener('mouseup', stopRec);
-  recBtn.addEventListener('mouseleave', stopRec);
-  recBtn.addEventListener('touchstart', startRec);
-  recBtn.addEventListener('touchend', stopRec);
-  recBtn.addEventListener('touchcancel', stopRec);
+
+/* The one exit for a take. Releases the hardware first, then decides whether
+   there is anything worth keeping. */
+function finishTake(take){
+  if (take.done) return;
+  take.done = true;
+  stopRecTimer(); stopRecMeter();
+  stopRecStream(take.stream);
+  if (recTake === take){ recTake = null; mediaRecorder = null; micStream = null; recState = 'idle'; }
+  const length = Date.now() - take.started;
+  const blob = take.chunks.length ? new Blob(take.chunks, { type: take.mime }) : null;
+  const here = take.records === activeRecordArray() && take.index === recIndex && step === 6;
+  if (blob && blob.size && length > REC_MIN_MS){
+    const previous = take.records[take.index];
+    take.records[take.index] = { url: URL.createObjectURL(blob), blob, duration: length };
+    if (previous && previous.url){ try { URL.revokeObjectURL(previous.url); } catch(e){} }
+  } else if (here){
+    recNote = length > REC_MIN_MS ? '' : 'Too short — tap, say the whole line, then tap again.';
+    if (length > REC_MIN_MS) showRecError({ name: 'empty' });
+  }
+  if (here) paintRecUi();
 }
+
+/* Let go of the microphone and any take in progress. A take already running is
+   stopped and kept (it is the person's voice); one still waiting on a permission
+   prompt is abandoned and its stream is closed as soon as it arrives. */
+function releaseMic(){
+  if (recState === 'recording') stopRec();
+  else if (recState === 'opening'){ recToken++; recState = 'idle'; paintRecUi(); }
+}
+
+if (recBtn){
+  recBtn.addEventListener('click', toggleRec);
+  recBtn.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.repeat) e.preventDefault(); });
+}
+// The OS may pause or kill the microphone when the page goes away; keep the take and let go.
+window.addEventListener('pagehide', releaseMic);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseMic(); });
 
 /* ---------------- AMBIENCE ENGINE (synthesized, no audio files) ---------------- */
 function makeNoiseBuffer(ctx, seconds, color){
@@ -2967,7 +3162,7 @@ function paintFinalSaveButtons(){
 }
 /* Sends you back to the recording step to redo your voice on this subliminal.
    Existing recordings come along, so lines you don't touch stay exactly as they
-   were — only the ones you actually hold-record again get replaced. */
+   were — only the ones you actually record again get replaced. */
 function rerecordVoice(){
   if (state.voiceMode !== 'own') return;
   stopFinal();
@@ -3756,7 +3951,7 @@ function playFinal(){
     document.getElementById('finalLine').textContent = recordingLoadErrors.length
       ? 'Your recordings are saved, but this device could not download them — ' +
         recordingLoadErrors[0] + '. Check your connection and open it again.'
-      : 'No lines were recorded — go back and hold the record button on at least one.';
+      : 'No lines were recorded — go back and record at least one.';
     return;
   }
 
@@ -4385,7 +4580,7 @@ function stopBuilderPreviews(){
   stopAmbiencePreview();
   stopSerenityPreview();
   if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
-  stopRec();
+  releaseMic();
 }
 if (typeof window.addEventListener === 'function'){
   window.addEventListener('hashchange', stopBuilderPreviews);

@@ -124,6 +124,14 @@ if (scienceBinauralGuideList){
    first-time visitor met a grid of ten frequencies before deciding anything, and
    "Start" on Today threw you out to the marketing page and scroll-jumped. */
 function showBuildPage(){
+  /* Building starts with an account: a visitor is taken to the sign-up form
+     instead, so nothing they make is lost for want of somewhere to save it.
+     Skipped while the session is still being restored, when a signed-in person
+     would otherwise look signed out for a moment. */
+  if (!currentUser && document.body.getAttribute('data-auth') !== 'loading'){
+    openAuthModal('signup');
+    return;
+  }
   document.body.setAttribute('data-view', 'build');
   window.scrollTo(0,0);
   history.pushState({ page:'build' }, '', '#build');
@@ -134,6 +142,24 @@ function showMarketingHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
   history.pushState({ page:'home' }, '', location.pathname);
+  if (typeof trackHomepageView === 'function') trackHomepageView();
+}
+/* Plans and prices, on a page of their own. The homepage leads with the free
+   plan; this is where somebody goes looking for what the paid one costs. */
+function showPricingPage(){
+  document.body.setAttribute('data-view', 'pricing');
+  window.scrollTo(0,0);
+  history.pushState({ page:'pricing' }, '', '#pricing');
+  if (typeof applyPricingVisibility === 'function') applyPricingVisibility();
+}
+/* Every "create my free subliminal" button on the home page. Straight to the
+   existing sign-up form for a visitor, straight to the builder for somebody who
+   already has an account. Nothing here is gated on a plan. */
+let signupSource = null;
+function startFreeSignup(source){
+  if (currentUser){ showBuildPage(); return; }
+  signupSource = source || null;
+  openAuthModal('signup');
 }
 /* "Home" means Today once you're signed in, and the marketing page if not. */
 function goHome(){

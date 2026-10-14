@@ -309,7 +309,7 @@ async function handleCheckoutReturn(){
     forgetFetch('tier');
     const tier = await getMyTier();
     if (tier !== 'none'){
-      if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: billingPeriod, via: 'stripe' });
+      if (typeof trackPaywall === 'function') trackPaywall('subscription_purchased', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: billingPeriod, via: 'stripe' });
       await refreshPlanEverywhere();
       say(`You're in — welcome to ${TIER_LABEL[tier]}.`, 'ok');
       return;
@@ -400,7 +400,7 @@ async function purchaseTier(tier, period){
     if (hasRitualEntitlement(customerInfo.entitlements.active || {})){
       msg.textContent = "You're in — welcome to " + TIER_LABEL[tier] + '.';
       msg.className = 'save-msg ok';
-      if (typeof trackPaywall === 'function') trackPaywall('subscription_completed', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: period, via: 'revenuecat' });
+      if (typeof trackPaywall === 'function') trackPaywall('subscription_purchased', { page: currentPageName(), feature: null, required_tier: tier, current_tier: tier, period: period, via: 'revenuecat' });
       /* The RevenueCat webhook updates the subscribers table server-side; give
          it a moment to land, then repaint everything that draws a plan -- the
          same refresh the web checkout comes back to, so a purchase never needs
@@ -665,8 +665,10 @@ async function saveSubliminal(opts){
     return;
   }
 
+  let priorSavedCount = null;   // only known when this save adds a row; feeds first_subliminal_created
   if (!updatingId){
     const { count } = await sb.from('subliminals').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+    priorSavedCount = count || 0;
     const subCap = TIER_SUBLIMINAL_CAPS[myTier];
     /* Being full only ever stops a *new* save. Everything already in the library
        stays openable and playable — see renderLibraryPlanLimit, which says so on
@@ -756,6 +758,11 @@ async function saveSubliminal(opts){
   /* From now on this screen is editing the row just written, so the next save
      updates it instead of making another. */
   const isFirstSave = !updatingId && !asNew;
+  /* The first one this account has ever saved. Counts and labels only: never the
+     title, the affirmations or the recordings. */
+  if (priorSavedCount === 0 && typeof trackEvent === 'function'){
+    trackEvent('first_subliminal_created', { voice_mode: state.voiceMode === 'own' ? 'own' : 'ai', minutes: Math.round(seconds / 60), current_tier: myTier });
+  }
   editingExistingId = savedSubliminal.id;
   activeMixId = savedSubliminal.id;
   contentAlreadySaved = true;
