@@ -1,0 +1,49 @@
+name: Subliminally website health alerts
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  website-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check website and critical audio assets
+        id: check
+        shell: bash
+        run: |
+          set +e
+          failed=""
+          for path in "/" "/js/builder.js" "/js/ambience.js" "/audio/ambience/inner-stillness.mp3" "/audio/ambience/ocean-escape.mp3"; do
+            status=$(curl --location --silent --show-error --output /dev/null --max-time 20 --write-out '%{http_code}' "https://subliminallybyfthr.com${path}")
+            if [ "$status" != "200" ]; then failed="$failed $path ($status);"; fi
+          done
+          if [ -n "$failed" ]; then
+            echo "healthy=false" >> "$GITHUB_OUTPUT"
+            echo "details=$failed" >> "$GITHUB_OUTPUT"
+          else
+            echo "healthy=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create or resolve website incident issue
+        uses: actions/github-script@v7
+        env:
+          HEALTHY: ${{ steps.check.outputs.healthy }}
+          DETAILS: ${{ steps.check.outputs.details }}
+        with:
+          script: |
+            const title = '[Website monitor] Subliminally site or audio unavailable';
+            const {owner, repo} = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {owner, repo, state:'open', per_page:100});
+            const issue = issues.find(i => !i.pull_request && i.title === title);
+            if (process.env.HEALTHY !== 'true' && !issue) {
+              await github.rest.issues.create({owner,repo,title,
+                body: 'Automated check failed at ' + new Date().toISOString() + '\\n\\nFailed endpoints: ' + process.env.DETAILS +
+                  '\\n\\nThis checks availability, not interactive sound selection. Test iPhone selection and playback separately.'});
+            } else if (process.env.HEALTHY === 'true' && issue) {
+              await github.rest.issues.createComment({owner,repo,issue_number:issue.number,
+                body:'All monitored endpoints recovered at '+new Date().toISOString()});
+              await github.rest.issues.update({owner,repo,issue_number:issue.number,state:'closed'});
+            }
