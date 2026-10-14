@@ -20,7 +20,7 @@
 // hear it, and there is nothing here that belongs to anyone.
 
 import { applyCors } from '../lib/cors.js';
-import { isConfigured, synthesizeSpeech, VoiceProviderError } from '../lib/elevenlabs.js';
+import { isConfigured, looksLikeMp3, synthesizeSpeech, VoiceProviderError } from '../lib/elevenlabs.js';
 import { readClip, uploadClip } from '../lib/tts-store.js';
 import {
   PREVIEW_SPEED, PREVIEW_TEXT, previewStoragePath, previewVoiceId,
@@ -56,7 +56,8 @@ async function loadPreview() {
     console.error('voice preview lookup failed', err);
     return null;
   });
-  if (stored) { cachedPreview = stored; return cachedPreview; }
+  // A stored file that is not audio is treated as absent and regenerated once.
+  if (stored && looksLikeMp3(stored)) { cachedPreview = stored; return cachedPreview; }
 
   if (generating) return generating;
   if (Date.now() < nextAttemptAt) {

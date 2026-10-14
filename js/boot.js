@@ -50,6 +50,7 @@ if (sb){
     // allowed to survive into their screens.
     if (wasId !== (currentUser && currentUser.id)){
       forgetFetch();
+      if (typeof resetAccountScopedAudio === 'function') resetAccountScopedAudio();
       // Including who their higher self is. Leaving the last person's choice
       // marked as loaded would draw it, once, to whoever signed in next.
       higherSelfLoaded = false;

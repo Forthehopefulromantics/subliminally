@@ -1126,10 +1126,8 @@ async function submitOnboarding(){
 
 async function logOut(){
   if (!sb) return;
-  // Don't carry one account's cloned voice or generated lines into the next.
-  forgetVoiceCatalogue();
-  voiceCatalogue = { presets: FALLBACK_PRESET_VOICES, myVoice: null, consentStatement: VOICE_CONSENT_FALLBACK, provider: null, loaded: false };
-  ttsCache.clear(); studioClipHandles.clear(); sequencePrepares.clear();
+  // Don't carry one account's cloned voice, generated lines or running session into the next.
+  resetAccountScopedAudio();
   await sb.auth.signOut();
 }
 /* Apple requires in-app account deletion for any app with sign-up. The heavy

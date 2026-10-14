@@ -23,6 +23,7 @@ const ANNUAL = 'https://buy.stripe.com/9B6eVc2PsaxdgPRg5fgYU08';
 const MONTHLY = 'https://buy.stripe.com/00weVc3Tw48PdDFdX7gYU07';
 
 let fails = 0, sessionBodies = [], stripeCalls = [];
+let subscriberRow = null, subscribersDown = false;   // what /rest/v1/subscribers answers
 function check(label, got, want){
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) fails++;
@@ -35,6 +36,10 @@ globalThis.fetch = async (url, opts) => {
     const token = (opts.headers.Authorization || '').replace('Bearer ', '');
     if (token !== 'good-token') return { ok: false, json: async () => ({}) };
     return { ok: true, json: async () => ({ id: 'user-abc', email: 'kyla@example.com' }) };
+  }
+  if (u.includes('/rest/v1/subscribers')){
+    if (subscribersDown) return { ok: false, status: 500, json: async () => ({}) };
+    return { ok: true, json: async () => (subscriberRow ? [subscriberRow] : []) };
   }
   stripeCalls.push(u);
   if (u.includes('payment_links/') && u.includes('line_items'))
@@ -107,6 +112,26 @@ check('a junk plan claim falls back to something sane', sessionBodies.at(-1).cli
 const before = stripeCalls.filter(u => u.includes('payment_links')).length;
 await call({ link: ANNUAL, tier: 'ritual', period: 'annual' });
 check('the link lookup is cached', stripeCalls.filter(u => u.includes('payment_links')).length, before);
+
+
+/* A second subscription is two charges for one person. */
+{
+  subscriberRow = { tier: 'ritual', status: 'active' };
+  sessionBodies = [];
+  let r2 = await call({ link: MONTHLY, tier: 'ritual', period: 'monthly' });
+  check('an active subscriber is refused a second checkout', [r2.code, r2.body.error, sessionBodies.length], [409, 'already_subscribed', 0]);
+  subscriberRow = { tier: 'ritual', status: 'trialing' };
+  r2 = await call({ link: MONTHLY, tier: 'ritual', period: 'monthly' });
+  check('so is someone still in their trial', [r2.code, sessionBodies.length], [409, 0]);
+  subscriberRow = { tier: 'ritual', status: 'canceled' };
+  r2 = await call({ link: MONTHLY, tier: 'ritual', period: 'monthly' });
+  check('a cancelled account can resubscribe as before', [r2.code, sessionBodies.length], [200, 1]);
+  subscriberRow = null; sessionBodies = [];
+  subscribersDown = true;
+  r2 = await call({ link: MONTHLY, tier: 'ritual', period: 'monthly' });
+  check('if the subscription cannot be read nothing is sold', [r2.code, r2.body.error, sessionBodies.length], [503, 'temporarily_unavailable', 0]);
+  subscribersDown = false;
+}
 
 console.log(fails ? `\n${fails} FAILED\n` : '\nall passed\n');
 process.exit(fails ? 1 : 0);

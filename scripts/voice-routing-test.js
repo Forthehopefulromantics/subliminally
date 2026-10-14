@@ -598,6 +598,69 @@ check('without a saved voice, nothing is generated', ttsCalls.length, before);
 check('  ...and the voice setup opens instead', [step(), get(`document.getElementById('myVoicePanel').dataset.open`)], [4, '1']);
 check('  ...still without the device voice', device(), 0);
 
+
+/* ================= 4b. SERENITY NEVER SPEAKS IN THE DEVICE'S VOICE =================
+   Regression: any failure between "ask for the line" and "play the clip" used to
+   fall back to speechSynthesis -- so someone who chose Serenity could silently
+   hear the phone's system voice. Now it is the same promise the clone makes:
+   stop, say why, and let Play try again. The device voice speaks only when the
+   device voice was chosen. */
+section('Serenity — failures are said out loud, never read by the device');
+const serenitySession = () => run(`
+  __played = []; __device = 0; __loads = 0;
+  state.voiceMode = 'ai'; state.aiVoiceId = 'serenity'; state.selectedVoice = 'serenity';
+  state.affirmations = ['I am brave.', 'I am safe.'];
+  layerVoiceEnabled = false;
+  ttsCache.clear(); studioClipHandles.clear(); sequencePrepares.clear(); ttsRepairNext = false;
+  loadClip = async function(c, handle){ __loads++; return { url: handle.url }; };
+`);
+setWorld({ tier: 'ritual', myVoice: null });
+
+serenitySession(); ttsCalls.length = 0; ttsFailWith = 'network';
+run(`playFinal()`); await drain(2);
+check('S1 a failed generation stops the session', [get('finalPlaying'), played().length], [false, 0]);
+check('S1   ...says so and offers Play again', finalLine().includes('tap Play to try again'), true);
+check('S1   ...and the device never spoke', device(), 0);
+ttsFailWith = null;
+run(`playFinal()`); await drain(2);
+check('S1   ...Play then works, in Serenity', [get('finalPlaying'), played()[0]], [true, 'https://storage.test/I%20am%20brave..mp3']);
+check('S1   ...asked for the Serenity key only', ttsCalls.every(c => c.body.voiceKey === 'serenity'), true);
+run(`stopFinal();`);
+
+serenitySession(); ttsCalls.length = 0;
+run(`loadClip = async function(){ throw new Error('clip_expired'); };`);
+run(`playFinal()`); await drain(2);
+check('S2 a clip that will not load stops rather than substitutes', [get('finalPlaying'), device()], [false, 0]);
+check('S2   ...and says so', finalLine().includes('tap Play to try again'), true);
+check('S2   ...after one fresh-link attempt, not a loop', ttsCalls.length, 2);
+check('S2   ...and the next request asks the server to verify the stored file', get('ttsRepairNext'), true);
+run(`stopFinal();`);
+
+serenitySession(); ttsCalls.length = 0;
+run(`
+  var __failedOnce = false;
+  loadClip = async function(c, handle){ if (!__failedOnce){ __failedOnce = true; throw new Error('clip_expired'); } return { url: handle.url }; };
+`);
+run(`playFinal()`); await drain(2);
+check('S3 an expired link is refreshed once and the line plays', [get('finalPlaying'), played()[0]], [true, 'https://storage.test/I%20am%20brave..mp3']);
+check('S3   ...with no device voice', device(), 0);
+run(`stopFinal();`);
+
+setWorld({ tier: 'free', myVoice: null });
+serenitySession(); ttsCalls.length = 0;
+run(`playFinal()`); await drain(2);
+check('S4 a lapsed account opening a Serenity subliminal is told, not given the device voice', [get('finalPlaying'), device(), ttsCalls.length], [false, 0, 0]);
+check('S4   ...with the reason', finalLine().includes('Ritual'), true);
+setWorld({ tier: 'ritual', myVoice: null });
+
+serenitySession(); ttsCalls.length = 0;
+run(`state.aiVoiceId = 'device'; state.selectedVoice = null;`);
+run(`playFinal()`); await drain(1);
+check('S5 the device voice still speaks when it was the choice', device() > 0, true);
+check('S5   ...and nothing was generated', ttsCalls.length, 0);
+run(`stopFinal(); state.aiVoiceId = 'serenity';`);
+
+
 /* ================= the paywall must not strand the screen ================= */
 section('A refused tap leaves the screen telling the truth');
 setWorld({ tier: 'free', myVoice: null });
