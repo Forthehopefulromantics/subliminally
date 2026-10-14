@@ -423,6 +423,9 @@ AmbienceBed.prototype.startRecorded = function(key, fade, token){
     return voice;
   }).catch((e) => {
     console.error('ambience could not be played:', key, e);
+    // Silent to the listener (the voice and tone carry on), so it is the one thing
+    // nobody would ever tell us about.
+    if (typeof window.reportAudioIssue === 'function') window.reportAudioIssue('ambience_failed', { code: (e && e.name) || 'error' });
     return null;
   });
 };

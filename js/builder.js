@@ -4229,14 +4229,25 @@ function playFinal(){
   /* A context that is still suspended a moment after starting was refused, and
      nothing anyone does with the mixer will make it audible. Better to say so
      than to run a timer over silence. */
+  const notRunning = () => alive() && !finalPaused && finalCtx && finalCtx.state !== 'running';
   const silenceCheck = setTimeout(() => {
     // A context suspended by the pause button was not refused.
-    if (alive() && !finalPaused && finalCtx && finalCtx.state !== 'running'){
+    if (!notRunning()) return;
+    /* Not running after 1.2 s is not yet "refused": waking the audio session can
+       take a couple of seconds on a phone (a Bluetooth route changing, the first
+       play after the app was backgrounded). Ending the session here made a
+       healthy start look like it played for a second and died. So ask once more
+       and give it until ~5 s, and record that it was slow. */
+    reportAudioIssue('start_slow', { state: finalCtx.state });
+    try { const p = finalCtx.resume(); if (p && p.catch) p.catch(()=>{}); } catch(e){}
+    const lastChance = setTimeout(() => {
+      if (!notRunning()) return;
       reportAudioIssue('blocked', { state: finalCtx.state });
       stopFinal();
       document.getElementById('finalLine').textContent =
         'This browser blocked the sound. Tap play once more — and check the silent switch on the side of your phone.';
-    }
+    }, 3800);
+    finalTimeouts.push(lastChance);
   }, 1200);
   finalTimeouts.push(silenceCheck);
 

@@ -625,6 +625,47 @@ let obGoingBack = false;
 let obSaving = false;
 let obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
 
+/* THE DRAFT. Nothing reaches the database until the last slide (see above), which
+   meant a refresh, a phone locking, or the OS reclaiming the tab part-way through
+   threw every answer away and started the questionnaire from "Let's begin". So
+   the in-progress answers are kept on this device, for this account, and put
+   back when the questionnaire reopens. Never anything but the answers they gave
+   in the questionnaire itself; cleared the moment the real save lands. */
+const OB_DRAFT_KEY = 'fthr_onboarding_draft_v1';
+function obDraftSave(){
+  try {
+    if (!currentUser || obSaving) return;
+    const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+    localStorage.setItem(OB_DRAFT_KEY, JSON.stringify({
+      user: currentUser.id,
+      index: obIndex,
+      answers: obAnswers,
+      avatar: obAvatarPicked ? higherSelf.avatar : null,
+      name: val('obName').slice(0, 40),
+      higherName: val('obHigherSelfName').slice(0, 24),
+      desireOther: val('obDesireOther').slice(0, 200),
+      faith: typeof myFaith !== 'undefined' ? { id: myFaith.id || null, own: String(myFaith.own || '').slice(0, 40) } : null,
+    }));
+  } catch(e){}
+}
+function obDraftClear(){ try { localStorage.removeItem(OB_DRAFT_KEY); } catch(e){} }
+function obDraftRestore(){
+  try {
+    const d = JSON.parse(localStorage.getItem(OB_DRAFT_KEY) || 'null');
+    if (!d || !currentUser || d.user !== currentUser.id){ if (d) obDraftClear(); return false; }
+    const a = d.answers || {};
+    const list = (x) => Array.isArray(x) ? x.filter(v => typeof v === 'string').slice(0, OB_DESIRE_COUNT) : [];
+    const one = (x) => typeof x === 'string' ? x : null;
+    obAnswers = { desires: list(a.desires), when: one(a.when), voice: one(a.voice), spirit: one(a.spirit), time: one(a.time) };
+    obIndex = Math.max(0, Math.min(OB_SLIDES.length - 1, Number(d.index) || 0));
+    const set = (id, v) => { const el = document.getElementById(id); if (el && typeof v === 'string') el.value = v; };
+    set('obName', d.name); set('obHigherSelfName', d.higherName); set('obDesireOther', d.desireOther);
+    if (d.avatar){ higherSelf.avatar = avatarId(d.avatar); obAvatarPicked = true; }
+    if (d.faith && typeof myFaith !== 'undefined') myFaith = { id: d.faith.id || null, own: d.faith.own || '' };
+    return true;
+  } catch(e){ return false; }
+}
+
 function obSlideName(){ return OB_SLIDES[obIndex]; }
 function obEl(id){ return document.getElementById(id); }
 
@@ -636,6 +677,7 @@ function openOnboardingModal(){
   obSaving = false;
   obAvatarPicked = false;
   obAnswers = { desires: [], when:null, voice:null, spirit:null, time:null };
+  obDraftRestore();     // a refresh resumes where they were; a fresh account finds nothing
   obEl('onboardOverlay').classList.add('open');
   document.body.style.overflow = 'hidden';
   obPaintSky();
@@ -688,6 +730,7 @@ function obShowSlide(){
   const step = obIndex + 1;
   obEl('obProgressFill').style.width = (step / OB_SLIDES.length * 100) + '%';
   obEl('obStep').textContent = step + '/' + OB_SLIDES.length;
+  obDraftSave();
   obEl('obBack').disabled = obIndex === 0;
   obEl('obSkip').style.display = obIndex === 0 ? 'none' : 'block';
 
@@ -911,6 +954,7 @@ function obToggleChoice(field, id){
   else chosen.push(id);
   obRenderChips();
   obRefreshGate();
+  obDraftSave();
 }
 
 /* A single answer answers the whole screen, so the gold lands on the card and
@@ -925,6 +969,7 @@ function obPickOne(field, id){
   if (field === 'spirit') obApplySpirit(id);
   obRenderChips();
   obRefreshGate();
+  obDraftSave();
   const holds = field === 'spirit' && (id === 'religion' || id === 'else');
   if (holds || obBlocked()) return;
   obCancelAdvance();
@@ -1012,7 +1057,11 @@ function pickOnboardAvatar(id){
 function obSetupInputs(){
   ['obName','obHigherSelfName'].forEach(id => {
     const el = obEl(id);
-    if (el) el.addEventListener('input', () => { obPersonalize(); obRefreshGate(); });
+    if (el) el.addEventListener('input', () => { obPersonalize(); obRefreshGate(); obDraftSave(); });
+  });
+  ['obFaithOther','obDesireOther'].forEach(id => {
+    const el = obEl(id);
+    if (el) el.addEventListener('input', obDraftSave);
   });
   // Enter moves on, the way the on-screen keyboard's "next" key implies.
   ['obName','obHigherSelfName','obFaithOther','obDesireOther'].forEach(id => {
@@ -1052,6 +1101,7 @@ async function submitOnboarding(){
   if (obSaving) return;                       // a second tap while saving does nothing
   if (!sb || !currentUser){ closeOnboardingModal(); return; }
 
+  obDraftSave();
   obSaving = true;
   cta.classList.add('busy');
   cta.disabled = true;
@@ -1106,6 +1156,7 @@ async function submitOnboarding(){
   // Read it back before moving. A write that reported no error but did not
   // land is the whole reason this screen used to come back every time.
   const saved = await myProfile({ force: true });
+  if (saved && saved.onboarding_completed === true) obDraftClear();
   if (!saved || saved.onboarding_completed !== true){
     obSaving = false;
     cta.classList.remove('busy');
