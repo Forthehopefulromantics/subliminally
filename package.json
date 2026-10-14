@@ -16,7 +16,8 @@
     "test:mix": "node scripts/mix-settings-test.cjs",
     "test:audio-editor": "node scripts/audio-editor-e2e.cjs",
     "test:lifecycle": "node scripts/audio-lifecycle-test.cjs",
-    "test:onboarding": "node scripts/onboarding-draft-e2e.cjs"
+    "test:onboarding": "node scripts/onboarding-draft-e2e.cjs",
+    "test:telemetry": "node scripts/telemetry-test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
