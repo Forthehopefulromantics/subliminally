@@ -2217,22 +2217,21 @@ function paintAmbienceConfirm(){
   const note = document.getElementById('ambienceConfirmNote');
   if (!btn) return;
   const chosen = [state.bg, state.bgLayer].filter(k => k && k !== 'none');
-  const isChosen = ambienceCandidate === 'none' ? !chosen.length : chosen.includes(ambienceCandidate);
-  const pending = !!ambienceCandidate && !isChosen;
-  btn.disabled = !pending;
-  btn.textContent = pending ? `Use ${ambienceName(ambienceCandidate)}` : `Using ${ambienceSummary()}`;
-  if (note){
-    note.textContent = pending
-      ? `Listening to ${ambienceName(ambienceCandidate)} — your session is still set to ${ambienceSummary()}.`
-      : '';
-  }
-  /* With two sounds layered, either can be taken off on its own; with one,
-     None is how you clear it. */
+  const candidate = ambienceCandidate || state.bg || 'none';
+  const candidateChosen = candidate === 'none' ? !chosen.length : chosen.includes(candidate);
+  // Selecting a card commits immediately. The primary action must never become
+  // disabled simply because a sound is already selected. This stranded users
+  // on mobile after tapping a card, particularly when Nature is optional.
+  btn.disabled = false;
+  btn.textContent = 'Continue with ' + ambienceSummary();
+  if (note) note.textContent = candidateChosen
+    ? (chosen.length ? 'Selected: ' + ambienceSummary() + '. You can also add a Nature or Meditation sound.' : 'No background sound selected. You can continue without one.')
+    : 'Previewing ' + ambienceName(candidate) + '. Tap its card to select it, or continue with ' + ambienceSummary() + '.';
   const remove = document.getElementById('ambienceRemoveBtn');
   if (remove){
-    const canRemove = isChosen && chosen.length > 1;
+    const canRemove = candidateChosen && chosen.length > 1 && candidate !== 'none';
     remove.hidden = !canRemove;
-    if (canRemove) remove.textContent = `Remove ${ambienceName(ambienceCandidate)}`;
+    if (canRemove) remove.textContent = 'Remove ' + ambienceName(candidate);
   }
 }
 
@@ -2321,6 +2320,11 @@ function selectAmbienceFromCard(key){
     warmAmbience(state.bgLayer);
   }
   paintBgCards();
+  // Keep the choice visible in assistive technology as well as visually.
+  const status = document.getElementById('ambienceMsg');
+  if (status) status.textContent = key === 'none'
+    ? 'No background sound selected.'
+    : ambienceName(key) + ' selected. You can add one from the other category or continue.';
 }
 
 function auditionAmbience(key){
@@ -2399,22 +2403,12 @@ function stopAmbiencePreview(){
 /* THE ONLY WRITE TO state.bg FROM THIS SCREEN. */
 function confirmAmbience(){
   stopAmbiencePreview();
-  const key = ambienceCandidate;
-  if (!key) return;
-  const chosen = [state.bg, state.bgLayer].filter(k => k && k !== 'none');
-  if (key === 'none' ? !chosen.length : chosen.includes(key)) return;
-  chooseAmbience(key);               // the answer, written first
-  paintBgCards();                    // then the screen, derived from it
-  warmAmbience(state.bg); warmAmbience(state.bgLayer);
-  /* Same as the voice cards: an answered question moves on -- once it is
-     fully answered. One sound leaves room to layer the other family, so the
-     screen stays; None, or one of each, moves on. Through nextStep(), which
-     from step 5 is the voice fork. */
-  const picks = ambiencePicks();
-  if (key === 'none' || (picks.meditation && picks.nature)){
-    setTimeout(() => { if (step === 5) nextStep(); }, STEP_ADVANCE_MS);
-  }
+  // Card taps are immediate selections; Preview never silently overwrites them.
+  // The explicit Continue control always progresses, whether the user chose
+  // one sound, layered two families, or selected no background sound.
+  if (step === 5) nextStep();
 }
+
 /* Take one layer off, leaving the other. */
 function removeAmbienceLayer(){
   stopAmbiencePreview();
