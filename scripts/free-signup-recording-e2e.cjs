@@ -108,6 +108,13 @@ const status = page => page.textContent('#recStatus');
     assert.equal(ev.filter(e => e === 'signup_started').length, 1, 'signup_started once despite reopening');
     ok(2, `CTA opens the existing sign-up form (no paywall); events ${JSON.stringify(ev)} are not duplicated`);
     await page.evaluate(() => closeAuthModal());
+    // Trying to build while signed out goes to sign-up, not the builder.
+    await page.evaluate(() => showBuildPage());
+    assert.ok(await page.isVisible('#authOverlay.open'));
+    assert.equal(await page.evaluate(() => document.body.dataset.view || ''), '');
+    assert.equal((await page.textContent('#authTitle')).trim(), 'Create your account');
+    assert.match(await page.textContent('#exploreRitual .btn'), /See pricing for more features/);
+    await page.evaluate(() => closeAuthModal());
 
     // Pricing is its own page, reached from the nav.
     await page.evaluate(() => closeMobileNav && closeMobileNav());

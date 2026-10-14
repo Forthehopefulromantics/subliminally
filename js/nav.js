@@ -124,6 +124,14 @@ if (scienceBinauralGuideList){
    first-time visitor met a grid of ten frequencies before deciding anything, and
    "Start" on Today threw you out to the marketing page and scroll-jumped. */
 function showBuildPage(){
+  /* Building starts with an account: a visitor is taken to the sign-up form
+     instead, so nothing they make is lost for want of somewhere to save it.
+     Skipped while the session is still being restored, when a signed-in person
+     would otherwise look signed out for a moment. */
+  if (!currentUser && document.body.getAttribute('data-auth') !== 'loading'){
+    openAuthModal('signup');
+    return;
+  }
   document.body.setAttribute('data-view', 'build');
   window.scrollTo(0,0);
   history.pushState({ page:'build' }, '', '#build');

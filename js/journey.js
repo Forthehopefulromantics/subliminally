@@ -335,6 +335,7 @@ window.addEventListener('popstate', (e) => {
   else if (page === 'today'){ document.body.setAttribute('data-view','today'); renderTodayPage(); }
   else if (page === 'reprogram') document.body.setAttribute('data-view','reprogram');
   else if (page === 'pricing'){ document.body.setAttribute('data-view','pricing'); if (typeof applyPricingVisibility === 'function') applyPricingVisibility(); }
+  else if (page === 'build' && !currentUser && document.body.getAttribute('data-auth') !== 'loading') openAuthModal('signup');
   else if (page === 'build'){ document.body.setAttribute('data-view','build'); if (typeof renderMyVoicePanel === 'function') renderMyVoicePanel(); }
   else document.body.removeAttribute('data-view');
 });
