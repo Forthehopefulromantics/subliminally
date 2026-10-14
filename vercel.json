@@ -3,5 +3,31 @@
     "api/voice-clone.js": {
       "includeFiles": "node_modules/ffmpeg-static/ffmpeg"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/blog",
+      "destination": "/api/blog?view=home"
+    },
+    {
+      "source": "/blog/",
+      "destination": "/api/blog?view=home"
+    },
+    {
+      "source": "/blog/category/:slug",
+      "destination": "/api/blog?view=category&slug=:slug"
+    },
+    {
+      "source": "/blog/:slug",
+      "destination": "/api/blog?view=post&slug=:slug"
+    },
+    {
+      "source": "/blog-sitemap.xml",
+      "destination": "/api/blog?view=sitemap"
+    },
+    {
+      "source": "/blog-admin",
+      "destination": "/api/blog?view=admin"
+    }
+  ]
 }
