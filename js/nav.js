@@ -134,6 +134,24 @@ function showMarketingHome(){
   document.body.removeAttribute('data-view');
   window.scrollTo(0,0);
   history.pushState({ page:'home' }, '', location.pathname);
+  if (typeof trackHomepageView === 'function') trackHomepageView();
+}
+/* Plans and prices, on a page of their own. The homepage leads with the free
+   plan; this is where somebody goes looking for what the paid one costs. */
+function showPricingPage(){
+  document.body.setAttribute('data-view', 'pricing');
+  window.scrollTo(0,0);
+  history.pushState({ page:'pricing' }, '', '#pricing');
+  if (typeof applyPricingVisibility === 'function') applyPricingVisibility();
+}
+/* Every "create my free subliminal" button on the home page. Straight to the
+   existing sign-up form for a visitor, straight to the builder for somebody who
+   already has an account. Nothing here is gated on a plan. */
+let signupSource = null;
+function startFreeSignup(source){
+  if (currentUser){ showBuildPage(); return; }
+  signupSource = source || null;
+  openAuthModal('signup');
 }
 /* "Home" means Today once you're signed in, and the marketing page if not. */
 function goHome(){

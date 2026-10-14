@@ -166,27 +166,18 @@ function pwEscape(s){
 }
 
 /* ---------------- ANALYTICS ----------------
-   There is no analytics provider in this app, and this is not the task that
-   should add one. So the events are emitted rather than sent: a DOM event
-   anything can listen to, plus the two globals a tag manager or gtag snippet
-   would already have put on the page if one were installed. Drop a provider in
-   later and it picks these up without a line changing here.
+   The sending, the consent check, the property allowlist and the once-only rule
+   all live in js/analytics.js. This file only names the paywall events and
+   hands them over, so a typo in a name is still caught here.
 
    Every event carries the same four things — page, feature, required_tier,
    current_tier — because a paywall number is meaningless without them. */
-const PAYWALL_EVENTS = ['paywall_viewed','locked_feature_clicked','upgrade_cta_clicked','paywall_dismissed','checkout_started','subscription_completed'];
-window.subliminallyEvents = window.subliminallyEvents || [];
+const PAYWALL_EVENTS = ['paywall_viewed','locked_feature_clicked','upgrade_cta_clicked','paywall_dismissed','checkout_started','subscription_purchased'];
 function trackPaywall(event, props){
   // The list above is the contract with whoever reads these later; a typo in an
   // event name is otherwise a silent hole in a funnel nobody notices for weeks.
   if (!PAYWALL_EVENTS.includes(event)) console.warn('Unknown paywall event:', event);
-  const payload = Object.assign({ event, at: new Date().toISOString() }, props || {});
-  // A short tail, for looking at what just happened in a console.
-  window.subliminallyEvents.push(payload);
-  if (window.subliminallyEvents.length > 100) window.subliminallyEvents.shift();
-  try { window.dispatchEvent(new CustomEvent('subliminally:analytics', { detail: payload })); } catch(e){}
-  if (Array.isArray(window.dataLayer)) window.dataLayer.push(payload);
-  if (typeof window.gtag === 'function') window.gtag('event', event, payload);
+  trackEvent(event, props);
 }
 /* The four fields every paywall event carries. `tier` is passed in where the
    caller already knows it, so drawing a locked row doesn't cost a round trip. */
@@ -392,8 +383,7 @@ function upgradeFromModal(key, needed){
   document.body.classList.remove('paywall-open');
   paywallOpenFor = null;
   if (!currentUser){ openAuthModal('signup'); return; }
-  showMarketingHome();
-  goTo('pricing');
+  showPricingPage();
   spotlightPlanCard(needed);
 }
 /* A soft ring around the card they came here for. There is one paid card now,

@@ -66,6 +66,11 @@ if (sb){
     // and someone halfway through their journal should not be thrown onto
     // Today for it.
     const isNewPerson = wasId !== (currentUser && currentUser.id);
+    /* A Google sign-up has no form to hook, so it is recognised by the account
+       being seconds old. Email sign-ups are counted where the form is submitted. */
+    if (authSettled && isNewPerson && currentUser && event === 'SIGNED_IN' && trackIsFreshOAuthAccount(currentUser)){
+      trackEvent('signup_completed', { method: 'oauth' });
+    }
     if (authSettled && isNewPerson && currentUser && event === 'SIGNED_IN') routeAfterAuth({ landOnToday: true });
     if (currentUser) savePushToken();
     if (currentUser && typeof hydratePlayerPrefs === 'function') hydratePlayerPrefs();
@@ -77,12 +82,15 @@ if (sb){
     authSettled = true;
     document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     renderAccountArea();
+    // The marketing page is what a visitor with no deep link and no account sees.
+    if (!currentUser && !location.hash) trackHomepageView();
     if (currentUser && typeof hydratePlayerPrefs === 'function') await hydratePlayerPrefs();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');
     if (location.hash === '#rituals') document.body.setAttribute('data-view','rituals');
     if (location.hash === '#reprogram') document.body.setAttribute('data-view','reprogram');
+    if (location.hash === '#pricing') document.body.setAttribute('data-view','pricing');
     // Reopened on #sanctuary: set the view before rendering, so the stage is
     // measured while it is on screen rather than while it is still display:none.
     if (currentUser && location.hash === '#sanctuary' && SANCTUARY_ENABLED){ document.body.setAttribute('data-view','sanctuary'); renderSanctuaryHome(); }
@@ -99,5 +107,17 @@ if (sb){
 } else {
   document.body.setAttribute('data-auth', 'out');
   renderAccountArea();
+  if (!location.hash) trackHomepageView();
 }
 /* library is now a static embed — nothing to fetch on load */
+
+function trackHomepageView(){
+  if (document.body.hasAttribute('data-view')) return;
+  trackEvent('homepage_view', { page: 'home', signed_in: !!currentUser });
+}
+function trackIsFreshOAuthAccount(user){
+  const provider = user && user.app_metadata && user.app_metadata.provider;
+  if (!provider || provider === 'email') return false;
+  const made = Date.parse(user.created_at || '');
+  return isFinite(made) && Date.now() - made < 2 * 60 * 1000;
+}

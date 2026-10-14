@@ -409,6 +409,8 @@ function updateAuthModalUI(){
   document.getElementById('authToggle').innerHTML = authMode === 'signup'
     ? `Already have an account? <button onclick="toggleAuthMode()">Log in</button>`
     : `New here? <button onclick="toggleAuthMode()">Create a free account</button>`;
+  // The sign-up form is on screen: that is the start, however it was reached.
+  if (authMode === 'signup' && typeof trackEvent === 'function') trackEvent('signup_started', { source: (typeof signupSource === 'string' && signupSource) || currentPageName() });
 }
 function toggleAuthModeFromReset(){
   authMode = 'login';
@@ -475,6 +477,7 @@ async function submitAuth(){
     return;
   }
 
+  if (wasSignup && typeof trackEvent === 'function') trackEvent('signup_completed', { method: 'email' });
   if (wasSignup){
     // Stash the chosen username/avatar so we can apply it once there's a real session
     // (which may be now, or after they click the email confirmation link and log in).
@@ -1195,7 +1198,7 @@ function renderNavLinks(){
         ['Build yours', 'showBuildPage()'],
         ['Subliminals', 'showLibraryPage()'],
         ['The Science', 'showReprogramPage()'],
-        ['Pricing', "showMarketingHome(); goTo('pricing')"],
+        ['Pricing', 'showPricingPage()'],
       ];
   document.getElementById('navLinks').innerHTML = links
     .map(([label, action]) => `<button onclick="${action}; closeMobileNav();">${label}</button>`)

@@ -234,6 +234,11 @@
   .flow-title{ font-family:var(--serif); font-size:23px; color:var(--moonlight); }
   .flow-sub{ font-size:13px; color:var(--haze); margin-top:-8px; }
   .flow-body{ flex:1; overflow-y:auto; }
+  .breath-note > summary{ cursor:pointer; list-style:none; font-style:normal; font-family:var(--sans); font-size:13px; color:var(--lilac); }
+  .breath-note > summary::-webkit-details-marker{ display:none; }
+  .breath-note > summary::after{ content:' ▾'; }
+  .breath-note[open] > summary{ margin-bottom:8px; }
+  .breath-note > summary:focus-visible{ outline:2px solid var(--lilac); outline-offset:3px; border-radius:6px; }
   .flow-nav{ display:flex; justify-content:space-between; align-items:center; margin-top:18px; gap:10px; flex-wrap:wrap; }
   .flow-back{ background:none; border:none; color:var(--haze); font-size:13px; cursor:pointer; }
   .flow-back:hover{ color:var(--candle); }
@@ -399,9 +404,41 @@
   @keyframes recLinePulse{ 0%,100%{ opacity:.45; } 50%{ opacity:.85; } }
   .record-counter{ font-size:12px; color:var(--haze); }
   .rec-tap-hint{ font-size:12.5px; color:var(--candle); background:rgba(227,190,127,0.1); border-radius:999px; padding:6px 14px; margin-top:6px; }
-  .rec-btn{ width:78px; height:78px; border-radius:50%; cursor:pointer; user-select:none; touch-action:none; background:var(--dusk); border:2px solid var(--candle); color:var(--candle); font-size:11px; letter-spacing:.05em; transition:all .2s; }
+  .record-text{ display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; }
+  .record-dock{ display:flex; flex-direction:column; align-items:center; gap:10px; width:100%; margin-top:6px; }
+  .rec-controls{ display:flex; align-items:center; justify-content:center; gap:16px; }
+  /* A real button, 84px, tap-to-toggle. touch-action stops double-tap zoom. */
+  .rec-btn{ width:84px; height:84px; border-radius:50%; cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; background:var(--dusk); border:2px solid var(--candle); color:var(--candle); font-size:11px; letter-spacing:.05em; text-transform:uppercase; transition:background .2s, border-color .2s, color .2s; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; }
+  .rec-btn:focus-visible{ outline:3px solid var(--lilac); outline-offset:4px; }
+  .rec-btn[aria-disabled="true"]{ opacity:.6; cursor:progress; }
+  .rec-btn-dot{ width:14px; height:14px; border-radius:50%; background:currentColor; transition:border-radius .2s; }
   .rec-btn.recording{ background:#C96A6A; border-color:#C96A6A; color:#fff; animation:breathe 1.2s ease-in-out infinite; }
-  .rec-status{ font-size:12px; color:var(--lilac); min-height:16px; }
+  .rec-btn.recording .rec-btn-dot{ border-radius:3px; }
+  .rec-timer{ font-variant-numeric:tabular-nums; font-size:20px; color:var(--moonlight); min-width:3ch; }
+  .rec-status{ font-size:13px; color:var(--lilac); min-height:18px; max-width:440px; }
+  .rec-error{ font-size:13px; color:#E39A9A; background:rgba(201,106,106,.12); border:1px solid rgba(201,106,106,.35); border-radius:12px; padding:10px 14px; max-width:440px; text-align:left; }
+  .rec-error[hidden], .rec-preview[hidden], .rec-timer[hidden]{ display:none; }
+  .rec-preview{ width:100%; max-width:440px; }
+  .rec-preview audio{ width:100%; height:40px; }
+  @media (prefers-reduced-motion: reduce){ .rec-btn.recording{ animation:none; } }
+  /* On a phone the words and the controls are two blocks, one above the other,
+     and they cannot overlap because neither is positioned over the other: the
+     words get a capped, scrollable box (so a long script never pushes the button
+     off the screen) and the controls follow it in the normal flow. The step is
+     scrolled to the top when it opens (see showStep), so both fit on one screen.
+     The bottom padding clears the home indicator on iPhones (env() is 0 where
+     there is none); Safari's own toolbar resizes the viewport rather than
+     covering it, and 100dvh follows that where 100vh does not. */
+  @media (max-width:640px){
+    .record-panel{ align-items:stretch; gap:0; }
+    .record-text{ max-height:calc(100vh - 520px); max-height:calc(100dvh - 520px); min-height:120px; overflow-y:auto; padding:4px 2px 12px; -webkit-overflow-scrolling:touch; }
+    .record-line-script{ max-height:none; }
+    .record-dock{ margin-top:0; padding:12px 0 calc(8px + env(safe-area-inset-bottom, 0px)); border-top:1px solid rgba(185,167,232,.16); }
+    .record-actions{ width:100%; }
+    .record-actions .mini-btn{ flex:1 1 0; min-height:44px; }
+    #recordFlowTitle{ scroll-margin-top:76px; }
+  }
+  body[data-sky="day"] .rec-timer{ color:#3E2A48; }
   .waveform{ display:flex; gap:3px; align-items:flex-end; height:22px; }
   .waveform div{ width:3px; border-radius:2px; background:var(--dusk); transition:height .15s, background .2s; }
   .waveform div.live{ background:var(--candle); }
@@ -438,6 +475,22 @@
   .final-line-script{ max-width:440px; max-height:160px; overflow-y:auto; text-align:left; padding:12px 16px; background:rgba(255,255,255,0.03); border-radius:14px; font-size:13.5px; }
   .final-toggle{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--haze); }
   .demo-note{ font-size:11px; color:var(--haze); background:rgba(255,255,255,0.04); border-radius:10px; padding:10px 12px; border:1px solid rgba(255,255,255,0.06); text-align:left; }
+
+  /* ---- the home page below the hero ---- */
+  .hero-free-note{ font-size:13.5px; color:var(--candle); letter-spacing:.02em; margin-top:-8px; }
+  .home-section{ padding:64px 0; border-top:1px solid rgba(255,255,255,0.06); }
+  .home-steps{ list-style:none; display:grid; grid-template-columns:1fr; gap:16px; max-width:900px; margin:0 auto; }
+  .home-step{ background:var(--veil); border:1px solid var(--dusk); border-radius:20px; padding:22px 20px; text-align:left; }
+  .home-step-num{ display:inline-grid; place-items:center; width:30px; height:30px; border-radius:50%; border:1px solid var(--candle); color:var(--candle); font-family:var(--serif); font-size:14px; }
+  .home-step h3{ font-family:var(--serif); font-weight:500; font-size:18px; color:var(--moonlight); margin-top:12px; }
+  .home-step p{ font-size:14px; color:var(--haze); margin-top:6px; }
+  .home-features{ list-style:none; display:grid; grid-template-columns:1fr; gap:10px; max-width:560px; margin:0 auto; }
+  .home-features li{ position:relative; padding:12px 16px 12px 40px; background:var(--veil); border:1px solid var(--dusk); border-radius:14px; font-size:14.5px; color:var(--moonlight); }
+  .home-features li::before{ content:"✦"; position:absolute; left:16px; top:12px; color:var(--lilac); font-size:13px; }
+  .home-section-cta{ display:flex; justify-content:center; margin-top:28px; }
+  @media (min-width:760px){ .home-steps{ grid-template-columns:repeat(3,1fr); } .home-section{ padding:80px 0; } }
+  body[data-sky="day"] .home-step, body[data-sky="day"] .home-features li{ background:rgba(255,255,255,.62); border-color:rgba(62,42,72,.14); }
+  body[data-sky="day"] .home-step h3, body[data-sky="day"] .home-features li{ color:#3E2A48; }
 
   .pricing{ padding:80px 0; border-top:1px solid rgba(255,255,255,0.06); }
   /* Two cards now — Free and Ritual — so the track is two columns wide. */
@@ -558,7 +611,9 @@
      marketing home — that's where the "too busy" was coming from. */
   body:not([data-view]) #flow-section,
   body[data-view="build"] > nav ~ section:not(#flow-section),
-  body[data-view="reprogram"] > nav ~ section:not(#reprogram){ display:none !important; }
+  body[data-view="reprogram"] > nav ~ section:not(#reprogram),
+  body[data-view="pricing"] > nav ~ section:not(#pricing),
+  body[data-view] .home-only{ display:none !important; }
   body[data-view="profile"] > footer,
   body[data-view="library"] > footer,
   body[data-view="journal"] > footer,
@@ -574,6 +629,9 @@
   body:not([data-view="journal"]) #journal{ display:none !important; }
   body:not([data-view="rituals"]) #rituals{ display:none !important; }
   body:not([data-view="reprogram"]) #reprogram{ display:none !important; }
+  /* Pricing is its own page, reached from the nav, the footer and the upgrade
+     sheet. The footer stays on it, for the terms and privacy links. */
+  body:not([data-view="pricing"]) #pricing{ display:none !important; }
 
   /* ---- the Sanctuary ----
      The stage is exactly the ratio of the artwork and is never cropped, which
@@ -2698,12 +2756,62 @@
   <div class="hero-bg"><img src="img/hero.jpg" alt="" aria-hidden="true"></div>
   <div class="orb-wrap" aria-hidden="true"><div class="orb"></div></div>
   <div class="motto">Be more <b>Hopeful</b> … Be more <b>Romantic</b> … Be more <b>you</b>.</div>
-  <h1>Your all in one<br><em>wellness app.</em></h1>
-  <p class="hero-sub">Personalized subliminals in your own voice, a gratitude and manifestation journal that honors the one you write by hand, and morning and night rituals you actually keep — all in one place.</p>
+  <h1>Your mind. Your voice. <br><em>Your next chapter.</em></h1>
+  <p class="hero-sub">Create personalized subliminals for free — your own affirmations, spoken in your own voice, layered with calming frequencies and sound, ready to play tonight.</p>
   <div class="hero-ctas">
-    <button class="btn btn-primary" onclick="showBuildPage()">Build my subliminal ✦</button>
+    <button type="button" class="btn btn-primary" id="heroCta" onclick="startFreeSignup('hero')">Create my free subliminal</button>
   </div>
+  <!-- Verified against the code, not the marketing: the only plans are Free and
+       Ritual (PLANS in js/billing.js); the free tier is $0 with no expiry
+       (the Free card below); and sign-up asks for an email, a password and a
+       username and nothing else (submitAuth in js/account.js) -- the checkout
+       is only ever reached from the Ritual card or an upgrade prompt. -->
+  <p class="hero-free-note">Free forever plan. No credit card required.</p>
   <p class="hero-note">Your subconscious takes in roughly <b>275,000 times</b> more per second than your conscious mind. <button onclick="showReprogramPage()">Why this works →</button></p>
+</section>
+
+<!-- The rest of the home page. Each section is short on purpose: the page's
+     only job is to get somebody to the free builder. Hidden on every other view. -->
+<section class="home-section home-only" id="howItWorks" aria-labelledby="howItWorksHeading">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">How it works</div>
+      <h2 id="howItWorksHeading">Three steps to your first subliminal</h2>
+    </div>
+    <ol class="home-steps">
+      <li class="home-step"><span class="home-step-num" aria-hidden="true">1</span><h3>Choose what you want to hear</h3><p>Pick a frequency and write your affirmations, or let us suggest some for you.</p></li>
+      <li class="home-step"><span class="home-step-num" aria-hidden="true">2</span><h3>Say it in your own voice</h3><p>Tap to record each line, tap again to stop, and listen back before you keep it.</p></li>
+      <li class="home-step"><span class="home-step-num" aria-hidden="true">3</span><h3>Layer sound and press play</h3><p>Blend in nature sounds or binaural beats, then fall asleep to it tonight.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="home-section home-only" id="freeFeatures" aria-labelledby="freeFeaturesHeading">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Free, always</div>
+      <h2 id="freeFeaturesHeading">Everything you need to begin</h2>
+    </div>
+    <ul class="home-features">
+      <li>Personalized subliminals built around your own words</li>
+      <li>Record them in your own voice</li>
+      <li>Layer frequencies, nature sounds and binaural beats</li>
+      <li>Sessions up to 20 minutes</li>
+      <li>Save 2 subliminals to your library</li>
+    </ul>
+    <div class="home-section-cta"><button type="button" class="btn btn-primary" onclick="startFreeSignup('free_features')">Create my free subliminal</button></div>
+  </div>
+</section>
+
+<section class="home-section home-only" id="exploreRitual" aria-labelledby="exploreRitualHeading">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">When you want more</div>
+      <h2 id="exploreRitualHeading">Explore Ritual</h2>
+      <p>Ritualize your mornings and nights with a journal, habit tracker, EFT tapping, visualization and sessions that last all night. Entirely optional — the free plan stays free.</p>
+    </div>
+    <div class="home-section-cta"><button type="button" class="btn btn-ghost" onclick="showPricingPage()">See plans and pricing</button></div>
+  </div>
 </section>
 
 <section class="science reprogram-page" id="reprogram">
@@ -3180,8 +3288,8 @@
       <!-- STEP 6: record (own voice) -->
       <div class="flow-step" data-step="6">
         <div class="flow-title" id="recordFlowTitle">Record in your own voice</div>
-        <div class="flow-sub" id="recordFlowSub">Press and hold, speak the line, then release.</div>
-        <div class="breath-note" id="recordBreathNote">Before you start — take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</div>
+        <div class="flow-sub" id="recordFlowSub">Tap to start, speak the line, then tap again to stop.</div>
+        <details class="breath-note" id="recordBreathNote"><summary>Before you start — take three slow breaths</summary>Take a slow breath in, and let it out. Do that three times. Give yourself a real moment to settle into a calm, grounded headspace, so what you record carries the right energy. You'll hear this back every night, so it's worth taking the time.</details>
         <div class="flow-body">
           <div class="record-panel">
             <!-- Both of these are filled in by showRecordLine() as step 6 opens.
@@ -3190,15 +3298,33 @@
                  a correct-looking counter over an affirmation that was never
                  drawn. Neither says anything now that could be mistaken for
                  somebody's actual line. -->
-            <div class="record-counter" id="recCounter"></div>
-            <div class="record-line record-line-loading" id="recLine">Preparing your affirmations…</div>
-            <div class="rec-tap-hint" id="recTapHint" style="display:none;"></div>
-            <button class="rec-btn" id="recBtn">HOLD</button>
-            <div class="waveform" id="waveform"></div>
-            <div class="rec-status" id="recStatus">press and hold to record</div>
-            <div class="record-actions">
-              <button class="mini-btn ghostbtn" id="skipBtn" onclick="skipLine()">Skip this line</button>
-              <button class="mini-btn candlebtn" id="nextLineBtn" onclick="nextLine()" disabled>Next line →</button>
+            <div class="record-text">
+              <div class="record-counter" id="recCounter"></div>
+              <div class="record-line record-line-loading" id="recLine">Preparing your affirmations…</div>
+              <div class="rec-tap-hint" id="recTapHint" style="display:none;"></div>
+            </div>
+            <!-- The controls are a separate block below the words, never over
+                 them. On a phone it sticks to the bottom of the screen above
+                 the home indicator, so a long script scrolls behind it. The
+                 button toggles: tap to start, tap again to stop. -->
+            <div class="record-dock" role="group" aria-label="Recording controls">
+              <div class="rec-controls">
+                <button type="button" class="rec-btn" id="recBtn" aria-label="Start recording">
+                  <span class="rec-btn-dot" aria-hidden="true"></span>
+                  <span class="rec-btn-text" id="recBtnText">Record</span>
+                </button>
+                <div class="rec-timer" id="recTimer" aria-hidden="true" hidden>0:00</div>
+              </div>
+              <div class="waveform" id="waveform" aria-hidden="true"></div>
+              <div class="rec-status" id="recStatus" role="status" aria-live="polite">Tap the button, say the line, then tap again to stop.</div>
+              <div class="rec-error" id="recError" role="alert" hidden></div>
+              <div class="rec-preview" id="recPreviewWrap" hidden>
+                <audio id="recPreview" controls preload="metadata" aria-label="Listen back to this recording"></audio>
+              </div>
+              <div class="record-actions">
+                <button type="button" class="mini-btn ghostbtn" id="skipBtn" onclick="skipLine()">Skip this line</button>
+                <button type="button" class="mini-btn candlebtn" id="nextLineBtn" onclick="nextLine()" disabled>Next line →</button>
+              </div>
             </div>
           </div>
         </div>
@@ -3609,7 +3735,8 @@
 </section>
 
 <section class="pricing" id="pricing">
-  <div class="wrap">
+  <div class="wrap page-head">
+    <a href="#" class="profile-page-back" onclick="goHome(); return false;">← Back to Subliminally</a>
     <div class="section-head" id="pricingHead">
       <div class="eyebrow">Membership</div>
       <h2 id="pricingHeading">Your all in one wellness app</h2>
@@ -3721,21 +3848,22 @@
      before it. Moving one of these lines changes behaviour. -->
 <script src="js/selectable.js"></script>
 <script src="js/dates.js"></script>
+<script src="js/analytics.js?v=20261014a"></script>
 <script src="js/sky.js"></script>
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20261001a"></script>
-<script src="js/billing.js?v=20261005a"></script>
-<script src="js/entitlements.js"></script>
-<script src="js/account.js"></script>
-<script src="js/nav.js"></script>
+<script src="js/builder.js?v=20261014a"></script>
+<script src="js/billing.js?v=20261014a"></script>
+<script src="js/entitlements.js?v=20261014a"></script>
+<script src="js/account.js?v=20261014a"></script>
+<script src="js/nav.js?v=20261014a"></script>
 <script src="js/today.js"></script>
 <script src="js/light.js"></script>
 <script src="js/avatar-emotions.js"></script>
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
-<script src="js/journey.js?v=20261005a"></script>
+<script src="js/journey.js?v=20261014a"></script>
 <script src="js/profile.js?v=20261005a"></script>
 <script src="js/mix-settings.js?v=20261005a"></script>
 <script src="js/player.js?v=20261001a"></script>
@@ -3744,6 +3872,6 @@
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>
 <script src="js/sanctuary.js"></script>
-<script src="js/boot.js"></script>
+<script src="js/boot.js?v=20261014a"></script>
 </body>
 </html>
