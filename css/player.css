@@ -3,24 +3,88 @@ body.player-open{ overflow:hidden; }
 .immersive-player{ position:fixed; inset:0; z-index:1200; display:none; overflow:hidden;
   color:#f8f2ff; background:#100d2d; isolation:isolate; }
 .immersive-player.open{ display:block; }
-.ip-sky{ position:absolute; inset:0; z-index:-3;
+/* One continuous full-screen sky: a single gradient stack, no tiles, no repeats.
+   Night is the default; body[data-sky="day"] (set by sky.js) swaps in the day sky. */
+.ip-sky{ position:absolute; inset:0; z-index:-3; overflow:hidden;
   background:
-    radial-gradient(circle at 78% 15%, rgba(255,226,163,.28), transparent 12%),
-    radial-gradient(ellipse at 50% 110%, rgba(199,130,240,.34), transparent 46%),
-    linear-gradient(180deg,#0e0d2d 0%,#211750 48%,#5b387b 100%); }
-.ip-stars,.ip-stars::before{ position:absolute; inset:0; content:""; pointer-events:none;
-  background-image:radial-gradient(circle,rgba(255,255,255,.75) 0 1px,transparent 1.5px);
-  background-size:67px 67px; opacity:.26; }
-.ip-stars::before{ transform:translate(31px,18px); background-size:97px 97px; opacity:.45; }
-.ip-moon{ position:absolute; width:132px; height:132px; right:-28px; top:7%; border-radius:50%;
-  background:radial-gradient(circle at 38% 38%,#fff9df,#eedcae 60%,#cda7d9 100%);
-  box-shadow:0 0 45px rgba(255,230,171,.32),0 0 110px rgba(199,156,237,.23); opacity:.82; }
-.ip-cloud{ position:absolute; left:-22%; width:145%; height:24%; border-radius:50%; filter:blur(22px);
-  background:radial-gradient(ellipse,rgba(223,199,249,.26),rgba(113,73,160,.09) 55%,transparent 72%);
+    radial-gradient(ellipse 70% 38% at 50% 108%, rgba(214,140,236,.38), transparent 70%),
+    radial-gradient(ellipse 120% 60% at 20% 30%, rgba(92,63,170,.30), transparent 70%),
+    radial-gradient(ellipse 90% 50% at 85% 55%, rgba(139,86,190,.22), transparent 72%),
+    linear-gradient(180deg,#0b0a2a 0%,#1a1348 32%,#32205f 62%,#6a4088 100%); }
+.ip-stars,.ip-stars::before{ position:absolute; inset:0; content:""; pointer-events:none; }
+@keyframes ip-twinkle{ from{ opacity:.55; } to{ opacity:1; } }
+.ip-moon{ position:absolute; width:104px; height:104px; right:9%; top:8%; border-radius:50%;
+  background:radial-gradient(circle at 38% 38%,#fffbe6,#f1e2b8 62%,#d5b4dd 100%);
+  box-shadow:0 0 38px rgba(255,236,186,.40),0 0 120px 30px rgba(199,156,237,.22); opacity:.9; }
+.ip-cloud{ position:absolute; left:-22%; width:145%; height:24%; border-radius:50%; filter:blur(26px);
+  background:radial-gradient(ellipse,rgba(223,199,249,.22),rgba(113,73,160,.08) 55%,transparent 72%);
   pointer-events:none; }
 .ip-cloud.one{ top:19%; animation:ip-drift 38s ease-in-out infinite alternate; }
 .ip-cloud.two{ bottom:-2%; opacity:.8; animation:ip-drift 52s ease-in-out infinite alternate-reverse; }
 @keyframes ip-drift{ from{ transform:translate3d(-3%,0,0); } to{ transform:translate3d(5%,1.5%,0); } }
+.ip-stars{ background-repeat:no-repeat; background-image:
+    radial-gradient(circle at 1.0% 79.7%,rgba(255,255,255,0.59) 0,rgba(255,255,255,0.59) 0.72px,transparent 1.62px),
+    radial-gradient(circle at 31.0% 68.9%,rgba(255,255,255,0.76) 0,rgba(255,255,255,0.76) 1.05px,transparent 1.95px),
+    radial-gradient(circle at 21.9% 63.0%,rgba(255,255,255,0.68) 0,rgba(255,255,255,0.68) 0.97px,transparent 1.87px),
+    radial-gradient(circle at 0.1% 20.5%,rgba(255,255,255,0.58) 0,rgba(255,255,255,0.58) 0.84px,transparent 1.74px),
+    radial-gradient(circle at 32.7% 26.9%,rgba(255,255,255,0.65) 0,rgba(255,255,255,0.65) 0.91px,transparent 1.81px),
+    radial-gradient(circle at 17.9% 19.8%,rgba(255,255,255,0.90) 0,rgba(255,255,255,0.90) 0.83px,transparent 1.73px),
+    radial-gradient(circle at 32.5% 46.3%,rgba(255,255,255,0.62) 0,rgba(255,255,255,0.62) 1.08px,transparent 1.98px),
+    radial-gradient(circle at 19.1% 45.2%,rgba(255,255,255,0.52) 0,rgba(255,255,255,0.52) 0.65px,transparent 1.55px),
+    radial-gradient(circle at 90.0% 42.3%,rgba(255,255,255,0.84) 0,rgba(255,255,255,0.84) 0.67px,transparent 1.57px),
+    radial-gradient(circle at 83.8% 29.5%,rgba(255,255,255,0.68) 0,rgba(255,255,255,0.68) 0.61px,transparent 1.51px),
+    radial-gradient(circle at 29.1% 61.6%,rgba(255,255,255,0.59) 0,rgba(255,255,255,0.59) 0.70px,transparent 1.60px),
+    radial-gradient(circle at 8.0% 16.7%,rgba(255,255,255,0.84) 0,rgba(255,255,255,0.84) 0.85px,transparent 1.75px),
+    radial-gradient(circle at 61.3% 44.3%,rgba(255,255,255,0.79) 0,rgba(255,255,255,0.79) 1.00px,transparent 1.90px),
+    radial-gradient(circle at 90.4% 50.6%,rgba(255,255,255,0.75) 0,rgba(255,255,255,0.75) 0.77px,transparent 1.67px),
+    radial-gradient(circle at 47.4% 15.3%,rgba(255,255,255,0.89) 0,rgba(255,255,255,0.89) 0.91px,transparent 1.81px),
+    radial-gradient(circle at 52.1% 50.3%,rgba(255,255,255,0.72) 0,rgba(255,255,255,0.72) 0.74px,transparent 1.64px),
+    radial-gradient(circle at 14.1% 41.1%,rgba(255,255,255,0.62) 0,rgba(255,255,255,0.62) 1.02px,transparent 1.92px),
+    radial-gradient(circle at 16.1% 55.4%,rgba(255,255,255,0.74) 0,rgba(255,255,255,0.74) 0.82px,transparent 1.72px),
+    radial-gradient(circle at 45.8% 71.2%,rgba(255,255,255,0.89) 0,rgba(255,255,255,0.89) 0.74px,transparent 1.64px),
+    radial-gradient(circle at 9.0% 88.5%,rgba(255,255,255,0.81) 0,rgba(255,255,255,0.81) 0.67px,transparent 1.57px),
+    radial-gradient(circle at 79.2% 56.4%,rgba(255,255,255,0.69) 0,rgba(255,255,255,0.69) 0.71px,transparent 1.61px),
+    radial-gradient(circle at 84.6% 64.4%,rgba(255,255,255,0.85) 0,rgba(255,255,255,0.85) 0.77px,transparent 1.67px),
+    radial-gradient(circle at 27.5% 1.9%,rgba(255,255,255,0.72) 0,rgba(255,255,255,0.72) 0.99px,transparent 1.89px),
+    radial-gradient(circle at 30.7% 22.7%,rgba(255,255,255,0.53) 0,rgba(255,255,255,0.53) 0.76px,transparent 1.66px),
+    radial-gradient(circle at 95.2% 9.2%,rgba(255,255,255,0.65) 0,rgba(255,255,255,0.65) 0.64px,transparent 1.54px),
+    radial-gradient(circle at 37.5% 55.7%,rgba(255,255,255,0.67) 0,rgba(255,255,255,0.67) 0.60px,transparent 1.50px),
+    radial-gradient(circle at 52.4% 27.8%,rgba(255,255,255,0.58) 0,rgba(255,255,255,0.58) 1.01px,transparent 1.91px),
+    radial-gradient(circle at 55.9% 43.0%,rgba(255,255,255,0.69) 0,rgba(255,255,255,0.69) 0.76px,transparent 1.66px),
+    radial-gradient(circle at 47.9% 84.3%,rgba(255,255,255,0.82) 0,rgba(255,255,255,0.82) 0.81px,transparent 1.71px),
+    radial-gradient(circle at 60.9% 41.3%,rgba(255,255,255,0.65) 0,rgba(255,255,255,0.65) 0.88px,transparent 1.78px),
+    radial-gradient(circle at 65.4% 11.4%,rgba(255,255,255,0.86) 0,rgba(255,255,255,0.86) 0.61px,transparent 1.51px),
+    radial-gradient(circle at 93.4% 2.6%,rgba(255,255,255,0.80) 0,rgba(255,255,255,0.80) 1.08px,transparent 1.98px),
+    radial-gradient(circle at 85.8% 50.6%,rgba(255,255,255,0.82) 0,rgba(255,255,255,0.82) 1.05px,transparent 1.95px),
+    radial-gradient(circle at 99.8% 88.3%,rgba(255,255,255,0.66) 0,rgba(255,255,255,0.66) 1.02px,transparent 1.92px),
+    radial-gradient(circle at 15.4% 23.1%,rgba(255,255,255,0.71) 0,rgba(255,255,255,0.71) 0.63px,transparent 1.53px),
+    radial-gradient(circle at 97.5% 35.1%,rgba(255,255,255,0.53) 0,rgba(255,255,255,0.53) 0.88px,transparent 1.78px),
+    radial-gradient(circle at 67.9% 47.9%,rgba(255,255,255,0.61) 0,rgba(255,255,255,0.61) 0.91px,transparent 1.81px),
+    radial-gradient(circle at 9.3% 13.2%,rgba(255,255,255,0.89) 0,rgba(255,255,255,0.89) 0.80px,transparent 1.70px),
+    radial-gradient(circle at 50.3% 6.9%,rgba(255,255,255,0.63) 0,rgba(255,255,255,0.63) 1.02px,transparent 1.92px),
+    radial-gradient(circle at 41.4% 66.8%,rgba(255,255,255,0.78) 0,rgba(255,255,255,0.78) 0.66px,transparent 1.56px),
+    radial-gradient(circle at 36.4% 91.0%,rgba(255,255,255,0.80) 0,rgba(255,255,255,0.80) 0.86px,transparent 1.76px),
+    radial-gradient(circle at 93.8% 49.4%,rgba(255,255,255,0.85) 0,rgba(255,255,255,0.85) 0.71px,transparent 1.61px),
+    radial-gradient(circle at 79.0% 54.1%,rgba(255,255,255,0.54) 0,rgba(255,255,255,0.54) 0.80px,transparent 1.70px),
+    radial-gradient(circle at 23.6% 79.1%,rgba(255,255,255,0.68) 0,rgba(255,255,255,0.68) 0.61px,transparent 1.51px),
+    radial-gradient(circle at 33.8% 59.0%,rgba(255,255,255,0.80) 0,rgba(255,255,255,0.80) 0.64px,transparent 1.54px),
+    radial-gradient(circle at 31.4% 66.7%,rgba(255,255,255,0.76) 0,rgba(255,255,255,0.76) 0.88px,transparent 1.78px); }
+.ip-stars::before{ background-repeat:no-repeat; background-image:
+    radial-gradient(circle at 25.1% 55.1%,rgba(255,255,255,0.81) 0,rgba(255,255,255,0.81) 1.63px,transparent 2.53px),
+    radial-gradient(circle at 41.8% 67.9%,rgba(255,255,255,0.87) 0,rgba(255,255,255,0.87) 1.25px,transparent 2.15px),
+    radial-gradient(circle at 72.6% 5.6%,rgba(255,255,255,0.76) 0,rgba(255,255,255,0.76) 1.59px,transparent 2.49px),
+    radial-gradient(circle at 97.8% 68.0%,rgba(255,255,255,0.91) 0,rgba(255,255,255,0.91) 1.47px,transparent 2.37px),
+    radial-gradient(circle at 16.7% 59.5%,rgba(255,255,255,0.76) 0,rgba(255,255,255,0.76) 1.77px,transparent 2.67px),
+    radial-gradient(circle at 14.8% 57.1%,rgba(255,255,255,0.95) 0,rgba(255,255,255,0.95) 1.58px,transparent 2.48px),
+    radial-gradient(circle at 29.1% 38.9%,rgba(255,255,255,0.99) 0,rgba(255,255,255,0.99) 1.25px,transparent 2.15px),
+    radial-gradient(circle at 33.2% 47.1%,rgba(255,255,255,0.95) 0,rgba(255,255,255,0.95) 1.34px,transparent 2.24px),
+    radial-gradient(circle at 56.3% 44.7%,rgba(255,255,255,0.88) 0,rgba(255,255,255,0.88) 1.67px,transparent 2.57px),
+    radial-gradient(circle at 62.4% 63.6%,rgba(255,255,255,0.79) 0,rgba(255,255,255,0.79) 1.52px,transparent 2.42px),
+    radial-gradient(circle at 84.6% 50.2%,rgba(255,255,255,0.97) 0,rgba(255,255,255,0.97) 1.68px,transparent 2.58px),
+    radial-gradient(circle at 80.5% 37.8%,rgba(255,255,255,0.99) 0,rgba(255,255,255,0.99) 1.68px,transparent 2.58px),
+    radial-gradient(circle at 25.9% 7.3%,rgba(255,255,255,0.94) 0,rgba(255,255,255,0.94) 1.28px,transparent 2.18px),
+    radial-gradient(circle at 16.6% 23.3%,rgba(255,255,255,0.77) 0,rgba(255,255,255,0.77) 1.29px,transparent 2.19px); animation:ip-twinkle 5.5s ease-in-out infinite alternate; }
+
 .ip-shell{ position:relative; height:100%; height:100dvh; max-width:720px; margin:0 auto;
   display:grid; grid-template-rows:auto minmax(190px,1fr) auto; gap:16px;
   padding:max(18px,env(safe-area-inset-top)) 20px max(18px,env(safe-area-inset-bottom)); }
@@ -104,9 +168,9 @@ body.player-open{ overflow:hidden; }
 .ps-custom.open{ display:grid; }
 .ps-custom input{ min-width:0; border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:11px 12px;
   color:#fff; background:rgba(0,0,0,.16); font:inherit; }
-@media (min-width:721px){ .immersive-player{ background:rgba(6,4,18,.94); } .ip-shell{ box-shadow:0 0 90px rgba(8,4,25,.48); } }
+/* No dark backdrop or shell shadow on desktop: that read as a boxed panel. The sky runs edge to edge. */
 @media (prefers-reduced-motion:reduce){
-  .ip-cloud{ animation:none!important; }
+  .ip-cloud,.ip-stars::before{ animation:none!important; }
 }
 
 /* ---------- Adjust Sounds: a saved subliminal's layers, edited in place ----------
@@ -208,7 +272,8 @@ body.audio-editor-open #upgradeOverlay{ z-index:1400; }
 .ip-layer-note[hidden]{ display:none; }
 .ip-sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
 /* Play/Pause and Start Over stay within reach however tall the controls above them grow. */
-.ip-controls{ position:sticky; bottom:0; z-index:3; padding:10px 0 2px; background:linear-gradient(180deg,rgba(25,17,62,0) 0,rgba(25,17,62,.97) 14px); }
+.ip-controls{ position:sticky; bottom:0; z-index:3; padding:10px 0 2px; background:linear-gradient(180deg,rgba(25,17,62,0) 0,rgba(25,17,62,.38) 26px,rgba(25,17,62,.38) 100%); -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 26px),linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%); -webkit-mask-composite:source-in;
+  mask-image:linear-gradient(180deg,transparent 0,#000 26px),linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%); mask-composite:intersect; }
 @media (prefers-reduced-motion:reduce){
   .ip-lyric-text,.ip-lyric-btn{ transition:none; }
   .ip-lyric[data-state="active"] .ip-lyric-btn{ animation:none; }
@@ -245,3 +310,58 @@ body.audio-editor-open #upgradeOverlay{ z-index:1400; }
 .immersive-player .listening-freqs h5, .player-sheet .listening-freqs h5{ margin:6px 0 0; font-size:12px; font-weight:500; color:#f6dca2; letter-spacing:.05em; text-transform:uppercase; }
 .immersive-player .listening-freqs h5 small, .player-sheet .listening-freqs h5 small{ text-transform:none; letter-spacing:0; opacity:.8; }
 @media (max-width:420px){ .fl-row{ grid-template-columns:minmax(66px,auto) 1fr 36px 44px; gap:6px; } }
+
+/* ---------- day sky ----------
+   Same structure, different light: soft blue, a warm sun glow, and white clouds.
+   Text flips to deep indigo so it keeps contrast on the pale sky. */
+.ip-kicker .k-day{ display:none; }
+body[data-sky="day"] .ip-kicker .k-day{ display:inline; }
+body[data-sky="day"] .ip-kicker .k-night{ display:none; }
+body[data-sky="day"] .immersive-player{ color:#2a1d4d; background:#bfdcf5; }
+body[data-sky="day"] .ip-sky{
+  background:
+    radial-gradient(ellipse 60% 34% at 50% 108%, rgba(255,226,200,.75), transparent 72%),
+    radial-gradient(ellipse 110% 55% at 15% 12%, rgba(255,255,255,.55), transparent 70%),
+    linear-gradient(180deg,#6fb4ec 0%,#9fd0f4 38%,#cfe8fa 72%,#f3f0f6 100%); }
+body[data-sky="day"] .ip-stars{ display:none; }
+body[data-sky="day"] .ip-moon{ right:8%; top:7%; width:96px; height:96px; opacity:1;
+  background:radial-gradient(circle at 40% 38%,#fffdf0,#ffe9a8 55%,#ffd27a 100%);
+  box-shadow:0 0 50px 12px rgba(255,236,170,.75),0 0 160px 60px rgba(255,244,205,.45); }
+body[data-sky="day"] .ip-cloud{ filter:blur(9px); height:13%; border-radius:0; width:60%; left:-10%;
+  background:radial-gradient(ellipse 30% 55% at 20% 68%,#fff 0,rgba(255,255,255,.9) 62%,transparent 100%),
+             radial-gradient(ellipse 28% 85% at 44% 48%,#fff 0,rgba(255,255,255,.95) 62%,transparent 100%),
+             radial-gradient(ellipse 26% 65% at 66% 62%,#fff 0,rgba(255,255,255,.9) 62%,transparent 100%),
+             radial-gradient(ellipse 40% 36% at 50% 88%,rgba(255,255,255,.95) 0,transparent 100%); }
+body[data-sky="day"] .ip-cloud.one{ top:15%; opacity:.95; }
+body[data-sky="day"] .ip-cloud.two{ top:auto; bottom:24%; left:auto; right:-14%; width:72%; height:15%; opacity:.9; }
+body[data-sky="day"] .ip-kicker{ color:#4a3a7d; }
+body[data-sky="day"] .ip-icon-btn{ color:#2a1d4d; background:rgba(255,255,255,.45); border-color:rgba(74,58,125,.25); }
+body[data-sky="day"] .ip-icon-btn:hover,body[data-sky="day"] .ip-icon-btn:focus-visible{ color:#6a3fa0; border-color:#8a5fc0; }
+body[data-sky="day"] .ip-track-copy small,body[data-sky="day"] .ip-ambience-copy small{ color:#5a4a86; }
+body[data-sky="day"] .ip-track-copy h2,body[data-sky="day"] .ip-track-text h2{ color:#241846; }
+body[data-sky="day"] .ip-ambience-card{ color:#241846; background:rgba(255,255,255,.55); border-color:rgba(74,58,125,.2); }
+body[data-sky="day"] .ip-ambience-mark{ color:#7a4fb0; background:linear-gradient(145deg,rgba(196,150,240,.35),rgba(255,200,190,.4)); }
+body[data-sky="day"] .ip-change{ color:#7a4a12; }
+body[data-sky="day"] .ip-times{ color:#4a3a7d; }
+body[data-sky="day"] .ip-progress-track{ background:rgba(42,29,77,.18); }
+body[data-sky="day"] .ip-control{ color:#3a2a68; }
+body[data-sky="day"] .ip-control.sel{ color:#7a4a12; }
+body[data-sky="day"] .ip-controls{ background:linear-gradient(180deg,rgba(235,244,252,0) 0,rgba(235,244,252,.4) 26px,rgba(235,244,252,.4) 100%); }
+body[data-sky="day"] .ip-main-play{ background:radial-gradient(circle at 50% 38%,#6d4fb0,#3a2670 100%); border-color:rgba(255,255,255,.85); box-shadow:0 9px 28px rgba(122,74,176,.25); }
+body[data-sky="day"] .ip-lyric-text{ color:#4a3a7d; }
+body[data-sky="day"] .ip-lyric[data-state="played"] .ip-lyric-text{ color:#5a4d86; }
+body[data-sky="day"] .ip-lyric[data-state="queued"] .ip-lyric-text{ color:#6b3f10; }
+body[data-sky="day"] .ip-lyric[data-state="queued"] .ip-lyric-btn{ box-shadow:inset 0 0 0 1px rgba(150,95,20,.4); }
+body[data-sky="day"] .ip-lyric[data-state="active"] .ip-lyric-text{ color:#1f1440; text-shadow:0 0 14px rgba(255,255,255,.5); }
+body[data-sky="day"] .ip-lyric[data-state="active"] .ip-lyric-btn{ background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.55) 22%,rgba(255,255,255,.45) 78%,rgba(255,255,255,0)); box-shadow:inset 0 0 0 1px rgba(122,74,176,.3); }
+body[data-sky="day"] .ip-lyric-tag{ color:#5a4a86; }
+body[data-sky="day"] .ip-follow,body[data-sky="day"] .ip-status{ background:rgba(255,255,255,.92); color:#4a2f78; border-color:rgba(122,74,176,.4); box-shadow:0 8px 24px rgba(74,58,125,.2); }
+body[data-sky="day"] .immersive-player .fl-name b,body[data-sky="day"] .immersive-player .listening-freqs h5,body[data-sky="day"] .immersive-player .fl-note{ color:#4a2f78; }
+body[data-sky="day"] .immersive-player .fl-name small,body[data-sky="day"] .immersive-player .fl-count,body[data-sky="day"] .immersive-player .fl-empty{ color:#5a4a86; }
+body[data-sky="day"] .immersive-player .fl-chip,body[data-sky="day"] .immersive-player .fl-row{ color:#2a1d4d; background:rgba(255,255,255,.5); border-color:rgba(74,58,125,.22); }
+body[data-sky="day"] .immersive-player .fl-chip small{ color:#5a4a86; }
+body[data-sky="day"] .immersive-player .fl-chip.sel{ color:#4a2f78; background:rgba(255,236,190,.8); border-color:#c9953a; }
+body[data-sky="day"] .immersive-player .fl-remove{ color:#4a3a7d; background:rgba(255,255,255,.5); border-color:rgba(74,58,125,.25); }
+@media (prefers-reduced-motion:no-preference){
+  .immersive-player, .ip-sky, .ip-kicker{ transition:color .6s ease; }
+}
