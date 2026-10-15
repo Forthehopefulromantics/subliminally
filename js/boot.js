@@ -78,6 +78,8 @@ if (sb){
     document.body.setAttribute('data-auth', currentUser ? 'in' : 'out');
     renderAccountArea();
     if (currentUser && typeof hydratePlayerPrefs === 'function') await hydratePlayerPrefs();
+    // An unfinished recording kept on this device is offered back on the builder's first screen.
+    if (typeof checkRecordingDraft === 'function') checkRecordingDraft();
     if (currentUser && location.hash === '#profile') document.body.setAttribute('data-view','profile');
     if (location.hash === '#library'){ document.body.setAttribute('data-view','library'); renderMyLibraryState(); }
     if (location.hash === '#journal') document.body.setAttribute('data-view','journal');

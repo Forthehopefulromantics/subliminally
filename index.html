@@ -8,8 +8,8 @@
 <link rel="canonical" href="https://www.subliminallybyfthr.com/" />
 <meta name="theme-color" content="#0D0B18" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="stylesheet" href="/css/player.css" />
-<link rel="stylesheet" href="/css/listening-fixes.css?v=20260923d" />
+<link rel="stylesheet" href="/css/player.css?v=20261015a" />
+<link rel="stylesheet" href="/css/listening-fixes.css?v=20261015a" />
 <link rel="stylesheet" href="/css/builder-celestial.css?v=20260923e" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
@@ -244,6 +244,88 @@
   .freq-card3 .hz{ font-family:var(--serif); font-size:17px; color:var(--moonlight); }
   .freq-card3 .word{ font-size:10.5px; color:var(--lilac); margin-top:2px; }
   @media (max-width:560px){ .freq-grid3{ grid-template-columns:repeat(2,1fr); } }
+  /* ---- frequency layers on the builder page (themed by the page's own variables) ---- */
+  .freq-card3{ position:relative; font:inherit; }
+  .freq-card3 .fc-order{ position:absolute; top:6px; right:8px; min-width:18px; height:18px; border-radius:9px; display:none; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#2b1f47; background:var(--candle); }
+  .freq-card3.sel .fc-order{ display:inline-flex; }
+  .freq-card3.sel::before{ content:"\2713"; position:absolute; top:5px; left:9px; font-size:12px; color:var(--candle); }
+  .freq-card3.fc-locked{ opacity:.55; }
+  .freq-card3:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  .fl-tray{ margin-top:12px; }
+  .fl-list{ list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+  .fl-row{ display:grid; grid-template-columns:minmax(78px,auto) 1fr 40px 44px; align-items:center; gap:10px; padding:8px 10px; border-radius:13px; background:rgba(185,167,232,.12); border:1px solid rgba(185,167,232,.34); }
+  .fl-name b{ display:block; font-size:13.5px; font-weight:500; color:var(--moonlight); }
+  .fl-name small{ display:block; font-size:11px; color:var(--lilac); }
+  .fl-row input[type=range]{ width:100%; min-width:0; accent-color:var(--lilac); }
+  .fl-row output{ font-size:12px; text-align:right; color:var(--candle); font-variant-numeric:tabular-nums; }
+  .fl-remove{ width:44px; height:44px; border-radius:50%; border:1px solid var(--dusk); background:transparent; color:var(--moonlight); font-size:20px; line-height:1; cursor:pointer; }
+  .fl-remove:hover{ color:#E39A9A; border-color:#E39A9A; }
+  .fl-remove:focus-visible,.fl-chip:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  .fl-count{ margin:8px 0 0; font-size:12px; color:var(--haze); }
+  .fl-note{ margin:4px 0 0; font-size:12.5px; color:var(--candle); }
+  .fl-note:empty{ display:none; }
+  .fl-warn{ margin:8px 0 0; padding:10px 12px; border-radius:11px; font-size:12.5px; line-height:1.5; color:var(--moonlight); background:rgba(240,176,80,.14); border:1px solid rgba(240,176,80,.55); }
+  .fl-warn[hidden]{ display:none; }
+  .fl-empty{ margin:6px 0 0; font-size:12.5px; color:var(--haze); }
+  .fl-final .fl-heading{ margin:0 0 6px; font-size:12px; font-weight:500; letter-spacing:.07em; text-transform:uppercase; color:var(--lilac); }
+  .fl-final .fl-heading span{ text-transform:none; letter-spacing:0; opacity:.85; margin-left:6px; }
+  .fl-chips{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+  .fl-chip{ display:flex; flex-direction:column; align-items:center; gap:1px; min-height:44px; padding:7px 4px; border-radius:12px; border:1px solid var(--dusk); background:var(--veil); color:var(--moonlight); font:inherit; font-size:12.5px; cursor:pointer; position:relative; }
+  .fl-chip small{ color:var(--lilac); font-size:10.5px; }
+  .fl-chip.sel{ border-color:var(--lilac); background:rgba(185,167,232,.2); }
+  .fl-chip.sel::after{ content:"\2713"; position:absolute; top:3px; right:7px; font-size:11px; color:var(--candle); }
+  .fl-chip[aria-disabled="true"]{ opacity:.5; }
+  .final-freq-picker.fl-final{ width:100%; max-width:520px; }
+  @media (max-width:420px){ .fl-row{ grid-template-columns:minmax(66px,auto) 1fr 36px 44px; gap:6px; } }
+  /* ---- draft banner, voice limit, counts, the recording manager, the finished-screen playlist ---- */
+  .draft-banner{ margin-bottom:14px; padding:13px 15px; border-radius:14px; background:rgba(185,167,232,.14); border:1px solid var(--lilac); }
+  .draft-banner p{ margin:0 0 10px; font-size:13.5px; color:var(--moonlight); }
+  .draft-banner[hidden]{ display:none; }
+  .draft-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .aff-count-row{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; margin-bottom:8px; }
+  .aff-count{ font-size:15px; color:var(--candle); font-variant-numeric:tabular-nums; }
+  .aff-count-hint{ font-size:12px; color:var(--haze); line-height:1.5; }
+  .aff-tools{ display:flex; align-items:center; gap:2px; }
+  .aff-move{ background:none; border:none; color:var(--haze); cursor:pointer; font-size:15px; min-width:32px; min-height:32px; border-radius:8px; }
+  .aff-move:hover:not(:disabled){ color:var(--candle); }
+  .aff-move:disabled{ opacity:.3; cursor:default; }
+  .aff-remove{ min-width:32px; min-height:32px; }
+  .aff-add:disabled{ opacity:.5; cursor:not-allowed; }
+  .voice-limit-note{ margin-top:12px; padding:11px 13px; border-radius:12px; font-size:13px; line-height:1.55; color:var(--moonlight); background:rgba(185,167,232,.12); border:1px solid rgba(185,167,232,.4); }
+  .voice-limit-note.blocked{ background:rgba(240,176,80,.14); border-color:rgba(240,176,80,.6); }
+  .voice-limit-note[hidden],#voiceLimitFix[hidden]{ display:none; }
+  #voiceLimitFix{ margin-top:8px; }
+  .rec-manager{ margin-top:22px; padding-top:16px; border-top:1px solid var(--dusk); }
+  .rec-manager[hidden]{ display:none; }
+  .rm-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .rm-head h3{ margin:0; font-family:var(--serif); font-weight:400; font-size:19px; color:var(--moonlight); }
+  .rm-count{ font-family:inherit; font-size:14px; color:var(--candle); margin-left:6px; font-variant-numeric:tabular-nums; }
+  .rm-summary{ font-size:12px; color:var(--haze); }
+  .rm-help{ margin:6px 0 12px; font-size:12.5px; color:var(--haze); line-height:1.5; }
+  .rm-list{ list-style:none; margin:0 0 12px; padding:0; display:grid; gap:8px; }
+  .rm-row{ display:grid; grid-template-columns:24px 1fr; gap:4px 10px; padding:10px 11px; border-radius:13px; background:var(--dusk); border:1px solid transparent; }
+  .rm-row.current{ border-color:var(--lilac); background:rgba(185,167,232,.16); }
+  .rm-num{ font-size:12px; color:var(--haze); padding-top:3px; font-variant-numeric:tabular-nums; }
+  .rm-text{ display:block; width:100%; text-align:left; background:none; border:0; padding:0; font-family:var(--serif); font-style:italic; font-size:14.5px; line-height:1.4; color:var(--moonlight); cursor:pointer; }
+  .rm-text:focus-visible{ outline:2px solid var(--candle); outline-offset:3px; border-radius:6px; }
+  .rm-status{ display:block; margin-top:3px; font-size:11.5px; color:var(--haze); }
+  .rm-status.ok{ color:#9ad8b2; }
+  .rm-status.stale{ color:var(--candle); }
+  .rm-actions,.rm-edit-actions{ grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+  .rm-btn{ min-height:38px; padding:0 11px; border-radius:10px; border:1px solid var(--lilac); background:transparent; color:var(--moonlight); font:inherit; font-size:12.5px; cursor:pointer; }
+  .rm-btn.rm-primary{ background:var(--lilac); color:#2b1f47; border-color:var(--lilac); font-weight:500; }
+  .rm-btn.rm-icon{ min-width:36px; padding:0; }
+  .rm-btn.rm-danger{ border-color:#E39A9A; color:#E39A9A; }
+  .rm-btn:disabled{ opacity:.35; cursor:default; }
+  .rm-btn:focus-visible{ outline:2px solid var(--candle); outline-offset:2px; }
+  .rm-edit{ width:100%; box-sizing:border-box; border-radius:10px; border:1px solid var(--lilac); background:var(--veil); color:var(--moonlight); font-family:var(--serif); font-style:italic; font-size:14.5px; padding:8px 10px; resize:vertical; }
+  .final-playlist{ width:100%; max-width:520px; margin:6px auto 0; text-align:left; }
+  .final-playlist[hidden]{ display:none; }
+  .final-playlist h4{ margin:0 0 6px; font-size:12px; font-weight:500; letter-spacing:.07em; text-transform:uppercase; color:var(--lilac); }
+  .final-playlist h4 span{ text-transform:none; letter-spacing:0; color:var(--candle); margin-left:6px; }
+  .final-playlist-list{ margin:0; padding:0; list-style:none; max-height:220px; overflow-y:auto; display:grid; gap:2px; }
+  .final-playlist-list li{ padding:6px 10px; border-radius:9px; font-family:var(--serif); font-style:italic; font-size:14px; line-height:1.4; color:var(--haze); }
+  .final-playlist-list li[data-state="active"]{ color:var(--moonlight); background:rgba(185,167,232,.2); box-shadow:inset 3px 0 0 var(--candle); }
   .freq-guide{ background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.2); border-radius:14px; padding:14px 16px; font-family:var(--serif); font-size:13.5px; color:var(--moonlight); line-height:1.5; min-height:20px; margin-top:10px; }
   .disclaimer{ display:flex; gap:9px; padding:12px 14px; border-radius:12px; background:rgba(185,167,232,0.08); border:1px solid rgba(185,167,232,0.18); margin-top:12px; }
   .disclaimer span.i{ color:var(--lilac); font-size:13px; }
@@ -2908,10 +2990,18 @@
 
       <!-- STEP 0: frequency (all 9) -->
       <div class="flow-step active" data-step="0">
-        <div class="flow-title">Choose your frequency</div>
-        <div class="flow-sub">The nine core Solfeggio tones used in sound healing.</div>
+        <div class="flow-title">Choose your frequencies</div>
+        <div class="flow-sub">The nine core Solfeggio tones used in sound healing. Layer up to four — tap one to add it, tap it again to take it off.</div>
         <div class="flow-body">
-          <div class="freq-grid3" id="freqChips" role="radiogroup" aria-label="Carrier frequency"></div>
+          <div class="draft-banner" id="draftBanner" hidden role="region" aria-label="Unfinished recording">
+            <p id="draftBannerText"></p>
+            <div class="draft-actions">
+              <button type="button" class="mini-btn candlebtn" onclick="resumeRecordingDraft()">Resume recording</button>
+              <button type="button" class="mini-btn ghostbtn" onclick="dismissRecordingDraft()">Discard it</button>
+            </div>
+          </div>
+          <div class="freq-grid3" id="freqChips" role="group" aria-label="Carrier frequencies (choose up to four)"></div>
+          <div class="fl-tray" data-fl-panel aria-label="Your chosen frequencies and their volumes"></div>
           <div class="freq-guide" id="freqGuideText">Tap a frequency to see what it's traditionally used for.</div>
           <div class="disclaimer"><span class="i">ⓘ</span><p>Frequency associations come from cultural and spiritual traditions. They are not medical treatment.</p></div>
         </div>
@@ -3054,6 +3144,7 @@
         <div class="flow-title" id="reviewTitle">Your affirmations</div>
         <div class="flow-sub" id="reviewSub">See every line before it's ever recorded or played. Edit or remove anything.</div>
         <div class="flow-body">
+          <div class="aff-count-row"><b class="aff-count" id="affCount" role="status"></b><span class="aff-count-hint" id="affCountHint"></span></div>
           <div class="aff-list" id="affList"></div>
           <button class="aff-add" id="addAffBtn" onclick="addAffirmation()">+ add your own line</button>
           <div class="save-msg" id="affListMsg"></div>
@@ -3103,6 +3194,8 @@
                chosen: what a cloned voice is, the confirmation, and the recorder. -->
           <div class="my-voice-panel" id="myVoicePanel" data-open="0"></div>
           <audio id="voicePreview" preload="none" style="display:none;"></audio>
+          <div class="voice-limit-note" id="voiceLimitNote" role="status" hidden></div>
+          <button type="button" class="mini-btn ghostbtn" id="voiceLimitFix" hidden onclick="showStep(3)">Review my affirmations</button>
           <div class="save-msg" id="voicePickerMsg"></div>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><button class="mini-btn candlebtn" id="toStep5" disabled onclick="nextStep()">Continue</button></div>
@@ -3201,6 +3294,16 @@
               <button class="mini-btn candlebtn" id="nextLineBtn" onclick="nextLine()" disabled>Next line →</button>
             </div>
           </div>
+          <!-- Every affirmation, with what it needs. See "the recording manager" in builder.js. -->
+          <section class="rec-manager" id="recManager" aria-labelledby="recMgrHeading" hidden>
+            <div class="rm-head">
+              <h3 id="recMgrHeading">Your affirmations <span id="recMgrCount" class="rm-count"></span></h3>
+              <span id="recMgrSummary" class="rm-summary" role="status"></span>
+            </div>
+            <p class="rm-help">Select a line to record it. Re-record, play, edit, reorder or delete any of them. Nothing is lost when you switch between lines.</p>
+            <ol class="rm-list" id="recMgrList"></ol>
+            <button type="button" class="aff-add" id="recMgrAdd" onclick="recAdd()">+ Add an affirmation</button>
+          </section>
         </div>
         <div class="flow-nav"><button class="flow-back" onclick="prevStep()">← Back</button><span></span></div>
       </div>
@@ -3223,8 +3326,10 @@
               </div>
               <div class="length-msg" id="finalTitleMsg"></div>
             </div>
-            <div class="final-freq-picker" id="finalFreqPicker" style="display:none;">
-              <select id="finalFreqSelect" onchange="changeFinalFrequency(this.value)"></select>
+            <div class="final-freq-picker fl-final" id="finalFreqPicker" style="display:none;">
+              <h4 class="fl-heading">Frequencies <span>up to 4 — tap to add or remove</span></h4>
+              <div class="fl-chips" data-fl-chips="fl-chip" role="group" aria-label="Add or remove frequencies"></div>
+              <div class="fl-tray" data-fl-panel aria-label="Your chosen frequencies and their volumes"></div>
             </div>
             <!-- Change the background without rebuilding anything. While the
                  session is playing this crossfades the ambience bed in place;
@@ -3235,6 +3340,10 @@
                       onchange="changeSessionAmbience(this.value)"></select>
             </div>
             <div class="final-line" id="finalLine">"…"</div>
+            <section class="final-playlist" id="finalPlaylistWrap" aria-labelledby="finalPlaylistHeading" hidden>
+              <h4 id="finalPlaylistHeading">Your affirmations <span id="finalPlaylistCount"></span></h4>
+              <ol class="final-playlist-list" id="finalPlaylist"></ol>
+            </section>
             <div id="soundCheckMsg"></div>
             <div class="final-point-tag" id="finalPointTag" style="display:none;"></div>
             <div class="mixer">
@@ -3720,13 +3829,16 @@
      inline handlers above keep working and each file can see the ones
      before it. Moving one of these lines changes behaviour. -->
 <script src="js/selectable.js"></script>
+<script src="js/frequency-layers.js?v=20261015a"></script>
+<script src="js/affirmation-timeline.js?v=20261015a"></script>
+<script src="js/draft-store.js?v=20261015a"></script>
 <script src="js/dates.js"></script>
 <script src="js/sky.js"></script>
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20261001a"></script>
-<script src="js/billing.js?v=20261005a"></script>
+<script src="js/builder.js?v=20261015a"></script>
+<script src="js/billing.js?v=20261015a"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
@@ -3736,10 +3848,11 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20261005a"></script>
-<script src="js/profile.js?v=20261005a"></script>
-<script src="js/mix-settings.js?v=20261005a"></script>
-<script src="js/player.js?v=20261001a"></script>
-<script src="js/audio-editor.js?v=20261001a"></script>
+<script src="js/profile.js?v=20261015a"></script>
+<script src="js/mix-settings.js?v=20261015a"></script>
+<script src="js/lyrics-list.js?v=20261015a"></script>
+<script src="js/player.js?v=20261015a"></script>
+<script src="js/audio-editor.js?v=20261015a"></script>
 <script src="js/journal.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/habit-onboarding.js"></script>

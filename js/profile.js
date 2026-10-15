@@ -210,6 +210,12 @@ async function loadSavedIntoBuilder(id, opts){
   state.playerTitle = s.title || 'Your Subliminal';
   const matchedFreq = FREQS.find(f => f.hz === s.frequency_hz) || null;
   state.freq = matchedFreq;
+  /* The tones travel in mix_settings. A subliminal saved before layers existed
+     has only frequency_hz, which becomes a single layer at full volume. */
+  setFrequencyLayers(
+    FrequencyLayers.normalizeFrequencyLayers(s.mix_settings && s.mix_settings.freqLayers, FREQ_HZ_LIST, s.frequency_hz),
+    { silent:true }
+  );
   state.affirmations = Array.isArray(s.affirmations) ? s.affirmations.slice() : [];
   state.bg = s.background || 'none';
   /* The layer lives in mix_settings. Only a sound from the other family is a
@@ -242,7 +248,14 @@ async function loadSavedIntoBuilder(id, opts){
        apart from lines that genuinely have no recording. */
     recordings = [];
     recordingLoadErrors = [];
+    /* Per-line timing metadata saved alongside (see buildAffirmationMeta): how
+       long each take is, and the words it was recorded for. */
+    const savedMeta = s.mix_settings && Array.isArray(s.mix_settings.affirmationMeta) ? s.mix_settings.affirmationMeta : [];
+    let lineNo = -1;
     for (const path of s.recording_urls){
+      lineNo++;
+      const meta = savedMeta[lineNo] || {};
+      const takeText = typeof meta.recordedText === 'string' ? meta.recordedText : state.affirmations[lineNo];
       if (!path){ recordings.push(null); continue; }   // never recorded: not an error
       const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
       if (sErr || !signed){
@@ -256,7 +269,7 @@ async function loadSavedIntoBuilder(id, opts){
         const blob = await res.blob();
         if (!blob.size) throw new Error('the audio file is empty');
         // `path` marks the take as already saved: saving again reuses it.
-        recordings.push({ url: URL.createObjectURL(blob), blob, path });
+        recordings.push({ url: URL.createObjectURL(blob), blob, path, text: takeText, durationMs: Number(meta.durationMs) || undefined });
       } catch(e){
         recordings.push(null);
         recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');

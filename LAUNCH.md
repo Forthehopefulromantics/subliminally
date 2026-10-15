@@ -3,6 +3,30 @@
 Things that are built but not switched on, and things only Kyla can do.
 Check this list before submitting to the App Store or announcing.
 
+## On-device checks for frequency layers and the lyrics player
+
+Automated tests run in Chromium (iPhone viewport and user agent, which exercises
+the iOS media-element output path) but cannot prove what Safari and the iOS app
+wrapper do with the screen locked. Before shipping, on a real iPhone, in Safari
+**and** in the installed app:
+
+1. Pick four frequencies, set different levels, press Play. All four sound, with
+   the voice and a nature sound, and nothing clips or pumps.
+2. Lock the phone for a minute. Audio continues; the lock-screen controls pause and
+   resume it; on unlock the lit line is the one being spoken.
+3. Take a phone call / ask Siri, then come back: the session either carries on or
+   shows as paused, and Play resumes it with one set of tones (not two).
+4. Flip the ringer switch to silent while playing: it keeps playing.
+5. Record 12+ lines in your own voice, force-quit the app mid-way, reopen: the
+   builder offers "Resume recording" with every take.
+6. Save, kill the app, reopen the subliminal from the library: all lines, takes
+   and the frequency levels are back, and the list shows before pressing Play.
+
+The wrapper has `UIBackgroundModes: audio` but no native `AVAudioSession` code;
+background audio relies on iOS keeping the web view's `<audio>` element alive. If
+step 2 fails in the app only, the fix is native (an `AVAudioSession` playback
+category set in `AppDelegate.swift`) and is not something the web code can do.
+
 ## Not switched on yet
 
 ### ElevenLabs — studio voices and voice cloning — switched on

@@ -53,6 +53,11 @@ function readMixSettings(){
   // The ambience layered under the main one (a meditation sound under a nature
   // sound, or the other way round) travels with the mix, like the levels do.
   if (typeof state !== 'undefined' && state && state.bgLayer && state.bgLayer !== 'none') mix.bgLayer = state.bgLayer;
+  // The stack of frequencies, each with its own level. frequency_hz on the row
+  // stays the first of them, for anything that reads the single column.
+  if (typeof state !== 'undefined' && state && Array.isArray(state.freqLayers) && state.freqLayers.length && typeof FrequencyLayers !== 'undefined') mix.freqLayers = FrequencyLayers.serializeFrequencyLayers(state.freqLayers);
+  // Each affirmation's order, length, planned timing and the words its take was recorded for.
+  if (typeof buildAffirmationMeta === 'function'){ const meta = buildAffirmationMeta(); if (meta) mix.affirmationMeta = meta; }
   // So does the soothing pad, which had nowhere to be saved before.
   if (typeof state !== 'undefined' && state && SOOTHING_VARIANTS.includes(state.soothingLayer)) mix.soothingLayer = state.soothingLayer;
   return mix;
@@ -119,9 +124,10 @@ function flushMixSave(){
   mixWriteQueue = mixWriteQueue.then(write,write);
   return mixWriteQueue;
 }
-function listeningMixMarkup(){
+function listeningMixMarkup(opts){
   const names = {mixTone:'Frequency',mixBg:'Nature sounds',mixVoice:'Affirmations',mixSoothing:'Soothing layer',mixCustom:'Your track',mixLayerVoice:'Second voice'};
-  return Object.keys(MIX_DEFAULTS).map(id => `<label class="listening-mix-row"><span>${names[id]}</span><input type="range" min="0" max="100" data-listening-mix="${id}" aria-label="${names[id]} volume" oninput="setListeningMix('${id}',this.value)"><output data-listening-value="${id}"></output></label>`).join('');
+  const freqs = opts && opts.frequencies ? `<div class="listening-freqs"><h5>Frequencies <small>up to 4</small></h5><div class="fl-chips" data-fl-chips="fl-chip" role="group" aria-label="Add or remove frequencies"></div><div class="fl-tray" data-fl-panel></div></div>` : '';
+  return freqs + Object.keys(MIX_DEFAULTS).map(id => `<label class="listening-mix-row"><span>${names[id]}</span><input type="range" min="0" max="100" data-listening-mix="${id}" aria-label="${names[id]} volume" oninput="setListeningMix('${id}',this.value)"><output data-listening-value="${id}"></output></label>`).join('');
 }
 function setListeningMix(id,value){
   if(!Object.hasOwn(MIX_DEFAULTS,id)) return;

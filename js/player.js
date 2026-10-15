@@ -25,7 +25,7 @@ const PLAYER_AMBIENCE = [
 const SYNTH_AMBIENCE_KEYS = new Set(['none','rain','ocean','thunder','forest','birds','waterfall','brown']);
 let playerPrefs = { ambience:'rain', frequency:528, favorites:[], balance:58, loopMode:'entire', duration:20, favoriteSubliminals:[] };
 let playerCategory = 'All', playerPendingTrack = null, playerPreview = null, playerPreviewCtx = null;
-let playerAffirmationText = '', playerUiTimer = null, playerSaveTimer = null, playerSessionSaved = false;
+let playerLyrics = null, playerUiTimer = null, playerSaveTimer = null, playerSessionSaved = false;
 
 function loadPlayerPrefs(){
   try { playerPrefs = { ...playerPrefs, ...JSON.parse(localStorage.getItem(PLAYER_PREFS_KEY) || '{}') }; } catch(e){}
@@ -54,11 +54,12 @@ function getPlayerLoopMode(){ return playerPrefs.loopMode || 'entire'; }
 function playerElapsedSeconds(){ return typeof getFinalElapsedMs === 'function' ? Math.floor(getFinalElapsedMs()/1000) : 0; }
 function currentPlayerTitle(){
   const input = document.getElementById('finalTitleInput');
-  return (state && state.playerTitle) || (input && input.value.trim()) || (state && state.freq ? `${state.freq.hz} Hz · ${state.freq.word}` : 'Your Subliminal');
+  return (state && state.playerTitle) || (input && input.value.trim()) || (state && state.freq ? frequencyTitle() : 'Your Subliminal');
 }
 function currentAmbienceLabel(){
   const bg = PLAYER_AMBIENCE.find(x => x.key === playerPrefs.ambience);
-  const freq = state && state.freq ? `${state.freq.hz} Hz` : '';
+  const layers = state && state.freqLayers ? state.freqLayers : [];
+  const freq = layers.length > 2 ? `${layers.length} frequencies` : layers.length ? layers.map(l => l.hz).join(' + ') + ' Hz' : '';
   // A layered pair names both, off the session's own answer.
   const layered = state && state.bgLayer && state.bgLayer !== 'none' && typeof ambienceName === 'function'
     ? [ambienceName(state.bg), ambienceName(state.bgLayer)] : null;
@@ -81,18 +82,25 @@ function svgIcon(name){
     // The cover affordance: a framed picture with a small star, the same
     // celestial mark the ambience artwork uses.
     image:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 16l5-4 4 3 3-2 6 4"/><circle cx="9" cy="9" r="1.3"/>',
-    star:'<path d="M12 3l1.9 5.4L19 10l-5.1 1.6L12 17l-1.9-5.4L5 10l5.1-1.6z"/>'
+    star:'<path d="M12 3l1.9 5.4L19 10l-5.1 1.6L12 17l-1.9-5.4L5 10l5.1-1.6z"/>',
+    follow:'<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>'
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||''}</svg>`;
 }
 function mountImmersivePlayer(){
   if (document.getElementById('immersivePlayer')) return;
   document.body.insertAdjacentHTML('beforeend', `
-    <section class="immersive-player" id="immersivePlayer" aria-hidden="true" aria-label="Subliminal player">
+    <div class="immersive-player" id="immersivePlayer" role="region" aria-hidden="true" aria-label="Subliminal player">
       <div class="ip-sky"><div class="ip-stars"></div><div class="ip-moon"></div><div class="ip-cloud one"></div><div class="ip-cloud two"></div></div>
       <div class="ip-shell">
         <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker">Sanctuary at night</span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
-        <div class="ip-hero" id="ipAffirmationViewport" aria-live="polite" aria-atomic="true"><div class="ip-affirmation-stream" id="ipAffirmationStream"></div></div>
+        <div class="ip-hero" id="ipAffirmationViewport">
+          <ol class="ip-lyrics" id="ipLyrics" aria-label="Your affirmations" tabindex="0"></ol>
+          <button type="button" class="ip-follow" id="ipFollow" hidden aria-label="Follow the affirmation being spoken">${svgIcon('follow')}<span>Follow</span></button>
+          <p class="ip-status" id="ipStatus" role="status" hidden></p>
+          <p class="ip-layer-note" id="ipLayerNote" hidden>A second, quieter voice plays underneath. The lit line is always your main voice.</p>
+          <div class="ip-sr-only" id="ipAnnounce" role="status" aria-live="polite" aria-atomic="true"></div>
+        </div>
         <div class="ip-lower">
           <div class="ip-track-copy">
             <button class="ip-cover" id="listeningCoverBtn" onclick="chooseListeningCover()" aria-label="Choose a cover photo" title="Choose a cover photo">
@@ -104,7 +112,7 @@ function mountImmersivePlayer(){
           </div>
           <button class="ip-ambience-card" onclick="openPlayerAmbience()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
           <button class="ip-adjust" id="ipAdjustBtn" onclick="openAudioEditor(activeMixId)" hidden>${svgIcon('sound')}<span>Adjust Sounds</span><small>Brainwave · frequency · ambience · volumes</small></button>
-          <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup()}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
+          <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup({ frequencies:true })}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
           <div><div class="ip-progress-track"><div class="ip-progress-fill" id="ipProgress"></div></div><div class="ip-times"><span id="ipElapsed">0:00</span><span id="ipRemaining">−20:00</span></div></div>
           <div class="ip-controls">
             <button class="ip-main-play" id="ipPlay" onclick="toggleImmersivePlayback()" aria-label="Pause">${svgIcon('pause')}</button>
@@ -112,7 +120,7 @@ function mountImmersivePlayer(){
           </div>
         </div>
       </div>
-    </section>
+    </div>
     <div class="player-sheet" id="ambienceSheet" role="dialog" aria-modal="true" aria-label="Choose your ambience"><div class="ps-panel" style="position:relative">
       <div class="ps-head"><h3>Choose your ambience</h3><button class="ps-close" onclick="closePlayerSheets()" aria-label="Close">✕</button></div>
       <div class="ps-categories" id="ambienceCategories"></div><div class="ps-list" id="ambienceList"></div>
@@ -123,8 +131,21 @@ function mountImmersivePlayer(){
     <div class="player-sheet" id="timerSheet" role="dialog" aria-modal="true" aria-label="Session timer"><div class="ps-panel"><div class="ps-head"><h3>Session timer</h3><button class="ps-close" onclick="closePlayerSheets()">✕</button></div><div class="ps-simple" id="timerOptions"></div></div></div>
   `);
   document.querySelectorAll('.player-sheet').forEach(sheet => sheet.addEventListener('click', e => { if (e.target === sheet) closePlayerSheets(); }));
+  /* The list reads the one timeline (see js/affirmation-timeline.js): it shows
+     what the audio reports and owns no timer of its own. */
+  playerLyrics = new LyricsList({
+    list: document.getElementById('ipLyrics'),
+    followBtn: document.getElementById('ipFollow'),
+    announce: document.getElementById('ipAnnounce'),
+    timeline: affTimeline,
+    onSelect: (i) => { if (finalPlaying) seekFinalToIndex(i); },
+  });
+  /* The player's line of status text. #finalLine is where the engine says things
+     that are not an affirmation (a blocked sound, a voice that will not play);
+     they are shown above the list so they are never lost. */
   const source = document.getElementById('finalLine');
   if (source) new MutationObserver(() => showImmersiveAffirmation(source.textContent)).observe(source,{childList:true,subtree:true,characterData:true});
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && playerLyrics && playerLyrics.follow) playerLyrics.scrollToActive(); });
   hydratePlayerPrefs();
 }
 function applyPlayerPrefs(){
@@ -137,11 +158,19 @@ function openImmersivePlayer(){
   mountImmersivePlayer(); playerSessionSaved = false;
   if (state && state.bg) playerPrefs.ambience = state.bg;
   if (state && state.freq) playerPrefs.frequency = state.freq.hz;
+  if (typeof paintFrequencyUi === 'function') paintFrequencyUi();
   if (state && state.targetLengthMinutes) playerPrefs.duration = state.targetLengthMinutes;
   const el = document.getElementById('immersivePlayer'); el.classList.add('open'); el.setAttribute('aria-hidden','false');
   document.body.classList.add('player-open');
   document.getElementById('ipTitle').textContent = currentPlayerTitle();
-  showImmersiveAffirmation((document.getElementById('finalLine')||{}).textContent || (state.affirmations||[])[0] || 'Breathe in. Your session is beginning.');
+  /* Every affirmation, whether or not anything is playing yet. */
+  const eftTags = state.eftMode && typeof EFT_LINE_POINTS !== 'undefined'
+    ? (state.affirmations||[]).map((_, i) => EFT_LINE_POINTS[i] ? (EFT_LINE_POINTS[i].isSetup ? `Setup Statement · tap ${EFT_LINE_POINTS[i].where}` : `${EFT_LINE_POINTS[i].label} · tap ${EFT_LINE_POINTS[i].where}`) : '') : [];
+  playerLyrics.setLines(state.affirmations || [], eftTags);
+  const layerNote = document.getElementById('ipLayerNote');
+  if (layerNote) layerNote.hidden = !(typeof layerVoiceEnabled !== 'undefined' && layerVoiceEnabled);
+  showImmersiveAffirmation((document.getElementById('finalLine')||{}).textContent || '');
+  playerLyrics.scrollToActive();
   const adjust = document.getElementById('ipAdjustBtn'); if (adjust) adjust.hidden = !activeMixId;
   refreshListeningCover(); syncListeningMix(); renderPlayerSelectionState(); updateImmersivePlayer();
   clearInterval(playerUiTimer); playerUiTimer = setInterval(updateImmersivePlayer,500);
@@ -157,25 +186,15 @@ function closeImmersivePlayer(){
   const el=document.getElementById('immersivePlayer'); if(el){el.classList.remove('open');el.setAttribute('aria-hidden','true');}
   document.body.classList.remove('player-open'); closePlayerSheets(); stopPlayerAmbiencePreview(); clearInterval(playerUiTimer); playerUiTimer=null;
 }
+/* The engine's messages (not affirmations) go above the list. An affirmation
+   itself is never drawn here: it is a row in the list. */
 function showImmersiveAffirmation(text){
-  const stream=document.getElementById('ipAffirmationStream'); if(!stream) return;
-  text=String(text||'').replace(/^['“"]|['”"]$/g,'').trim();
-  if(!text||(text===playerAffirmationText&&stream.querySelector('.ip-affirmation.current')))return;
-  playerAffirmationText=text;
-
-  const departing=stream.querySelector('.ip-affirmation.departing');
-  if(departing){ departing.classList.replace('departing','leaving'); setTimeout(()=>departing.remove(),950); }
-  const current=stream.querySelector('.ip-affirmation.current');
-  if(current){ current.classList.replace('current','departing'); current.setAttribute('aria-hidden','true'); }
-
-  const next=document.createElement('div');
-  next.className='ip-affirmation entering'; next.textContent=text;
-  stream.appendChild(next);
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{ next.classList.remove('entering'); next.classList.add('current'); }));
-  setTimeout(()=>{
-    stream.querySelectorAll('.ip-affirmation.leaving').forEach(el=>el.remove());
-    [...stream.querySelectorAll('.ip-affirmation')].slice(0,-2).forEach(el=>el.remove());
-  },1000);
+  const status = document.getElementById('ipStatus'); if (!status) return;
+  const clean = String(text || '').replace(/^['“"]|['”"]$/g, '').trim();
+  const isLine = (state.affirmations || []).some(a => String(a).trim() === clean);
+  const placeholder = clean === '…' || clean === '...';
+  status.textContent = (!clean || isLine || placeholder) ? '' : clean;
+  status.hidden = !status.textContent;
 }
 function fmtPlayerTime(sec){ sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; }
 function updateImmersivePlayer(){
@@ -197,7 +216,7 @@ function renderAmbienceLibrary(){
   cats.innerHTML=PLAYER_CATEGORIES.map(c=>`<button class="ps-chip${c===playerCategory?' sel':''}" aria-pressed="${c===playerCategory}" onclick="setAmbienceCategory('${c}')">${c}</button>`).join('');
   const favorites=new Set(playerPrefs.favorites), selectedKey=(playerPendingTrack&&playerPendingTrack.key)||playerPrefs.ambience;
   let tracks=PLAYER_AMBIENCE.filter(t=>playerCategory==='All'||t.category===playerCategory||(playerCategory==='Favorites'&&favorites.has(t.key)));
-  document.getElementById('ambienceList').innerHTML=tracks.map(t=>{const available=trackIsAvailable(t),previewing=playerPreview&&playerPreview.key===t.key,isSelected=selectedKey===t.key||(`${t.key}`===`freq-${playerPrefs.frequency}`);return `<div class="ps-track${isSelected?' sel':''}${available?'':' unavailable'}" data-track="${t.key}">
+  document.getElementById('ambienceList').innerHTML=tracks.map(t=>{const available=trackIsAvailable(t),previewing=playerPreview&&playerPreview.key===t.key,isSelected=t.kind==='frequency'?(state.freqLayers||[]).some(l=>`freq-${l.hz}`===t.key):selectedKey===t.key;return `<div class="ps-track${isSelected?' sel':''}${available?'':' unavailable'}" data-track="${t.key}">
     <button class="ps-preview" ${available?'':'disabled'} onclick="previewAmbience('${t.key}')" aria-label="${previewing?'Stop':'Preview'} ${t.name}">${svgIcon(previewing?'pause':'play')}</button>
     <button class="ps-track-copy" style="border:0;background:none;color:inherit;text-align:left" ${available?'':'disabled'} onclick="selectPendingAmbience('${t.key}')"><b>${t.name}</b><small>${t.category}${available?'':' · Add audio to enable'}</small></button>
     <button class="ps-heart${favorites.has(t.key)?' sel':''}" onclick="toggleAmbienceFavorite('${t.key}')" aria-label="Favorite ${t.name}">${svgIcon('heart')}</button><span class="ps-check">${isSelected?'✓':''}</span></div>`}).join('') || '<p style="padding:28px;color:#b9aacd;text-align:center">No favorites yet.</p>';
@@ -209,7 +228,7 @@ function selectPendingAmbience(key){const t=PLAYER_AMBIENCE.find(x=>x.key===key)
 function toggleAmbienceFavorite(key){const s=new Set(playerPrefs.favorites);s.has(key)?s.delete(key):s.add(key);playerPrefs.favorites=[...s];persistPlayerPrefs();renderAmbienceLibrary();}
 function usePendingAmbience(){
   if(!playerPendingTrack)return;
-  if(playerPendingTrack.kind==='frequency'){const f=FREQS.find(x=>x.hz===playerPendingTrack.hz);if(f){playerPrefs.frequency=f.hz;state.freq=f;changeFinalFrequency(String(f.hz));}}
+  if(playerPendingTrack.kind==='frequency'){const f=FREQS.find(x=>x.hz===playerPendingTrack.hz);if(f){playerPrefs.frequency=f.hz;const has=(state.freqLayers||[]).some(l=>l.hz===f.hz);if(!has)toggleFrequency(f.hz);}}
   else {playerPrefs.ambience=playerPendingTrack.key;state.bg=playerPendingTrack.key;if(typeof changeFinalAmbience==='function')changeFinalAmbience(state.bg);}
   persistPlayerPrefs();renderPlayerSelectionState();closePlayerSheets();stopPlayerAmbiencePreview();
 }
