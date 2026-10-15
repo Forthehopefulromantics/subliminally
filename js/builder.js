@@ -307,7 +307,7 @@ function pickCustomDuration(){
    Two places have to agree with this and both do: the "how many affirmations"
    slider in index.html starts here, and this is the check for the review step,
    where lines can still be deleted after they have been generated. */
-const MIN_AFFIRMATIONS = 5;
+const MIN_AFFIRMATIONS = AffirmationKit.MIN_AFFIRMATIONS;
 function affirmationShortfall(){
   /* EFT is a fixed round of lines, one per tapping point, and a visualization
      is a single script. Neither is a list anybody adds to, so neither is
@@ -380,7 +380,7 @@ function resetFlow(){
   document.getElementById('quizGoal').value='';
   document.getElementById('toStep1').disabled = true;
   document.getElementById('toStep5').disabled = true;
-  document.getElementById('countRange').value = 5; document.getElementById('countVal').textContent = 5;
+  
   document.getElementById('sessionLengthSlider').value = 5;
   document.getElementById('sessionLengthVal').textContent = '5 min';
   renderDurationChips();
@@ -672,7 +672,7 @@ function paintToneChips(){ syncSelectionByData('#toneChips .chip', 'key', state.
 });
 paintToneChips();
 const countRange = document.getElementById('countRange');
-countRange.addEventListener('input', ()=>{ document.getElementById('countVal').textContent = countRange.value; state.count = parseInt(countRange.value); });
+countRange.addEventListener('input', ()=>{ selectAffirmationCount(parseInt(countRange.value, 10), { fromRange: true }); });
 
 /* ---- Ritual-only: subliminal + EFT tapping mode ---- */
 const eftPointsList = document.getElementById('eftPointsList');
@@ -727,7 +727,7 @@ async function pickRitualMode(btn){
     state.count = 1; // one continuous script, not discrete lines
     setAffirmationGap(1.5);
   } else {
-    state.count = parseInt(countRange.value, 10);
+    state.count = affirmationGenerateCount;
     setAffirmationGap(DEFAULT_GAP_SECONDS);
   }
   // The length question is not asked for tapping, so it comes off the screen
@@ -974,12 +974,24 @@ function buildFallbackList(){
   if (state.tone==='bold') lines.push("I don't wait for permission to feel this way.");
   if (state.tone==='gentle') lines.push("I am patient with however tonight goes.");
   if (state.tone==='calm') lines.push("I don't need to force any of this.");
-  const wrappers = ["Tonight, I remember: %s","Quietly, I know this: %s","Even now, %s","It's simple: %s"];
-  let i = 0;
-  while (lines.length < state.count){
-    const base = bank[i % bank.length];
-    lines.push(wrappers[i % wrappers.length].replace('%s', base.replace(/\.$/,'').toLowerCase()));
-    i++;
+  /* Up to a hundred lines can be asked for and this is what answers when the
+     writer cannot be reached, so it has to make a hundred *different* ones: every
+     wrapper is tried on every base line once, in turn, and nothing repeats. */
+  const wrappers = [
+    "Tonight, I remember: %s","Quietly, I know this: %s","Even now, %s","It's simple: %s",
+    "Today, I let it be true: %s","With every breath, %s","I give myself permission: %s","Right here, right now, %s",
+    "I am learning that %s","In my own time, %s","I choose to believe that %s","Deep down, I know that %s",
+    "Each morning, %s","Without effort, %s","I notice how %s","All the way through, %s",
+    "I allow it to be so: %s","More and more, %s","Gently, %s","As I rest, %s",
+  ];
+  const seen = new Set(lines.map(l => l.toLowerCase()));
+  for (const wrap of wrappers){
+    for (const base of bank){
+      if (lines.length >= state.count) break;
+      const line = wrap.replace('%s', base.replace(/\.$/,'').toLowerCase());
+      if (!seen.has(line.toLowerCase())){ seen.add(line.toLowerCase()); lines.push(line); }
+    }
+    if (lines.length >= state.count) break;
   }
   return lines.slice(0, state.count);
 }
@@ -1045,9 +1057,9 @@ function buildVisualizationFallback(){
 }
 
 /* ---------------- review/edit ----------------
-   Up to AffirmationKit.MAX_AFFIRMATIONS (20) lines can be written here. Which of
+   Up to AffirmationKit.MAX_AFFIRMATIONS (100) lines can be written here. Which of
    them a voice can carry is decided later, on the voice screen: Record Your Own
-   Voice takes all 20, Serenity and Clone Your Voice take 10. Nothing on this
+   Voice takes all 100, Serenity and Clone Your Voice take 10. Nothing on this
    screen or the next deletes a line because of the voice picked -- see
    voiceLimitProblem(). */
 let importTrimNote = '';
@@ -1189,11 +1201,51 @@ function selectAffirmationMode(mode){
   answered(event && event.target);
 }
 
-function selectAffirmationCount(count){
-  affirmationGenerateCount = count;
-  document.querySelectorAll('#affirmationCountChips .chip').forEach(c => c.classList.remove('sel'));
-  document.querySelector(`[data-count="${count}"]`).classList.add('sel');
-  state.count = count;
+/* How many lines to write. The five quick picks and the custom box all end up
+   here, and so does the slider under "Fine-tune", so they cannot disagree. The
+   count is the number of lines to *write*; which voice can read that many is the
+   voice screen's business (see voiceLimitProblem), and nothing here costs
+   anything but a few seconds of the writer's time -- no voice is generated until
+   a voice is chosen and the person says go. */
+function selectAffirmationCount(count, opts){
+  const n = AffirmationKit.clampCount(count);
+  if (n == null) return;
+  affirmationGenerateCount = n;
+  state.count = n;
+  const preset = AffirmationKit.COUNT_PRESETS.includes(n);
+  document.querySelectorAll('#affirmationCountChips .chip[data-count]').forEach(c => {
+    const on = preset && Number(c.dataset.count) === n && !(opts && opts.custom);
+    c.classList.toggle('sel', on); c.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  const custom = document.getElementById('affirmationCountCustom');
+  const box = document.getElementById('affirmationCountCustomInput');
+  const customOn = !!(opts && opts.custom) || !preset;
+  if (custom){ custom.classList.toggle('sel', customOn); custom.setAttribute('aria-checked', customOn ? 'true' : 'false'); }
+  if (box && !(opts && opts.fromBox)) box.value = customOn ? String(n) : '';
+  const range = document.getElementById('countRange');
+  if (range && !(opts && opts.fromRange)){ range.value = n; }
+  const val = document.getElementById('countVal');
+  if (val) val.textContent = String(n);
+  paintAffirmationCountHint(n);
+}
+/* The custom box: typing is free, the number is checked when it is committed
+   (leaving the box, or Enter), so "5" on the way to "50" is not corrected out
+   from under the keyboard. */
+function commitCustomAffirmationCount(){
+  const box = document.getElementById('affirmationCountCustomInput');
+  if (!box) return;
+  const n = AffirmationKit.clampCount(box.value);
+  if (n == null){ box.value = ''; selectAffirmationCount(affirmationGenerateCount); return; }
+  box.value = String(n);
+  selectAffirmationCount(n, { custom: true, fromBox: true });
+}
+function paintAffirmationCountHint(n){
+  const el = document.getElementById('affirmationCountHint');
+  if (!el) return;
+  const L = AffirmationKit.AFFIRMATION_LIMITS;
+  el.textContent = n > L.serenity
+    ? `${n} lines is for Record Your Own Voice. Serenity and Clone Your Voice read up to ${L.serenity}, and your lines are never cut to fit — you choose the voice after you've seen them.`
+    : `Record Your Own Voice takes up to ${L.own}; Serenity and Clone Your Voice take up to ${L.serenity}.`;
 }
 
 function switchAffirmationTab(tab){
@@ -1499,7 +1551,8 @@ function advanceAfterPick(){
    -- so the rule is the shape, not one class name. */
 const QUESTION_BLOCKS = '.quiz-q, .soothing-picker';
 function nextQuestionAfter(el){
-  const here = el && el.closest(QUESTION_BLOCKS);
+  // `el` is sometimes a global event's target (see selectAffirmationMode), which is not always an element -- document and window have no closest().
+  const here = el && typeof el.closest === 'function' && el.closest(QUESTION_BLOCKS);
   if (!here) return null;
   let n = here.nextElementSibling;
   while (n){
@@ -1523,7 +1576,7 @@ function answered(el){
     // Nothing else to answer here. The continue button is the honest next step
     // on the quiz screen -- it is what gates generating -- so go to it rather
     // than skipping a screen the person has not finished.
-    const card = el && el.closest('.flow-step');
+    const card = el && typeof el.closest === 'function' && el.closest('.flow-step');
     const cta = card && card.querySelector('.flow-nav .mini-btn:not([disabled])');
     if (cta){
       cta.scrollIntoView({ behavior:'smooth', block:'center' });
@@ -2121,6 +2174,15 @@ function ttsLineText(text){ return String(text == null ? '' : text).replace(/\s+
 function ttsLineKey(voiceKey, speed, text){ return voiceKey + '|' + speed + '|' + ttsLineText(text); }
 
 async function ttsRequest(lines, voiceKey, speed){
+  /* THE COST RULE for long lists. Only a voice you record yourself reads more
+     than ten lines; every line Serenity or a cloned voice reads is a paid
+     generation. The voice screen already holds anyone who tries (see
+     voiceLimitProblem); this is the same rule at the last door, so no path --
+     a reopened subliminal, a changed voice, a stale tab -- can send a long list
+     to the provider. */
+  if (!state.eftMode && !state.visualizationMode && nonEmptyAffirmationCount() > AffirmationKit.AFFIRMATION_LIMITS.serenity){
+    throw new Error('too_many_lines_for_ai_voice');
+  }
   const token = sb && (await sb.auth.getSession()).data.session?.access_token;
   if (!token) throw new Error('not_signed_in');
   const res = await fetch(`${API_BASE}/api/tts`, {
@@ -2776,17 +2838,19 @@ function setRecordStepCopy(target){
   const title = document.getElementById('recordFlowTitle');
   const sub = document.getElementById('recordFlowSub');
   const breath = document.getElementById('recordBreathNote');
+  const tap = typeof recTapMode === 'function' && recTapMode();
+  const how = tap ? 'tap to start, speak the line, tap again to finish — and you can pause in the middle' : 'press and hold, speak the line, then release';
   if (target === 'layer'){
     title.textContent = "Record your second, layered voice";
-    sub.textContent = "This plays quietly underneath your main voice — press and hold, speak the line, then release.";
+    sub.textContent = `This plays quietly underneath your main voice — ${how}.`;
     breath.style.display = 'none';
   } else if (state.visualizationMode){
     title.textContent = "Read your visualization out loud";
-    sub.textContent = "Press and hold, read through the whole script in one take, then release when you're done.";
+    sub.textContent = tap ? "Tap to start, read through the whole script in one take, and tap again when you're done. You can pause in the middle." : "Press and hold, read through the whole script in one take, then release when you're done.";
     breath.style.display = '';
   } else {
     title.textContent = "Record in your own voice";
-    sub.textContent = "Press and hold, speak the line, then release.";
+    sub.textContent = tap ? 'Tap to start, speak the line, tap again to finish. You can pause in the middle.' : 'Press and hold, speak the line, then release.';
     breath.style.display = '';
   }
 }
@@ -2846,15 +2910,28 @@ function showRecordLine(){
   }
   lineEl.classList.remove('record-line-loading');
   document.getElementById('skipBtn').disabled = false;
+  paintRecAuto();
   /* An index past the end is a bug somewhere upstream, but it must not show up
      here as the word "undefined" in quotes. */
   if (recIndex < 0 || recIndex >= lines.length) recIndex = 0;
 
   const isEftPoint = state.eftMode && recordTarget === 'primary' && EFT_LINE_POINTS[recIndex];
   const isScript = state.visualizationMode && recordTarget === 'primary';
+  const ownList = recordTarget === 'primary' && !isEftPoint && !isScript;
+  const doneCount = arr.reduce((c, r, i) => c + (i < lines.length && r ? 1 : 0), 0);
   counterEl.textContent = isEftPoint
     ? `Line ${recIndex+1} of 11 — ${EFT_LINE_POINTS[recIndex].label}`
-    : (isScript ? 'Your full script — one continuous take' : `${recIndex+1} of ${lines.length}`);
+    : (isScript ? 'Your full script — one continuous take'
+      : recordTarget === 'layer' ? `Second voice · ${recIndex+1} of ${lines.length}`
+      : `Recording ${recIndex+1} of ${lines.length} · ${doneCount} recorded`);
+  const prog = document.getElementById('recProgress');
+  if (prog){
+    prog.hidden = !ownList;
+    const pct = lines.length ? Math.round(doneCount / lines.length * 100) : 0;
+    prog.setAttribute('aria-valuenow', String(pct));
+    prog.setAttribute('aria-valuetext', `${doneCount} of ${lines.length} affirmations recorded`);
+    const fill = document.getElementById('recProgressFill'); if (fill) fill.style.width = pct + '%';
+  }
   lineEl.textContent = '"'+lines[recIndex]+'"';
   document.getElementById('recTapHint').textContent = isEftPoint
     ? (EFT_LINE_POINTS[recIndex].isSetup
@@ -2863,8 +2940,10 @@ function showRecordLine(){
     : '';
   document.getElementById('recTapHint').style.display = isEftPoint ? 'block' : 'none';
   document.getElementById('recLine').classList.toggle('record-line-script', isScript);
-  document.getElementById('recStatus').textContent = 'press and hold to record';
-  document.getElementById('nextLineBtn').disabled = !arr[recIndex];
+  if (!recBusy()) document.getElementById('recStatus').textContent = recTapMode() ? 'tap to start recording' : 'press and hold to record';
+  const nextBtn = document.getElementById('nextLineBtn');
+  nextBtn.disabled = !arr[recIndex];
+  nextBtn.textContent = recIndex >= lines.length - 1 ? 'Finish →' : 'Next line →';
   paintRecordManager();
 }
 function skipLine(){ advanceLine(); }
@@ -2923,6 +3002,38 @@ function reconcileRecordings(){
   }
   recordings = next;
 }
+/* Where each take is on its way to the person's account. Taken from the take
+   itself (see js/take-sync.js), never remembered separately, so the label can
+   only say what is true. */
+function recSyncState(take){
+  if (!take || !take.blob) return take && take.path ? 'synced' : 'none';
+  if (take.path) return 'synced';
+  if (take._sync) return 'syncing';
+  if (take.syncError) return 'failed';
+  return 'local';
+}
+let recRepaintQueued = false;
+function scheduleRecordRepaint(){
+  if (recRepaintQueued) return;
+  recRepaintQueued = true;
+  (window.requestAnimationFrame || setTimeout)(() => {
+    recRepaintQueued = false;
+    if (step === 6) { paintRecordManager(); updateRecordProgress(); }
+  });
+}
+function updateRecordProgress(){
+  const lines = activeRecordLines(); const arr = activeRecordArray();
+  if (!recordLinesReady() || recordTarget !== 'primary' || state.eftMode || state.visualizationMode) return;
+  const doneCount = arr.reduce((c, r, i) => c + (i < lines.length && r ? 1 : 0), 0);
+  const counterEl = document.getElementById('recCounter');
+  if (counterEl) counterEl.textContent = `Recording ${recIndex+1} of ${lines.length} · ${doneCount} recorded`;
+  const pct = lines.length ? Math.round(doneCount / lines.length * 100) : 0;
+  const prog = document.getElementById('recProgress');
+  if (prog){ prog.setAttribute('aria-valuenow', String(pct)); prog.setAttribute('aria-valuetext', `${doneCount} of ${lines.length} affirmations recorded`); }
+  const fill = document.getElementById('recProgressFill'); if (fill) fill.style.width = pct + '%';
+}
+let lastPaintedRecIndex = -1;
+let recScrollListToCurrent = false;
 function paintRecordManager(){
   const box = document.getElementById('recManager');
   if (!box) return;
@@ -2932,14 +3043,34 @@ function paintRecordManager(){
   const max = AffirmationKit.MAX_AFFIRMATIONS;
   const n = state.affirmations.length;
   const done = state.affirmations.filter((_, i) => recordings[i]).length;
+  const syncing = recordings.filter(r => r && recSyncState(r) === 'syncing').length;
+  const failed = recordings.filter(r => r && recSyncState(r) === 'failed').length;
   document.getElementById('recMgrCount').textContent = AffirmationKit.countLabel(n, max);
-  document.getElementById('recMgrSummary').textContent = `${done} of ${n} recorded`;
+  document.getElementById('recMgrSummary').textContent = `${done} of ${n} recorded`
+    + (syncing ? ` · saving ${syncing} to your account…` : '')
+    + (failed ? ` · ${failed} not uploaded yet` : '');
+  const retryAll = document.getElementById('recRetryAll');
+  if (retryAll) retryAll.hidden = !failed;
   const editable = recManagerEditable();
   const addBtn = document.getElementById('recMgrAdd');
   addBtn.hidden = !editable;
   addBtn.disabled = n >= max;
   addBtn.textContent = n >= max ? `${AffirmationKit.countLabel(n, max)} — that is the most one subliminal holds` : `+ Add an affirmation (${AffirmationKit.countLabel(n, max)})`;
   const list = document.getElementById('recMgrList');
+  /* Rebuilt on every change, so the scroll position is carried across: a person
+     on line 71 who records it must not be thrown back to line 1. */
+  const keepTop = list.scrollTop;
+  /* ...and by the first visible row rather than by pixels, because rows change
+     height as their status text changes ("saving…" -> "saved") and a pixel
+     offset would drift off the row the person was looking at. */
+  let anchor = null;
+  if (list.children.length){
+    const top0 = list.getBoundingClientRect().top;
+    for (const child of list.children){
+      const r = child.getBoundingClientRect();
+      if (r.bottom > top0 + 1){ anchor = { i: Number(child.dataset.i), off: r.top - top0 }; break; }
+    }
+  }
   list.textContent = '';
   const mk = (cls, label, text, onclick, disabled) => {
     const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text;
@@ -2947,8 +3078,10 @@ function paintRecordManager(){
   };
   state.affirmations.forEach((line, i) => {
     const st = recTakeStatus(i);
+    const sync = recSyncState(recordings[i]);
     const li = document.createElement('li');
     li.className = 'rm-row' + (i === recIndex ? ' current' : '') + (st !== 'none' ? ' recorded' : '');
+    if (i === recIndex) li.setAttribute('aria-current', 'true');
     li.dataset.i = String(i);
     const num = document.createElement('span'); num.className = 'rm-num'; num.textContent = String(i + 1);
     li.appendChild(num);
@@ -2969,17 +3102,21 @@ function paintRecordManager(){
       t.setAttribute('aria-label', `Affirmation ${i + 1}: ${line}. Select to record this line.`);
       t.onclick = () => recSelect(i);
       body.appendChild(t);
-      const status = document.createElement('small'); status.className = 'rm-status ' + st;
+      const status = document.createElement('small'); status.className = 'rm-status ' + st + (sync === 'syncing' || sync === 'failed' ? ' ' + sync : '');
+      const where = sync === 'synced' ? ' · saved' : sync === 'syncing' ? ' · saving…' : sync === 'failed' ? ' · not uploaded yet — saved on this device'
+        : (currentUser ? ' · saved on this device' : ' · saved on this device (sign in to keep it in your account)');
       status.textContent = st === 'none' ? 'Not recorded yet'
         : st === 'stale' ? 'Words changed since recording — re-record to match'
-        : `Recorded${recordings[i].durationMs ? ' · ' + fmtTakeLength(recordings[i].durationMs) : ''}`;
+        : `Recorded${recordings[i].durationMs ? ' · ' + fmtTakeLength(recordings[i].durationMs) : ''}${where}`;
       body.appendChild(status);
     }
     li.appendChild(body);
     if (recEditingIndex !== i){
       const actions = document.createElement('div'); actions.className = 'rm-actions';
       actions.appendChild(mk('rm-btn rm-primary', `${st === 'none' ? 'Record' : 'Re-record'} affirmation ${i + 1}`, st === 'none' ? 'Record' : 'Re-record', () => recSelect(i, true)));
-      if (st !== 'none') actions.appendChild(mk('rm-btn', `Play your recording of affirmation ${i + 1}`, 'Play', () => recPlayTake(i)));
+      if (st !== 'none') actions.appendChild(mk('rm-btn', recPlayingIndex === i ? `Stop playing affirmation ${i + 1}` : `Play your recording of affirmation ${i + 1}`, recPlayingIndex === i ? 'Stop' : 'Play', () => recPlayTake(i)));
+      if (sync === 'failed') actions.appendChild(mk('rm-btn', `Retry saving affirmation ${i + 1} to your account`, 'Retry save', () => { syncTake(recordings[i]); scheduleRecordRepaint(); }));
+      if (st !== 'none') actions.appendChild(mk('rm-btn', `Remove the recording of affirmation ${i + 1} (keeps the words)`, 'Remove recording', () => recDeleteTake(i)));
       if (editable){
         actions.appendChild(mk('rm-btn', `Edit affirmation ${i + 1}`, 'Edit', () => { recEditingIndex = i; paintRecordManager(); }));
         actions.appendChild(mk('rm-btn rm-icon', `Move affirmation ${i + 1} up`, '↑', () => recMove(i, -1), i === 0));
@@ -2990,6 +3127,17 @@ function paintRecordManager(){
     }
     list.appendChild(li);
   });
+  list.scrollTop = keepTop;
+  if (anchor && list.children[anchor.i]){
+    const drift = (list.children[anchor.i].getBoundingClientRect().top - list.getBoundingClientRect().top) - anchor.off;
+    if (Math.abs(drift) > 0.5) list.scrollTop += drift;
+  }
+  if (recScrollListToCurrent || (lastPaintedRecIndex !== recIndex && lastPaintedRecIndex !== -1)){
+    recScrollListToCurrent = false;
+    const cur = list.children[recIndex];
+    if (cur){ const top = cur.offsetTop - Math.max(0, (list.clientHeight - cur.offsetHeight) / 2); list.scrollTop = Math.max(0, top); }
+  }
+  lastPaintedRecIndex = recIndex;
 }
 function recBusy(){ return recPressed || recOpening; }
 function recSelect(i, scroll){
@@ -2999,20 +3147,67 @@ function recSelect(i, scroll){
   showRecordLine();
   if (scroll){ const panel = document.querySelector('.record-panel'); if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
-let recPlayback = null;
+let recPlayback = null; let recPlayingIndex = -1;
 function recStopPlayback(){
+  recPlayingIndex = -1;
   if (!recPlayback) return;
   try { recPlayback.pause(); } catch (e) {}
   recPlayback = null;
 }
+/* Preview a take. Pressing Play on the one that is playing stops it. */
 function recPlayTake(i){
+  const wasPlaying = recPlayingIndex === i;
   recStopPlayback();
+  if (wasPlaying){ scheduleRecordRepaint(); return; }
   const take = recordings[i];
   if (!take || !take.url) return;
   const a = new Audio(take.url);
-  recPlayback = a;
-  a.onended = () => { if (recPlayback === a) recPlayback = null; };
-  const p = a.play(); if (p && p.catch) p.catch(() => {});
+  recPlayback = a; recPlayingIndex = i;
+  const over = () => { if (recPlayback === a){ recPlayback = null; recPlayingIndex = -1; scheduleRecordRepaint(); } };
+  a.onended = over; a.onerror = over;
+  const p = a.play(); if (p && p.catch) p.catch(over);
+  scheduleRecordRepaint();
+}
+/* Give a take back: its picture of the audio, its place in the upload queue,
+   and -- when it never became part of a saved subliminal -- its uploaded file.
+   A saved subliminal's files are never touched (see TakeSync.discard). The
+   copy on this device is removed by the next draft save, after the new state is
+   written, so a crash in between never leaves a draft pointing at nothing. */
+function releaseTake(take){
+  if (!take) return;
+  if (take.url && String(take.url).startsWith('blob:')) { try { URL.revokeObjectURL(take.url); } catch(e){} }
+  take._clip = null;
+  if (take.blob) { try { takeSync.discard(take); } catch(e){} }
+}
+/* Remove just the recording of a line; the words stay and can be recorded again. */
+function recDeleteTake(i){
+  if (recBusy() || !recordings[i]) return;
+  if (!window.confirm(`Remove your recording of affirmation ${i + 1}? The words stay, so you can record it again.`)) return;
+  recStopPlayback();
+  releaseTake(recordings[i]);
+  recordings[i] = null;
+  showRecordLine(); saveRecordingDraft();
+}
+function recJump(value){
+  const n = state.affirmations.length;
+  const k = parseInt(String(value || '').trim(), 10);
+  const status = document.getElementById('recStatus');
+  if (!Number.isFinite(k) || k < 1 || k > n){ if (status) status.textContent = `Pick a line from 1 to ${n}.`; return; }
+  recScrollListToCurrent = true;
+  recSelect(k - 1, true);
+}
+function recJumpNextUnrecorded(){
+  const n = state.affirmations.length;
+  for (let step = 1; step <= n; step++){
+    const j = (recIndex + step) % n;
+    if (!recordings[j]){ recScrollListToCurrent = true; recSelect(j, true); return; }
+  }
+  document.getElementById('recStatus').textContent = 'Every line has a recording.';
+}
+function recRetrySync(){
+  takeSync.setFolder(syncFolder());
+  recordings.forEach(t => { if (t && t.blob && !t.path) syncTake(t); });
+  scheduleRecordRepaint();
 }
 /* Move, delete and add keep `recordings` in step with `state.affirmations`
    by doing the same thing to both. */
@@ -3035,7 +3230,7 @@ function recRemove(i){
   state.affirmations.splice(i, 1);
   const [gone] = recordings.splice(i, 1);
   recStopPlayback();
-  if (gone && gone.url && gone.url.startsWith('blob:')) { try { URL.revokeObjectURL(gone.url); } catch(e){} }
+  releaseTake(gone);
   if (recIndex > i || recIndex >= state.affirmations.length) recIndex = Math.max(0, recIndex - 1);
   recEditingIndex = -1;
   showRecordLine(); saveRecordingDraft();
@@ -3063,27 +3258,72 @@ function recSaveEdit(i, text){
 /* ---------------- an unfinished recording survives a refresh ---------------- */
 function draftOwner(){ return (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null; }
 let draftSaveTimer = null;
+/* Which take records the draft on this device currently holds, so a take that
+   has been replaced or deleted can be dropped from disk once the draft that no
+   longer mentions it has been written. */
+let draftStoredIds = new Set();
+let draftChain = Promise.resolve();
 function saveRecordingDraft(){
   if (state.voiceMode !== 'own' || typeof DraftStore === 'undefined') return;
   clearTimeout(draftSaveTimer);
-  draftSaveTimer = setTimeout(() => {
-    if (!recordings.some(r => r)) { DraftStore.clear(draftOwner()); return; }
-    DraftStore.save(draftOwner(), {
-      affirmations: state.affirmations.slice(),
-      takes: state.affirmations.map((_, i) => recordings[i] && recordings[i].blob
-        ? { blob: recordings[i].blob, durationMs: recordings[i].durationMs || 0, text: recordings[i].text != null ? recordings[i].text : state.affirmations[i] }
-        : null),
-      freqLayers: FrequencyLayers.serializeFrequencyLayers(state.freqLayers),
-      binauralBand: state.binauralBand || null,
-      bg: state.bg, bgLayer: state.bgLayer, soothingLayer: state.soothingLayer,
-      targetLengthMinutes: state.targetLengthMinutes,
-      eftMode: !!state.eftMode, visualizationMode: !!state.visualizationMode,
-    });
-  }, 250);
+  draftSaveTimer = setTimeout(() => { draftChain = draftChain.then(flushRecordingDraft).catch(() => {}); }, 250);
 }
-function discardRecordingDraft(){
+/* Audio first, then the list that points at it, so the draft never names a take
+   that is not on disk. Only takes that are new are written: line 90 is a single
+   small write, not lines 1 to 90 again. */
+async function flushRecordingDraft(){
+  const owner = draftOwner();
+  if (state.voiceMode !== 'own') return;
+  const takes = state.affirmations.map((_, i) => recordings[i] || null);
+  if (!takes.some(Boolean)){ await DraftStore.clear(owner); draftStoredIds = new Set(); return; }
+  for (const t of takes){
+    if (t && t.blob && !t._stored){
+      TakeSyncKit.TakeSync.ensureId(t);
+      t._stored = await DraftStore.putTake(owner, t.id, t);
+    }
+  }
+  const ids = takes.map(t => (t && t._stored ? t.id : null));
+  await DraftStore.saveMeta(owner, {
+    affirmations: state.affirmations.slice(),
+    takeIds: ids,
+    freqLayers: FrequencyLayers.serializeFrequencyLayers(state.freqLayers),
+    binauralBand: state.binauralBand || null,
+    bg: state.bg, bgLayer: state.bgLayer, soothingLayer: state.soothingLayer,
+    targetLengthMinutes: state.targetLengthMinutes,
+    eftMode: !!state.eftMode, visualizationMode: !!state.visualizationMode,
+  });
+  const keep = new Set(ids.filter(Boolean));
+  for (const id of draftStoredIds) if (!keep.has(id)) await DraftStore.deleteTake(owner, id);
+  draftStoredIds = keep;
+}
+/* Remove uploaded recordings that no saved subliminal points at. This is the
+   only way anything in the recordings bucket is ever deleted from the app, and
+   it asks first: a file that any of this person's subliminals lists is kept, and
+   if that list cannot be read nothing is removed at all. A leftover file costs a
+   few kilobytes; a deleted recording is gone. */
+async function removeUnreferencedRecordings(paths){
+  const list = [...new Set((paths || []).filter(Boolean))];
+  if (!list.length || typeof sb === 'undefined' || !sb || typeof currentUser === 'undefined' || !currentUser) return;
+  try {
+    const { data, error } = await sb.from('subliminals').select('recording_urls, layer_recording_urls').eq('user_id', currentUser.id);
+    if (error || !Array.isArray(data)) return;
+    const used = new Set();
+    data.forEach(r => [].concat(r.recording_urls || [], r.layer_recording_urls || []).forEach(p => { if (p) used.add(p); }));
+    const doomed = list.filter(p => !used.has(p));
+    if (doomed.length) await sb.storage.from('recordings').remove(doomed);
+  } catch(e){ /* see above: when in doubt, keep it */ }
+}
+/* `purge`: also remove what this draft uploaded to the person's account -- only
+   uploads that never became part of a saved subliminal (see above). */
+function discardRecordingDraft(opts){
   clearTimeout(draftSaveTimer);
-  if (typeof DraftStore !== 'undefined') DraftStore.clear(draftOwner());
+  if (opts && opts.purge){
+    (recordings || []).forEach(t => { try { takeSync.discard(t); } catch(e){} });   // waits for an upload still in flight
+    const extra = (opts.paths || []).filter(p => !(recordings || []).some(t => t && t.path === p));
+    if (extra.length) removeUnreferencedRecordings(extra);
+  }
+  draftStoredIds = new Set();
+  draftChain = draftChain.then(() => (typeof DraftStore !== 'undefined' ? DraftStore.clear(draftOwner()) : undefined)).catch(() => {});
 }
 let pendingDraft = null;
 async function checkRecordingDraft(){
@@ -3106,7 +3346,10 @@ function resumeRecordingDraft(){
   if (!d) return;
   document.getElementById('draftBanner').hidden = true;
   state.affirmations = d.affirmations.slice();
-  recordings = d.takes.map((t, i) => t && t.blob ? { url: URL.createObjectURL(t.blob), blob: t.blob, durationMs: t.durationMs || undefined, text: t.text != null ? t.text : d.affirmations[i] } : null);
+  recordings = d.takes.map((t, i) => t && t.blob
+    ? { id: t.id || TakeSyncKit.makeId(), url: URL.createObjectURL(t.blob), blob: t.blob, durationMs: t.durationMs || undefined, text: t.text != null ? t.text : d.affirmations[i], path: t.path || null, committed: false, _stored: !!t.id }
+    : null);
+  draftStoredIds = new Set(recordings.filter(r => r && r._stored).map(r => r.id));
   state.eftMode = !!d.eftMode; state.visualizationMode = !!d.visualizationMode;
   state.bg = d.bg || 'none'; state.bgLayer = d.bgLayer || 'none'; state.soothingLayer = d.soothingLayer || 'none';
   state.binauralBand = d.binauralBand || null;
@@ -3117,13 +3360,48 @@ function resumeRecordingDraft(){
   beginRecordingPass('primary');
   const firstOpen = recordings.findIndex(r => !r);
   recIndex = firstOpen >= 0 ? firstOpen : 0;
+  recScrollListToCurrent = true;
   showRecordLine();
+  // An older draft is rewritten in the new layout; anything not yet in the
+  // account is sent now.
+  saveRecordingDraft();
+  syncPendingTakes();
 }
 function dismissRecordingDraft(){
   document.getElementById('draftBanner').hidden = true;
+  const paths = pendingDraft ? DraftStore.paths(pendingDraft) : [];
   pendingDraft = null;
-  discardRecordingDraft();
+  discardRecordingDraft({ purge: true, paths });
 }
+
+/* ---------------- saving each recording as it is made ----------------
+   Every take goes to the person's own private folder in the recordings bucket
+   the moment it exists (js/take-sync.js). Signed out, it simply stays on the
+   device and goes up at sign-in or at Save. */
+const takeSync = new TakeSyncKit.TakeSync({
+  upload: (path, blob, mime) => sb.storage.from('recordings').upload(path, blob, { contentType: mime }),
+  remove: (paths) => removeUnreferencedRecordings(paths),
+  extFor: (mime) => extForMime(mime),
+  onChange: () => scheduleRecordRepaint(),
+});
+function syncFolder(){ return typeof sb !== 'undefined' && sb && typeof currentUser !== 'undefined' && currentUser && currentUser.id ? `${currentUser.id}/takes` : null; }
+function syncTake(take){
+  if (!take || !take.blob) return Promise.resolve(false);
+  takeSync.setFolder(syncFolder());
+  const owner = draftOwner();
+  return takeSync.enqueue(take).then(ok => {
+    if (ok && take.id && typeof DraftStore !== 'undefined' && take._stored) DraftStore.patchTake(owner, take.id, { path: take.path });
+    scheduleRecordRepaint();
+    return ok;
+  });
+}
+function syncPendingTakes(){
+  if (!syncFolder()) return;
+  recordings.forEach(t => { if (t && t.blob && !t.path) syncTake(t); });
+}
+/* The connection came back, or somebody signed in: whatever is waiting goes up. */
+window.addEventListener('online', () => { recordings.forEach(t => { if (t) t.syncError = null; }); syncPendingTakes(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPendingTakes(); });
 
 /* ---------------- how many lines each voice can carry ----------------
    Chosen after the lines are written, so a person can arrive at the voice screen
@@ -3211,20 +3489,47 @@ async function loadClip(ctx, rec){
     clip = { kind: 'buffer', buffer: await ctx.decodeAudioData(buf) };
   } catch (e){
     const el = new Audio();
-    el.src = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(blob);
+    el.src = objectUrl;
     el.preload = 'auto';
     await new Promise((resolve, reject) => {
       el.oncanplaythrough = resolve;
       el.onerror = () => reject(new Error('unplayable recording (' + trueMime + ')'));
       el.load();
     });
-    clip = { kind: 'element', el };
+    clip = { kind: 'element', el, objectUrl };
   }
   rec._clip = clip; rec._clipCtx = ctx;
   // The length of the take, kept with it: it is saved as the line's timing metadata.
   const dur = clip.kind === 'buffer' ? clip.buffer.duration : clip.el.duration;
   if (Number.isFinite(dur) && dur > 0) rec.durationMs = Math.round(dur * 1000);
   return clip;
+}
+
+/* A hundred recordings decoded at once is a hundred seconds of uncompressed
+   audio held in memory for the whole session -- on a phone, that is what gets a
+   long subliminal killed in the background. Past this many lines, only the line
+   being spoken and the one after it stay decoded; the rest are let go and decoded
+   again when the loop comes round (a few milliseconds each), and the next line
+   is decoded ahead of time so the gap between lines does not change. Short lists
+   are left exactly as they were. */
+const CLIP_WINDOW_OVER = 24;
+function releaseClip(rec){
+  const c = rec && rec._clip;
+  if (!c) return;
+  rec._clip = null; rec._clipCtx = null;
+  if (c.kind === 'element'){
+    try { c.el.pause(); c.el.removeAttribute('src'); c.el.load(); } catch(e){}
+    if (c.objectUrl) { try { URL.revokeObjectURL(c.objectUrl); } catch(e){} }
+  }
+}
+function keepClipsNear(ctx, recorded, idx){
+  if (recorded.length <= CLIP_WINDOW_OVER) return;
+  const next = recorded[(idx + 1) % recorded.length].r;
+  const keep = new Set([recorded[idx].r, next]);
+  recorded.forEach(x => { if (!keep.has(x.r) && x.r._clip) releaseClip(x.r); });
+  // A decode that finishes after the session has been stopped must not be kept.
+  loadClip(ctx, next).then(() => { if (!finalPlaying || finalCtx !== ctx) releaseClip(next); }).catch(() => {});
 }
 
 /* Play one loaded clip through `gainValue`, calling onended when it finishes.
@@ -3285,6 +3590,87 @@ let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dat
 let recPressed = false;
 let recOpening = false;
 const recBtn = document.getElementById('recBtn');
+
+/* TWO WAYS TO RECORD. Hold the button (the original) or tap to start, tap to
+   finish -- which is what makes Pause and Resume possible, and what a long
+   line or a long session is more comfortable with. The choice is remembered on
+   this device. */
+const REC_MODE_KEY = 'fthr_rec_mode';
+const REC_AUTO_KEY = 'fthr_rec_auto_next';
+let recModePref = 'hold';
+try { recModePref = localStorage.getItem(REC_MODE_KEY) === 'tap' ? 'tap' : 'hold'; } catch(e){}
+function recTapMode(){ return recModePref === 'tap'; }
+function setRecMode(mode){
+  if (recBusy()) return;
+  recModePref = mode === 'tap' ? 'tap' : 'hold';
+  try { localStorage.setItem(REC_MODE_KEY, recModePref); } catch(e){}
+  paintRecMode();
+  if (step === 6) showRecordLine();
+}
+function paintRecMode(){
+  document.querySelectorAll('#recModeRow .rec-mode-btn').forEach(b => {
+    const on = b.dataset.mode === recModePref;
+    b.classList.toggle('sel', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  if (!recBtn.classList.contains('recording')) recBtn.textContent = recTapMode() ? 'TAP' : 'HOLD';
+  setRecordStepCopy(recordTarget);
+}
+/* Move on by itself after each recording. Off by default for a short list, on
+   for a long one, unless the person has said which they want. */
+function recAutoNext(){
+  let pref = null;
+  try { pref = localStorage.getItem(REC_AUTO_KEY); } catch(e){}
+  if (pref === '1') return true;
+  if (pref === '0') return false;
+  return recordTarget === 'primary' && state.affirmations.length > 10;
+}
+function setRecAutoNext(on){ try { localStorage.setItem(REC_AUTO_KEY, on ? '1' : '0'); } catch(e){} }
+function paintRecAuto(){ const box = document.getElementById('recAutoNext'); if (box) box.checked = recAutoNext(); }
+
+/* The take being recorded right now. Pause time is kept out of its length; a
+   cancelled take is thrown away instead of saved. */
+let recTake = null;
+function recTakeHeldMs(t, now){
+  return Math.max(0, (now - t.started) - t.pausedTotal - (t.pausedAt ? now - t.pausedAt : 0));
+}
+function paintTapControls(){
+  const box = document.getElementById('recTapControls');
+  if (!box) return;
+  const live = !!recTake && recBtn.classList.contains('recording') && recTapMode();
+  box.hidden = !live;
+  const pause = document.getElementById('recPauseBtn');
+  if (pause){
+    pause.textContent = recTake && recTake.pausedAt ? 'Resume' : 'Pause';
+    pause.hidden = !(recTake && recTake.recorder && typeof recTake.recorder.pause === 'function');
+  }
+  recBtn.classList.toggle('paused', !!(recTake && recTake.pausedAt));
+}
+function toggleRecPause(){
+  const t = recTake;
+  if (!t || !t.recorder || t.recorder.state === 'inactive') return;
+  const status = document.getElementById('recStatus');
+  try {
+    if (!t.pausedAt && t.recorder.state === 'recording'){
+      t.recorder.pause(); t.pausedAt = Date.now();
+      cancelAnimationFrame(animId);
+      bars.forEach(b=>{ b.style.height='4px'; b.classList.remove('live'); });
+      status.textContent = 'paused — tap Resume to carry on, or tap the button to finish';
+    } else if (t.pausedAt && t.recorder.state === 'paused'){
+      t.recorder.resume(); t.pausedTotal += Date.now() - t.pausedAt; t.pausedAt = 0;
+      status.textContent = "listening… tap the button when you're done";
+      if (analyser) animateBars();
+    }
+  } catch(e){ status.textContent = 'Could not pause — tap the button to finish this take.'; }
+  paintTapControls();
+}
+/* Throw this take away without touching any recording that is already saved
+   for the line. */
+function cancelRecTake(){
+  if (!recTake) return;
+  recTake.cancelled = true;
+  stopRec();
+}
+
 async function startRec(e){
   if (e && e.preventDefault) e.preventDefault();
   if (recPressed || recOpening || recBtn.classList.contains('recording')) return;
@@ -3292,50 +3678,94 @@ async function startRec(e){
   stopAmbiencePreview();
   stopSerenityPreview();
   if (typeof stopPlayerAmbiencePreview === 'function') stopPlayerAmbiencePreview();
+  recStopPlayback();
   if (finalPlaying) stopFinal();
   recOpening = true;
   try{ micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}}); }
-  catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions."; return; }
+  catch(err){ recPressed = false; document.getElementById('recStatus').textContent="Microphone access is needed — check your browser permissions. Nothing you have recorded is affected."; return; }
   finally { recOpening = false; }
   /* Let go while the microphone was still opening. Nothing was recorded, so
      the stream is handed straight back rather than left running. */
   if (!recPressed){
     micStream.getTracks().forEach(t=>t.stop());
-    document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
+    document.getElementById('recStatus').textContent = recTapMode() ? 'Cancelled — tap again to record.' : 'Too quick — hold a little longer.';
     return;
   }
   // Timed from when the microphone is actually live, so the wait for a
   // permission prompt is never mistaken for a long recording.
   holdStart = Date.now(); audioChunks=[];
   const recMime = pickRecordingMime();
-  mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
-  const takeRecorder = mediaRecorder, takeStream = micStream, takeChunks = [];
-  const takeStarted = holdStart, takeIndex = recIndex, takeRecords = activeRecordArray();
+  let takeRecorder;
+  try { takeRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream); }
+  catch(err){
+    micStream.getTracks().forEach(t=>t.stop());
+    recPressed = false;
+    document.getElementById('recStatus').textContent = "This device couldn't start recording just now. Try this line again — your other recordings are safe.";
+    return;
+  }
+  mediaRecorder = takeRecorder;
+  const takeStream = micStream, takeChunks = [];
+  const take = recTake = { recorder: takeRecorder, started: holdStart, pausedAt: 0, pausedTotal: 0, cancelled: false, failed: false };
+  const takeIndex = recIndex, takeRecords = activeRecordArray(), takeTarget = recordTarget;
   const takeText = activeRecordLines()[takeIndex];
-  mediaRecorder.ondataavailable = ev=>takeChunks.push(ev.data);
-  mediaRecorder.onstop = ()=>{
-    const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
-    const url = URL.createObjectURL(blob);
-    takeStream.getTracks().forEach(t=>t.stop());
-    const held = Date.now()-takeStarted;
-    if (held > 400){
-      // The words travel with the take: they are what lets an edited or moved
-      // line be told apart from one that still matches its recording.
-      const replaced = takeRecords[takeIndex];
-      takeRecords[takeIndex] = { url, blob, durationMs: held, text: takeText };
-      // The take it replaces is no longer reachable: give its audio back.
-      if (replaced && replaced.url && replaced.url.startsWith('blob:') && replaced !== takeRecords[takeIndex]) { try { URL.revokeObjectURL(replaced.url); } catch(e){} }
-      document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
-      document.getElementById('nextLineBtn').disabled=false;
-      paintRecordManager();
-      saveRecordingDraft();
-    } else {
-      document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
-    }
+  takeRecorder.ondataavailable = ev=>{ if (ev.data && ev.data.size) takeChunks.push(ev.data); };
+  /* A recorder that fails ends THIS take only. The microphone is given back,
+     the line is left exactly as it was, and the person is told to try again --
+     nothing else in the session is touched. */
+  takeRecorder.onerror = () => {
+    take.failed = true;
+    resetRecButton();
+    document.getElementById('recStatus').textContent = `Something interrupted recording line ${takeIndex + 1}. Tap to try it again — nothing else was affected.`;
+    try { if (takeRecorder.state !== 'inactive') takeRecorder.stop(); } catch(e){}
   };
-  mediaRecorder.start();
-  recBtn.classList.add('recording'); recBtn.textContent='●';
-  document.getElementById('recStatus').textContent="listening… release when you're done";
+  takeRecorder.onstop = ()=>{
+    takeStream.getTracks().forEach(t=>t.stop());
+    if (recTake === take) recTake = null;
+    const status = document.getElementById('recStatus');
+    if (take.cancelled){ status.textContent = 'Take cancelled — this line is as it was.'; paintTapControls(); return; }
+    if (take.failed){ paintTapControls(); return; }
+    const held = recTakeHeldMs(take, Date.now());
+    const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
+    if (!(held > 400 && blob.size > 0)){
+      status.textContent = recTapMode() ? 'That was very short — tap and speak a little longer.' : 'Too quick — hold a little longer.';
+      paintTapControls();
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    /* The words travel with the take: they are what lets an edited or moved
+       line be told apart from one that still matches its recording. */
+    const replaced = takeRecords[takeIndex];
+    const saved = { id: TakeSyncKit.makeId(), url, blob, durationMs: held, text: takeText, committed: false };
+    takeRecords[takeIndex] = saved;
+    // The take it replaces is no longer reachable: give its audio back.
+    if (replaced && replaced !== saved) releaseTake(replaced);
+    showRecordLine();
+    document.getElementById('nextLineBtn').disabled = !activeRecordArray()[recIndex];
+    let message = 'Saved — record again to redo it.';
+    if (takeTarget === 'primary'){
+      message = currentUser ? 'Saved — sending it to your account…' : 'Saved on this device.';
+      saveRecordingDraft();                                    // on this device, right away
+      // ...and on to the account once the device copy is written, so the
+      // draft always knows the upload's path. Recording carries on meanwhile.
+      draftChain = draftChain.then(flushRecordingDraft).catch(() => {}).then(() => syncTake(saved)).then(ok => {
+        const st = document.getElementById('recStatus');
+        if (!st || recBusy() || recIndex !== takeIndex || recordings[takeIndex] !== saved) return;
+        if (ok) st.textContent = 'Saved to your account — record again to redo it.';
+        else if (syncFolder()) st.textContent = 'Saved on this device. Your account could not be reached yet — it keeps trying.';
+      });
+    }
+    status.textContent = message;
+    // A long list should not need a tap per line to move along.
+    if (takeTarget === recordTarget && takeIndex === recIndex && recAutoNext() && recIndex < activeRecordLines().length - 1){
+      recIndex++; recScrollListToCurrent = true; showRecordLine();
+      status.textContent = `Saved line ${takeIndex + 1}. ${recTapMode() ? 'Tap' : 'Hold'} to record line ${recIndex + 1}.`;
+    }
+    paintTapControls();
+  };
+  takeRecorder.start();
+  recBtn.classList.add('recording'); recBtn.textContent = recTapMode() ? '■' : '●';
+  document.getElementById('recStatus').textContent = recTapMode() ? "listening… tap the button when you're done" : "listening… release when you're done";
+  paintTapControls();
   recCtx = new (window.AudioContext||window.webkitAudioContext)();
   const src = recCtx.createMediaStreamSource(micStream);
   analyser = recCtx.createAnalyser(); analyser.fftSize=64; src.connect(analyser);
@@ -3347,35 +3777,61 @@ function animateBars(){
   bars.forEach((bar,i)=>{ const v=dataArray[i%dataArray.length]||0; bar.style.height=Math.max(4,(v/255)*22)+'px'; bar.classList.add('live'); });
   animId = requestAnimationFrame(animateBars);
 }
+/* Everything about the button that says "recording", put back. */
+function resetRecButton(){
+  recPressed = false;
+  recBtn.classList.remove('recording','paused'); recBtn.textContent = recTapMode() ? 'TAP' : 'HOLD';
+  cancelAnimationFrame(animId);
+  bars.forEach(b=>{ b.style.height='4px'; b.classList.remove('live'); });
+  if (recCtx){ try{ recCtx.close(); }catch(e){} recCtx = null; }
+  const box = document.getElementById('recTapControls'); if (box) box.hidden = true;
+}
 function stopRec(){
   // Released, whether or not the microphone ever opened -- startRec checks
   // this after its await and gives the stream back if it did not.
   if (!recPressed) return;
-  recPressed = false;
-  if (!recBtn.classList.contains('recording')) return;
-  recBtn.classList.remove('recording'); recBtn.textContent='HOLD';
-  cancelAnimationFrame(animId);
-  bars.forEach(b=>{ b.style.height='4px'; b.classList.remove('live'); });
+  if (!recBtn.classList.contains('recording')){ recPressed = false; return; }
+  resetRecButton();
   if (mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-  if (recCtx){ try{ recCtx.close(); }catch(e){} recCtx = null; }
 }
+/* Hold mode: down starts, up ends. Tap mode: a tap starts, the next tap ends,
+   and leaving the button or lifting the finger means nothing. */
+function recDown(e){
+  if (recTapMode()){
+    if (e && e.preventDefault) e.preventDefault();
+    if (recPressed || recBtn.classList.contains('recording')){ stopRec(); return; }
+    startRec(e);
+    return;
+  }
+  startRec(e);
+}
+function recUp(e){ if (!recTapMode()) stopRec(e); }
 /* Pointer events where they exist, which is one event per press however the
    press was made. The mouse/touch pair below is the fallback, and only one of
    the two sets is ever attached -- a browser that has both used to report a
    single tap as a touch and a mouse press. */
 if (window.PointerEvent){
-  recBtn.addEventListener('pointerdown', startRec);
-  recBtn.addEventListener('pointerup', stopRec);
-  recBtn.addEventListener('pointercancel', stopRec);
-  recBtn.addEventListener('pointerleave', stopRec);
+  recBtn.addEventListener('pointerdown', recDown);
+  recBtn.addEventListener('pointerup', recUp);
+  recBtn.addEventListener('pointercancel', recUp);
+  recBtn.addEventListener('pointerleave', recUp);
 } else {
-  recBtn.addEventListener('mousedown', startRec);
-  recBtn.addEventListener('mouseup', stopRec);
-  recBtn.addEventListener('mouseleave', stopRec);
-  recBtn.addEventListener('touchstart', startRec);
-  recBtn.addEventListener('touchend', stopRec);
-  recBtn.addEventListener('touchcancel', stopRec);
+  recBtn.addEventListener('mousedown', recDown);
+  recBtn.addEventListener('mouseup', recUp);
+  recBtn.addEventListener('mouseleave', recUp);
+  recBtn.addEventListener('touchstart', recDown);
+  recBtn.addEventListener('touchend', recUp);
+  recBtn.addEventListener('touchcancel', recUp);
 }
+/* Keyboard: Space or Enter does what a tap does (tap mode) -- hold mode has no
+   keyboard equivalent for "hold", so there it starts on press and ends on release. */
+recBtn.addEventListener('keydown', e => {
+  if (e.key !== ' ' && e.key !== 'Enter') return;
+  if (e.repeat){ e.preventDefault(); return; }
+  e.preventDefault(); recDown(e);
+});
+recBtn.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); recUp(e); } });
+paintRecMode();
 
 /* ---------------- AMBIENCE ENGINE (synthesized, no audio files) ---------------- */
 function makeNoiseBuffer(ctx, seconds, color){
@@ -4502,6 +4958,7 @@ function playFinal(){
         }
         if (idx >= recorded.length){ onDone(recorded.length > 0); return; }
         const { r, i } = recorded[idx];
+        keepClipsNear(finalCtx, recorded, idx);
         showFinalAffirmation(state.affirmations[i], i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
         loadClip(finalCtx, r).then(finalCallback(clip=>{
@@ -4813,6 +5270,8 @@ function finishFinal(){
   try { window.speechSynthesis.cancel(); } catch(e){}
   stopSilentKeeper();
   closeAudioOut(finalCtx);
+  // The context is gone, so decoded copies of the takes (tied to it) are only memory.
+  (recordings || []).forEach(t => { if (t && t._clip && t._clipCtx === finalCtx) releaseClip(t); });
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   clearTimeout(finalRecoverTimer);
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
@@ -4856,6 +5315,8 @@ function stopFinal(){
   if (typeof recordPlayerSession === 'function') recordPlayerSession(false, listenedSeconds);
   stopSilentKeeper();
   closeAudioOut(finalCtx);
+  // The context is gone, so decoded copies of the takes (tied to it) are only memory.
+  (recordings || []).forEach(t => { if (t && t._clip && t._clipCtx === finalCtx) releaseClip(t); });
   if (finalTimerInterval){ clearInterval(finalTimerInterval); finalTimerInterval = null; }
   clearTimeout(finalRecoverTimer);
   updateSessionTimerLabel();

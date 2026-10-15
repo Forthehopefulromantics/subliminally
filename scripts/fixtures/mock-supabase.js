@@ -46,10 +46,22 @@
   }
   const toDataUrl=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b);});
   const bucket=name=>({
-    async upload(path,blob){ const db=load(); db.storage[name+'/'+path]=await toDataUrl(blob); save(db); log({storage:name,op:'upload',path}); return {data:{path},error:null}; },
+    /* Like the real thing: a path that exists is refused unless upsert is set,
+       and uploads can run side by side (the data is read after the await, so two
+       at once cannot overwrite each other). Tests can make the next N uploads
+       fail with localStorage.mock_upload_fail = N, or all of them with 'all'. */
+    async upload(path,blob,opts){
+      const failing=localStorage.getItem('mock_upload_fail');
+      if(failing){ if(failing!=='all'){ const n=parseInt(failing,10)-1; if(n>0) localStorage.setItem('mock_upload_fail',String(n)); else localStorage.removeItem('mock_upload_fail'); }
+        log({storage:name,op:'upload-failed',path}); return {data:null,error:{message:'network lost (injected)'}}; }
+      const url=await toDataUrl(blob);
+      const db=load();
+      if(db.storage[name+'/'+path] && !(opts&&opts.upsert)){ log({storage:name,op:'upload-duplicate',path}); return {data:null,error:{message:'The resource already exists',statusCode:'409'}}; }
+      db.storage[name+'/'+path]=url; save(db); log({storage:name,op:'upload',path}); return {data:{path},error:null};
+    },
     async createSignedUrl(path){ const u=load().storage[name+'/'+path]; return u?{data:{signedUrl:u},error:null}:{data:null,error:{message:'not found'}}; },
     async createSignedUrls(paths){ const s=load().storage; return {data:paths.map(p=>({path:p,signedUrl:s[name+'/'+p]||null})),error:null}; },
-    async remove(paths){ return {data:paths,error:null}; },
+    async remove(paths){ const db=load(); paths.forEach(p=>{ delete db.storage[name+'/'+p]; }); save(db); log({storage:name,op:'remove',paths}); return {data:paths,error:null}; },
     getPublicUrl(p){ return {data:{publicUrl:''}}; },
   });
   window.supabase={ createClient(){ return {

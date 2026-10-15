@@ -4,17 +4,37 @@ const assert = require('node:assert/strict');
 const K = require('../js/affirmation-timeline.js');
 
 /* ---- limits ---- */
-assert.equal(K.limitFor('record_own'), 20);
+assert.equal(K.limitFor('record_own'), 100, 'Record Your Own Voice goes to 100');
+assert.equal(K.MAX_AFFIRMATIONS, 100, 'and nothing else in the system caps the list lower');
 assert.equal(K.limitFor('serenity'), 10, 'Serenity keeps its 10');
 assert.equal(K.limitFor('clone_voice'), 10, 'Clone Your Voice keeps its 10');
-assert.equal(K.countLabel(12, 20), '12/20');
+assert.equal(K.limitFor('something_new'), 10, 'an unknown voice gets the conservative limit, never the free one');
+assert.equal(K.AFFIRMATION_LIMITS.other, 10);
+assert.equal(K.countLabel(12, 100), '12/100');
 assert.equal(K.overLimitMessage(12, 'record_own'), '', '12 lines is fine when recording yourself');
-assert.equal(K.overLimitMessage(20, 'record_own'), '', 'and 20 is the most');
+assert.equal(K.overLimitMessage(100, 'record_own'), '', 'and 100 is the most');
+assert.match(K.overLimitMessage(101, 'record_own'), /up to 100/);
 assert.equal(K.overLimitMessage(10, 'serenity'), '');
 const msg = K.overLimitMessage(14, 'serenity');
 assert.match(msg, /up to 10/); assert.match(msg, /14/); assert.match(msg, /Nothing has been removed/, 'the explanation says nothing was deleted');
 assert.match(msg, /Record Your Own Voice/, 'and where to go for more');
+assert.match(msg, /up to 100/, 'the message names the new ceiling');
 assert.match(K.overLimitMessage(11, 'clone_voice'), /Clone Your Voice reads up to 10/);
+assert.match(K.overLimitMessage(100, 'serenity'), /Take out 90 lines/, '100 lines against Serenity: take out 90, or record');
+
+/* ---- how many: quick picks and a custom number ---- */
+assert.deepEqual([...K.COUNT_PRESETS], [5, 10, 20, 50, 100], 'the five quick picks');
+assert.equal(K.MIN_AFFIRMATIONS, 5, 'the existing minimum is kept');
+assert.equal(K.clampCount(37), 37, 'any whole number between the ends is accepted');
+assert.equal(K.clampCount('64'), 64); assert.equal(K.clampCount(' 99 '), 99);
+assert.equal(K.clampCount(100), 100); assert.equal(K.clampCount(5), 5);
+assert.equal(K.clampCount(101), 100, 'over the top is pulled to 100'); assert.equal(K.clampCount('250'), 100);
+assert.equal(K.clampCount(2), 5, 'under the minimum is pulled to 5'); assert.equal(K.clampCount(0), 5); assert.equal(K.clampCount(-9), 5);
+assert.equal(K.clampCount('12.6'), 12, 'text is read as a whole number'); assert.equal(K.clampCount(12.6), 13);
+assert.equal(K.clampCount(''), null, 'not a number at all is null, so the caller can keep the old value');
+assert.equal(K.clampCount('abc'), null); assert.equal(K.clampCount(null), null); assert.equal(K.clampCount(NaN), null);
+assert.equal(K.clampCount(1, 1, 100), 1, 'a caller with no minimum can ask for 1');
+for (const p of K.COUNT_PRESETS) assert.equal(K.clampCount(p), p, 'every quick pick is itself valid');
 
 /* ---- ordering ---- */
 assert.deepEqual(K.moveItem(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd']);
@@ -97,4 +117,4 @@ assert.equal(tl.active, -1);
 assert.ok(seen.length > 10, 'listeners are told about every change');
 tl.on(() => { throw new Error('a broken listener'); });
 tl.lineStart(1); // must not throw
-console.log('PASS: limits 20/10, count label, over-limit explanation, reorder, timing plan, sequential sync, overlap rule, pause/resume, loop, seek, start over');
+console.log('PASS: limits 100/10, count presets + custom clamp, count label, over-limit explanation, reorder, timing plan, sequential sync, overlap rule, pause/resume, loop, seek, start over');

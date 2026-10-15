@@ -18,9 +18,25 @@
 
   /* How many affirmations each way of voicing a subliminal can carry. Recording
      yourself is the only one that is not limited by what a voice provider
-     generates per request, so it is the only one that goes to 20. */
-  const AFFIRMATION_LIMITS = Object.freeze({ own: 20, serenity: 10, clone: 10, other: 10 });
-  const MAX_AFFIRMATIONS = 20;
+     generates (and bills) per line, so it is the only one that goes to 100.
+     Serenity and Clone Your Voice stay at ten: every line they read is a paid
+     generation. */
+  const AFFIRMATION_LIMITS = Object.freeze({ own: 100, serenity: 10, clone: 10, other: 10 });
+  const MAX_AFFIRMATIONS = 100;
+  /* The fewest lines a subliminal is built from, and the quick picks offered
+     for the count. Any whole number between the two is allowed as well. */
+  const MIN_AFFIRMATIONS = 5;
+  const COUNT_PRESETS = Object.freeze([5, 10, 20, 50, 100]);
+  /* A typed count -> a whole number inside [MIN, MAX], or null when it is not a
+     number at all. Out-of-range numbers are pulled to the nearest end rather
+     than refused, so 250 means 100 and 2 means 5. */
+  function clampCount(value, min, max) {
+    const lo = min == null ? MIN_AFFIRMATIONS : min;
+    const hi = max == null ? MAX_AFFIRMATIONS : max;
+    const n = typeof value === 'number' ? value : parseInt(String(value == null ? '' : value).trim(), 10);
+    if (!Number.isFinite(n)) return null;
+    return Math.max(lo, Math.min(hi, Math.round(n)));
+  }
 
   function voiceKind(selectedVoice) {
     if (selectedVoice === 'record_own' || selectedVoice === 'own') return 'own';
@@ -161,7 +177,7 @@
     }
   }
 
-  const api = { AFFIRMATION_LIMITS, MAX_AFFIRMATIONS, voiceKind, limitFor, countLabel, overLimitMessage, moveItem, planTimings, AffirmationTimeline };
+  const api = { AFFIRMATION_LIMITS, MAX_AFFIRMATIONS, MIN_AFFIRMATIONS, COUNT_PRESETS, clampCount, voiceKind, limitFor, countLabel, overLimitMessage, moveItem, planTimings, AffirmationTimeline };
   root.AffirmationKit = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

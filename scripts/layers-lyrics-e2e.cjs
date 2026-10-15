@@ -1,4 +1,4 @@
-/* End-to-end: frequency layers, 20 affirmations for your own voice, and the
+/* End-to-end: frequency layers, up to 100 affirmations for your own voice, and the
    lyrics-style live list — in a real browser (Chromium, iPhone viewport and user
    agent, so the iOS media-element output route is the one under test) against an
    in-memory Supabase (scripts/fixtures/mock-supabase.js) and a fake microphone.
@@ -28,6 +28,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
+  if (process.env.DEBUGLOG) page.on('console', m => console.log('[page]', m.type(), m.text().slice(0, 300)));
   page.on('dialog', d => d.accept());
   await page.addInitScript(() => {
     if (window !== window.top) return;
@@ -342,26 +343,32 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   assert.equal(reset.active, -1); assert.ok(reset.states, 'Stop clears the highlight');
   step(7, 'navigation keeps one playing session; Stop leaves 0 oscillators, 0 open contexts and no highlight');
 
-  /* ================= 8. 20 AFFIRMATIONS ================= */
+  /* ================= 8. 100 AFFIRMATIONS ================= */
   await page.evaluate(() => { startNewSubliminal(); showBuildPage(); state.affirmations = Array.from({ length: 12 }, (_, i) => `Line ${i + 1} of my own.`); showStep(3); renderAffList(); });
-  assert.equal(await page.textContent('#affCount'), '12/20 affirmations');
+  assert.equal(await page.textContent('#affCount'), '12/100 affirmations');
   for (let i = 0; i < 8; i++) await page.click('#addAffBtn');
-  assert.equal(await page.textContent('#affCount'), '20/20 affirmations');
-  assert.equal(await page.evaluate(() => document.getElementById('addAffBtn').disabled), true, 'the 21st cannot be added');
+  assert.equal(await page.textContent('#affCount'), '20/100 affirmations', 'the old ceiling of 20 is gone');
+  assert.equal(await page.evaluate(() => document.getElementById('addAffBtn').disabled), false, 'the 21st can be added');
+  await page.evaluate(() => { while (state.affirmations.length < 99) state.affirmations.push('Filler ' + state.affirmations.length); renderAffList(); });
+  await page.click('#addAffBtn');
+  assert.equal(await page.textContent('#affCount'), '100/100 affirmations');
+  assert.equal(await page.evaluate(() => document.getElementById('addAffBtn').disabled), true, 'the 101st cannot be added');
   await page.evaluate(() => addAffirmation());
-  assert.equal(await page.evaluate(() => state.affirmations.length), 20);
+  assert.equal(await page.evaluate(() => state.affirmations.length), 100);
   assert.match(await page.textContent('#affListMsg'), /most one subliminal holds/);
   // reorder + delete + edit in the review step
   await page.evaluate(() => { state.affirmations[0] = 'FIRST'; state.affirmations[1] = 'SECOND'; renderAffList(); });
   await page.click('#affList .aff-row:nth-child(1) .aff-move[aria-label="Move affirmation 1 down"]');
   assert.deepEqual(await page.evaluate(() => state.affirmations.slice(0, 2)), ['SECOND', 'FIRST'], 'reorder');
   await page.click('#affList .aff-row:nth-child(2) .aff-remove');
-  assert.equal(await page.evaluate(() => state.affirmations.length), 19, 'delete');
-  // paste of 31 lines: cut at 20, and says so
-  await page.evaluate(() => { document.getElementById('affirmationPasteText').value = Array.from({ length: 31 }, (_, i) => `Pasted ${i + 1}`).join('\n'); affirmationMode = 'import'; handleAffirmationInputBeforeGenerate(); });
-  assert.equal(await page.evaluate(() => state.affirmations.length), 20);
-  assert.match(await page.textContent('#affListMsg'), /had 31 lines.*first 20/);
-  step(8, 'count shows N/20, the 21st is refused with a message, review step can edit/reorder/delete, a 31-line paste is cut to 20 with an explanation');
+  assert.equal(await page.evaluate(() => state.affirmations.length), 99, 'delete');
+  // paste of 131 lines: cut at 100, and says so; 60 pasted lines are all kept
+  await page.evaluate(() => { document.getElementById('affirmationPasteText').value = Array.from({ length: 131 }, (_, i) => `Pasted ${i + 1}`).join('\n'); affirmationMode = 'import'; handleAffirmationInputBeforeGenerate(); });
+  assert.equal(await page.evaluate(() => state.affirmations.length), 100);
+  assert.match(await page.textContent('#affListMsg'), /had 131 lines.*first 100/);
+  await page.evaluate(() => { document.getElementById('affirmationPasteText').value = Array.from({ length: 60 }, (_, i) => `Pasted ${i + 1}`).join('\n'); affirmationMode = 'import'; handleAffirmationInputBeforeGenerate(); });
+  assert.equal(await page.evaluate(() => state.affirmations.length), 60, 'a 60-line paste is kept whole (the old cap was 20)');
+  step(8, 'count shows N/100, the 101st is refused with a message, review step can edit/reorder/delete, a 131-line paste is cut to 100 with an explanation and a 60-line paste is kept');
 
   // voice limits: Serenity/Clone keep 10, nothing is deleted, the reason is shown
   await page.evaluate(() => { state.affirmations = Array.from({ length: 12 }, (_, i) => `Keep me ${i + 1}`); showStep(4); setSelectedVoice(VOICE_SERENITY); nextStep(); });
@@ -381,7 +388,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   /* ================= 9. record, edit, reorder, delete, re-record, persistence ================= */
   await page.evaluate(() => { startNewSubliminal(); showBuildPage(); state.affirmations = Array.from({ length: 12 }, (_, i) => `Own line ${i + 1}.`); setFrequencyLayers([{ hz: 528, vol: 100 }]); setSelectedVoice(VOICE_RECORD_OWN); beginRecordingPass('primary'); });
-  assert.equal(await page.textContent('#recMgrCount'), '12/20'); assert.equal(await page.$$eval('#recMgrList .rm-row', r => r.length), 12);
+  assert.equal(await page.textContent('#recMgrCount'), '12/100'); assert.equal(await page.$$eval('#recMgrList .rm-row', r => r.length), 12);
   const record = async (ms) => {
     await page.dispatchEvent('#recBtn', 'pointerdown'); await page.waitForFunction(() => document.getElementById('recBtn').classList.contains('recording'), null, { timeout: 5000 });
     await sleep(ms); await page.dispatchEvent('#recBtn', 'pointerup');
@@ -408,12 +415,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   assert.match(await page.textContent('#recMgrList .rm-row[data-i="1"] .rm-status'), /^Recorded/);
   // delete an unrecorded line; add one
   await page.click('#recMgrList .rm-row[data-i="3"] [aria-label="Delete affirmation 4"]');
-  assert.equal(await page.textContent('#recMgrCount'), '11/20');
+  assert.equal(await page.textContent('#recMgrCount'), '11/100');
 
   await page.click('#recMgrAdd'); await page.fill('#recMgrList .rm-edit', 'A brand new line.'); await page.click('#recMgrList [aria-label="Save this change"]');
-  assert.equal(await page.textContent('#recMgrCount'), '12/20');
+  assert.equal(await page.textContent('#recMgrCount'), '12/100');
   await page.screenshot({ path: SHOTS + '/record-manager.png', fullPage: false });
-  step(9, 'record any line, play/re-record, edit (take kept + flagged), reorder (take follows words), delete, add — all with a live N/20 count; durations measured');
+  step(9, 'record any line, play/re-record, edit (take kept + flagged), reorder (take follows words), delete, add — all with a live N/100 count; durations measured');
 
   // refresh in the middle: the recording comes back
   await page.waitForTimeout(600);
@@ -449,7 +456,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.evaluate(async (id) => { await loadSavedIntoBuilder(id); }, row.id);
   const reopened = await page.evaluate(() => ({ n: recordings.filter(Boolean).length, lines: state.affirmations.slice(), pl: document.querySelectorAll('#finalPlaylist li').length, count: document.getElementById('finalPlaylistCount').textContent,
     stale: recordings.filter(Boolean).filter(r => r.text !== state.affirmations[recordings.indexOf(r)]).length, dur: recordings.every(r => r.durationMs > 0) }));
-  assert.equal(reopened.n, 12); assert.deepEqual(reopened.lines, row.affirmations); assert.equal(reopened.pl, 12); assert.equal(reopened.count, '12/20');
+  assert.equal(reopened.n, 12); assert.deepEqual(reopened.lines, row.affirmations); assert.equal(reopened.pl, 12); assert.equal(reopened.count, '12/100');
   assert.equal(reopened.stale, 0); assert.ok(reopened.dur);
   await page.evaluate(() => openImmersivePlayer());
   assert.equal(await page.$$eval('#ipLyrics .ip-lyric', l => l.length), 12, 'reopening a saved subliminal shows all its affirmations in the player before playing');

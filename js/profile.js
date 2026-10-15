@@ -200,6 +200,51 @@ async function renameLibraryItem(id){
    same way, but you are not thrown onto the builder page to find a second
    button. Everything before this point is identical either way -- there is one
    loader, not two. */
+/* The saved recordings of one subliminal, fetched. A hundred of them are not
+   fetched one after another: the links are signed in one request and the files
+   are downloaded a handful at a time, so opening a long subliminal takes a few
+   round trips rather than a hundred and none of the files is held twice.
+
+   Every way a line can fail is told apart from a line that was never recorded:
+   a null path is "never recorded" (not an error); a link that could not be
+   signed or a file that would not download is an error, counted, and the rest
+   of the lines load regardless. */
+async function fetchSavedTakes(paths, describe){
+  const takes = new Array(paths.length).fill(null);
+  const errors = [];
+  const wanted = paths.map((p, i) => ({ p, i })).filter(x => x.p);
+  const signed = new Map();
+  try {
+    const { data, error } = await sb.storage.from('recordings').createSignedUrls(wanted.map(x => x.p), 3600);
+    if (!error && Array.isArray(data)) data.forEach(row => { if (row && row.signedUrl) signed.set(row.path, row.signedUrl); });
+  } catch(e){ /* signed one at a time below */ }
+  async function one(entry){
+    const { p: path, i } = entry;
+    try {
+      let url = signed.get(path);
+      if (!url){
+        const { data, error } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+        if (error || !data) throw new Error((error && error.message) || 'could not get a link to the audio');
+        url = data.signedUrl;
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('the audio file came back ' + res.status);
+      const blob = await res.blob();
+      if (!blob.size) throw new Error('the audio file is empty');
+      const info = describe(i) || {};
+      // `path` marks the take as already saved: saving again reuses it, and it is never cleaned up.
+      takes[i] = { id: TakeSyncKit.makeId(), url: URL.createObjectURL(blob), blob, path, committed: true, text: info.text, durationMs: info.durationMs };
+    } catch(e){
+      errors.push((e && e.message) || 'the audio could not be downloaded');
+    }
+  }
+  const queue = wanted.slice();
+  const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
+    while (queue.length) await one(queue.shift());
+  });
+  await Promise.all(workers);
+  return { takes, errors };
+}
 async function loadSavedIntoBuilder(id, opts){
   if (!sb || !currentUser) return;
   await flushMixSave();
@@ -251,30 +296,15 @@ async function loadSavedIntoBuilder(id, opts){
     /* Per-line timing metadata saved alongside (see buildAffirmationMeta): how
        long each take is, and the words it was recorded for. */
     const savedMeta = s.mix_settings && Array.isArray(s.mix_settings.affirmationMeta) ? s.mix_settings.affirmationMeta : [];
-    let lineNo = -1;
-    for (const path of s.recording_urls){
-      lineNo++;
+    const loaded = await fetchSavedTakes(s.recording_urls, (lineNo) => {
       const meta = savedMeta[lineNo] || {};
-      const takeText = typeof meta.recordedText === 'string' ? meta.recordedText : state.affirmations[lineNo];
-      if (!path){ recordings.push(null); continue; }   // never recorded: not an error
-      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-      if (sErr || !signed){
-        recordings.push(null);
-        recordingLoadErrors.push((sErr && sErr.message) || 'could not get a link to the audio');
-        continue;
-      }
-      try {
-        const res = await fetch(signed.signedUrl);
-        if (!res.ok) throw new Error('the audio file came back ' + res.status);
-        const blob = await res.blob();
-        if (!blob.size) throw new Error('the audio file is empty');
-        // `path` marks the take as already saved: saving again reuses it.
-        recordings.push({ url: URL.createObjectURL(blob), blob, path, text: takeText, durationMs: Number(meta.durationMs) || undefined });
-      } catch(e){
-        recordings.push(null);
-        recordingLoadErrors.push((e && e.message) || 'the audio could not be downloaded');
-      }
-    }
+      return {
+        text: typeof meta.recordedText === 'string' ? meta.recordedText : state.affirmations[lineNo],
+        durationMs: Number(meta.durationMs) || undefined,
+      };
+    });
+    recordings = loaded.takes;
+    recordingLoadErrors = loaded.errors;
     state.voiceMode = 'own';
     state.selectedVoice = VOICE_RECORD_OWN;
     if (recordingLoadErrors.length){
@@ -321,16 +351,7 @@ async function loadSavedIntoBuilder(id, opts){
   layerRecordings = [];
   const hasLayerRecordings = Array.isArray(s.layer_recording_urls) && s.layer_recording_urls.some(p => p);
   if (hasLayerRecordings){
-    for (const path of s.layer_recording_urls){
-      if (!path){ layerRecordings.push(null); continue; }
-      const { data: signed, error: sErr } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-      if (sErr || !signed){ layerRecordings.push(null); continue; }
-      try {
-        const res = await fetch(signed.signedUrl);
-        const blob = await res.blob();
-        layerRecordings.push({ url: URL.createObjectURL(blob), blob, path });
-      } catch(e){ layerRecordings.push(null); }
-    }
+    layerRecordings = (await fetchSavedTakes(s.layer_recording_urls, () => ({}))).takes;
   }
 
   prepareFinal();

@@ -263,7 +263,7 @@ vm.runInContext(`
   var MediaRecorder = undefined;
 `, ctx);
 
-for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/ambience.js', 'js/builder.js'])
+for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/take-sync.js', 'js/ambience.js', 'js/builder.js'])
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 
 /* The voice catalogue is asked over the network on the real page; here it is a
@@ -347,7 +347,7 @@ check('a pick moves on to ambience', step(), 5);
 pickAmbience('rain');
 await settle();
 check('picking a background reaches the recorder', step(), 6);
-check('the counter is drawn, not the placeholder', recCounter(), '1 of 10');
+check('the counter is drawn, not the placeholder', recCounter(), 'Recording 1 of 10 · 0 recorded');
 check('affirmation #1 is on screen immediately', recLine(), '"Affirmation number 1."');
 check('no "..." anywhere', recLine().includes('...'), false);
 check('recordings are sized to the lines', get('recordings.length'), 10);
@@ -357,7 +357,7 @@ check('Next line is not available until something is recorded', get(`document.ge
 run(`recordings[0] = { url:'blob:1' }; showRecordLine();`);
 check('once recorded, Next line opens', get(`document.getElementById('nextLineBtn').disabled`), false);
 run(`advanceLine()`);
-check('line two is line two', [recCounter(), recLine()], ['2 of 10', '"Affirmation number 2."']);
+check('line two is line two', [recCounter(), recLine()], ['Recording 2 of 10 · 1 recorded', '"Affirmation number 2."']);
 run(`for (let i = 1; i < 10; i++) advanceLine();`);
 check('after the tenth, on to assembly', step(), 7);
 

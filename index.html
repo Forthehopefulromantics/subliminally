@@ -302,7 +302,28 @@
   .rm-count{ font-family:inherit; font-size:14px; color:var(--candle); margin-left:6px; font-variant-numeric:tabular-nums; }
   .rm-summary{ font-size:12px; color:var(--haze); }
   .rm-help{ margin:6px 0 12px; font-size:12.5px; color:var(--haze); line-height:1.5; }
-  .rm-list{ list-style:none; margin:0 0 12px; padding:0; display:grid; gap:8px; }
+  /* A hundred lines must scroll inside the page, not make it a hundred rows tall. */
+  .rm-list{ position:relative; list-style:none; margin:0 0 12px; padding:2px 4px 2px 0; display:grid; gap:8px; max-height:min(60vh,560px); overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; scroll-padding:8px; }
+  .rm-tools{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 10px; }
+  .rm-jump{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--haze); }
+  .rm-jump input{ width:68px; min-height:36px; box-sizing:border-box; border-radius:10px; border:1px solid var(--lilac); background:var(--veil); color:var(--moonlight); font:inherit; padding:0 8px; }
+  .rm-status.syncing{ color:var(--lilac); }
+  .rm-status.failed{ color:#E39A9A; }
+  .rec-progress{ width:min(320px,80%); height:6px; border-radius:999px; background:var(--dusk); overflow:hidden; }
+  .rec-progress[hidden]{ display:none; }
+  .rec-progress i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--lilac),var(--candle)); border-radius:999px; transition:width .3s; }
+  .record-counter strong{ color:var(--moonlight); font-weight:500; font-size:14px; }
+  .rec-mode{ display:inline-flex; gap:2px; padding:3px; border-radius:999px; background:var(--dusk); }
+  .rec-mode-btn{ border:0; background:transparent; color:var(--haze); font:inherit; font-size:12px; padding:7px 13px; border-radius:999px; cursor:pointer; min-height:34px; }
+  .rec-mode-btn.sel{ background:var(--lilac); color:#2b1f47; }
+  .rec-tap-controls{ display:flex; gap:8px; justify-content:center; }
+  .rec-tap-controls[hidden]{ display:none; }
+  .rec-btn.paused{ background:var(--dusk); border-color:#C96A6A; color:#C96A6A; animation:none; }
+  .rec-auto{ font-size:12px; color:var(--haze); display:flex; gap:7px; align-items:center; cursor:pointer; }
+  .chip.count-custom{ display:inline-flex; align-items:center; gap:8px; }
+  .chip.count-custom input{ width:62px; border:0; border-bottom:1px solid var(--lilac); background:transparent; color:var(--moonlight); font:inherit; font-size:13px; text-align:center; padding:0 2px; min-height:22px; }
+  .chip.count-custom input:focus-visible{ outline:2px solid var(--candle); outline-offset:3px; }
+  .chip.count-custom.sel{ border-color:var(--lilac); }
   .rm-row{ display:grid; grid-template-columns:24px 1fr; gap:4px 10px; padding:10px 11px; border-radius:13px; background:var(--dusk); border:1px solid transparent; }
   .rm-row.current{ border-color:var(--lilac); background:rgba(185,167,232,.16); }
   .rm-num{ font-size:12px; color:var(--haze); padding-top:3px; font-variant-numeric:tabular-nums; }
@@ -3035,10 +3056,19 @@
             </div>
             <div class="quiz-q">
               <label>How many affirmations?</label>
-              <div class="chip-grid" id="affirmationCountChips">
-                <button class="chip sel" data-count="5" onclick="selectAffirmationCount(5)">5 affirmations</button>
-                <button class="chip" data-count="10" onclick="selectAffirmationCount(10)">10 affirmations</button>
+              <div class="chip-grid" id="affirmationCountChips" role="radiogroup" aria-label="How many affirmations">
+                <button type="button" class="chip sel" role="radio" aria-checked="true" data-count="5" onclick="selectAffirmationCount(5)">5</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-count="10" onclick="selectAffirmationCount(10)">10</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-count="20" onclick="selectAffirmationCount(20)">20</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-count="50" onclick="selectAffirmationCount(50)">50</button>
+                <button type="button" class="chip" role="radio" aria-checked="false" data-count="100" onclick="selectAffirmationCount(100)">100</button>
+                <label class="chip count-custom" id="affirmationCountCustom" role="radio" aria-checked="false">
+                  <span>Custom</span>
+                  <input type="number" inputmode="numeric" min="5" max="100" step="1" id="affirmationCountCustomInput" placeholder="5–100" aria-label="Custom number of affirmations, 5 to 100"
+                    onfocus="this.select()" onchange="commitCustomAffirmationCount()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitCustomAffirmationCount();this.blur();}">
+                </label>
               </div>
+              <p class="quiz-help" id="affirmationCountHint">Record Your Own Voice takes up to 100; Serenity and Clone Your Voice take up to 10.</p>
             </div>
           </div>
 
@@ -3123,8 +3153,8 @@
               </div>
               <div class="quiz-q" id="countRow">
                 <label>How many affirmations?</label>
-                <div class="count-row"><input type="range" id="countRange" min="5" max="10" value="5"><span class="count-val" id="countVal">5</span></div>
-                <p class="quiz-help">Five is the fewest a subliminal is built from; ten is the most.</p>
+                <div class="count-row"><input type="range" id="countRange" min="5" max="100" value="5" aria-label="Number of affirmations"><span class="count-val" id="countVal">5</span></div>
+                <p class="quiz-help">Five is the fewest a subliminal is built from; one hundred is the most, and only Record Your Own Voice reads more than ten.</p>
               </div>
             </div>
           </details>
@@ -3283,12 +3313,22 @@
                  a correct-looking counter over an affirmation that was never
                  drawn. Neither says anything now that could be mistaken for
                  somebody's actual line. -->
-            <div class="record-counter" id="recCounter"></div>
+            <div class="record-counter" id="recCounter" role="status" aria-live="polite"></div>
+            <div class="rec-progress" id="recProgress" role="progressbar" aria-label="Affirmations recorded" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><i id="recProgressFill"></i></div>
             <div class="record-line record-line-loading" id="recLine">Preparing your affirmations…</div>
             <div class="rec-tap-hint" id="recTapHint" style="display:none;"></div>
+            <div class="rec-mode" id="recModeRow" role="radiogroup" aria-label="How to record">
+              <button type="button" class="rec-mode-btn sel" role="radio" aria-checked="true" data-mode="hold" onclick="setRecMode('hold')">Hold to record</button>
+              <button type="button" class="rec-mode-btn" role="radio" aria-checked="false" data-mode="tap" onclick="setRecMode('tap')">Tap to record</button>
+            </div>
             <button class="rec-btn" id="recBtn">HOLD</button>
+            <div class="rec-tap-controls" id="recTapControls" hidden>
+              <button type="button" class="mini-btn ghostbtn" id="recPauseBtn" onclick="toggleRecPause()">Pause</button>
+              <button type="button" class="mini-btn ghostbtn" id="recCancelBtn" onclick="cancelRecTake()">Cancel take</button>
+            </div>
             <div class="waveform" id="waveform"></div>
-            <div class="rec-status" id="recStatus">press and hold to record</div>
+            <div class="rec-status" id="recStatus" role="status">press and hold to record</div>
+            <label class="rec-auto"><input type="checkbox" id="recAutoNext" onchange="setRecAutoNext(this.checked)"> Move to the next line after each recording</label>
             <div class="record-actions">
               <button class="mini-btn ghostbtn" id="skipBtn" onclick="skipLine()">Skip this line</button>
               <button class="mini-btn candlebtn" id="nextLineBtn" onclick="nextLine()" disabled>Next line →</button>
@@ -3300,8 +3340,13 @@
               <h3 id="recMgrHeading">Your affirmations <span id="recMgrCount" class="rm-count"></span></h3>
               <span id="recMgrSummary" class="rm-summary" role="status"></span>
             </div>
-            <p class="rm-help">Select a line to record it. Re-record, play, edit, reorder or delete any of them. Nothing is lost when you switch between lines.</p>
-            <ol class="rm-list" id="recMgrList"></ol>
+            <p class="rm-help">Each recording is saved the moment you finish it — on this device straight away, and to your account as soon as there is a connection. Select a line to record it; re-record, play, remove a recording, edit, reorder or delete any of them. Leave and come back and they will be here.</p>
+            <div class="rm-tools">
+              <label class="rm-jump">Go to line <input type="number" min="1" id="recJump" inputmode="numeric" aria-label="Go to line number" onkeydown="if(event.key==='Enter'){event.preventDefault();recJump(this.value);}"></label>
+              <button type="button" class="rm-btn" onclick="recJumpNextUnrecorded()">Next unrecorded</button>
+              <button type="button" class="rm-btn" id="recRetryAll" onclick="recRetrySync()" hidden>Retry saving</button>
+            </div>
+            <ol class="rm-list" id="recMgrList" tabindex="-1" aria-label="Your affirmations, numbered"></ol>
             <button type="button" class="aff-add" id="recMgrAdd" onclick="recAdd()">+ Add an affirmation</button>
           </section>
         </div>
@@ -3830,15 +3875,16 @@
      before it. Moving one of these lines changes behaviour. -->
 <script src="js/selectable.js"></script>
 <script src="js/frequency-layers.js?v=20261015a"></script>
-<script src="js/affirmation-timeline.js?v=20261015a"></script>
-<script src="js/draft-store.js?v=20261015a"></script>
+<script src="js/affirmation-timeline.js?v=20261016a"></script>
+<script src="js/draft-store.js?v=20261016a"></script>
+<script src="js/take-sync.js?v=20261016a"></script>
 <script src="js/dates.js"></script>
 <script src="js/sky.js"></script>
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20261015a"></script>
-<script src="js/billing.js?v=20261015a"></script>
+<script src="js/builder.js?v=20261016a"></script>
+<script src="js/billing.js?v=20261016a"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js"></script>
 <script src="js/nav.js"></script>
@@ -3848,7 +3894,7 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20261005a"></script>
-<script src="js/profile.js?v=20261015a"></script>
+<script src="js/profile.js?v=20261016a"></script>
 <script src="js/mix-settings.js?v=20261015a"></script>
 <script src="js/lyrics-list.js?v=20261015a"></script>
 <script src="js/player.js?v=20261015a"></script>
