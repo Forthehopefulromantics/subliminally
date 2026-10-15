@@ -19,7 +19,9 @@
     "test:affirmations": "node scripts/affirmation-timeline-test.cjs",
     "test:layers-lyrics": "node scripts/layers-lyrics-e2e.cjs",
     "test:lifecycle": "node scripts/audio-lifecycle-test.cjs",
-    "test:unit": "npm run test:rituals && npm run test:faith && npm run test:checkout && npm run test:mix && npm run test:frequency-layers && npm run test:affirmations && npm run test:lifecycle"
+    "test:unit": "npm run test:rituals && npm run test:faith && npm run test:checkout && npm run test:mix && npm run test:frequency-layers && npm run test:affirmations && npm run test:lifecycle && npm run test:take-sync",
+    "test:take-sync": "node scripts/take-sync-test.cjs",
+    "test:own-voice-100": "node scripts/own-voice-100-e2e.cjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

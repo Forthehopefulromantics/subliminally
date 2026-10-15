@@ -61,11 +61,83 @@ Everything new is stored in the existing `subliminals.mix_settings` jsonb:
 - `affirmationMeta: [{order, durationMs, startMs, endMs, recordedText}]` - one per
   affirmation; the audio is `recording_urls[i]`, the text is `affirmations[i]`.
 
-An unfinished recording is kept in IndexedDB (`js/draft-store.js`) until the
-subliminal is saved or the draft is discarded.
+An unfinished recording is kept on the device (see "Recording and saving" below)
+until the subliminal is saved or the draft is discarded.
 
 ## Limits
 
-`AffirmationKit.AFFIRMATION_LIMITS`: Record Your Own Voice 20; Serenity 10;
-Clone Your Voice 10. The review step allows up to 20 lines; the voice screen
-holds Continue (never deletes) when the chosen voice carries fewer.
+`AffirmationKit.AFFIRMATION_LIMITS`: Record Your Own Voice **100**; Serenity 10;
+Clone Your Voice 10. `MAX_AFFIRMATIONS` (100) is the most the review step, the
+paste/upload import and the recording manager will hold; `MIN_AFFIRMATIONS` (5)
+is the fewest. The count picker on the first screen offers 5 / 10 / 20 / 50 / 100
+and a custom number (`AffirmationKit.clampCount`, 5-100).
+
+The voice screen holds Continue (never deletes) when the chosen voice carries
+fewer lines than there are. The cost rule is enforced at three doors, none of
+which Record Your Own Voice touches:
+
+1. the voice screen (`voiceLimitProblem`) - Serenity/Clone with more than 10 lines
+   cannot continue, and nothing is removed;
+2. `ttsRequest` in `js/builder.js` - refuses to send a request to `/api/tts` while
+   the list is longer than the AI limit, so a reopened subliminal, a changed voice
+   or a stale tab cannot reach the provider with a long list;
+3. `/api/tts` itself - unchanged (25 lines per request, per-user hourly/daily
+   ceilings).
+
+`/api/generate-affirmations` writes up to 100 lines of *text*. That is a few
+thousand tokens from the text model; no voice is generated until a voice is
+chosen and the person plays or builds it.
+
+## Recording and saving
+
+Each take is its own file and its own small record; nothing is ever rewritten as
+a whole.
+
+- **Recording UI** (`js/builder.js`, step 6): hold-to-record (the original) or
+  tap-to-record with Pause / Resume / Cancel. Pause time is excluded from the
+  take's length. A numbered, scrollable list shows every line with Record /
+  Re-record, Play / Stop, Remove recording (keeps the words), Edit, move, Delete;
+  Go to line, Next unrecorded, and a "Recording N of M" counter with a progress
+  bar. A microphone refusal, a recorder error or a cancelled take change nothing
+  else.
+- **On the device** (`js/draft-store.js`, IndexedDB): a small `draft:<owner>`
+  record (words, order, settings, `takeIds`) plus one `take:<owner>:<id>` record
+  per take. A take is written once; line 90 is one small write. The previous
+  single-record layout is still read and is upgraded the first time it is saved.
+- **In the account** (`js/take-sync.js`): each take is uploaded to the private
+  `recordings` bucket as it is made, to `<userId>/takes/<takeId>.<ext>`. The path
+  is derived from the take's own id, so a take can only ever be one object; a
+  retry after a lost response gets "already exists", which is treated as success.
+  A pool of 3 uploads, 3 retries with back-off, retried again when the connection
+  returns or the page becomes visible, and once more at Save. A failed upload is
+  shown on its row and never stops recording.
+- **Save** writes only the list of paths (`recording_urls`). If any take could not
+  be uploaded, nothing is written (so an existing subliminal can never be saved
+  over with holes in its list) and pressing Save again sends only what is
+  missing. Saving twice at once writes one row. Saving over a subliminal whose
+  recordings did not all download is refused.
+- **Nothing existing is removed.** Files that belong to a saved subliminal are
+  `committed` and are never deleted. The only deletions from the app are uploads
+  that never became part of a saved subliminal (a replaced or removed take, a
+  discarded draft), and `removeUnreferencedRecordings` checks every one against
+  the person's subliminals first and deletes nothing if that list cannot be read.
+- **Loading** (`fetchSavedTakes` in `js/profile.js`): one signing request for all
+  paths, downloads six at a time. A path that is `null` is "never recorded"; a
+  failed download is counted as an error, never confused with that.
+
+## Playback memory
+
+A hundred decoded takes held for a whole session is about a hundred seconds of
+uncompressed audio. Past `CLIP_WINDOW_OVER` (24) recorded lines only the line
+being spoken and the next are held decoded (`keepClipsNear`); the next is decoded
+ahead of its turn so the gap between lines is unchanged. Lists of 24 or fewer
+behave exactly as before. Stopping gives the decoded audio back.
+
+## Tests
+
+`npm run test:unit` includes `test:affirmations` (limits, count presets, custom
+clamp) and `test:take-sync` (one object per take, joined duplicate uploads, a
+pool of 3 over 100 takes, retries, lost-response safety, only uncommitted uploads
+removed). `npm run test:layers-lyrics` and `npm run test:own-voice-100` are
+browser tests (serve the repo on :8123 first): the latter records, refreshes,
+edits, saves, reopens, re-records and plays a complete 100-affirmation subliminal.

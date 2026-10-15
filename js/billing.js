@@ -602,32 +602,54 @@ async function getMySubscriberRow(){
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
 
-/* Uploads whichever takes are new and keeps the storage path of every take
-   that was already saved, so saving a reopened subliminal never re-uploads —
-   let alone re-records — a voice that has not changed. */
+/* Makes sure every take is in storage, and returns the storage path of each.
+
+   Takes recorded in this session are normally in storage already: they were sent
+   one by one as they were made (js/take-sync.js), so this mostly finds a path on
+   every take and has nothing to upload. Anything that is not there yet -- a
+   second voice layer, a take whose upload was still running or had failed, a
+   draft recorded while signed out -- is sent now, a few at a time, and an
+   upload that is already in flight is joined rather than started again. Takes
+   that were already saved keep their path, so saving a reopened subliminal never
+   re-uploads, let alone re-records, a voice that has not changed.
+
+   `failed` counts takes that could not be put in storage. Saving with any of
+   them missing would write a list with holes in it, so the caller stops and
+   says so instead; the recordings stay on the device and in memory. */
 async function uploadVoiceTakes(takes, folder, label){
+  takeSync.setFolder(`${currentUser.id}/takes`);
+  const pending = takes.map(t => (t && t.blob && !t.path) ? takeSync.enqueue(t) : null);
+  await Promise.all(pending.filter(Boolean));
   const paths = [];
-  let anyUploaded = false, anySaved = false;
-  for (let i = 0; i < takes.length; i++){
-    const take = takes[i];
-    if (!take || !take.blob){ paths.push(null); continue; }
-    if (take.path){ paths.push(take.path); anySaved = true; continue; }
-    const mime = take.blob.type || 'audio/webm';
-    const path = `${folder}/${i}.${extForMime(mime)}`;
-    const { error: upErr } = await sb.storage.from('recordings').upload(path, take.blob, { contentType: mime });
-    if (upErr){ console.error(label + ' upload failed for line', i, upErr); paths.push(null); continue; }
-    take.path = path; // store the storage path; we generate a signed URL when loading it back
-    paths.push(path);
-    anyUploaded = true;
-  }
-  return { paths, ok: anyUploaded || anySaved };
+  let anySaved = false, failed = 0, firstError = '';
+  takes.forEach((take, i) => {
+    if (!take || !take.blob){ paths.push(take && take.path ? take.path : null); if (take && take.path) anySaved = true; return; }
+    if (take.path){ paths.push(take.path); anySaved = true; return; }
+    failed++; paths.push(null);
+    if (!firstError) firstError = take.syncError || 'upload failed';
+    console.error(label + ' upload failed for line', i, take.syncError);
+  });
+  return { paths, ok: anySaved && !failed, failed, firstError };
+}
+/* After the row is written, every take it points at belongs to a saved
+   subliminal and is never removed as a leftover. */
+function markTakesCommitted(takes){
+  (takes || []).forEach(t => { if (t && t.path) t.committed = true; });
 }
 
 /* Saving. A fresh build is inserted. A subliminal that is already saved — just
    saved, or reopened from the library — is UPDATED in place: same row, same
    title unless it was changed here, same voice files. Only `{ asNew: true }`
    (the "Save as new" button) makes a second row. */
+let saveSubliminalBusy = false;
 async function saveSubliminal(opts){
+  /* Pressing Save twice while the first is still working must not write two rows. */
+  if (saveSubliminalBusy) return;
+  saveSubliminalBusy = true;
+  try { return await saveSubliminalNow(opts); }
+  finally { saveSubliminalBusy = false; }
+}
+async function saveSubliminalNow(opts){
   const asNew = !!(opts && opts.asNew);
   const updatingId = asNew ? null : editingExistingId;
   const msg = document.getElementById('saveMsg');
@@ -680,15 +702,32 @@ async function saveSubliminal(opts){
     }
   }
 
+  /* Some of this subliminal's saved recordings did not download when it was
+     opened (see recordingLoadErrors). Writing the list back now would replace
+     the saved paths with gaps. The saved version is left exactly as it is: open
+     it again, or keep these changes as a new copy. */
+  if (updatingId && state.voiceMode === 'own' && recordingLoadErrors.length){
+    msg.textContent = `${recordingLoadErrors.length} of this subliminal's saved recordings didn't download, so saving over it could lose them. Nothing has been changed. Open it again once you're back online, or use “Save as new” to keep these changes as a copy.`;
+    msg.className = 'save-msg err';
+    return;
+  }
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
 
   let recordingUrls = null;
-  let recordingUploadFailed = false;
   if (state.voiceMode === 'own' && recordings.some(r => r)){
     msg.textContent = 'Uploading your voice…'; msg.className = 'save-msg';
     const takes = await uploadVoiceTakes(recordings, `${currentUser.id}/${Date.now()}`, 'recording');
+    if (takes.failed){
+      /* Nothing is written. A list with a hole in it, saved over an existing
+         subliminal, would be a recording lost -- so the save waits, the takes
+         stay exactly where they are, and pressing Save again sends only what is
+         missing. */
+      msg.textContent = `${takes.failed} of your recordings couldn't be sent to your account just now (${takes.firstError}). Nothing was lost and nothing was saved over — check your connection and press Save again.`;
+      msg.className = 'save-msg err';
+      if (typeof scheduleRecordRepaint === 'function') scheduleRecordRepaint();
+      return;
+    }
     recordingUrls = takes.paths;
-    if (!takes.ok) recordingUploadFailed = true;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
@@ -709,7 +748,13 @@ async function saveSubliminal(opts){
   let layerRecordingUrls = null;
   if (layerVoiceEnabled && state.layerVoiceMode === 'own' && layerRecordings.some(r => r)){
     msg.textContent = 'Uploading your second voice layer…'; msg.className = 'save-msg';
-    layerRecordingUrls = (await uploadVoiceTakes(layerRecordings, `${currentUser.id}/${Date.now()}-layer`, 'layer recording')).paths;
+    const layerTakes = await uploadVoiceTakes(layerRecordings, `${currentUser.id}/${Date.now()}-layer`, 'layer recording');
+    if (layerTakes.failed){
+      msg.textContent = `${layerTakes.failed} of your second-voice recordings couldn't be sent just now (${layerTakes.firstError}). Nothing was lost and nothing was saved over — check your connection and press Save again.`;
+      msg.className = 'save-msg err';
+      return;
+    }
+    layerRecordingUrls = layerTakes.paths;
     msg.textContent = 'Saving…'; msg.className = 'save-msg';
   }
 
@@ -744,15 +789,12 @@ async function saveSubliminal(opts){
     msg.className = 'save-msg err';
     return;
   }
-  if (recordingUploadFailed){
-    msg.textContent = 'Saved — but your voice recording failed to upload, so this one will replay with the AI voice. (If this keeps happening, the recordings storage bucket may not be set up yet.)';
-    msg.className = 'save-msg err';
-  } else {
-    msg.textContent = updatingId ? 'Changes saved to this subliminal.'
-      : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
-      : 'Saved to your library.';
-    msg.className = 'save-msg ok';
-  }
+  msg.textContent = updatingId ? 'Changes saved to this subliminal.'
+    : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
+    : 'Saved to your library.';
+  msg.className = 'save-msg ok';
+  // These files belong to a saved subliminal now and are never cleaned up as leftovers.
+  markTakesCommitted(recordings); markTakesCommitted(layerRecordings);
   /* From now on this screen is editing the row just written, so the next save
      updates it instead of making another. */
   const isFirstSave = !updatingId && !asNew;

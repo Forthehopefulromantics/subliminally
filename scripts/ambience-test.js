@@ -305,7 +305,7 @@ vm.runInContext(`
   var MediaRecorder = undefined;
 `, ctx);
 
-for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/ambience.js', 'js/builder.js'])
+for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/take-sync.js', 'js/ambience.js', 'js/builder.js'])
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 
 /* Speech is stubbed out AFTER builder.js, because builder.js declares these

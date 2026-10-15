@@ -1,4 +1,4 @@
-export const config = { api: { bodyParser: true } };
+export const config = { api: { bodyParser: true }, maxDuration: 60 };
 
 import { applyCors } from '../lib/cors.js';
 import { faithFraming } from '../lib/faith-language.js';
@@ -30,9 +30,13 @@ export default async function handler(req, res) {
   }
 
   const { count, freqLabel, toneLabel, goal, faith, faithWord, intensity } = req.body || {};
-  // Standard subliminals contain at most ten affirmations. EFT keeps its own
-  // separate 11-line structure and never calls this route.
-  const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 5), 10);
+  /* A standard subliminal holds five to one hundred lines. Only Record Your Own
+     Voice can read more than ten (Serenity and Clone Your Voice stay at ten, and
+     the voice screen holds anyone who picks one with more), so this route is
+     text only: writing a hundred lines costs a few thousand tokens and never
+     touches the voice provider. EFT keeps its own separate 11-line structure
+     and never calls this route. */
+  const safeCount = Math.min(Math.max(parseInt(count, 10) || 5, 5), 100);
   /* Their saved answer in Settings, as framing rather than a word list. Null
      when they have not answered or the answer is not one we know, and then the
      section is left out rather than filled with a guess. */
@@ -47,7 +51,7 @@ Desired voice/tone: ${toneLabel || 'warm'}
 What the person said they want help with: "${goal || 'not specified'}"
 ${intensityGuidance}
 Rules: each line under 12 words, first person, present tense, no medical claims, no "cure"/"heal disease"/"rewire your DNA"/"guaranteed". Reflect their goal naturally without quoting it verbatim. Avoid generic statements like "I am worthy" or "I am confident" — be specific and vivid instead. Vary sentence structure and starters — don't begin every line with "I am".
-Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.${framing ? '\n\n' + framing : ''}`;
+${safeCount > 20 ? `Every one of the ${safeCount} lines must be different from the others in wording and angle: cover many facets of what they asked for, and never repeat a line.\n` : ''}Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, no code fences.${framing ? '\n\n' + framing : ''}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -59,7 +63,8 @@ Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, 
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1200,
+        // About 25 tokens a line, with room to spare; 1200 was sized for ten.
+        max_tokens: Math.max(1200, safeCount * 60 + 200),
         messages: [{ role: 'user', content: prompt }],
       }),
     });
@@ -81,7 +86,21 @@ Return ONLY a raw JSON array of ${safeCount} strings. No markdown, no preamble, 
       return;
     }
 
-    res.status(200).json({ affirmations: parsed.filter((x) => typeof x === 'string') });
+    /* Lines come back trimmed, non-empty and without exact repeats, and never more
+       than were asked for. A model asked for a hundred will occasionally say the
+       same thing twice; the person should not have to record it twice. */
+    const seen = new Set();
+    const affirmations = [];
+    for (const x of parsed) {
+      if (typeof x !== 'string') continue;
+      const line = x.trim();
+      const key = line.toLowerCase().replace(/\s+/g, ' ');
+      if (!line || seen.has(key)) continue;
+      seen.add(key);
+      affirmations.push(line);
+      if (affirmations.length >= safeCount) break;
+    }
+    res.status(200).json({ affirmations });
   } catch (err) {
     console.error('generate-affirmations error:', err);
     res.status(500).json({ error: 'Something went wrong generating affirmations.' });
