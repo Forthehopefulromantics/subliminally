@@ -27,7 +27,8 @@ what the frequency-layer / lyrics-list work added. Code lives in `js/builder.js`
 | Nature / meditation ambience | `AmbienceBed` (`js/ambience.js`) | unchanged |
 | Soothing pad, custom track | `restartSoothingLayer`, `startCustomTrackPlayback` | unchanged |
 | Affirmation voice | `playClip` / device speech | reports `lineStarted` / `lineEnded` to the timeline |
-| Second (layered) voice | `runLayerSequence` | never reports lines, so it can never be highlighted |
+| Second (layered) voice | `runLayerSequence` | Ritual-only, separate from affirmation layering below; never reports lines, so it can never be highlighted |
+| Affirmation layers 2-4 | `VoiceLayerEngine` (`js/voice-layers.js`) | read the same recordings as layer 1; see "Affirmation layering" |
 
 ## What the audit found (and what was done)
 
@@ -141,3 +142,49 @@ pool of 3 over 100 takes, retries, lost-response safety, only uncommitted upload
 removed). `npm run test:layers-lyrics` and `npm run test:own-voice-100` are
 browser tests (serve the repo on :8123 first): the latter records, refreshes,
 edits, saves, reopens, re-records and plays a complete 100-affirmation subliminal.
+
+
+## Affirmation layering (`js/voice-layers.js`, `js/voice-layers-ui.js`)
+
+Up to four voices read the subliminal's own recordings at once, on every plan.
+
+- **A layer is a list of indices**, never audio. Line 7 is one recording/one decoded
+  clip whichever layer plays it; nothing is re-recorded, regenerated or rendered.
+  `distribute(total, layers)` splits contiguously and evenly (100/4 = 1-25, 26-50,
+  51-75, 76-100; 10/4 = 3,3,2,2). Manual edits (Advanced) are a validated
+  `groups` array: every line exactly once, no layer empty, else the automatic split.
+- **Layer 1 is the existing sequence** (`runSequence`), now walking its own group via
+  `mainVoiceCursor()`. It still owns the timeline, pause, seek, EFT repeats and the
+  end of the session, so the lit lyric line is always the main voice. **Layers 2-4**
+  run in `VoiceLayerEngine`: one gain node and one timer chain each, looping their own
+  group in order, started at `0 / gap / 2*gap / 3*gap` (staggered, default 3 s,
+  configurable 2-4 s) or all at 0 (simultaneous).
+- **Gain management.** Every voice feeds one *voice bus* (`ctx.__voiceBus`) ->
+  `DynamicsCompressor` -> `audioOut`. The bus gain is `headroom(gains)`: voices add
+  as root-sum-square, and the bus comes down only when that passes 0.9 (1.0 for one
+  layer), so the default 65/40/30/20 is untouched and four voices at 100% are held
+  to 0.45. The compressor is neutral (ratio 1) with one layer and a fast safety
+  limiter (-16 dB, 8:1) when layered; the existing soft limiter is still last.
+  Measured with four 0.95-amplitude layers at 100%: 0.81 at the speaker.
+- **Volumes.** Layer 1's slider *is* the Affirmations fader (`mixVoice`, default 65);
+  layers 2-4 are 40/30/20. Live, per subliminal. Voices, frequencies (`mixTone`),
+  nature (`mixBg`) and background pad/track keep their own faders and their own
+  layering controls (`FrequencyMixer`).
+- **Live changes** (`applyVoiceLayers`) add/remove layers, re-level and re-point lines
+  in place; the main voice resumes at its first line after the one it just finished.
+  The device's built-in voice cannot be layered (one utterance at a time, no gain), so
+  that session falls back to one voice reading every line (`suppressVoiceLayers`).
+- **Time.** The session clock is wall time (`getFinalElapsedMs`), so layers never add
+  minutes: 4 layers x 20 min records 20 min. No plan check is involved anywhere.
+- **Persistence.** `mix_settings.voiceLayers = {count, mode, staggerMs, volumes[4],
+  groups|null}` (volumes[0] mirrors `mixVoice`). No schema change; a row without it
+  opens as one voice, and `restoreMixSettings` replaces it per subliminal.
+- **Cleanup.** `stopFinal` / `finishFinal` stop the engine (timers cancelled, nodes
+  disconnected) before the context closes; layer clips are released as they finish
+  once a list is past `CLIP_WINDOW_OVER`.
+- **Lyrics.** `LyricsList.setLayers/setSecondary` add a small "Voice N" label and a
+  soft glow; they change no size or position and never scroll the list.
+
+Tests: `npm run test:voice-layers` (distribution, config, gain, engine on a fake clock)
+is part of `test:unit`; `npm run test:voice-layers-e2e` (serve on :8123) measures it in
+Chromium on an iPhone profile plus a free desktop account.

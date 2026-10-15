@@ -104,6 +104,29 @@
         this.scrollToActive();
       }
     }
+    /* Which layer reads each line (1-based; 0 = not layered). Layered lines carry
+       a quiet "Voice N" label. This never moves the list. */
+    setLayers(owner) {
+      this.owner = owner || [];
+      const layered = this.owner.some(n => n > 0);
+      this.list.classList.toggle('ip-lyrics-layered', layered);
+      this.items.forEach((li, i) => {
+        const n = this.owner[i] || 0;
+        if (n > 0) { li.dataset.layer = String(n); li.dataset.layerLabel = String(n); } else { delete li.dataset.layer; delete li.dataset.layerLabel; }
+      });
+    }
+    /* The lines the secondary layers are saying right now: { slot: lineIndex }.
+       A soft glow only. The lit line, the announcement and the scroll position
+       belong to the main voice alone, so several simultaneous voices can never
+       tug the list about. */
+    setSecondary(map) {
+      const now = {};
+      Object.keys(map || {}).forEach(slot => { const i = map[slot]; if (Number.isInteger(i) && i >= 0) now[i] = slot; });
+      this.items.forEach((li, i) => {
+        if (now[i]) { li.dataset.secondary = now[i]; li.classList.add('is-secondary'); }
+        else if (li.dataset.secondary) { delete li.dataset.secondary; li.classList.remove('is-secondary'); }
+      });
+    }
     /* Centre line i in the scrolling element. */
     scrollTo(i) {
       const li = this.items[i];
