@@ -208,7 +208,7 @@ function fakeClip(ctx, { seconds = 8, padMs = 26, level = 0.072 } = {}){
   return { buffer: buf, pad, len };
 }
 
-const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange','countVal',
+const IDS = ['flowProgress','intensityCards','freqChips','intentionChips','toneChips','countRange','countVal',
   'eftPointsList','bgGrid','waveform','recBtn','freqGuideText','toStep1','toStep5','quizGoal',
   'sessionLengthSlider','sessionLengthVal','lengthMsg','durationChips','ritualModeChips',
   'ritualModeMsg','eftGuidePanel','visualizationGuidePanel','countRow','sessionLengthRow',
@@ -280,7 +280,7 @@ const ctx = {
   Audio: function(){ this.play = () => Promise.resolve(); this.pause = () => {};
                      this.setAttribute = () => {}; this.addEventListener = () => {}; },
 };
-ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx;
+ctx.window = ctx; ctx.globalThis = ctx; ctx.self = ctx; ctx.addEventListener = () => {};
 vm.createContext(ctx);
 
 vm.runInContext(`
@@ -305,7 +305,7 @@ vm.runInContext(`
   var MediaRecorder = undefined;
 `, ctx);
 
-for (const f of ['js/selectable.js', 'js/ambience.js', 'js/builder.js'])
+for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/ambience.js', 'js/builder.js'])
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 
 /* Speech is stubbed out AFTER builder.js, because builder.js declares these

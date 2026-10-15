@@ -28,7 +28,7 @@ const AE_SOOTHING = [['none','None'],['pad','Warm pad'],['chimes','Soft chimes']
 /* Everything this sheet can change, as one comparable value. */
 function audioLayerSnapshot(){
   return {
-    freqHz: state.freq ? state.freq.hz : null,
+    freqLayers: FrequencyLayers.serializeFrequencyLayers(state.freqLayers),
     band: state.binauralBand || null,
     bg: state.bg || 'none',
     bgLayer: state.bgLayer || 'none',
@@ -40,7 +40,7 @@ function audioLayerSnapshot(){
    recordings, title and cover are deliberately absent. */
 function savedAudioPayload(){
   return {
-    frequency_hz: state.freq ? state.freq.hz : null,
+    frequency_hz: state.freq ? state.freq.hz : null,   // the first layer; the whole stack is in mix_settings
     binaural_band: state.binauralBand || null,
     background: state.bg || 'none',
     mix_settings: readMixSettings()
@@ -135,10 +135,9 @@ function renderAudioEditor(){
       </div>
     </section>
     <section class="ae-section">
-      <h4>Frequency</h4>
-      <div class="ae-grid" id="aeFreqs" role="radiogroup" aria-label="Frequency">
-        ${FREQS.map(f => `<button type="button" class="ae-card" role="radio" data-hz="${f.hz}" onclick="aeChooseFreq(${f.hz})"><b>${f.hz} Hz</b><small>${escapeAe(f.word)}</small></button>`).join('')}
-      </div>
+      <h4>Frequencies</h4><p class="ae-hint">Layer up to four tones. Tap one to add it, tap it again to take it off, and set each one's level.</p>
+      <div class="ae-grid" id="aeFreqs" data-fl-chips="ae-card" role="group" aria-label="Frequencies (choose up to four)"></div>
+      <div class="fl-tray" data-fl-panel aria-label="Your chosen frequencies and their volumes"></div>
     </section>
     <section class="ae-section">
       <h4>Nature &amp; ambience</h4><p class="ae-hint">One meditation sound and one nature sound can play together. Tap a chosen sound again to take it off.</p>
@@ -157,6 +156,7 @@ function renderAudioEditor(){
       <h4>Volume mix</h4><p class="ae-hint">Voice, frequency, ambience and every other layer, each on its own.</p>
       <div class="listening-mix ae-mix">${listeningMixMarkup()}</div>
     </section>`;
+  paintFrequencyUi();
   paintAudioEditor();
 }
 function escapeAe(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -166,7 +166,6 @@ function escapeAe(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => 
 function paintAudioEditor(){
   if (!document.getElementById('aeBody')) return;
   syncSelectionByData('#aeBands .ae-chip', 'band', state.binauralBand || 'none');
-  syncSelection('#aeFreqs .ae-card', el => !!state.freq && el.dataset.hz === String(state.freq.hz));
   const chosen = [state.bg, state.bgLayer].filter(k => k && k !== 'none');
   syncSelectionByDataIn('#aeAmbience .ae-card', 'key', chosen.length ? chosen : ['none']);
   syncSelectionByData('#aeSoothing .ae-chip', 'variant', state.soothingLayer || 'none');
@@ -189,12 +188,6 @@ function aeChooseBand(band){
   state.binauralBand = band === 'none' ? null : band;
   syncSelectionByData('#binauralChips .length-chip', 'band', state.binauralBand || 'none');
   changeFinalBrainwave(prev);
-  paintAudioEditor();
-}
-function aeChooseFreq(hz){
-  changeFinalFrequency(String(hz));
-  renderFinalFreqPicker();
-  if (typeof paintFreqCards === 'function') paintFreqCards();
   paintAudioEditor();
 }
 function aeChooseAmbience(key){
@@ -235,8 +228,7 @@ function previewAudioEdits(){
    closed without saving. */
 function restoreAudioLayers(snap){
   if (!snap) return;
-  const freq = FREQS.find(f => f.hz === snap.freqHz) || null;
-  if (freq) changeFinalFrequency(String(freq.hz)); else state.freq = null;
+  setFrequencyLayers(snap.freqLayers, { silent:true });
   renderFinalFreqPicker();
   const prevBand = state.binauralBand || null;
   state.binauralBand = snap.band;

@@ -20,7 +20,7 @@
 /* ---------- the shell, on a phone in the dark ---------- */
 .ip-shell{ box-sizing:border-box; grid-template-rows:auto minmax(120px,1fr) auto; }
 .ip-hero{ min-height:120px; }
-.ip-lower{ max-height:64dvh; overflow-y:auto; padding-bottom:4px; }
+.ip-lower{ max-height:46dvh; overflow-y:auto; padding-bottom:4px; }
 
 /* ---------- cover art, chosen from the player ----------
    The artwork is the button. A cover is a picture you press, not a row of text
@@ -149,11 +149,9 @@ body.player-open .now-bar{ display:none!important; }
 @media (max-height:650px){
   .ip-shell{ gap:6px; padding-top:6px; }
   .ip-lower{ gap:6px; }
-  .ip-affirmation{ font-size:26px; }
   .ip-main-play{ width:64px; height:64px; }
 }
 @media (prefers-reduced-motion:reduce){
-  .ip-affirmation{ transition:none; }
   .ip-cloud{ animation:none; }
   .ip-main-play,.ip-control,.ip-cover{ transition:none; }
 }

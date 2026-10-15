@@ -114,7 +114,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+let state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 /* Three phases rather than eight bars: choosing everything (frequency through
    ambience), recording it, and hearing it. The line after the current phase
@@ -163,6 +163,7 @@ function showStep(n){
      the Serenity one can play — are drawn as the step opens rather than as a
      side effect of picking something. */
   if (n === 4){
+    paintVoiceLimitNote();
     /* Draw what is chosen before anything is awaited, so coming back to this
        screen never shows three blank cards for a beat. */
     paintVoiceCards();
@@ -185,7 +186,8 @@ function showStep(n){
     pendingRitualMode = null;
     if (chip) pickRitualMode(chip);
   }
-  if (n === 7){ renderFinalFreqPicker(); renderFinalAmbiencePicker(); }
+  if (n === 7){ renderFinalFreqPicker(); renderFinalAmbiencePicker(); renderFinalPlaylist(); }
+  if (n === 0) checkRecordingDraft();
 }
 /* The session-length slider runs from 5 minutes to 8 hours with no restriction on
    dragging — nothing is gated until they try to actually generate/save a session
@@ -315,6 +317,12 @@ function affirmationShortfall(){
   return Math.max(0, MIN_AFFIRMATIONS - have);
 }
 function nextStep(serenityCleared){
+  /* Before any plan check: a voice that cannot carry this many lines is a
+     reason to stop, not something to pay for first. The lines are left alone. */
+  if (step === 4){
+    const problem = voiceLimitProblem();
+    if (problem){ sayInVoicePicker(''); paintVoiceLimitNote(); return; }
+  }
   if (step === 4 && serenityCleared !== true && selectedVoiceFromState() === VOICE_SERENITY){
     serenityAllowedToContinue().then(ok => { if (ok && step === 4) nextStep(true); });
     return;
@@ -355,7 +363,7 @@ function nextStep(serenityCleared){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   affirmationMode = 'generate';
   affirmationGenerateCount = 5;
   /* Clearing through the one helper rather than stripping the class by hand:
@@ -365,6 +373,8 @@ function resetFlow(){
      undefined after a reset, so a second build generated with no intensity at
      all and none of the three cards was lit. */
   paintIntensityCards();
+  paintFrequencyUi();
+  frequencyNote('');
   forgetVoiceChoice();
   paintVoiceCards();
   document.getElementById('quizGoal').value='';
@@ -432,29 +442,190 @@ function resetFlow(){
   showStep(0);
 }
 
-/* ---- step 0: frequency ---- */
+/* ---- step 0: frequency ----
+   Up to four tones can be layered. The answer is state.freqLayers -- an ordered
+   list of { hz, vol } -- and state.freq stays what it always was, the first of
+   them, because the saved row's frequency_hz column, the title and the older
+   screens read that. Every card, chip and slider on every screen is drawn from
+   the list (paintFrequencyUi), never from the tap that changed it. */
+const FREQ_HZ_LIST = FREQS.map(f => f.hz);
 const freqChips = document.getElementById('freqChips');
-/* Which frequency is lit, derived from state.freq. Tapping writes the answer and
-   then calls this -- rather than painting the tapped card and hoping nothing
-   ever redraws the list, which is how a chosen frequency used to vanish when
-   you came back to step 0 from step 1. */
+function frequencyByHz(hz){ return FREQS.find(f => f.hz === hz) || null; }
+/* Which cards are lit, derived from state.freqLayers. */
 function paintFreqCards(){
-  syncSelection('#freqChips .freq-card3', el => !!state.freq && el.dataset.hz === String(state.freq.hz));
+  const chosen = new Set((state.freqLayers || []).map(l => String(l.hz)));
+  const full = chosen.size >= FrequencyLayers.MAX_FREQUENCY_LAYERS;
+  syncSelection('#freqChips .freq-card3', el => chosen.has(el.dataset.hz));
+  document.querySelectorAll('#freqChips .freq-card3').forEach(el => {
+    const on = chosen.has(el.dataset.hz);
+    const badge = el.querySelector('.fc-order');
+    const idx = (state.freqLayers || []).findIndex(l => String(l.hz) === el.dataset.hz);
+    if (badge) badge.textContent = on ? String(idx + 1) : '';
+    // A fifth tone is refused with a message, so the card says so as well.
+    el.setAttribute('aria-disabled', (!on && full) ? 'true' : 'false');
+    el.classList.toggle('fc-locked', !on && full);
+  });
 }
 FREQS.forEach(f=>{
   const c = document.createElement('button'); c.className='freq-card3';
+  c.type = 'button';
   c.dataset.hz = f.hz;
-  c.setAttribute('role', 'radio');
-  c.innerHTML = `<div class="hz">${f.hz} Hz</div><div class="word">${f.word}</div>`;
-  c.onclick = ()=>{
-    state.freq = f;
-    paintFreqCards();
-    document.getElementById('freqGuideText').textContent = '"'+f.guide+'"';
-    document.getElementById('toStep1').disabled = false;
-  };
+  c.setAttribute('role', 'checkbox');
+  c.setAttribute('aria-checked', 'false');
+  c.innerHTML = `<span class="fc-order" aria-hidden="true"></span><div class="hz">${f.hz} Hz</div><div class="word">${f.word}</div>`;
+  c.onclick = ()=>{ toggleFrequency(f.hz, { source:'builder' }); };
   freqChips.appendChild(c);
 });
 paintFreqCards();
+
+/* ---- the frequency layers: one model, every screen ---- */
+const frequencyMixer = new FrequencyLayers.FrequencyMixer();
+function frequencyLayerList(){ return Array.isArray(state.freqLayers) ? state.freqLayers : []; }
+function frequencyLabel(){
+  const layers = frequencyLayerList();
+  if (!layers.length) return 'none';
+  return layers.map(l => { const f = frequencyByHz(l.hz); return f ? `${f.hz} Hz, ${f.word}` : `${l.hz} Hz`; }).join(' + ');
+}
+/* "528 Hz · renewal", or "528 + 432 Hz · renewal + harmony" for a stack. */
+function frequencyTitle(){
+  const layers = frequencyLayerList();
+  if (!layers.length) return '';
+  const words = layers.map(l => (frequencyByHz(l.hz) || {}).word).filter(Boolean);
+  return `${layers.map(l => l.hz).join(' + ')} Hz · ${words.join(' + ')}`;
+}
+function frequencyNote(msg){
+  document.querySelectorAll('[data-fl-note]').forEach(el => { el.textContent = msg || ''; });
+}
+/* The single place the layer list is written. It keeps state.freq in step with
+   it, redraws every screen that shows it, hands the change to the live engine
+   (which fades, never jumps) and queues the save for a subliminal that has one. */
+function setFrequencyLayers(layers, opts){
+  const o = opts || {};
+  state.freqLayers = FrequencyLayers.normalizeFrequencyLayers(layers, FREQ_HZ_LIST);
+  state.freq = state.freqLayers.length ? frequencyByHz(state.freqLayers[0].hz) : null;
+  const next = document.getElementById('toStep1');
+  if (next) next.disabled = !state.freqLayers.length;
+  paintFrequencyUi();
+  applyFrequencyToEngine();
+  const title = document.getElementById('finalTitle');
+  if (title) title.textContent = frequencyTitle();
+  if (!o.silent && typeof queueMixSave === 'function') queueMixSave();
+  if (typeof renderPlayerSelectionState === 'function') renderPlayerSelectionState();
+  if (typeof paintAudioEditor === 'function') paintAudioEditor();
+}
+function toggleFrequency(hz, opts){
+  const r = FrequencyLayers.toggleFrequencyLayer(frequencyLayerList(), hz);
+  if (!r.changed){
+    frequencyNote(`You can layer up to ${FrequencyLayers.MAX_FREQUENCY_LAYERS} frequencies. Remove one to add ${hz} Hz.`);
+    return false;
+  }
+  frequencyNote('');
+  const f = frequencyByHz(hz);
+  if (r.action === 'added' && f){
+    const guide = document.getElementById('freqGuideText');
+    if (guide) guide.textContent = '"' + f.guide + '"';
+  }
+  setFrequencyLayers(r.layers, opts);
+  return true;
+}
+function removeFrequency(hz){
+  frequencyNote('');
+  setFrequencyLayers(FrequencyLayers.removeFrequencyLayer(frequencyLayerList(), hz));
+}
+function setFrequencyVolume(hz, vol){
+  state.freqLayers = FrequencyLayers.setFrequencyLayerVolume(frequencyLayerList(), hz, vol);
+  /* Move the readout and the warning in place. Rebuilding the rows here would
+     tear down the slider that is being dragged. */
+  const v = FrequencyLayers.normalizeFrequencyLayers(state.freqLayers).find(l => l.hz === hz);
+  document.querySelectorAll(`[data-fl-vol="${hz}"]`).forEach(el => {
+    if (document.activeElement !== el || el.value !== String(v.vol)) el.value = v.vol;
+    el.setAttribute('aria-valuetext', v.vol + ' percent');
+  });
+  document.querySelectorAll(`[data-fl-out="${hz}"]`).forEach(el => { el.textContent = v.vol + '%'; });
+  paintFrequencyWarnings();
+  applyFrequencyToEngine();
+  if (typeof queueMixSave === 'function') queueMixSave();
+  if (typeof paintAudioEditor === 'function') paintAudioEditor();
+}
+function frequencyMixInputs(){
+  const num = id => { const el = document.getElementById(id); return el ? Number(el.value) : undefined; };
+  return { master: num('mixTone'), voice: num('mixVoice') };
+}
+function paintFrequencyWarnings(){
+  const warns = FrequencyLayers.assessFrequencyMix(frequencyLayerList(), frequencyMixInputs());
+  document.querySelectorAll('[data-fl-warn]').forEach(el => {
+    const text = warns.map(w => w.message).join(' ');
+    el.textContent = text;
+    el.hidden = !text;
+  });
+  return warns;
+}
+function frequencyRowsMarkup(){
+  const layers = frequencyLayerList();
+  if (!layers.length) return '<p class="fl-empty">No frequency chosen yet.</p>';
+  return `<ul class="fl-list" aria-label="Chosen frequencies">${layers.map(l => {
+    const f = frequencyByHz(l.hz) || { hz:l.hz, word:'' };
+    return `<li class="fl-row" data-hz="${l.hz}">
+      <span class="fl-name"><b>${f.hz} Hz</b><small>${f.word}</small></span>
+      <input type="range" min="0" max="100" value="${l.vol}" data-fl-vol="${l.hz}" aria-label="${f.hz} Hz volume" aria-valuetext="${l.vol} percent"
+             oninput="setFrequencyVolume(${l.hz}, this.value)">
+      <output data-fl-out="${l.hz}" aria-hidden="true">${l.vol}%</output>
+      <button type="button" class="fl-remove" onclick="removeFrequency(${l.hz})" aria-label="Remove ${f.hz} Hz">&times;</button>
+    </li>`;
+  }).join('')}</ul>`;
+}
+/* Draws every frequency tray on the page. A tray is any element carrying
+   data-fl-panel. The rows are rebuilt only when the chosen set changed. */
+function paintFrequencyUi(){
+  const layers = frequencyLayerList();
+  const signature = layers.map(l => l.hz).join(',');
+  document.querySelectorAll('[data-fl-panel]').forEach(panel => {
+    if (panel.dataset.flSig !== signature){
+      panel.dataset.flSig = signature;
+      panel.innerHTML = `<div class="fl-rows">${frequencyRowsMarkup()}</div>
+        <p class="fl-count" role="status">${layers.length} of ${FrequencyLayers.MAX_FREQUENCY_LAYERS} frequencies</p>
+        <p class="fl-note" data-fl-note role="status"></p>
+        <p class="fl-warn" data-fl-warn role="status" hidden></p>`;
+    } else {
+      panel.querySelectorAll('[data-fl-vol]').forEach(el => {
+        const l = layers.find(x => String(x.hz) === el.dataset.flVol);
+        if (l && document.activeElement !== el) el.value = l.vol;
+      });
+      panel.querySelectorAll('[data-fl-out]').forEach(el => {
+        const l = layers.find(x => String(x.hz) === el.dataset.flOut);
+        if (l) el.textContent = l.vol + '%';
+      });
+      const count = panel.querySelector('.fl-count');
+      if (count) count.textContent = `${layers.length} of ${FrequencyLayers.MAX_FREQUENCY_LAYERS} frequencies`;
+    }
+  });
+  const chosen = new Set(layers.map(l => String(l.hz)));
+  const full = layers.length >= FrequencyLayers.MAX_FREQUENCY_LAYERS;
+  document.querySelectorAll('[data-fl-chips]').forEach(box => {
+    if (!box.dataset.flBuilt){
+      box.dataset.flBuilt = '1';
+      const cls = box.dataset.flChips || 'fl-chip';
+      box.innerHTML = FREQS.map(f => `<button type="button" class="${cls}" role="checkbox" aria-checked="false" data-hz="${f.hz}" onclick="toggleFrequency(${f.hz})"><b>${f.hz} Hz</b><small>${f.word}</small></button>`).join('');
+    }
+    const btns = box.querySelectorAll('button');
+    syncSelection(btns, el => chosen.has(el.dataset.hz));
+    btns.forEach(el => el.setAttribute('aria-disabled', (!chosen.has(el.dataset.hz) && full) ? 'true' : 'false'));
+  });
+  paintFreqCards();
+  paintFrequencyWarnings();
+  const sel = document.getElementById('finalFreqPicker');
+  if (sel) sel.style.display = layers.length ? 'block' : 'none';
+  if (typeof syncListeningMix === 'function') syncListeningMix();
+}
+/* The live engine follows the list. Called on every change and a no-op while
+   nothing is playing (Play builds the tones from the same list). */
+function applyFrequencyToEngine(){
+  if (!finalPlaying || !frequencyMixer.attached) return;
+  frequencyMixer.sync(state.freqLayers, { band: currentBinauralBand() });
+}
+function currentBinauralBand(){
+  return state.binauralBand && BINAURAL_BANDS[state.binauralBand] ? { hz: BINAURAL_BANDS[state.binauralBand].hz } : null;
+}
 
 /* ---- step 1: quiz ---- */
 const intentionChips = document.getElementById('intentionChips');
@@ -752,7 +923,7 @@ function faithForGenerator(){
 }
 async function callClaudeForAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
-  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const freqLabel = state.freq ? frequencyLabel() : 'none';
   const response = await fetch(API_BASE + "/api/generate-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -769,7 +940,7 @@ async function callClaudeForAffirmations(){
    touches /api/generate-affirmations, which the regular flow still uses untouched. */
 async function callClaudeForEftAffirmations(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
-  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const freqLabel = state.freq ? frequencyLabel() : 'none';
   const response = await fetch(API_BASE + "/api/generate-eft-affirmations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -857,7 +1028,7 @@ function eftLinesFrom(parts){
    whatever comes back here is just raw material for them to rewrite. */
 async function callClaudeForVisualizationScript(){
   const toneLabel = {gentle:"gentle and nurturing", bold:"bold and direct", calm:"calm and neutral"}[state.tone] || "warm";
-  const freqLabel = state.freq ? state.freq.hz+' Hz, '+state.freq.word : 'none';
+  const freqLabel = state.freq ? frequencyLabel() : 'none';
   const response = await fetch(API_BASE + "/api/generate-visualization-script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -873,9 +1044,45 @@ function buildVisualizationFallback(){
   return `You are standing right at the edge of it — ${goal}. Take a slow breath in, and notice how steady you feel.\n\nYour body already knows what to do here. Every rep, every rehearsal, every quiet hour you put in is right here with you now, backing you up. You feel calm, focused, and completely ready.\n\nAs it unfolds exactly the way you pictured it, notice how natural it feels. Not forced — just you, doing the thing you were always capable of.\n\nAnd when it's done, you feel that unmistakable click of knowing: this is who you are.`;
 }
 
-/* ---------------- review/edit ---------------- */
+/* ---------------- review/edit ----------------
+   Up to AffirmationKit.MAX_AFFIRMATIONS (20) lines can be written here. Which of
+   them a voice can carry is decided later, on the voice screen: Record Your Own
+   Voice takes all 20, Serenity and Clone Your Voice take 10. Nothing on this
+   screen or the next deletes a line because of the voice picked -- see
+   voiceLimitProblem(). */
+let importTrimNote = '';
+/* Pasted or uploaded text -> lines. A list longer than the most any subliminal
+   holds is cut at that number, and the cut is announced (importTrimNote), not
+   hidden. */
+function importAffirmations(text){
+  const all = parseAffirmationsFromText(text);
+  const max = AffirmationKit.MAX_AFFIRMATIONS;
+  if (all.length > max){
+    importTrimNote = `Your list had ${all.length} lines. The first ${max} were added, because ${max} is the most one subliminal holds. Nothing else was changed.`;
+    return all.slice(0, max);
+  }
+  importTrimNote = '';
+  return all;
+}
+function nonEmptyAffirmationCount(){ return (state.affirmations || []).filter(a => String(a).trim().length > 0).length; }
+function paintAffirmationCount(){
+  const el = document.getElementById('affCount');
+  if (!el) return;
+  const n = state.affirmations.length;
+  const max = AffirmationKit.MAX_AFFIRMATIONS;
+  el.textContent = state.eftMode || state.visualizationMode ? '' : AffirmationKit.countLabel(n, max) + ' affirmations';
+  const hint = document.getElementById('affCountHint');
+  if (hint){
+    hint.textContent = state.eftMode || state.visualizationMode ? '' : (n > AffirmationKit.AFFIRMATION_LIMITS.serenity
+      ? `Record Your Own Voice reads up to ${AffirmationKit.AFFIRMATION_LIMITS.own}. Serenity and Clone Your Voice read up to ${AffirmationKit.AFFIRMATION_LIMITS.serenity}, so with this many you will want your own voice.`
+      : `Up to ${AffirmationKit.AFFIRMATION_LIMITS.own} with Record Your Own Voice, ${AffirmationKit.AFFIRMATION_LIMITS.serenity} with Serenity or Clone Your Voice.`);
+  }
+  const add = document.getElementById('addAffBtn');
+  if (add) add.disabled = n >= max;
+}
 function renderAffList(){
   const list = document.getElementById('affList'); list.innerHTML='';
+  const fixedShape = state.eftMode || state.visualizationMode;
   state.affirmations.forEach((line,i)=>{
     const row = document.createElement('div'); row.className='aff-row';
     if (state.visualizationMode) row.classList.add('aff-row-script');
@@ -886,6 +1093,7 @@ function renderAffList(){
       num.textContent = state.eftMode && EFT_LINE_POINTS[i] ? (i+1)+'. '+EFT_LINE_POINTS[i].label : (i+1)+'.';
     }
     const ta = document.createElement('textarea'); ta.value=line;
+    ta.setAttribute('aria-label', `Affirmation ${i+1}`);
     if (state.visualizationMode){
       ta.rows = 12;
       ta.placeholder = 'Write it however you want — as detailed as you can. This is entirely yours.';
@@ -896,21 +1104,50 @@ function renderAffList(){
       ta.oninput = ()=>{ state.affirmations[i]=ta.value; };
     }
     row.appendChild(num); row.appendChild(ta);
-    if (!state.eftMode && !state.visualizationMode){
-      // Removing a line would break the one-line-per-tapping-point mapping, so it's
-      // disabled in EFT mode — the count has to stay at exactly nine.
-      const rm = document.createElement('button'); rm.className='aff-remove'; rm.textContent='✕';
-      rm.onclick = ()=>{ state.affirmations.splice(i,1); renderAffList(); };
-      row.appendChild(rm);
+    if (!fixedShape){
+      // Reordering and removing would break the one-line-per-tapping-point
+      // mapping, so both are left out in EFT mode, where the count stays at eleven.
+      const mk = (cls, label, text, onclick, disabled) => {
+        const b = document.createElement('button'); b.type='button'; b.className=cls; b.textContent=text;
+        b.setAttribute('aria-label', label); b.disabled = !!disabled; b.onclick = onclick; return b;
+      };
+      const tools = document.createElement('div'); tools.className = 'aff-tools';
+      tools.appendChild(mk('aff-move', `Move affirmation ${i+1} up`, '↑', () => moveAffirmation(i, -1), i === 0));
+      tools.appendChild(mk('aff-move', `Move affirmation ${i+1} down`, '↓', () => moveAffirmation(i, 1), i === state.affirmations.length-1));
+      tools.appendChild(mk('aff-remove', `Remove affirmation ${i+1}`, '✕', ()=>{ state.affirmations.splice(i,1); renderAffList(); }));
+      row.appendChild(tools);
     }
     list.appendChild(row);
   });
-  document.getElementById('addAffBtn').style.display = (state.eftMode || state.visualizationMode) ? 'none' : '';
+  document.getElementById('addAffBtn').style.display = fixedShape ? 'none' : '';
+  paintAffirmationCount();
   // Once there are enough lines again, stop saying there aren't.
   const listMsg = document.getElementById('affListMsg');
-  if (listMsg && !affirmationShortfall()){ listMsg.textContent = ''; listMsg.className = 'save-msg'; }
+  if (listMsg && importTrimNote){ listMsg.textContent = importTrimNote; listMsg.className = 'save-msg'; importTrimNote = ''; }
+  else if (listMsg && !affirmationShortfall()){ listMsg.textContent = ''; listMsg.className = 'save-msg'; }
 }
-function addAffirmation(){ state.affirmations.push("I am..."); renderAffList(); }
+function addAffirmation(){
+  const max = AffirmationKit.MAX_AFFIRMATIONS;
+  if (state.affirmations.length >= max){
+    const msg = document.getElementById('affListMsg');
+    if (msg){ msg.textContent = `That is the most one subliminal holds (${AffirmationKit.countLabel(max, max)}). Remove a line to add another.`; msg.className = 'save-msg err'; }
+    return;
+  }
+  state.affirmations.push("I am...");
+  renderAffList();
+  const rows = document.querySelectorAll('#affList .aff-row textarea');
+  const last = rows[rows.length - 1];
+  if (last){ try { last.focus(); last.select(); } catch(e){} }
+}
+function moveAffirmation(i, dir){
+  const to = i + dir;
+  if (to < 0 || to >= state.affirmations.length) return;
+  state.affirmations = AffirmationKit.moveItem(state.affirmations, i, to);
+  renderAffList();
+  const btn = document.querySelectorAll('#affList .aff-row')[to];
+  const again = btn && btn.querySelector(dir < 0 ? '.aff-move:first-child' : '.aff-move:nth-child(2)');
+  if (again && !again.disabled) again.focus();
+}
 
 /* ---- affirmation mode: generate or import ---- */
 let affirmationMode = 'generate';
@@ -1024,7 +1261,7 @@ async function handleAffirmationFileUpload(file){
       }
       return;
     }
-    state.affirmations = parseAffirmationsFromText(text);
+    state.affirmations = importAffirmations(text);
     if (state.affirmations.length < MIN_AFFIRMATIONS){
       if (msgEl){
         msgEl.textContent = `Only found ${state.affirmations.length} affirmation${state.affirmations.length === 1 ? '' : 's'} — need at least ${MIN_AFFIRMATIONS}. Please paste more or upload another file.`;
@@ -1092,7 +1329,7 @@ function loadAndConfigureAffirmationInput(){
     state.goal = document.getElementById('quizGoal').value.trim();
     state.count = affirmationGenerateCount;
   } else if (affirmationMode === 'import' && pasted){
-    state.affirmations = parseAffirmationsFromText(pasted);
+    state.affirmations = importAffirmations(pasted);
     if (state.affirmations.length < MIN_AFFIRMATIONS){
       const msg = document.getElementById('affListMsg');
       if (msg){
@@ -1113,7 +1350,7 @@ function handleAffirmationInputBeforeGenerate(){
   if (affirmationMode === 'import'){
     const pasted = document.getElementById('affirmationPasteText')?.value.trim();
     if (pasted){
-      state.affirmations = parseAffirmationsFromText(pasted);
+      state.affirmations = importAffirmations(pasted);
       if (state.affirmations.length < MIN_AFFIRMATIONS){
         const msg = document.getElementById('affListMsg');
         if (msg){
@@ -1343,6 +1580,7 @@ function setSelectedVoice(choice){
   }
   rememberVoiceChoice(choice);
   paintVoiceCards();
+  paintVoiceLimitNote();
   const cta = document.getElementById('toStep5');
   if (cta) cta.disabled = !choice;
 }
@@ -2452,6 +2690,7 @@ function startNextPhase(serenityCleared){
     serenityAllowedToContinue().then(ok => { if (ok && step === 5) startNextPhase(true); });
     return;
   }
+  /* Blank lines are dropped (they have nothing to say); no line with words in it is. */
   state.affirmations = state.affirmations.filter(a=>a.trim().length>0);
   if (!state.affirmations.length){
     if (state.visualizationMode) state.affirmations = [buildVisualizationFallback()];
@@ -2500,6 +2739,14 @@ function startNextPhase(serenityCleared){
     return;
   }
 
+  const limitProblem = voiceLimitProblem();
+  if (limitProblem){
+    showStep(4);
+    paintVoiceCards();
+    sayInVoicePicker('');
+    paintVoiceLimitNote();
+    return;
+  }
   const needsPrimaryRecording = voice === VOICE_RECORD_OWN;
   const needsLayerRecording = layerVoiceEnabled && layerVoiceMode === 'own';
 
@@ -2520,7 +2767,7 @@ function beginRecordingPass(target){
   recordTarget = target;
   recIndex = 0;
   if (target === 'layer') layerRecordings = new Array(state.layerAffirmations.length).fill(null);
-  else recordings = new Array(state.affirmations.length).fill(null);
+  else reconcileRecordings();
   setRecordStepCopy(target);
   showStep(6);   // showStep draws the line; see showRecordLine()
 }
@@ -2618,6 +2865,7 @@ function showRecordLine(){
   document.getElementById('recLine').classList.toggle('record-line-script', isScript);
   document.getElementById('recStatus').textContent = 'press and hold to record';
   document.getElementById('nextLineBtn').disabled = !arr[recIndex];
+  paintRecordManager();
 }
 function skipLine(){ advanceLine(); }
 function nextLine(){ advanceLine(); }
@@ -2631,6 +2879,289 @@ function advanceLine(){
     return;
   }
   prepareFinal(); showStep(7);
+}
+
+/* ---------------- the recording manager ----------------
+   Every affirmation, with what it needs: view it, edit it, move it, delete it,
+   record it, record it again. It sits under the hold-to-record button and works
+   on the same two arrays the player reads -- state.affirmations and recordings,
+   index for index -- so what is on this list is what will play.
+
+   A take remembers the words it was recorded for (take.text). Edit a line after
+   recording it and the take is kept, not thrown away, but the row says the words
+   have changed so you can re-record it. Nothing here deletes anything the
+   person did not ask to delete. */
+let recEditingIndex = -1;
+function recManagerEditable(){ return !state.eftMode && !state.visualizationMode; }
+function recTakeStatus(i){
+  const take = recordings[i];
+  if (!take) return 'none';
+  return take.text != null && take.text !== state.affirmations[i] ? 'stale' : 'ok';
+}
+function fmtTakeLength(ms){
+  const s = Math.max(0, Math.round((Number(ms) || 0) / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+/* The recordings, made to line up with the affirmations again after anything
+   that changed the list (editing it in step 3, a regenerate, a reopen). A take
+   follows its words: matched first by identical text, so moving or deleting a
+   line in step 3 never attaches a take to the wrong sentence. A take whose line
+   was only edited in place keeps its slot, marked as changed. */
+function reconcileRecordings(){
+  const old = Array.isArray(recordings) ? recordings.slice() : [];
+  const used = new Set();
+  const lines = state.affirmations || [];
+  const next = lines.map((text, i) => {
+    const same = old[i];
+    if (same && same.text === text && !used.has(same)){ used.add(same); return same; }
+    const found = old.find(r => r && !used.has(r) && r.text === text);
+    if (found){ used.add(found); return found; }
+    return null;
+  });
+  if (old.length === lines.length){
+    next.forEach((r, i) => { if (!r && old[i] && !used.has(old[i])){ next[i] = old[i]; used.add(old[i]); } });
+  }
+  recordings = next;
+}
+function paintRecordManager(){
+  const box = document.getElementById('recManager');
+  if (!box) return;
+  const show = recordTarget === 'primary' && state.voiceMode === 'own';
+  box.hidden = !show;
+  if (!show) return;
+  const max = AffirmationKit.MAX_AFFIRMATIONS;
+  const n = state.affirmations.length;
+  const done = state.affirmations.filter((_, i) => recordings[i]).length;
+  document.getElementById('recMgrCount').textContent = AffirmationKit.countLabel(n, max);
+  document.getElementById('recMgrSummary').textContent = `${done} of ${n} recorded`;
+  const editable = recManagerEditable();
+  const addBtn = document.getElementById('recMgrAdd');
+  addBtn.hidden = !editable;
+  addBtn.disabled = n >= max;
+  addBtn.textContent = n >= max ? `${AffirmationKit.countLabel(n, max)} — that is the most one subliminal holds` : `+ Add an affirmation (${AffirmationKit.countLabel(n, max)})`;
+  const list = document.getElementById('recMgrList');
+  list.textContent = '';
+  const mk = (cls, label, text, onclick, disabled) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text;
+    b.setAttribute('aria-label', label); b.disabled = !!disabled; b.onclick = onclick; return b;
+  };
+  state.affirmations.forEach((line, i) => {
+    const st = recTakeStatus(i);
+    const li = document.createElement('li');
+    li.className = 'rm-row' + (i === recIndex ? ' current' : '') + (st !== 'none' ? ' recorded' : '');
+    li.dataset.i = String(i);
+    const num = document.createElement('span'); num.className = 'rm-num'; num.textContent = String(i + 1);
+    li.appendChild(num);
+    const body = document.createElement('div'); body.className = 'rm-body';
+    if (recEditingIndex === i){
+      const ta = document.createElement('textarea'); ta.className = 'rm-edit'; ta.value = line; ta.rows = 2;
+      ta.setAttribute('aria-label', `Edit affirmation ${i + 1}`);
+      ta.onkeydown = (ev) => { if (ev.key === 'Escape'){ recEditingIndex = -1; paintRecordManager(); } };
+      body.appendChild(ta);
+      const row = document.createElement('div'); row.className = 'rm-edit-actions';
+      row.appendChild(mk('rm-btn rm-primary', 'Save this change', 'Save', () => recSaveEdit(i, ta.value)));
+      row.appendChild(mk('rm-btn', 'Cancel editing', 'Cancel', () => { recEditingIndex = -1; paintRecordManager(); }));
+      body.appendChild(row);
+      setTimeout(() => { try { ta.focus(); } catch (e) {} }, 0);
+    } else {
+      const t = document.createElement('button'); t.type = 'button'; t.className = 'rm-text';
+      t.textContent = line;
+      t.setAttribute('aria-label', `Affirmation ${i + 1}: ${line}. Select to record this line.`);
+      t.onclick = () => recSelect(i);
+      body.appendChild(t);
+      const status = document.createElement('small'); status.className = 'rm-status ' + st;
+      status.textContent = st === 'none' ? 'Not recorded yet'
+        : st === 'stale' ? 'Words changed since recording — re-record to match'
+        : `Recorded${recordings[i].durationMs ? ' · ' + fmtTakeLength(recordings[i].durationMs) : ''}`;
+      body.appendChild(status);
+    }
+    li.appendChild(body);
+    if (recEditingIndex !== i){
+      const actions = document.createElement('div'); actions.className = 'rm-actions';
+      actions.appendChild(mk('rm-btn rm-primary', `${st === 'none' ? 'Record' : 'Re-record'} affirmation ${i + 1}`, st === 'none' ? 'Record' : 'Re-record', () => recSelect(i, true)));
+      if (st !== 'none') actions.appendChild(mk('rm-btn', `Play your recording of affirmation ${i + 1}`, 'Play', () => recPlayTake(i)));
+      if (editable){
+        actions.appendChild(mk('rm-btn', `Edit affirmation ${i + 1}`, 'Edit', () => { recEditingIndex = i; paintRecordManager(); }));
+        actions.appendChild(mk('rm-btn rm-icon', `Move affirmation ${i + 1} up`, '↑', () => recMove(i, -1), i === 0));
+        actions.appendChild(mk('rm-btn rm-icon', `Move affirmation ${i + 1} down`, '↓', () => recMove(i, 1), i === n - 1));
+        actions.appendChild(mk('rm-btn rm-danger', `Delete affirmation ${i + 1}`, 'Delete', () => recRemove(i), n <= MIN_AFFIRMATIONS));
+      }
+      li.appendChild(actions);
+    }
+    list.appendChild(li);
+  });
+}
+function recBusy(){ return recPressed || recOpening; }
+function recSelect(i, scroll){
+  if (recBusy() || i < 0 || i >= state.affirmations.length) return;
+  recEditingIndex = -1;
+  recIndex = i;
+  showRecordLine();
+  if (scroll){ const panel = document.querySelector('.record-panel'); if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+let recPlayback = null;
+function recStopPlayback(){
+  if (!recPlayback) return;
+  try { recPlayback.pause(); } catch (e) {}
+  recPlayback = null;
+}
+function recPlayTake(i){
+  recStopPlayback();
+  const take = recordings[i];
+  if (!take || !take.url) return;
+  const a = new Audio(take.url);
+  recPlayback = a;
+  a.onended = () => { if (recPlayback === a) recPlayback = null; };
+  const p = a.play(); if (p && p.catch) p.catch(() => {});
+}
+/* Move, delete and add keep `recordings` in step with `state.affirmations`
+   by doing the same thing to both. */
+function recMove(i, dir){
+  if (recBusy()) return;
+  const to = i + dir;
+  if (to < 0 || to >= state.affirmations.length) return;
+  state.affirmations = AffirmationKit.moveItem(state.affirmations, i, to);
+  recordings = AffirmationKit.moveItem(recordings, i, to);
+  if (recIndex === i) recIndex = to; else if (recIndex === to) recIndex = i;
+  recEditingIndex = -1;
+  paintRecordManager(); showRecordLine(); saveRecordingDraft();
+  const btn = document.querySelector(`#recMgrList .rm-row[data-i="${to}"] [aria-label^="Move affirmation ${to + 1} ${dir < 0 ? 'up' : 'down'}"]`);
+  if (btn && !btn.disabled) btn.focus();
+}
+function recRemove(i){
+  if (recBusy() || state.affirmations.length <= MIN_AFFIRMATIONS) return;
+  const had = !!recordings[i];
+  if (had && !window.confirm(`Delete affirmation ${i + 1} and its recording? This cannot be undone.`)) return;
+  state.affirmations.splice(i, 1);
+  const [gone] = recordings.splice(i, 1);
+  recStopPlayback();
+  if (gone && gone.url && gone.url.startsWith('blob:')) { try { URL.revokeObjectURL(gone.url); } catch(e){} }
+  if (recIndex > i || recIndex >= state.affirmations.length) recIndex = Math.max(0, recIndex - 1);
+  recEditingIndex = -1;
+  showRecordLine(); saveRecordingDraft();
+}
+function recAdd(){
+  if (recBusy()) return;
+  const max = AffirmationKit.MAX_AFFIRMATIONS;
+  if (state.affirmations.length >= max) return;
+  state.affirmations.push('I am...');
+  recordings.push(null);
+  recIndex = state.affirmations.length - 1;
+  recEditingIndex = recIndex;
+  showRecordLine(); saveRecordingDraft();
+  const list = document.getElementById('recMgrList');
+  if (list && list.lastElementChild && list.lastElementChild.scrollIntoView) list.lastElementChild.scrollIntoView({ block: 'nearest' });
+}
+function recSaveEdit(i, text){
+  const clean = String(text || '').trim();
+  if (!clean){ recEditingIndex = -1; paintRecordManager(); return; }
+  state.affirmations[i] = clean;
+  recEditingIndex = -1;
+  showRecordLine(); saveRecordingDraft();
+}
+
+/* ---------------- an unfinished recording survives a refresh ---------------- */
+function draftOwner(){ return (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null; }
+let draftSaveTimer = null;
+function saveRecordingDraft(){
+  if (state.voiceMode !== 'own' || typeof DraftStore === 'undefined') return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(() => {
+    if (!recordings.some(r => r)) { DraftStore.clear(draftOwner()); return; }
+    DraftStore.save(draftOwner(), {
+      affirmations: state.affirmations.slice(),
+      takes: state.affirmations.map((_, i) => recordings[i] && recordings[i].blob
+        ? { blob: recordings[i].blob, durationMs: recordings[i].durationMs || 0, text: recordings[i].text != null ? recordings[i].text : state.affirmations[i] }
+        : null),
+      freqLayers: FrequencyLayers.serializeFrequencyLayers(state.freqLayers),
+      binauralBand: state.binauralBand || null,
+      bg: state.bg, bgLayer: state.bgLayer, soothingLayer: state.soothingLayer,
+      targetLengthMinutes: state.targetLengthMinutes,
+      eftMode: !!state.eftMode, visualizationMode: !!state.visualizationMode,
+    });
+  }, 250);
+}
+function discardRecordingDraft(){
+  clearTimeout(draftSaveTimer);
+  if (typeof DraftStore !== 'undefined') DraftStore.clear(draftOwner());
+}
+let pendingDraft = null;
+async function checkRecordingDraft(){
+  const banner = document.getElementById('draftBanner');
+  if (!banner || typeof DraftStore === 'undefined') return;
+  const d = await DraftStore.load(draftOwner());
+  const has = d && Array.isArray(d.takes) && d.takes.some(t => t && t.blob) && Array.isArray(d.affirmations) && d.affirmations.length;
+  // Only offered on an empty builder: never over something being built.
+  const idle = !state.affirmations.length && !editingExistingId && step === 0;
+  pendingDraft = has ? d : null;
+  banner.hidden = !(has && idle);
+  if (has && idle){
+    const recorded = d.takes.filter(t => t && t.blob).length;
+    document.getElementById('draftBannerText').textContent =
+      `You have an unfinished recording: ${recorded} of ${d.affirmations.length} affirmations recorded.`;
+  }
+}
+function resumeRecordingDraft(){
+  const d = pendingDraft;
+  if (!d) return;
+  document.getElementById('draftBanner').hidden = true;
+  state.affirmations = d.affirmations.slice();
+  recordings = d.takes.map((t, i) => t && t.blob ? { url: URL.createObjectURL(t.blob), blob: t.blob, durationMs: t.durationMs || undefined, text: t.text != null ? t.text : d.affirmations[i] } : null);
+  state.eftMode = !!d.eftMode; state.visualizationMode = !!d.visualizationMode;
+  state.bg = d.bg || 'none'; state.bgLayer = d.bgLayer || 'none'; state.soothingLayer = d.soothingLayer || 'none';
+  state.binauralBand = d.binauralBand || null;
+  if (d.targetLengthMinutes) state.targetLengthMinutes = d.targetLengthMinutes;
+  setFrequencyLayers(FrequencyLayers.normalizeFrequencyLayers(d.freqLayers, FREQ_HZ_LIST), { silent:true });
+  if (!state.freqLayers.length) setFrequencyLayers([{ hz: 528, vol: 100 }], { silent:true });
+  setSelectedVoice(VOICE_RECORD_OWN);
+  beginRecordingPass('primary');
+  const firstOpen = recordings.findIndex(r => !r);
+  recIndex = firstOpen >= 0 ? firstOpen : 0;
+  showRecordLine();
+}
+function dismissRecordingDraft(){
+  document.getElementById('draftBanner').hidden = true;
+  pendingDraft = null;
+  discardRecordingDraft();
+}
+
+/* ---------------- how many lines each voice can carry ----------------
+   Chosen after the lines are written, so a person can arrive at the voice screen
+   holding more lines than the voice they pick will read. The answer is never to
+   cut them: the continue is held, the reason is said, and the lines are exactly
+   as they were. Switching back to Record Your Own Voice lifts the hold. */
+function voiceLimitProblem(){
+  if (state.eftMode || state.visualizationMode) return '';
+  return AffirmationKit.overLimitMessage(nonEmptyAffirmationCount(), state.selectedVoice || selectedVoiceFromState());
+}
+function paintVoiceLimitNote(){
+  const note = document.getElementById('voiceLimitNote');
+  if (!note) return;
+  const n = nonEmptyAffirmationCount();
+  const fixed = state.eftMode || state.visualizationMode;
+  const problem = voiceLimitProblem();
+  const over = n > AffirmationKit.AFFIRMATION_LIMITS.serenity && !fixed;
+  note.hidden = !over;
+  note.className = 'voice-limit-note' + (problem ? ' blocked' : '');
+  note.textContent = !over ? '' : (problem || `You have ${n} affirmations. Record Your Own Voice reads up to ${AffirmationKit.AFFIRMATION_LIMITS.own}; Serenity and Clone Your Voice read up to ${AffirmationKit.AFFIRMATION_LIMITS.serenity}.`);
+  const fix = document.getElementById('voiceLimitFix');
+  if (fix) fix.hidden = !problem;
+}
+/* What is saved for each line, alongside the audio: its place in the order, how
+   long the take is, where it falls in a pass at the current pace, and the words
+   it was recorded for. null when the voice is not a recording (there is no take
+   to time). */
+function buildAffirmationMeta(){
+  if (!state || state.voiceMode !== 'own' || !Array.isArray(state.affirmations) || !state.affirmations.length) return null;
+  const durations = state.affirmations.map((_, i) => (recordings[i] && recordings[i].durationMs) || 0);
+  const plan = AffirmationKit.planTimings(durations, { gapMs: affirmationGapMs, repeats: eftRepeatsForIndex });
+  return state.affirmations.map((text, i) => ({
+    order: i,
+    durationMs: durations[i],
+    startMs: plan[i].startMs,
+    endMs: plan[i].endMs,
+    recordedText: recordings[i] ? (recordings[i].text != null ? recordings[i].text : text) : null,
+  }));
 }
 
 /* Recording format. Chrome and Android record WebM/Opus; Safari records MP4/AAC.
@@ -2690,11 +3221,18 @@ async function loadClip(ctx, rec){
     clip = { kind: 'element', el };
   }
   rec._clip = clip; rec._clipCtx = ctx;
+  // The length of the take, kept with it: it is saved as the line's timing metadata.
+  const dur = clip.kind === 'buffer' ? clip.buffer.duration : clip.el.duration;
+  if (Number.isFinite(dur) && dur > 0) rec.durationMs = Math.round(dur * 1000);
   return clip;
 }
 
-/* Play one loaded clip through `gainValue`, calling onended when it finishes. */
-function playClip(ctx, clip, gainValue, extraDest, onended){
+/* Play one loaded clip through `gainValue`, calling onended when it finishes.
+   `meta.index`, when given, is the affirmation this clip IS: the timeline is told
+   when its sound actually begins and when it actually ends. The quiet second
+   voice passes no meta, so it can never light a line. */
+function playClip(ctx, clip, gainValue, extraDest, onended, meta){
+  const lineIndex = meta && Number.isInteger(meta.index) ? meta.index : null;
   if (clip.kind === 'buffer'){
     const g = ctx.createGain(); g.gain.value = gainValue;
     g.connect(audioOut(ctx));
@@ -2702,8 +3240,9 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
     const src = ctx.createBufferSource(); src.buffer = clip.buffer;
     src.connect(g);
     liveVoiceGains.add(g);
-    src.onended = () => { liveVoiceGains.delete(g); if (onended) onended(); };
+    src.onended = () => { liveVoiceGains.delete(g); if (lineIndex !== null) lineEnded(lineIndex); if (onended) onended(); };
     src.start();
+    if (lineIndex !== null) lineStarted(lineIndex);
     return;
   }
   // createMediaElementSource can only ever be called once per <audio> element,
@@ -2717,7 +3256,11 @@ function playClip(ctx, clip, gainValue, extraDest, onended){
   clip.gain.gain.value = gainValue;
   liveVoiceGains.add(clip.gain);
   liveVoiceElements.add(clip.el);
-  const done = () => { liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el); if (onended) onended(); };
+  let started = false;
+  // `playing` is when the element is really sounding -- including after a pause
+  // that landed before it began, which resumeFinal answers with a fresh play().
+  clip.el.onplaying = () => { if (!started && lineIndex !== null){ started = true; lineStarted(lineIndex); } };
+  const done = () => { liveVoiceGains.delete(clip.gain); liveVoiceElements.delete(clip.el); clip.el.onplaying = null; if (lineIndex !== null && started) lineEnded(lineIndex); if (onended) onended(); };
   clip.el.onended = done;
   try { clip.el.currentTime = 0; } catch(e){}
   const p = clip.el.play();
@@ -2768,6 +3311,7 @@ async function startRec(e){
   mediaRecorder = recMime ? new MediaRecorder(micStream, { mimeType: recMime }) : new MediaRecorder(micStream);
   const takeRecorder = mediaRecorder, takeStream = micStream, takeChunks = [];
   const takeStarted = holdStart, takeIndex = recIndex, takeRecords = activeRecordArray();
+  const takeText = activeRecordLines()[takeIndex];
   mediaRecorder.ondataavailable = ev=>takeChunks.push(ev.data);
   mediaRecorder.onstop = ()=>{
     const blob = new Blob(takeChunks, {type: takeRecorder.mimeType || recMime || 'audio/webm'});
@@ -2775,9 +3319,16 @@ async function startRec(e){
     takeStream.getTracks().forEach(t=>t.stop());
     const held = Date.now()-takeStarted;
     if (held > 400){
-      takeRecords[takeIndex] = { url, blob };
+      // The words travel with the take: they are what lets an edited or moved
+      // line be told apart from one that still matches its recording.
+      const replaced = takeRecords[takeIndex];
+      takeRecords[takeIndex] = { url, blob, durationMs: held, text: takeText };
+      // The take it replaces is no longer reachable: give its audio back.
+      if (replaced && replaced.url && replaced.url.startsWith('blob:') && replaced !== takeRecords[takeIndex]) { try { URL.revokeObjectURL(replaced.url); } catch(e){} }
       document.getElementById('recStatus').textContent='Saved — hold again to redo it.';
       document.getElementById('nextLineBtn').disabled=false;
+      paintRecordManager();
+      saveRecordingDraft();
     } else {
       document.getElementById('recStatus').textContent='Too quick — hold a little longer.';
     }
@@ -2918,7 +3469,7 @@ let editingExistingId = null;
 // (e.g. re-recording), same as anything reopened via "Load & adjust".
 let contentAlreadySaved = false;
 function prepareFinal(){
-  document.getElementById('finalTitle').textContent = `${state.freq ? state.freq.hz+' Hz · '+state.freq.word : ''}`;
+  document.getElementById('finalTitle').textContent = frequencyTitle();
   document.getElementById('finalLine').textContent = '"'+(state.affirmations[0]||'')+'"';
   document.getElementById('finalLine').classList.toggle('final-line-script', !!state.visualizationMode);
   document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
@@ -2943,7 +3494,7 @@ function prepareFinal(){
     titleInput.placeholder = 'Name this subliminal';
   } else {
     titleInput.value = '';
-    titleInput.placeholder = state.freq ? `e.g. "${state.freq.hz} Hz — ${state.freq.word}"` : 'Name this subliminal';
+    titleInput.placeholder = state.freq ? `e.g. "${frequencyTitle().replace(' · ', ' — ')}"` : 'Name this subliminal';
   }
   paintFinalSaveButtons();
 
@@ -2973,9 +3524,7 @@ function rerecordVoice(){
   stopFinal();
   recordTarget = 'primary';
   recIndex = 0;
-  if (!Array.isArray(recordings) || recordings.length !== state.affirmations.length){
-    recordings = new Array(state.affirmations.length).fill(null);
-  }
+  reconcileRecordings();
   setRecordStepCopy('primary');
   showStep(6);
 }
@@ -3029,44 +3578,25 @@ function updateFinalPointTag(index){
    reloaded via "Load & adjust" in My Library. */
 function renderFinalFreqPicker(){
   const wrap = document.getElementById('finalFreqPicker');
-  const sel = document.getElementById('finalFreqSelect');
-  if (!wrap || !sel || !state.freq) { if (wrap) wrap.style.display = 'none'; return; }
-  sel.innerHTML = FREQS.map(f => `<option value="${f.hz}" ${f.hz===state.freq.hz?'selected':''}>${f.hz} Hz — ${f.word}</option>`).join('');
-  wrap.style.display = 'block';
+  if (!wrap) return;
+  wrap.style.display = frequencyLayerList().length ? 'block' : 'none';
+  paintFrequencyUi();
 }
+/* Set the tone to one frequency: the older single-choice entry point, kept for
+   anything that still thinks in one frequency. It replaces the stack. */
 function changeFinalFrequency(hzStr){
   const hz = parseInt(hzStr, 10);
-  const match = FREQS.find(f => f.hz === hz);
-  if (!match) return;
-  state.freq = match;
-  document.getElementById('finalTitle').textContent = `${match.hz} Hz · ${match.word}`;
-  // If it's currently playing, retune the live tone in place instead of restarting the session.
-  if (finalPlaying && finalTone){
-    const now = finalCtx.currentTime;
-    finalTone.frequency.linearRampToValueAtTime(match.hz, now + 1.2);
-    if (finalToneLayer2){
-      const delta = (state.binauralBand && BINAURAL_BANDS[state.binauralBand]) ? BINAURAL_BANDS[state.binauralBand].hz : null;
-      finalToneLayer2.frequency.linearRampToValueAtTime(delta !== null ? match.hz + delta : match.hz * 1.003, now + 1.2);
-    }
-  }
+  if (!frequencyByHz(hz)) return;
+  setFrequencyLayers([{ hz, vol: FrequencyLayers.DEFAULT_LAYER_VOLUME }]);
 }
 
-/* The brainwave (binaural) layer, changed on a finished subliminal. Between two
-   bands the right-ear oscillator is retuned in place. Turning the beat on or
-   off changes the shape of the tone graph (two hard-panned oscillators versus
-   one centred pair), so a playing session restarts to pick it up — the voice
-   it restarts is the same audio already in hand, never regenerated. */
+/* The brainwave (binaural) layer, changed on a finished subliminal. The mixer
+   retunes the right ear in place between two bands, and fades each tone out and
+   its replacement in when the beat is switched on or off, so a session no
+   longer restarts to change it. */
 function changeFinalBrainwave(prevBand){
-  if (!finalPlaying || !finalCtx || !finalTone) return;
-  const band = state.binauralBand && BINAURAL_BANDS[state.binauralBand] ? state.binauralBand : null;
-  const prev = prevBand && BINAURAL_BANDS[prevBand] ? prevBand : null;
-  if (band === prev) return;
-  if (band && prev && finalToneLayer2){
-    const baseHz = state.freq ? state.freq.hz : 528;
-    finalToneLayer2.frequency.linearRampToValueAtTime(baseHz + BINAURAL_BANDS[band].hz, finalCtx.currentTime + 1.2);
-    return;
-  }
-  restartListening();
+  if (!finalPlaying || !finalCtx || !frequencyMixer.attached) return;
+  frequencyMixer.setBand(currentBinauralBand());
 }
 
 /* The same idea for the ambience: a second picker on the finished subliminal,
@@ -3109,7 +3639,7 @@ function changeSessionAmbience(key){
   saveAmbienceLayer();
 }
 
-let finalCtx=null, finalTone=null, finalToneLayer2=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
+let finalCtx=null, finalPlaying=false, finalRecorder=null, finalChunks=[], finalStream=null, finalTimeouts=[];
 /* The session's ambience. One object, for the whole life of the page: it
    outlives the AudioContext, which is opened per play and closed after, so the
    ambience somebody chose is still the ambience when they press play again.
@@ -3134,6 +3664,17 @@ let finalPauseWaiters=[];
    made under, so a clip, a voice line or a timer left over from an earlier
    session can never play into the next one -- that was the second voice. */
 let finalSession=0;
+/* Which affirmation is being spoken, stamped on the session clock. The sounds
+   report in (lineStarted / lineEnded) and the lyrics list reads it back out;
+   nothing else decides what is highlighted. See js/affirmation-timeline.js. */
+const affTimeline = new AffirmationKit.AffirmationTimeline({ now: () => getFinalElapsedMs() });
+function lineStarted(index){ affTimeline.lineStart(index); }
+function lineEnded(index){ affTimeline.lineEnd(index); }
+/* Back to "nothing has played": a new play, Start Over, Stop, or the end. */
+function resetAffTimeline(){
+  affTimeline.reset();
+  affTimeline.setCount((state.affirmations || []).length);
+}
 let liveToneGain=null, liveSoothingGain=null, liveCustomGain=null, customTrackSource=null, liveLayerVoiceGain=null;
 /* Every gain node a voice line is currently playing through. A line is its own
    node that dies when the line ends, so unlike the tone and the background
@@ -3192,6 +3733,7 @@ function finalLater(fn, ms){
 function pauseFinal(){
   if (!finalPlaying || finalPaused) return;
   finalPaused = true; finalPauseStarted = Date.now();
+  affTimeline.pause();
   try { if (finalCtx && finalCtx.state !== 'closed'){ const p = finalCtx.suspend(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
   // The iOS route out of the graph, then every clip element mid-line.
   try { if (finalCtx && finalCtx.__outEl) finalCtx.__outEl.pause(); } catch(e){}
@@ -3213,6 +3755,7 @@ function resumeFinal(){
   if (!finalPlaying || !finalPaused) return;
   if (finalPauseStarted) finalPausedTotal += Date.now() - finalPauseStarted;
   finalPauseStarted = null; finalPaused = false;
+  affTimeline.resume();
   startSilentKeeper();
   try { if (finalCtx && finalCtx.state !== 'closed' && finalCtx.state !== 'running'){ const p = finalCtx.resume(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
   try { if (finalCtx && finalCtx.__outEl){ const p = finalCtx.__outEl.play(); if (p && p.catch) p.catch(()=>{}); } } catch(e){}
@@ -3234,6 +3777,14 @@ function seekFinalAffirmation(delta){
   const lines = state.affirmations || [];
   if (!lines.length) return;
   finalRequestedIndex = (finalAffirmationIndex + delta + lines.length) % lines.length;
+  affTimeline.request(finalRequestedIndex);
+}
+/* Tap on a line in the list: it plays next, at the next line boundary. */
+function seekFinalToIndex(index){
+  const lines = state.affirmations || [];
+  if (!finalPlaying || !Number.isInteger(index) || index < 0 || index >= lines.length) return;
+  finalRequestedIndex = index;
+  affTimeline.request(index);
 }
 function showFinalAffirmation(text, index){
   finalAffirmationIndex = Number.isInteger(index) ? index : finalAffirmationIndex;
@@ -3242,6 +3793,37 @@ function showFinalAffirmation(text, index){
   updateFinalPointTag(finalAffirmationIndex);
   if (typeof showImmersiveAffirmation === 'function') showImmersiveAffirmation(text || '');
 }
+/* The affirmations on the finished screen: every line, before anything is
+   played, after recording, and when a saved subliminal is reopened. While it
+   plays, the same timeline that drives the player lights the line being spoken. */
+function renderFinalPlaylist(){
+  const wrap = document.getElementById('finalPlaylistWrap');
+  const list = document.getElementById('finalPlaylist');
+  if (!wrap || !list) return;
+  const lines = state.affirmations || [];
+  wrap.hidden = !lines.length || !!state.visualizationMode;
+  list.textContent = '';
+  lines.forEach((text, i) => {
+    const li = document.createElement('li');
+    li.dataset.i = String(i);
+    li.textContent = text;
+    list.appendChild(li);
+  });
+  const count = document.getElementById('finalPlaylistCount');
+  if (count) count.textContent = AffirmationKit.countLabel(lines.length, Math.max(lines.length, AffirmationKit.limitFor(state.selectedVoice || selectedVoiceFromState())));
+  paintFinalPlaylist(affTimeline.snapshot());
+}
+function paintFinalPlaylist(snap){
+  const list = document.getElementById('finalPlaylist');
+  if (!list) return;
+  Array.from(list.children).forEach((li, i) => {
+    const st = (snap.states && snap.states[i]) || 'upcoming';
+    if (li.dataset.state !== st) li.dataset.state = st;
+    if (st === 'active') li.setAttribute('aria-current', 'true'); else li.removeAttribute('aria-current');
+  });
+}
+affTimeline.on(paintFinalPlaylist);
+
 /* Swap only the ambience graph. Voice clips and the TTS cache are untouched. */
 function changeFinalAmbience(key){
   chooseAmbience(key || 'none');
@@ -3419,7 +4001,8 @@ function setLiveGain(node, v){
 function applyLiveMixGain(id, value){
   if (typeof queueMixSave === 'function') queueMixSave();
   if (!finalPlaying) return;
-  if (id==='mixTone') setLiveGain(liveToneGain, value/100 * 0.10);
+  if (id==='mixTone'){ if (frequencyMixer.attached) frequencyMixer.setMasterLevel(FrequencyLayers.masterGainValue(value)); paintFrequencyWarnings(); }
+  if (id==='mixVoice') paintFrequencyWarnings();
   /* The ambience level is the bed's, not a node's: it has to survive the bed
      swapping one track for another underneath it, which a handle on the gain
      node of the track that is currently playing does not. */
@@ -3680,10 +4263,25 @@ function audioOut(ctx){
   bus.gain.value = 1;
   ctx.__outDirect = false;
   ctx.__outBus = bus;
+  /* The last stop before the speaker is a soft limiter (see softLimiterCurve in
+     js/frequency-layers.js): identity below 0.8, rounded off above, so a pile-up
+     of loud layers is shaped rather than clipped. Where the context cannot make
+     one the bus goes straight out, as it always did. */
+  let tail = bus;
+  if (typeof ctx.createWaveShaper === 'function' && typeof FrequencyLayers !== 'undefined'){
+    try {
+      const pre = ctx.createGain(); pre.gain.value = 0.5;
+      const shaper = ctx.createWaveShaper(); shaper.curve = FrequencyLayers.softLimiterCurve(); shaper.oversample = '2x';
+      const post = ctx.createGain(); post.gain.value = 2;
+      bus.connect(pre); pre.connect(shaper); shaper.connect(post);
+      tail = post;
+    } catch(e){ tail = bus; }
+  }
+  ctx.__outTail = tail;
   const useDirect = () => {
     if (ctx.__outClosed || ctx.__outDirect) return;
-    if (ctx.__outMd) { try { bus.disconnect(ctx.__outMd); } catch(e){} }
-    bus.connect(ctx.destination); ctx.__outDirect = true;
+    if (ctx.__outMd) { try { tail.disconnect(ctx.__outMd); } catch(e){} }
+    tail.connect(ctx.destination); ctx.__outDirect = true;
   };
   if (!needsMediaElementOutput()){ useDirect(); return bus; }
   try {
@@ -3693,7 +4291,7 @@ function audioOut(ctx){
     el.setAttribute('playsinline', '');
     el.autoplay = true;
     el.addEventListener('pause', handleUnexpectedMediaPause);
-    bus.connect(md);
+    tail.connect(md);
     ctx.__outEl = el; ctx.__outMd = md;
     const p = el.play();
     if (p && p.catch) p.catch(useDirect);
@@ -3703,11 +4301,13 @@ function audioOut(ctx){
 function closeAudioOut(ctx){
   if (!ctx) return;
   ctx.__outClosed = true;
+  const tail = ctx.__outTail || ctx.__outBus;
+  if (tail){ try { tail.disconnect(); } catch(e){} }
   if (ctx.__outBus){ try { ctx.__outBus.disconnect(); } catch(e){} }
   if (!ctx.__outEl) return;
   try { ctx.__outEl.pause(); ctx.__outEl.srcObject = null; } catch(e){}
   ctx.__outEl = null;
-  if (ctx.__outMd){ try { ctx.__outBus.disconnect(ctx.__outMd); } catch(e){} ctx.__outMd = null; }
+  if (ctx.__outMd){ try { tail.disconnect(ctx.__outMd); } catch(e){} ctx.__outMd = null; }
 
 }
 
@@ -3766,6 +4366,7 @@ function playFinal(){
   finalPaused = false; finalPauseStarted = null; finalPausedTotal = 0; finalFadeEnding = false;
   finalPauseWaiters = [];
   finalAffirmationIndex = 0; finalRequestedIndex = null;
+  resetAffTimeline();
   const session = ++finalSession;
   const alive = () => finalPlaying && session === finalSession;
   deviceSpeechFailures = 0;
@@ -3782,37 +4383,15 @@ function playFinal(){
   // a fresh suspended one that will never be allowed to start.
   primeAudio();
   startCustomTrackPlayback();
-  const toneGain = finalCtx.createGain();
-  const targetToneVol = document.getElementById('mixTone').value/100 * 0.10;
-  toneGain.gain.setValueAtTime(0, finalCtx.currentTime);
-  toneGain.gain.linearRampToValueAtTime(targetToneVol, finalCtx.currentTime + 2.5); // gentle fade-in, no hard onset
-  const toneFilter = finalCtx.createBiquadFilter();
-  toneFilter.type = 'lowpass'; toneFilter.frequency.value = 2600; toneFilter.Q.value = 0.4; // softens harsh upper harmonics
-  toneFilter.connect(toneGain).connect(audioOut(finalCtx));
-  const baseHz = state.freq ? state.freq.hz : 528;
-  if (state.binauralBand && BINAURAL_BANDS[state.binauralBand]){
-    // Binaural mode: left ear gets the base frequency, right ear gets base+delta.
-    // Needs the toneFilter to receive a true stereo signal, so each oscillator gets
-    // its own hard-panned channel instead of both summing to the center.
-    const delta = BINAURAL_BANDS[state.binauralBand].hz;
-    const panL = finalCtx.createStereoPanner(); panL.pan.value = -1;
-    const panR = finalCtx.createStereoPanner(); panR.pan.value = 1;
-    finalTone = finalCtx.createOscillator(); finalTone.type='sine'; finalTone.frequency.value = baseHz;
-    finalTone.connect(panL).connect(toneFilter); finalTone.start();
-    const toneLayer2 = finalCtx.createOscillator(); toneLayer2.type='sine'; toneLayer2.frequency.value = baseHz + delta;
-    toneLayer2.connect(panR).connect(toneFilter);
-    toneLayer2.start();
-    finalToneLayer2 = toneLayer2;
-  } else {
-    finalTone = finalCtx.createOscillator(); finalTone.type='sine'; finalTone.frequency.value = baseHz;
-    finalTone.connect(toneFilter); finalTone.start();
-    // A second, quieter, very slightly detuned voice removes the "piercing" quality of one isolated pure tone
-    const toneLayer2 = finalCtx.createOscillator(); toneLayer2.type='sine'; toneLayer2.frequency.value = baseHz * 1.003;
-    const layer2Gain = finalCtx.createGain(); layer2Gain.gain.value = 0.4;
-    toneLayer2.connect(layer2Gain).connect(toneFilter);
-    toneLayer2.start();
-    finalToneLayer2 = toneLayer2;
-  }
+  /* The frequency layers. One mixer owns every tone: attaching it to a context
+     it is already attached to does nothing, and each Hz is looked up before it
+     is made, so there is never a second copy of a tone. The master gain is the
+     Frequency fader and fades in over 2.5 seconds, as the single tone always did;
+     each tone then glides to its own level. */
+  const toneGain = frequencyMixer
+    .attach(finalCtx, audioOut(finalCtx), { fadeIn: 2.5, level: FrequencyLayers.masterGainValue(document.getElementById('mixTone').value) })
+    .master;
+  frequencyMixer.sync(state.freqLayers && state.freqLayers.length ? state.freqLayers : [{ hz: 528, vol: 100 }], { band: currentBinauralBand() });
   liveToneGain = toneGain;
 
   /* The ambience, on its own graph with its own lifetime. It is started here
@@ -3908,6 +4487,8 @@ function playFinal(){
   }
 
   function runSequence(onDone){
+    // A new pass (the first, or the loop coming round): every line is upcoming again.
+    affTimeline.beginPass();
     if (state.voiceMode === 'own'){
       const recorded = recordings.map((r,i)=>({r,i})).filter(x=>x.r);
       let idx = 0;
@@ -3937,7 +4518,7 @@ function playFinal(){
                 if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
                 finalLater(playNext, gapForNextLine());
               }
-            }));
+            }), { index: i });
           }
           playOnce();
         })).catch(e=>{
@@ -3998,10 +4579,13 @@ function playFinal(){
         function deviceSpeak(){
           if (!alive()) return;
           if (waitWhileFinalPaused(deviceSpeak)) return;
+          const lineIdx = idx;
           if (deviceVoiceSilent){
             // Known not to speak here: keep the lines moving with the music
-            // rather than stalling four seconds on each one.
-            finalLater(advance, 2600);
+            // rather than stalling four seconds on each one. The line is shown
+            // for exactly that long, so the highlight still has a start and end.
+            lineStarted(lineIdx);
+            finalLater(() => { lineEnded(lineIdx); advance(); }, 2600);
             return;
           }
           const utter = new SpeechSynthesisUtterance(lines[idx]);
@@ -4012,6 +4596,7 @@ function playFinal(){
             if (settled) return;
             settled = true;
             clearTimeout(watchdog);
+            lineEnded(lineIdx);
             if (spoke) deviceSpeechFailures = 0;
             else deviceSpeechFailures++;
             if (deviceSpeechFailures >= 3 && !deviceVoiceSilent) reportNoDeviceVoice();
@@ -4024,10 +4609,11 @@ function playFinal(){
             if (settled) return;
             settled = true;
             clearTimeout(watchdog);
+            lineEnded(lineIdx);
             waitWhileFinalPaused(deviceSpeak);
           };
 
-          utter.onstart = () => { deviceSpeechFailures = 0; };
+          utter.onstart = () => { deviceSpeechFailures = 0; lineStarted(lineIdx); };
           utter.onend   = () => { if (finalPaused) cutByPause(); else settle(true); };
           utter.onerror = () => { if (finalPaused) cutByPause(); else settle(false); };
 
@@ -4060,7 +4646,7 @@ function playFinal(){
             if (!url){ clonedVoiceFailed(); return; }
             url.then(u => loadClip(finalCtx, studioClipHandle(u)))
               .then(finalCallback(clip => {
-                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
+                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance, { index: idx });
               }))
               .catch(clonedVoiceFailed);
             return;
@@ -4071,7 +4657,7 @@ function playFinal(){
             return synthesizeLine(line, voiceKey)
               .then(url => loadClip(finalCtx, studioClipHandle(url)))
               .then(finalCallback(clip => {
-                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance);
+                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance, { index: idx });
               }))
               .catch(() => deviceSpeak());
           }).catch(deviceSpeak);
@@ -4221,6 +4807,7 @@ function finishFinal(){
   finalPlaying = false; finalSession++;
   finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
   finalPauseWaiters = [];
+  resetAffTimeline();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
   if (typeof recordPlayerSession === 'function') recordPlayerSession(true, listenedSeconds);
   try { window.speechSynthesis.cancel(); } catch(e){}
@@ -4239,8 +4826,7 @@ function finishFinal(){
   } else if (finalChunks.length){
     window._subliminallyDownloadBlob = new Blob(finalChunks, { type:'audio/webm' });
   }
-  if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
-  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
+  frequencyMixer.detach();
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   // The ending fade has finished; detach now so restarting cannot reuse a closed bus.
   sessionBed.stop({ fade: 0 });
@@ -4265,6 +4851,7 @@ function stopFinal(){
   finalPlaying = false; finalSession++;
   finalPaused = false; finalPauseStarted = null; finalFadeEnding = false;
   finalPauseWaiters = [];
+  resetAffTimeline();
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none';
   if (typeof recordPlayerSession === 'function') recordPlayerSession(false, listenedSeconds);
   stopSilentKeeper();
@@ -4274,8 +4861,7 @@ function stopFinal(){
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   try { window.speechSynthesis.cancel(); } catch(e){}
-  if (finalTone){ try{ finalTone.stop(); }catch(e){} finalTone=null; }
-  if (finalToneLayer2){ try{ finalToneLayer2.stop(); }catch(e){} finalToneLayer2=null; }
+  frequencyMixer.detach();
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   /* Stop means stop: the context closes on the next line, so there is nothing
      to fade into and nothing that could still be running afterwards. The key

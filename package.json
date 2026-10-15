@@ -14,7 +14,12 @@
     "cap:ios": "npm run cap:sync && cap open ios",
     "cap:android": "npm run cap:sync && cap open android",
     "test:mix": "node scripts/mix-settings-test.cjs",
-    "test:audio-editor": "node scripts/audio-editor-e2e.cjs"
+    "test:audio-editor": "node scripts/audio-editor-e2e.cjs",
+    "test:frequency-layers": "node scripts/frequency-layers-test.cjs",
+    "test:affirmations": "node scripts/affirmation-timeline-test.cjs",
+    "test:layers-lyrics": "node scripts/layers-lyrics-e2e.cjs",
+    "test:lifecycle": "node scripts/audio-lifecycle-test.cjs",
+    "test:unit": "npm run test:rituals && npm run test:faith && npm run test:checkout && npm run test:mix && npm run test:frequency-layers && npm run test:affirmations && npm run test:lifecycle"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

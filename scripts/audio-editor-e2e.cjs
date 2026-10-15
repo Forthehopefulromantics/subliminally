@@ -101,6 +101,8 @@ const step = (n, s) => console.log(`✔ ${n}. ${s}`);
 
   // 4-5. Change the frequency and save.
   const uploadsBefore = (await log()).filter(e => e.storage).length;
+  // Frequencies are layers now: take 528 off, put 432 on.
+  await page.click('#aeFreqs .ae-card[data-hz="528"]');
   await page.click('#aeFreqs .ae-card[data-hz="432"]');
   assert.equal(await page.textContent('#aeSaveBtn'), 'Save Changes');
   await page.click('#aeSaveBtn');
@@ -172,7 +174,8 @@ const step = (n, s) => console.log(`✔ ${n}. ${s}`);
   // 11. No duplicates from editing; Save as new only on request.
   assert.equal((await subs()).length, 1, 'audio editing never duplicates');
   await openEditor();
-  await page.click('#aeFreqs .ae-card[data-hz="741"]');
+  await page.click('#aeFreqs .ae-card[data-hz="432"]');   // off
+  await page.click('#aeFreqs .ae-card[data-hz="741"]');   // on
   await page.click('#aeSaveNewBtn');
   await page.fill('#aeNewTitle', 'Night Reset — focus');
   await page.click('#aeNewRow .ps-use');

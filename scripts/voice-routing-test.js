@@ -145,7 +145,7 @@ function mk(id, cls, parent){
 }
 
 /* Everything builder.js reaches for, by id, at load and during the flow. */
-const IDS = ['flowProgress','freqChips','intentionChips','toneChips','countRange','countVal',
+const IDS = ['flowProgress','intensityCards','freqChips','intentionChips','toneChips','countRange','countVal',
   'eftPointsList','bgGrid','waveform','recBtn','freqGuideText','toStep1','toStep5','quizGoal',
   'sessionLengthSlider','sessionLengthVal','lengthMsg','durationChips','ritualModeChips',
   'ritualModeMsg','eftGuidePanel','visualizationGuidePanel','countRow','sessionLengthRow',
@@ -226,7 +226,7 @@ const ctx = {
   Date, Math, JSON, Set, Map, Object, Array, Promise, String, Number, Boolean, Error,
   URL, TextEncoder, isNaN, parseInt, parseFloat, encodeURIComponent, decodeURIComponent,
 };
-ctx.window = ctx;
+ctx.window = ctx; ctx.addEventListener = () => {};
 ctx.globalThis = ctx;
 ctx.self = ctx;
 vm.createContext(ctx);
@@ -263,7 +263,7 @@ vm.runInContext(`
   var MediaRecorder = undefined;
 `, ctx);
 
-for (const f of ['js/selectable.js', 'js/ambience.js', 'js/builder.js'])
+for (const f of ['js/selectable.js', 'js/frequency-layers.js', 'js/affirmation-timeline.js', 'js/ambience.js', 'js/builder.js'])
   vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
 
 /* The voice catalogue is asked over the network on the real page; here it is a

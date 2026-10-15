@@ -758,6 +758,8 @@ async function saveSubliminal(opts){
   const isFirstSave = !updatingId && !asNew;
   editingExistingId = savedSubliminal.id;
   activeMixId = savedSubliminal.id;
+  // The recording is in the library now; the unfinished copy kept on this device is no longer needed.
+  if (typeof discardRecordingDraft === 'function') discardRecordingDraft();
   contentAlreadySaved = true;
   state.playerTitle = title;
   if (typeof paintFinalSaveButtons === 'function') paintFinalSaveButtons();
