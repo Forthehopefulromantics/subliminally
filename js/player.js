@@ -93,7 +93,7 @@ function mountImmersivePlayer(){
     <div class="immersive-player" id="immersivePlayer" role="region" aria-hidden="true" aria-label="Subliminal player">
       <div class="ip-sky"><div class="ip-stars"></div><div class="ip-moon"></div><div class="ip-cloud one"></div><div class="ip-cloud two"></div></div>
       <div class="ip-shell">
-        <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker">Sanctuary at night</span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
+        <div class="ip-top"><button class="ip-icon-btn" onclick="closeImmersivePlayer()" aria-label="Minimize player">${svgIcon('close')}</button><span class="ip-kicker"><span class="k-night">Sanctuary at night</span><span class="k-day">Sanctuary by day</span></span><button class="ip-icon-btn" onclick="openPlayerMenu()" aria-label="More options">•••</button></div>
         <div class="ip-hero" id="ipAffirmationViewport">
           <ol class="ip-lyrics" id="ipLyrics" aria-label="Your affirmations" tabindex="0"></ol>
           <button type="button" class="ip-follow" id="ipFollow" hidden aria-label="Follow the affirmation being spoken">${svgIcon('follow')}<span>Follow</span></button>
