@@ -114,7 +114,7 @@ const VOICE_SERENITY   = 'serenity';     // the catalogue's AI voice reads them
 const VOICE_CLONE      = 'clone_voice';  // an AI version of this person's voice
 const VOICE_CHOICES = [VOICE_RECORD_OWN, VOICE_SERENITY, VOICE_CLONE];
 
-let state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+let state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, voiceLayers:VoiceLayers.defaultConfig(), affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
 
 /* Three phases rather than eight bars: choosing everything (frequency through
    ambience), recording it, and hearing it. The line after the current phase
@@ -363,7 +363,7 @@ function nextStep(serenityCleared){
 function prevStep(){ showStep(Math.max(0,step-1)); }
 function resetFlow(){
   stopFinal();
-  state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
+  state = { freq:null, freqLayers:[], intention:null, goal:'', tone:null, intensity:'bold', count:5, affirmations:[], selectedVoice:null, voiceMode:null, aiVoiceId:null, bg:'none', bgLayer:'none', targetLengthMinutes:5, soothingLayer:'none', layerAffirmations:[], layerVoiceMode:null, layerAiVoiceId:null, voiceLayers:VoiceLayers.defaultConfig(), affirmationGapMs:2400, pace:'steady', eftMode:false, visualizationMode:false, binauralBand:null, playerTitle:null };
   affirmationMode = 'generate';
   affirmationGenerateCount = 5;
   /* Clearing through the one helper rather than stripping the class by hand:
@@ -3523,13 +3523,19 @@ function releaseClip(rec){
     if (c.objectUrl) { try { URL.revokeObjectURL(c.objectUrl); } catch(e){} }
   }
 }
-function keepClipsNear(ctx, recorded, idx){
-  if (recorded.length <= CLIP_WINDOW_OVER) return;
-  const next = recorded[(idx + 1) % recorded.length].r;
-  const keep = new Set([recorded[idx].r, next]);
-  recorded.forEach(x => { if (!keep.has(x.r) && x.r._clip) releaseClip(x.r); });
+function keepClipsNear(ctx, lineIdx){
+  if (recordings.length <= CLIP_WINDOW_OVER) return;
+  const order = voiceLayerGroups()[0] || [];
+  const at = order.indexOf(lineIdx);
+  const nextIdx = order.length ? order[(at + 1) % order.length] : lineIdx;
+  const keep = new Set([recordings[lineIdx], recordings[nextIdx]]);
+  /* Only the main voice's own takes are managed here. The layered voices let go
+     of theirs as each line finishes (playVoiceLayerLine), so a take another
+     layer is mid-way through is never stopped from under it. */
+  order.forEach(i => { const r = recordings[i]; if (r && !keep.has(r) && r._clip) releaseClip(r); });
+  const next = recordings[nextIdx];
   // A decode that finishes after the session has been stopped must not be kept.
-  loadClip(ctx, next).then(() => { if (!finalPlaying || finalCtx !== ctx) releaseClip(next); }).catch(() => {});
+  if (next) loadClip(ctx, next).then(() => { if (!finalPlaying || finalCtx !== ctx) releaseClip(next); }).catch(() => {});
 }
 
 /* Play one loaded clip through `gainValue`, calling onended when it finishes.
@@ -3538,14 +3544,21 @@ function keepClipsNear(ctx, recorded, idx){
    voice passes no meta, so it can never light a line. */
 function playClip(ctx, clip, gainValue, extraDest, onended, meta){
   const lineIndex = meta && Number.isInteger(meta.index) ? meta.index : null;
+  /* Where this clip goes. The main voice joins the voice bus (headroom and
+     safety compressor shared by every affirmation layer); a layered voice passes
+     its own layer gain as meta.dest and carries its volume there, so the clip's
+     own gain is 1 and it is not one of the nodes the Affirmations slider owns. */
+  const layerDest = meta && meta.dest ? meta.dest : null;
+  const out = layerDest || ctx.__voiceBus || audioOut(ctx);
+  const rec = layerDest || ctx.__voiceBus ? null : extraDest;   // the bus is wired to the recording once
   if (clip.kind === 'buffer'){
     const g = ctx.createGain(); g.gain.value = gainValue;
-    g.connect(audioOut(ctx));
-    if (extraDest && extraDest !== audioOut(ctx)) g.connect(extraDest);
+    g.connect(out);
+    if (rec && rec !== audioOut(ctx)) g.connect(rec);
     const src = ctx.createBufferSource(); src.buffer = clip.buffer;
     src.connect(g);
-    liveVoiceGains.add(g);
-    src.onended = () => { liveVoiceGains.delete(g); if (lineIndex !== null) lineEnded(lineIndex); if (onended) onended(); };
+    if (!layerDest) liveVoiceGains.add(g);
+    src.onended = () => { liveVoiceGains.delete(g); try { g.disconnect(); } catch(e){} if (lineIndex !== null) lineEnded(lineIndex); if (onended) onended(); };
     src.start();
     if (lineIndex !== null) lineStarted(lineIndex);
     return;
@@ -3555,11 +3568,17 @@ function playClip(ctx, clip, gainValue, extraDest, onended, meta){
   if (!clip.gain){
     clip.gain = ctx.createGain();
     ctx.createMediaElementSource(clip.el).connect(clip.gain);
-    clip.gain.connect(audioOut(ctx));
-    if (extraDest && extraDest !== audioOut(ctx)) clip.gain.connect(extraDest);
+    clip.gain.connect(out);
+    clip.dest = out;
+    if (rec && rec !== audioOut(ctx)) clip.gain.connect(rec);
+  } else if (clip.dest !== out){
+    // A line that moved to another layer: the same element, a different route.
+    try { clip.gain.disconnect(); } catch(e){}
+    clip.gain.connect(out);
+    clip.dest = out;
   }
   clip.gain.gain.value = gainValue;
-  liveVoiceGains.add(clip.gain);
+  if (!layerDest) liveVoiceGains.add(clip.gain);
   liveVoiceElements.add(clip.el);
   let started = false;
   // `playing` is when the element is really sounding -- including after a pause
@@ -3934,6 +3953,7 @@ function prepareFinal(){
   document.getElementById('rerecordBtn').style.display = (state.voiceMode === 'own') ? 'inline-flex' : 'none';
   renderFinalFreqPicker();
   renderFinalAmbiencePicker();
+  if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels();
   /* Start the ambience download now, while somebody is reading this screen and
      naming their subliminal, rather than in the second after they press play. */
   warmAmbience(state.bg); warmAmbience(state.bgLayer);
@@ -4145,6 +4165,256 @@ function voiceMixValue(){
   return el ? el.value/100 : 1;
 }
 
+/* ---------------- Affirmation layering ----------------
+   Up to four voices read the SAME recordings at once. A layer is only a list of
+   affirmation indices (see js/voice-layers.js): no recording is copied, re-
+   recorded or regenerated, and nothing is rendered ahead of time. Layer 1 is the
+   existing sequence below (runSequence); layers 2-4 are run by VoiceLayerEngine.
+   Every layer feeds one voice bus (headroom + a safety compressor) before the
+   session's output bus, so voices cannot add up past full scale. The session
+   clock is wall time, so four layers for twenty minutes is still twenty minutes. */
+let voiceLayerRev = 0, voiceLayerEngine = null, voiceLayersSuppressed = false;
+function voiceLayerConfig(){ return VoiceLayers.normalizeConfig(state.voiceLayers); }
+/* The groups that will play now: one per active layer, none empty. */
+function voiceLayerGroups(){
+  const total = (state.affirmations || []).length;
+  const cfg = voiceLayerConfig();
+  if (voiceLayersSuppressed) return [VoiceLayers.distribute(total, 1)[0]];
+  let groups = VoiceLayers.resolveGroups(cfg, total);
+  if (state.voiceMode === 'own'){
+    // Only lines that have a take can be heard; layers share out what exists.
+    const ok = i => !!(recordings && recordings[i]);
+    groups = groups.map(g => g.filter(ok));
+    if (groups.some(g => !g.length)){
+      const have = [];
+      for (let i = 0; i < total; i++) if (ok(i)) have.push(i);
+      groups = VoiceLayers.distribute(have.length, cfg.count).map(g => g.map(p => have[p]));
+    }
+  }
+  return groups;
+}
+/* Linear level of each active layer. Layer 1 is the Affirmations fader. */
+function voiceLayerGains(groups){
+  const cfg = voiceLayerConfig();
+  const n = (groups || voiceLayerGroups()).length;
+  const vols = cfg.volumes.slice();
+  vols[0] = Number(voiceMixValue() * 100);
+  return vols.slice(0, n).map(v => v / 100);
+}
+/* The line each secondary layer is saying right now, for the lyrics hint. */
+const voiceLayerNow = {};
+function paintVoiceLayerLyrics(){
+  if (typeof playerLyrics === 'undefined' || !playerLyrics) return;
+  const groups = voiceLayerGroups();
+  const owner = (state.affirmations || []).map((_, i) => groups.length > 1 ? VoiceLayers.layerOf(groups, i) + 1 : 0);
+  playerLyrics.setLayers(owner);
+  playerLyrics.setSecondary(voiceLayerNow);
+}
+function onVoiceLayerLine(slot, index){
+  if (index >= 0) voiceLayerNow[slot] = index; else delete voiceLayerNow[slot];
+  if (typeof playerLyrics !== 'undefined' && playerLyrics) playerLyrics.setSecondary(voiceLayerNow);
+}
+function clearVoiceLayerNow(){ Object.keys(voiceLayerNow).forEach(k => delete voiceLayerNow[k]); }
+
+function setupVoiceBus(ctx, recordDest){
+  if (ctx.__voiceBus) return ctx.__voiceBus;
+  const bus = ctx.createGain();
+  let tail = bus;
+  if (typeof ctx.createDynamicsCompressor === 'function'){
+    try { const comp = ctx.createDynamicsCompressor(); bus.connect(comp); ctx.__voiceComp = comp; tail = comp; } catch(e){ tail = bus; }
+  }
+  tail.connect(audioOut(ctx));
+  if (recordDest && recordDest !== audioOut(ctx)) tail.connect(recordDest);
+  ctx.__voiceBus = bus;
+  updateVoiceBus();
+  return bus;
+}
+/* Headroom for the voices, and the safety compressor, follow the layers. One
+   layer: gain 1 and a ratio of 1, which does nothing, so a single-voice session
+   sounds exactly as it did before layering existed. */
+function updateVoiceBus(){
+  const ctx = finalCtx;
+  if (!ctx || !ctx.__voiceBus || ctx.state === 'closed') return;
+  const gains = voiceLayerGains();
+  const t = ctx.currentTime;
+  try {
+    ctx.__voiceBus.gain.cancelScheduledValues(t);
+    ctx.__voiceBus.gain.setTargetAtTime(VoiceLayers.headroom(gains), t, 0.05);
+  } catch(e){}
+  const comp = ctx.__voiceComp;
+  if (comp){
+    const layered = gains.length > 1;
+    try {
+      comp.threshold.setTargetAtTime(layered ? -16 : 0, t, 0.05);
+      comp.knee.setTargetAtTime(layered ? 8 : 0, t, 0.05);
+      comp.ratio.setTargetAtTime(layered ? 8 : 1, t, 0.05);
+      comp.attack.value = 0.003; comp.release.value = 0.25;
+    } catch(e){}
+  }
+}
+function stopVoiceLayerEngine(){
+  if (voiceLayerEngine){ try { voiceLayerEngine.stop(); } catch(e){} voiceLayerEngine = null; }
+  clearVoiceLayerNow();
+}
+/* Layers 2-4 say their lines through their own gain; layer 1 keeps going in
+   runSequence. */
+function playVoiceLayerLine(index, dest, done){
+  const finish = finalCallback(done);
+  const own = state.voiceMode === 'own';
+  const rec = own ? recordings[index] : null;
+  const play = clip => playClip(finalCtx, clip, 1, null, () => {
+    // Past the memory window a finished take is let go, as the main voice does.
+    if (rec && recordings.length > CLIP_WINDOW_OVER) releaseClip(rec);
+    finish();
+  }, { dest });
+  if (own){
+    if (!rec){ finish(); return; }
+    loadClip(finalCtx, rec).then(finalCallback(play)).catch(e => { console.error('could not play layered line', index, e); finish(); });
+    return;
+  }
+  const line = state.affirmations[index];
+  if (isClonedVoiceSession()){
+    const url = ttsLineText(line) ? clonedClipUrl(line) : null;
+    if (!url){ finish(); return; }
+    url.then(u => loadClip(finalCtx, studioClipHandle(u))).then(finalCallback(play)).catch(() => finish());
+    return;
+  }
+  resolveVoiceKey(state.aiVoiceId).catch(() => null).then(voiceKey => {
+    if (!voiceKey){ suppressVoiceLayers(); finish(); return; }
+    return synthesizeLine(line, voiceKey).then(url => loadClip(finalCtx, studioClipHandle(url))).then(finalCallback(play));
+  }).catch(() => finish());
+}
+/* The device's built-in voice can only speak one thing at a time and cannot be
+   given a volume, so it cannot be layered. The session carries on with one
+   voice reading every line rather than going quiet. */
+function suppressVoiceLayers(){
+  if (voiceLayersSuppressed) return;
+  voiceLayersSuppressed = true;
+  applyVoiceLayers();
+}
+/* Bring the running session in line with the configuration. Safe to call on
+   every change: layers are added, removed, re-levelled or re-pointed in place,
+   and nothing already sounding is cut. */
+function syncVoiceLayerEngine(){
+  if (!finalPlaying || !finalCtx || !finalCtx.__voiceBus) return;
+  const groups = voiceLayerGroups();
+  if (groups.length < 2){ stopVoiceLayerEngine(); return; }
+  if (!voiceLayerEngine){
+    const ctx = finalCtx;
+    voiceLayerEngine = new VoiceLayers.VoiceLayerEngine({
+      ctx, bus: ctx.__voiceBus,
+      playLine: playVoiceLayerLine,
+      later: (fn, ms) => finalLater(fn, ms),
+      cancel: t => { clearTimeout(t); const i = finalTimeouts.indexOf(t); if (i >= 0) finalTimeouts.splice(i, 1); },
+      isLive: () => finalPlaying && finalCtx === ctx,
+      gapMs: () => gapForNextLine(),
+      loops: () => (typeof getPlayerLoopMode === 'function' ? getPlayerLoopMode() : 'entire') !== 'none',
+      onLine: onVoiceLayerLine
+    });
+  }
+  voiceLayerEngine.sync(groups, voiceLayerGains(groups), VoiceLayers.layerOffsets(voiceLayerConfig(), groups.length));
+}
+function applyVoiceLayers(){
+  voiceLayerRev++;
+  updateVoiceBus();
+  syncVoiceLayerEngine();
+  paintVoiceLayerLyrics();
+  if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels();
+}
+/* A per-layer volume slider (layers 2-4; layer 1 is the Affirmations fader). */
+function setVoiceLayerVolume(slot, value){
+  const cfg = voiceLayerConfig();
+  cfg.volumes[slot] = VoiceLayers.clampVolume(value, cfg.volumes[slot]);
+  state.voiceLayers = cfg;
+  if (slot === 0){ setListeningMix('mixVoice', cfg.volumes[0]); return; }
+  updateVoiceBus();
+  if (voiceLayerEngine) voiceLayerEngine.setGain(slot, cfg.volumes[slot] / 100);
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+function setVoiceLayerCount(n){
+  const cfg = voiceLayerConfig();
+  const next = VoiceLayers.clampCount(n);
+  if (next === cfg.count) return;
+  cfg.count = next;
+  cfg.groups = null;          // a different number of layers is shared out afresh
+  state.voiceLayers = cfg;
+  applyVoiceLayers();
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+function setVoiceLayerMode(mode){
+  const cfg = voiceLayerConfig();
+  if (!VoiceLayers.MODES.includes(mode) || cfg.mode === mode) return;
+  cfg.mode = mode; state.voiceLayers = cfg;
+  if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels();
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+function setVoiceLayerStagger(ms){
+  const cfg = voiceLayerConfig();
+  cfg.staggerMs = VoiceLayers.clampStagger(ms); state.voiceLayers = cfg;
+  if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels();
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+/* Move one affirmation to another layer. Never empties a layer, never copies. */
+function assignVoiceLayerLine(index, slot){
+  const total = (state.affirmations || []).length;
+  const cfg = voiceLayerConfig();
+  const groups = VoiceLayers.resolveGroups(cfg, total);
+  const moved = VoiceLayers.moveLine(groups, index, slot);
+  if (JSON.stringify(moved) === JSON.stringify(groups)) { if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels(); return false; }
+  cfg.groups = moved.concat(Array.from({ length: VoiceLayers.MAX_LAYERS - moved.length }, () => []));
+  state.voiceLayers = cfg;
+  applyVoiceLayers();
+  if (typeof queueMixSave === 'function') queueMixSave();
+  return true;
+}
+function balanceVoiceLayers(){
+  const cfg = voiceLayerConfig(); cfg.groups = null; state.voiceLayers = cfg;
+  applyVoiceLayers();
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+/* Back to the recommended sound: staggered, 65/40/30/20, shared out evenly. The
+   number of layers is the listener's choice and stays. */
+function resetVoiceLayers(){
+  state.voiceLayers = VoiceLayers.recommendedConfig(state.voiceLayers);
+  setListeningMix('mixVoice', VoiceLayers.DEFAULT_VOLUMES[0]);
+  applyVoiceLayers();
+  if (typeof queueMixSave === 'function') queueMixSave();
+}
+/* A short listen: every layer starts over from the top of its own lines (with
+   the stagger), without touching the session clock. */
+function previewVoiceLayers(){
+  if (!finalPlaying) return false;
+  if (finalPaused){ resumeFinal(); return true; }
+  const groups = voiceLayerGroups();
+  stopVoiceLayerEngine();
+  syncVoiceLayerEngine();
+  if (groups[0] && groups[0].length) seekFinalToIndex(groups[0][0]);
+  return true;
+}
+/* The main voice's walk through its own lines. It re-reads the layer
+   configuration whenever that changes, and picks up at the first of its lines
+   after the one it just finished, so changing layers mid-session never repeats
+   or skips a line it had already said. */
+function mainVoiceCursor(){
+  let rev = -1, order = [], pos = 0, last = -1;
+  const sync = () => {
+    if (rev === voiceLayerRev) return;
+    const first = rev === -1;
+    rev = voiceLayerRev;
+    order = voiceLayerGroups()[0] || [];
+    if (first){ pos = 0; return; }
+    const at = order.findIndex(i => i > last);
+    pos = at < 0 ? order.length : at;
+  };
+  return {
+    size(){ sync(); return order.length; },
+    done(){ sync(); return pos >= order.length; },
+    current(){ sync(); return pos < order.length ? order[pos] : -1; },
+    advance(){ sync(); if (pos < order.length){ last = order[pos]; pos++; } },
+    jump(i){ sync(); const at = order.indexOf(i); if (at < 0) return false; pos = at; return true; }
+  };
+}
+
 /* Player time excludes pauses so the UI, completion record and timer agree. */
 function getFinalElapsedMs(){
   if (!finalStartTime) return 0;
@@ -4239,6 +4509,9 @@ function seekFinalAffirmation(delta){
 function seekFinalToIndex(index){
   const lines = state.affirmations || [];
   if (!finalPlaying || !Number.isInteger(index) || index < 0 || index >= lines.length) return;
+  /* A line the main voice does not own is cued on the layer that does; the
+     lit line stays on the main voice. */
+  if (voiceLayerEngine && !(voiceLayerGroups()[0] || []).includes(index)){ voiceLayerEngine.request(index); return; }
   finalRequestedIndex = index;
   affTimeline.request(index);
 }
@@ -4468,7 +4741,10 @@ function applyLiveMixGain(id, value){
   if (id==='mixLayerVoice') setLiveGain(liveLayerVoiceGain, value/100);
   /* The affirmation volume reaches whatever is sounding right now as well as
      every line after it. It used to only be read when a line started. */
-  if (id==='mixVoice') liveVoiceGains.forEach(g => setLiveGain(g, value/100));
+  if (id==='mixVoice'){
+    liveVoiceGains.forEach(g => setLiveGain(g, value/100));
+    updateVoiceBus();
+  }
 }
 ['mixTone','mixBg','mixVoice','mixSoothing','mixCustom','mixLayerVoice'].forEach(id=>{
   const el = document.getElementById(id);
@@ -4875,6 +5151,15 @@ function playFinal(){
     destForRecording = dest;
   }
 
+  /* The voice bus and the affirmation layers. Reset per session so a device-voice
+     verdict from one subliminal never silences the layers of the next. */
+  voiceLayersSuppressed = false;
+  voiceLayerRev++;
+  clearVoiceLayerNow();
+  setupVoiceBus(finalCtx, destForRecording);
+  syncVoiceLayerEngine();
+  paintVoiceLayerLyrics();
+
   // Ritual-only: a second, quieter voice layered underneath the main one, looping on
   // its own independent cycle so the two don't read as a single flat voice.
   if (layerVoiceEnabled && state.layerAffirmations && state.layerAffirmations.length){
@@ -4946,19 +5231,19 @@ function playFinal(){
     // A new pass (the first, or the loop coming round): every line is upcoming again.
     affTimeline.beginPass();
     if (state.voiceMode === 'own'){
-      const recorded = recordings.map((r,i)=>({r,i})).filter(x=>x.r);
-      let idx = 0;
+      const cursor = mainVoiceCursor();
       function playNext(){
         if (!alive()) return;
         if (waitWhileFinalPaused(playNext)) return;
         if (finalRequestedIndex !== null){
-          const requestedRecorded = recorded.findIndex(x => x.i === finalRequestedIndex);
+          const want = finalRequestedIndex;
           finalRequestedIndex = null;
-          if (requestedRecorded >= 0) idx = requestedRecorded;
+          cursor.jump(want);
         }
-        if (idx >= recorded.length){ onDone(recorded.length > 0); return; }
-        const { r, i } = recorded[idx];
-        keepClipsNear(finalCtx, recorded, idx);
+        if (cursor.done()){ onDone(cursor.size() > 0); return; }
+        const i = cursor.current();
+        const r = recordings[i];
+        keepClipsNear(finalCtx, i);
         showFinalAffirmation(state.affirmations[i], i);
         const repeatsForThisLine = eftRepeatsForIndex(i);
         loadClip(finalCtx, r).then(finalCallback(clip=>{
@@ -4972,7 +5257,7 @@ function playFinal(){
                 // Short beat between repeats of the same line, timed to a single tap.
                 finalLater(playOnce, 700);
               } else {
-                if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+                if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) cursor.advance();
                 finalLater(playNext, gapForNextLine());
               }
             }), { index: i });
@@ -4983,17 +5268,20 @@ function playFinal(){
           // Never fail silently — a session that plays no voice should say why.
           console.error('could not play recorded line', i, e);
           document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
-          finalCallback(() => { idx++; finalLater(playNext, gapForNextLine()); })();
+          finalCallback(() => { cursor.advance(); finalLater(playNext, gapForNextLine()); })();
         });
       }
       playNext();
     } else {
       const lines = state.affirmations;
+      const cursor = mainVoiceCursor();
       let idx = 0;
       // Resolved once per session: a studio voice key, or null to use the voice
       // built into this device. Anything that goes wrong with a studio voice
       // falls back to the device rather than leaving the session silent.
       const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
+      /* The device voice cannot be layered: one voice then reads every line. */
+      voicePromise.then(k => { if (!k) suppressVoiceLayers(); });
       /* ...except a cloned voice, which never falls back. A line that cannot be
          played stops the session and says so; Play tries again. */
       const cloned = isClonedVoiceSession();
@@ -5006,8 +5294,9 @@ function playFinal(){
       function speakNext(){
         if (!alive()) return;
         if (waitWhileFinalPaused(speakNext)) return;
-        if (finalRequestedIndex !== null){ idx = finalRequestedIndex; finalRequestedIndex = null; }
-        if (idx >= lines.length){ onDone(lines.length > 0); return; }
+        if (finalRequestedIndex !== null){ cursor.jump(finalRequestedIndex); finalRequestedIndex = null; }
+        if (cursor.done()){ onDone(lines.length > 0); return; }
+        idx = cursor.current();
         showFinalAffirmation(lines[idx], idx);
         const repeatsForThisLine = eftRepeatsForIndex(idx);
         let rep = 0;
@@ -5017,7 +5306,7 @@ function playFinal(){
           if (rep < repeatsForThisLine){
             finalLater(speakOnce, 700);
           } else {
-            if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) idx++;
+            if (!(typeof getPlayerLoopMode === 'function' && getPlayerLoopMode() === 'current')) cursor.advance();
             finalLater(speakNext, gapForNextLine());
           }
         });
@@ -5170,6 +5459,10 @@ function playFinal(){
     }
     if (alive() && selectedLoopMode !== 'none' && (stillBuildingTowardTarget || manualLoop)){
       finalLater(() => runSequence(loopCheck), 0);
+    } else if (alive() && voiceLayerEngine && voiceLayerEngine.busy()){
+      /* Played once, and the layered voices are still reading their lines: the
+         session ends when the last of them has, not in the middle of a word. */
+      finalLater(() => loopCheck(true), 500);
     } else {
       finishFinal();
     }
@@ -5242,7 +5535,7 @@ function fadeOutAndFinishFinal(){
   if (!finalPlaying || finalFadeEnding) return;
   finalFadeEnding = true;
   const now = finalCtx ? finalCtx.currentTime : 0;
-  [liveToneGain,sessionBed.out,sessionLayerBed.out,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
+  [liveToneGain,sessionBed.out,sessionLayerBed.out,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,finalCtx && finalCtx.__voiceBus,...liveVoiceGains].forEach(node => {
     if (!node || !node.gain || !finalCtx) return;
     try {
       node.gain.cancelScheduledValues(now);
@@ -5285,6 +5578,7 @@ function finishFinal(){
   } else if (finalChunks.length){
     window._subliminallyDownloadBlob = new Blob(finalChunks, { type:'audio/webm' });
   }
+  stopVoiceLayerEngine();
   frequencyMixer.detach();
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   // The ending fade has finished; detach now so restarting cannot reuse a closed bus.
@@ -5322,6 +5616,7 @@ function stopFinal(){
   updateSessionTimerLabel();
   finalTimeouts.forEach(clearTimeout); finalTimeouts = [];
   try { window.speechSynthesis.cancel(); } catch(e){}
+  stopVoiceLayerEngine();
   frequencyMixer.detach();
   if (finalPremiumPad){ finalPremiumPad.stop(); finalPremiumPad = null; }
   /* Stop means stop: the context closes on the next line, so there is nothing

@@ -112,7 +112,8 @@ function mountImmersivePlayer(){
           </div>
           <button class="ip-ambience-card" onclick="openPlayerAmbience()"><span class="ip-ambience-mark">${svgIcon('sound')}</span><span class="ip-ambience-copy"><small>Ambience</small><b id="ipAmbience">528 Hz + Rain</b></span><span class="ip-change">Change ›</span></button>
           <button class="ip-adjust" id="ipAdjustBtn" onclick="openAudioEditor(activeMixId)" hidden>${svgIcon('sound')}<span>Adjust Sounds</span><small>Brainwave · frequency · ambience · volumes</small></button>
-          <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup({ frequencies:true })}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
+          <div class="vl-host" data-voice-layers-host></div>
+                    <details class="listening-mix"><summary>Sound adjustments</summary>${listeningMixMarkup({ frequencies:true })}<button class="ps-use" onclick="saveMixAdjustments()">Save adjustments</button><p data-mix-status role="status"></p></details>
           <div><div class="ip-progress-track"><div class="ip-progress-fill" id="ipProgress"></div></div><div class="ip-times"><span id="ipElapsed">0:00</span><span id="ipRemaining">−20:00</span></div></div>
           <div class="ip-controls">
             <button class="ip-main-play" id="ipPlay" onclick="toggleImmersivePlayback()" aria-label="Pause">${svgIcon('pause')}</button>
@@ -167,8 +168,11 @@ function openImmersivePlayer(){
   const eftTags = state.eftMode && typeof EFT_LINE_POINTS !== 'undefined'
     ? (state.affirmations||[]).map((_, i) => EFT_LINE_POINTS[i] ? (EFT_LINE_POINTS[i].isSetup ? `Setup Statement · tap ${EFT_LINE_POINTS[i].where}` : `${EFT_LINE_POINTS[i].label} · tap ${EFT_LINE_POINTS[i].where}`) : '') : [];
   playerLyrics.setLines(state.affirmations || [], eftTags);
+
   const layerNote = document.getElementById('ipLayerNote');
   if (layerNote) layerNote.hidden = !(typeof layerVoiceEnabled !== 'undefined' && layerVoiceEnabled);
+  if (typeof paintVoiceLayerLyrics === 'function') paintVoiceLayerLyrics();
+  if (typeof renderVoiceLayerPanels === 'function') renderVoiceLayerPanels();
   showImmersiveAffirmation((document.getElementById('finalLine')||{}).textContent || '');
   playerLyrics.scrollToActive();
   const adjust = document.getElementById('ipAdjustBtn'); if (adjust) adjust.hidden = !activeMixId;

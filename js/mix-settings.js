@@ -58,6 +58,13 @@ function readMixSettings(){
   if (typeof state !== 'undefined' && state && Array.isArray(state.freqLayers) && state.freqLayers.length && typeof FrequencyLayers !== 'undefined') mix.freqLayers = FrequencyLayers.serializeFrequencyLayers(state.freqLayers);
   // Each affirmation's order, length, planned timing and the words its take was recorded for.
   if (typeof buildAffirmationMeta === 'function'){ const meta = buildAffirmationMeta(); if (meta) mix.affirmationMeta = meta; }
+  // Affirmation layering: how many voices, how they start, their levels and which
+  // lines each reads. Layer 1's level is the Affirmations fader, saved above.
+  if (typeof state !== 'undefined' && state && typeof VoiceLayers !== 'undefined'){
+    const vl = VoiceLayers.serializeConfig(state.voiceLayers);
+    vl.volumes[0] = mix.mixVoice;
+    mix.voiceLayers = vl;
+  }
   // So does the soothing pad, which had nowhere to be saved before.
   if (typeof state !== 'undefined' && state && SOOTHING_VARIANTS.includes(state.soothingLayer)) mix.soothingLayer = state.soothingLayer;
   return mix;
@@ -79,6 +86,12 @@ function restoreMixSettings(id, settings){
     if(number) number.value = value;
     applyLiveMixGain(key,value);
   });
+  /* Each subliminal brings its own layering; one with none saved plays as one
+     voice, exactly as before, and never inherits the one opened before it. */
+  if (typeof state !== 'undefined' && state && typeof VoiceLayers !== 'undefined'){
+    state.voiceLayers = VoiceLayers.normalizeConfig(settings && settings.voiceLayers);
+    if (typeof applyVoiceLayers === 'function') applyVoiceLayers();
+  }
   restoringMix = false;
   syncListeningMix();
   mixMessage(id ? 'Your saved sound levels' : 'Sound levels will be included when you save this subliminal.');
