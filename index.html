@@ -1050,6 +1050,12 @@
   .pw-toggle:hover{ opacity:1; }
   .auth-field input, .auth-field select{ width:100%; background:var(--dusk); border:1px solid transparent; border-radius:12px; padding:12px 14px; color:var(--moonlight); font-size:14px; outline:none; transition:border-color .2s; font-family:inherit; }
   .auth-field input:focus, .auth-field select:focus{ border-color:var(--candle); }
+  .auth-consent{ display:flex; gap:10px; align-items:flex-start; font-size:12.5px; line-height:1.45; color:var(--haze); margin:2px 0 4px; cursor:pointer; text-align:left; }
+  .auth-consent input{ width:auto; margin-top:2px; flex:none; accent-color:var(--candle); }
+  .email-pref-status{ font-size:13px; color:var(--moonlight); margin:0 0 10px; }
+  .email-pref-fine{ font-size:11.5px; color:var(--haze); margin-top:12px; line-height:1.5; }
+  .admin-health-grid{ display:grid; grid-template-columns:1fr auto; gap:4px 16px; font-size:12.5px; color:var(--moonlight); margin-bottom:10px; }
+  .admin-health-grid span:nth-child(even){ text-align:right; color:var(--candle); }
   .auth-msg{ font-size:12.5px; min-height:16px; margin-top:10px; }
   .auth-msg.err{ color:#E39A9A; }
   .auth-msg.ok{ color:var(--candle); }
@@ -2582,6 +2588,12 @@
       <label>Username</label>
       <input type="text" id="signupUsername" placeholder="how others will know you" autocomplete="off">
     </div>
+    <!-- Optional, unchecked by default. Covers email AND Google sign-up (it is only shown on the
+         sign-up form). If this wording changes, bump MARKETING_CONSENT_VERSION in js/account.js. -->
+    <label class="auth-consent" id="marketingOptInField" style="display:none;">
+      <input type="checkbox" id="marketingOptIn">
+      <span>Yes! Send me affirmations, wellness tips, product updates, and exclusive Subliminally offers. I can unsubscribe anytime.</span>
+    </label>
     <div class="auth-msg" id="authMsg"></div>
     <button class="btn btn-primary" id="authSubmitBtn" style="width:100%; justify-content:center;" onclick="submitAuth()">Log in</button>
     <div class="auth-toggle" id="authToggle">New here? <button onclick="toggleAuthMode()">Create a free account</button></div>
@@ -3700,6 +3712,23 @@
           <button class="mini-btn ghostbtn" onclick="updatePassword()">Update password</button>
           <div class="save-msg" id="passwordSettingsMsg"></div>
         </div>
+        <div class="profile-field-card" id="emailPrefsCard">
+          <label>Email preferences</label>
+          <p class="email-pref-status" id="emailPrefStatus">Loading…</p>
+          <label class="auth-consent">
+            <input type="checkbox" id="emailPrefMarketing" onchange="saveEmailPreference(this.checked)" disabled>
+            <span>Send me affirmations, wellness tips, product updates, and exclusive Subliminally offers.</span>
+          </label>
+          <div class="save-msg" id="emailPrefMsg"></div>
+          <p class="email-pref-fine">This only controls marketing email. Account, security, billing and essential service emails (like confirming your address or resetting your password) are always sent, whatever you choose here.</p>
+        </div>
+        <div class="profile-field-card" id="adminSyncCard" style="display:none;">
+          <label>Email sync health (admin)</label>
+          <div class="admin-health-grid" id="adminSyncBody"></div>
+          <button class="mini-btn ghostbtn" onclick="loadSyncHealth()">Refresh</button>
+          <button class="mini-btn ghostbtn" onclick="replayFailedSync()">Replay failed events</button>
+          <div class="save-msg" id="adminSyncMsg"></div>
+        </div>
       </div>
       <h3 class="profile-subhead">Get in touch</h3>
       <div class="journal-tabs" style="max-width:340px;">
@@ -3894,7 +3923,7 @@
 <script src="js/kaly.js"></script>
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20261005a"></script>
-<script src="js/profile.js?v=20261016a"></script>
+<script src="js/profile.js?v=20261017a"></script>
 <script src="js/mix-settings.js?v=20261015a"></script>
 <script src="js/lyrics-list.js?v=20261015a"></script>
 <script src="js/player.js?v=20261015a"></script>

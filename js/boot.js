@@ -57,6 +57,7 @@ if (sb){
     }
     renderAccountArea();
     if (currentUser) applyPendingSignupProfile();
+    if (currentUser) applyPendingMarketingConsent();
     // A sign-in that happens after the first load -- typing a password, coming
     // back from Google -- routes here. Before that, the block below does it
     // once, with the restored session in hand.

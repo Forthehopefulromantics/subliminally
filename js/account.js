@@ -97,6 +97,43 @@ try {
   console.error('Supabase init failed:', e);
 }
 
+/* ---------- marketing consent ----------
+   The wording beside the sign-up checkbox (index.html #marketingOptInField) is versioned so the
+   database can say exactly what a person agreed to. Change the wording => bump this, and add the
+   new text to docs/marketing-sync.md. The checkbox is optional and starts unchecked. */
+const MARKETING_CONSENT_VERSION = '2026-10-v1';
+const PENDING_MARKETING_KEY = 'subliminally_pending_marketing_consent';
+// A tick made on the sign-up form is only honoured for this long -- long enough to bounce out to
+// Google and back, short enough that a stale tick can never be applied to a later login.
+const PENDING_MARKETING_TTL_MS = 60 * 60 * 1000;
+
+function marketingOptInChecked(){
+  const box = document.getElementById('marketingOptIn');
+  return !!(box && box.checked);
+}
+function rememberPendingMarketingConsent(source){
+  try { localStorage.setItem(PENDING_MARKETING_KEY, JSON.stringify({ version: MARKETING_CONSENT_VERSION, source, at: Date.now() })); } catch(e){}
+}
+function clearPendingMarketingConsent(){
+  try { localStorage.removeItem(PENDING_MARKETING_KEY); } catch(e){}
+}
+/* Social sign-up: the checkbox was ticked before leaving for the provider, so the choice is
+   recorded here, once there is a session. Never blocks sign-in; a failure only means the person
+   can opt in from Settings instead. */
+async function applyPendingMarketingConsent(){
+  let pending = null;
+  try { pending = JSON.parse(localStorage.getItem(PENDING_MARKETING_KEY) || 'null'); } catch(e){}
+  if (!pending || !sb || !currentUser) return;
+  clearPendingMarketingConsent();
+  if (!pending.at || Date.now() - pending.at > PENDING_MARKETING_TTL_MS) return;
+  try {
+    const { error } = await sb.rpc('set_marketing_consent', {
+      p_subscribed: true, p_source: pending.source || 'signup_google', p_version: pending.version,
+    });
+    if (error) console.warn('marketing consent not recorded:', error.message);
+  } catch(e){ console.warn('marketing consent not recorded:', e); }
+}
+
 let currentUser = null;
 let authMode = 'login'; // 'login' | 'signup' | 'reset'
 let journalTab = 'received';
@@ -205,6 +242,10 @@ async function startOAuthSignIn(provider){
   if (!sb){ document.getElementById('authMsg').textContent = 'Accounts aren\'t connected yet — check back soon.'; document.getElementById('authMsg').className='auth-msg err'; return; }
   const msg = document.getElementById('authMsg');
   const native = isNativeApp();
+  // The checkbox only exists on the sign-up form, so signing in with Google from the log-in form
+  // can never record consent. Clear any stale tick either way.
+  clearPendingMarketingConsent();
+  if (authMode === 'signup' && marketingOptInChecked()) rememberPendingMarketingConsent('signup_' + provider);
   const { data, error } = await sb.auth.signInWithOAuth({
     provider,
     options: {
@@ -392,6 +433,7 @@ function updateAuthModalUI(){
     document.querySelector('#authPassword').closest('.auth-field').style.display = 'none';
     document.getElementById('confirmPwField').style.display = 'none';
     document.getElementById('signupUsernameField').style.display = 'none';
+    document.getElementById('marketingOptInField').style.display = 'none';
     document.getElementById('authToggle').innerHTML = `<button onclick="toggleAuthModeFromReset()">Back to log in</button>`;
     document.getElementById('googleAuthRow').style.display = 'none';
     return;
@@ -403,6 +445,7 @@ function updateAuthModalUI(){
   document.getElementById('authSubmitBtn').textContent = authMode === 'signup' ? 'Create a free account' : 'Log in';
   document.querySelector('#authPassword').closest('.auth-field').style.display = 'block';
   const signupOnly = authMode === 'signup' ? 'block' : 'none';
+  document.getElementById('marketingOptInField').style.display = authMode === 'signup' ? 'flex' : 'none';
   document.getElementById('confirmPwField').style.display = signupOnly;
   document.getElementById('signupUsernameField').style.display = signupOnly;
   document.getElementById('forgotPwRow').style.display = authMode === 'login' ? 'block' : 'none';
@@ -455,7 +498,14 @@ async function submitAuth(){
   let data, error;
   try {
     const result = wasSignup
-      ? await sb.auth.signUp({ email, password })
+      ? await sb.auth.signUp({
+          email, password,
+          // Only an explicit tick is sent; the database records proof (time, wording version,
+          // source) and nothing reaches Resend until the email address is confirmed.
+          options: marketingOptInChecked()
+            ? { data: { marketing_opt_in: true, marketing_consent_version: MARKETING_CONSENT_VERSION } }
+            : undefined,
+        })
       : await sb.auth.signInWithPassword({ email, password });
     data = result.data; error = result.error;
   } catch (e){

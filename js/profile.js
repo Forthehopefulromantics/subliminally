@@ -26,6 +26,8 @@ async function loadProfile(){
   // unless the builder has it in use and this is only an auth event redrawing
   // Settings in the background.
   if (!voiceCloneHeldElsewhere('voiceCloneBody')) mountVoiceClone('voiceCloneBody', 'voiceCloneMsg');
+  loadEmailPreferences();
+  loadSyncHealth(true);
   if (typeof loadFaith === 'function') await loadFaith();
   if (typeof renderFaithSettings === 'function') renderFaithSettings();
 
@@ -1499,6 +1501,79 @@ async function updateEmail(){
   if (error){ msg.textContent = error.message; msg.className = 'save-msg err'; return; }
   msg.textContent = 'Check both your old and new inbox to confirm the change.'; msg.className = 'save-msg ok';
 }
+/* ---------- email preferences (Settings) ----------
+   Marketing email only. Confirmation, password-reset, security, billing and service notices are
+   transactional: they never read this, and nothing here can switch them off. The row itself is
+   only writable through the set_marketing_consent function, which acts on the signed-in account. */
+function describeEmailPref(pref){
+  if (!pref) return "We couldn't load your email preferences.";
+  const when = pref.consent_at ? ' since ' + new Date(pref.consent_at).toLocaleDateString() : '';
+  if (pref.status === 'subscribed') return "You're subscribed to Subliminally news and offers" + when + '.';
+  if (pref.status === 'unsubscribed'){
+    if (pref.suppressed_reason === 'bounced') return "Marketing email is off — mail to this address bounced.";
+    if (pref.suppressed_reason === 'complained') return 'Marketing email is off — you reported a message as spam.';
+    return 'You are unsubscribed from marketing email' + when + '.';
+  }
+  return "You haven't chosen yet, so we won't send you marketing email.";
+}
+async function loadEmailPreferences(){
+  const status = document.getElementById('emailPrefStatus');
+  const box = document.getElementById('emailPrefMarketing');
+  if (!status || !box) return;
+  if (!sb || !currentUser){ status.textContent = ''; return; }
+  const { data, error } = await sb.rpc('get_my_marketing_preference');
+  if (error || !data){ status.textContent = describeEmailPref(null); box.disabled = true; return; }
+  status.textContent = describeEmailPref(data);
+  box.checked = data.status === 'subscribed';
+  box.disabled = false;
+}
+async function saveEmailPreference(subscribed){
+  const msg = document.getElementById('emailPrefMsg');
+  const box = document.getElementById('emailPrefMarketing');
+  if (!sb || !currentUser) return;
+  box.disabled = true;
+  msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  const { error } = await sb.rpc('set_marketing_consent', {
+    p_subscribed: !!subscribed, p_source: 'settings', p_version: MARKETING_CONSENT_VERSION,
+  });
+  if (error){
+    msg.textContent = "Couldn't save that — try again."; msg.className = 'save-msg err';
+    await loadEmailPreferences();
+    return;
+  }
+  msg.textContent = subscribed ? "You're subscribed." : "You're unsubscribed."; msg.className = 'save-msg ok';
+  await loadEmailPreferences();
+}
+
+/* ---------- email sync health (admins only) ----------
+   Counts, never addresses. The functions refuse anyone who is not in app_admins, so a normal
+   account just never sees this card. */
+async function loadSyncHealth(quiet){
+  const card = document.getElementById('adminSyncCard');
+  if (!card || !sb || !currentUser) return;
+  const { data, error } = await sb.rpc('marketing_sync_health');
+  if (error || !data){ card.style.display = 'none'; return; }
+  card.style.display = '';
+  const rows = [
+    ['Eligible contacts', data.eligible_contacts], ['Synced to Resend', data.synced_contacts],
+    ['Opted out', data.opt_outs], ['Consent unknown (legacy)', data.consent_unknown],
+    ['Waiting', data.events_pending], ['Retrying', data.events_retrying],
+    ['Failed', data.events_failed],
+    ['Last successful sync', data.last_successful_sync ? new Date(data.last_successful_sync).toLocaleString() : 'never'],
+  ];
+  document.getElementById('adminSyncBody').innerHTML = rows
+    .map(([k, v]) => '<span>' + k + '</span><span>' + String(v) + '</span>').join('');
+  if (!quiet) document.getElementById('adminSyncMsg').textContent = '';
+}
+async function replayFailedSync(){
+  const msg = document.getElementById('adminSyncMsg');
+  msg.textContent = 'Replaying…'; msg.className = 'save-msg';
+  const { data, error } = await sb.rpc('marketing_replay_failed', { p_limit: 500 });
+  if (error){ msg.textContent = 'Replay refused.'; msg.className = 'save-msg err'; return; }
+  msg.textContent = data + ' event(s) queued again.'; msg.className = 'save-msg ok';
+  loadSyncHealth(true);
+}
+
 async function updatePassword(){
   const msg = document.getElementById('passwordSettingsMsg');
   const newPassword = document.getElementById('settingsPassword').value;
