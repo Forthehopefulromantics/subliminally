@@ -1665,9 +1665,20 @@ let libraryNowPlayingId = null;
 function reflectLibraryPlaying(){
   document.querySelectorAll('.lib-play').forEach(b => b.classList.remove('is-playing'));
   document.querySelectorAll('.lib-now').forEach(n => { n.textContent = ''; });
-  if (!finalPlaying || !libraryNowPlayingId) return;
+  if (!libraryNowPlayingId) return;
   const btn = document.getElementById('libPlay-' + libraryNowPlayingId);
   const now = document.getElementById('libNow-' + libraryNowPlayingId);
+  /* A Serenity or cloned voice is made (and checked) before it plays, which can
+     take a few seconds and can fail. This card is where the person pressed Play,
+     so it is where that has to be said -- not on a builder screen they cannot see. */
+  if (!finalPlaying){
+    if (now && typeof studioStatus !== 'undefined' && studioStatus.state !== 'idle' && studioStatus.state !== 'ready'){
+      now.textContent = studioStatus.state === 'failed'
+        ? 'Voice failed — tap Play to try again'
+        : (studioStatus.state === 'saving' ? 'Saving Audio…' : 'Generating Voice…');
+    }
+    return;
+  }
   if (btn) btn.classList.add('is-playing');
   if (now) now.textContent = document.getElementById('finalLine').textContent || 'Playing…';
 }

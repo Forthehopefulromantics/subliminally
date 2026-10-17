@@ -35,9 +35,10 @@ import {
   MODEL_ID, VoiceProviderError, clampSpeed, isConfigured, synthesizeSpeech,
 } from '../lib/elevenlabs.js';
 import {
-  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, findCachedClips, hashesFor, normalizeLine,
+  MAX_CHARS_PER_LINE, MAX_LINES_PER_REQUEST, findCachedClips, forgetClip, hashesFor, normalizeLine,
   rateLimitFor, recordGenerations, rememberClip, signClipUrl, storagePathFor, touchClips, uploadClip,
 } from '../lib/tts-store.js';
+import { maybeAlertAdmin, recordFailure } from '../lib/tts-diagnostics.js';
 
 /* Generating several lines takes longer than the default ceiling allows, and a
    function cut off half way through has spent the credits without keeping the
@@ -76,7 +77,18 @@ const HTTP_FOR_CODE = {
   provider_auth: 502,
   rejected: 502,
   provider_failed: 502,
+  bad_audio: 502,
+  upload_failed: 502,
+  index_failed: 502,
 };
+
+/* Worth asking again in a moment, as opposed to a quota, a key, a bad voice or a
+   limit, which fail the same way every time. The browser reads this per clip. */
+const RETRYABLE_CODES = new Set(['timeout', 'network', 'provider_failed', 'bad_audio', 'upload_failed', 'index_failed', 'generation_failed']);
+
+/* The function limit is 60s. Stop starting work well before it, so every response
+   is an answer rather than a platform 504 with nothing in the log. */
+const BUDGET_MS = 50000;
 
 function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
@@ -111,6 +123,7 @@ async function resolveVoice(userId, requested) {
 }
 
 export default async function handler(req, res) {
+  const startedAt = Date.now();
   if (applyCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'method_not_allowed' }); return; }
 
@@ -171,7 +184,14 @@ export default async function handler(req, res) {
   });
 
   const wanted = clips.filter((c) => c.clipKey);
-  const cached = await findCachedClips(user.id, wanted.map((c) => c.clipKey));
+  let cached = await findCachedClips(user.id, wanted.map((c) => c.clipKey));
+  /* `repair`: the browser downloaded what we handed back and it was not playable
+     (empty, cut short, undecodable). The stored copy is bad, so it is forgotten
+     and made again rather than served again. Only the lines the browser names. */
+  if (body.repair === true && cached.size) {
+    await Promise.all(Array.from(cached.keys()).map((k) => forgetClip(user.id, k)));
+    cached = new Map();
+  }
   const misses = wanted.filter((c) => !cached.has(c.clipKey));
 
   /* Nothing is generated until the whole request is known to be within the
@@ -190,7 +210,42 @@ export default async function handler(req, res) {
   }
 
   const ledger = [];
+  const failures = [];
   let fatal = null;
+  const deadlineAt = startedAt + BUDGET_MS;
+
+  /* Make one clip: generate, check it is audio, store it, index it. The clip only
+     counts as made when all four happened; anything less throws with a code. */
+  async function produce(clip) {
+    const storagePath = storagePathFor(user.id, clip.clipKey);
+    await once(`${user.id}|${clip.clipKey}`, async () => {
+      const audio = await synthesizeSpeech({ providerVoiceId: voice.providerVoiceId, text: clip.text, speed, deadlineAt });
+      try { await uploadClip(storagePath, audio); }
+      catch (e) { throw new VoiceProviderError('upload_failed', e && e.message); }
+      const indexed = await rememberClip({
+        userId: user.id,
+        providerVoiceId: voice.providerVoiceId,
+        clipKey: clip.clipKey,
+        textHash: clip.textHash,
+        speed,
+        modelId: MODEL_ID,
+        characterCount: clip.text.length,
+        storagePath,
+      });
+      if (!indexed) throw new VoiceProviderError('index_failed', 'tts_clips write failed');
+    });
+    clip.storagePath = storagePath;
+    clip.cached = false;
+    ledger.push({ userId: user.id, providerVoiceId: voice.providerVoiceId, textHash: clip.textHash, characterCount: clip.text.length, cacheHit: false });
+  }
+  function failClip(clip, err, stage) {
+    const code = err instanceof VoiceProviderError ? err.code : 'generation_failed';
+    // Codes and counts only: the line itself is never logged.
+    console.error('tts line failed:', code, 'stage', stage, 'attempts', (err && err.attempts) || 1, (err && err.detail) || (err && err.message) || '');
+    clip.error = code;
+    failures.push({ userId: user.id, voiceKey: requested, code, stage, httpStatus: err && err.status, attempts: err && err.attempts, source: 'server' });
+    if (FATAL_CODES.has(code)) fatal = code;
+  }
 
   for (const clip of wanted) {
     const hit = cached.get(clip.clipKey);
@@ -202,45 +257,56 @@ export default async function handler(req, res) {
       continue;
     }
     if (fatal) { clip.error = fatal; continue; }
-    try {
-      const storagePath = storagePathFor(user.id, clip.clipKey);
-      await once(`${user.id}|${clip.clipKey}`, async () => {
-        const audio = await synthesizeSpeech({ providerVoiceId: voice.providerVoiceId, text: clip.text, speed });
-        await uploadClip(storagePath, audio);
-        await rememberClip({
-          userId: user.id,
-          providerVoiceId: voice.providerVoiceId,
-          clipKey: clip.clipKey,
-          textHash: clip.textHash,
-          speed,
-          modelId: MODEL_ID,
-          characterCount: clip.text.length,
-          storagePath,
-        });
-      });
-      clip.storagePath = storagePath;
-      clip.cached = false;
-      ledger.push({ userId: user.id, providerVoiceId: voice.providerVoiceId, textHash: clip.textHash, characterCount: clip.text.length, cacheHit: false });
-    } catch (err) {
-      const code = err instanceof VoiceProviderError ? err.code : 'generation_failed';
-      console.error('tts line failed:', code, (err && err.detail) || (err && err.message) || err);
-      clip.error = code;
-      if (FATAL_CODES.has(code)) fatal = code;
-    }
+    try { await produce(clip); }
+    catch (err) { failClip(clip, err, err && err.code === 'upload_failed' ? 'upload' : 'generate'); }
   }
 
+  const ledgerWritten = ledger.length;
   await Promise.all([
     recordGenerations(ledger),
     ...clips.filter((c) => c.storagePath).map(async (c) => { c.url = await signClipUrl(c.storagePath); }),
   ]);
+
+  /* SELF-HEAL. A row that says the audio exists while the bucket says it does not
+     (the object was removed, or an earlier upload was lost after its row was
+     written) used to be handed back for ever: a clip with no link, so a line
+     with no voice. Forget the dead row and make the line again. It replaces
+     audio the person already had, so it is not held to the hourly allowance. */
+  for (const clip of clips.filter((c) => c.cached && c.storagePath && !c.url)) {
+    if (fatal || Date.now() > deadlineAt - 5000) { clip.error = fatal || 'timeout'; continue; }
+    console.error('tts clip row without audio, regenerating');
+    failures.push({ userId: user.id, voiceKey: requested, code: 'stale_clip', stage: 'sign', source: 'server' });
+    try {
+      await forgetClip(user.id, clip.clipKey);
+      clip.storagePath = null; clip.cached = false;
+      await produce(clip);
+      clip.url = await signClipUrl(clip.storagePath);
+    } catch (err) { failClip(clip, err, 'generate'); }
+  }
+  // What the self-heal pass added to the ledger after the first write.
+  await recordGenerations(ledger.slice(ledgerWritten));
+
   // A signed link that could not be minted is no use to the player either.
-  clips.forEach((c) => { if (c.storagePath && !c.url) c.error = c.error || 'generation_failed'; });
+  clips.forEach((c) => {
+    if (c.storagePath && !c.url) {
+      c.error = c.error || 'generation_failed';
+      if (!failures.some((f) => f.code === c.error)) failures.push({ userId: user.id, voiceKey: requested, code: c.error, stage: 'sign', source: 'server' });
+    }
+  });
   touchClips(clips.filter((c) => c.cached && c.rowId).map((c) => c.rowId));
+
+  /* Diagnostics are written before answering — the function is frozen the moment
+     the response is sent — and an alert goes out if this is the Nth failure in a
+     short while. Neither can fail the request. */
+  if (failures.length) {
+    await Promise.all(failures.map(recordFailure));
+    await maybeAlertAdmin();
+  }
 
   const playable = clips.filter((c) => c.url);
   if (!playable.length) {
     const code = fatal || (clips.find((c) => c.error && c.error !== 'empty') || {}).error || 'generation_failed';
-    res.status(HTTP_FOR_CODE[code] || 502).json({ error: code });
+    res.status(HTTP_FOR_CODE[code] || 502).json({ error: code, retryable: RETRYABLE_CODES.has(code) });
     return;
   }
 
@@ -263,6 +329,9 @@ export default async function handler(req, res) {
     generated: ledger.filter((r) => !r.cacheHit).length,
     reused: ledger.filter((r) => r.cacheHit).length,
     warning: fatal || null,
-    clips: clips.map((c) => ({ index: c.index, text: c.text, url: c.url || null, cached: !!c.cached, error: c.error || null })),
+    clips: clips.map((c) => ({
+      index: c.index, text: c.text, url: c.url || null, cached: !!c.cached,
+      error: c.error || null, retryable: c.error ? RETRYABLE_CODES.has(c.error) : false,
+    })),
   });
 }
