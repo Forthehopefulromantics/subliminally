@@ -2005,7 +2005,7 @@ async function onMyVoiceReady(){
      step, never to the affirmation-by-affirmation recorder. */
   setSelectedVoice(VOICE_CLONE);    // lights the card and enables Continue
   /* Nothing is read in the new voice here. ElevenLabs is only asked for speech
-     when the subliminal is generated (prepareClonedVoice), never for a preview. */
+     when the subliminal is generated (prepareStudioVoice), never for a preview. */
   sayInVoicePicker('✓ Your AI voice is ready', 'ok');
   // Redrawing the cards checks the plan again; a failure there must not take
   // back the voice that was just made, or the message saying so.
@@ -2156,7 +2156,10 @@ function clonedVoiceErrorText(code){
    is fetched once and the decoded audio is reused for every repeat. */
 const ttsCache = new Map();          // "voiceKey|speed|line" -> Promise<url>
 /* loadClip caches its decoded audio on the object it's handed, so each generated
-   line needs one stable handle rather than a fresh literal per repeat. */
+   line needs one stable handle rather than a fresh literal per repeat. Once a
+   line has been downloaded and checked, the handle also HOLDS THE AUDIO (`blob`),
+   so playing it never depends on a link that can expire or a network that can
+   drop -- which is also what lets it carry on with the screen locked. */
 const studioClipHandles = new Map();
 function studioClipHandle(url){
   if (!studioClipHandles.has(url)) studioClipHandles.set(url, { url });
@@ -2173,25 +2176,51 @@ const TTS_LINES_PER_REQUEST = 6;
 function ttsLineText(text){ return String(text == null ? '' : text).replace(/\s+/g, ' ').trim(); }
 function ttsLineKey(voiceKey, speed, text){ return voiceKey + '|' + speed + '|' + ttsLineText(text); }
 
-async function ttsRequest(lines, voiceKey, speed){
+/* ---- bounded retries ----
+   A dropped connection, a provider timeout or a 5xx is worth another go, a few
+   times, with a growing pause. A quota, a key, a limit or a bad voice is not: it
+   fails the same way every time, and trying again only makes a rate limit worse. */
+const TTS_ATTEMPTS = 3;
+const TTS_REQUEST_TIMEOUT_MS = 65000;      // the route's own limit is 60s
+const TTS_RETRYABLE = new Set(['timeout', 'network', 'provider_failed', 'bad_audio', 'upload_failed', 'index_failed', 'generation_failed']);
+function ttsCodeRetryable(code){ return TTS_RETRYABLE.has(code) || /^tts_failed_5\d\d$/.test(String(code)); }
+function ttsBackoffMs(attempt){ return Math.round(700 * Math.pow(2, attempt - 1) * (0.75 + Math.random() * 0.5)); }
+function ttsSleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function ttsRequest(lines, voiceKey, speed, opts){
   /* THE COST RULE for long lists. Only a voice you record yourself reads more
      than ten lines; every line Serenity or a cloned voice reads is a paid
      generation. The voice screen already holds anyone who tries (see
      voiceLimitProblem); this is the same rule at the last door, so no path --
      a reopened subliminal, a changed voice, a stale tab -- can send a long list
      to the provider. */
-  if (!state.eftMode && !state.visualizationMode && nonEmptyAffirmationCount() > AffirmationKit.AFFIRMATION_LIMITS.serenity){
+  /* A saved subliminal is exempt: it was built under whatever limit applied then
+     (some Serenity ones hold 13 and 43 lines), its audio is already stored, and
+     reading stored clips back costs nothing. The route's own hourly/daily ceilings
+     still bound anything that does need generating. */
+  if (!editingExistingId && !state.eftMode && !state.visualizationMode && nonEmptyAffirmationCount() > AffirmationKit.AFFIRMATION_LIMITS.serenity){
     throw new Error('too_many_lines_for_ai_voice');
   }
   const token = sb && (await sb.auth.getSession()).data.session?.access_token;
   if (!token) throw new Error('not_signed_in');
-  const res = await fetch(`${API_BASE}/api/tts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    // The pace is part of the reading, not just the gap after it, so it is part
-    // of what identifies a clip.
-    body: JSON.stringify({ voiceKey, speed, lines }),
-  });
+  const abort = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = abort ? setTimeout(() => abort.abort(), TTS_REQUEST_TIMEOUT_MS) : null;
+  let res;
+  try {
+    res = await fetch(`${API_BASE}/api/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      // The pace is part of the reading, not just the gap after it, so it is part
+      // of what identifies a clip. `repair` asks for the lines to be made again
+      // because the stored copy would not play.
+      body: JSON.stringify({ voiceKey, speed, lines, repair: !!(opts && opts.repair) }),
+      signal: abort ? abort.signal : undefined,
+    });
+  } catch (e){
+    throw new Error(e && e.name === 'AbortError' ? 'timeout' : 'network');
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
   let out = {};
   try { out = await res.json(); } catch(e){}
   if (!res.ok) throw new Error(out.error || `tts_failed_${res.status}`);
@@ -2218,29 +2247,48 @@ async function synthesizeLine(text, voiceKey){
 
 /* Every line of a sequence, in as few requests as possible. Lines already in hand
    are not asked for again, and the request is skipped entirely when there is
-   nothing new — which is what makes pressing Generate twice cost nothing. */
-async function fetchSequenceAudio(lines, voiceKey){
+   nothing new — which is what makes pressing Generate twice cost nothing.
+
+   A batch that fails for a reason that can pass is asked again (only the lines
+   still missing), up to TTS_ATTEMPTS times; the server answers the lines that
+   did land from storage, so a retry never pays for them twice. */
+async function fetchSequenceAudio(lines, voiceKey, opts){
+  const o = opts || {};
   const speed = paceNow().speed;
   const wanted = [];
   (lines || []).forEach(l => {
     const line = ttsLineText(l);
-    if (line && !wanted.includes(line) && !ttsCache.has(ttsLineKey(voiceKey, speed, line))) wanted.push(line);
+    if (line && !wanted.includes(line) && (o.repair || !ttsCache.has(ttsLineKey(voiceKey, speed, line)))) wanted.push(line);
   });
   if (!wanted.length) return { ok: true, code: null };
   let failure = null;
-  for (let i = 0; i < wanted.length; i += TTS_LINES_PER_REQUEST){
-    const batch = wanted.slice(i, i + TTS_LINES_PER_REQUEST);
-    try {
-      const out = await ttsRequest(batch, voiceKey, speed);
+  for (let i = 0; i < wanted.length && !failure; i += TTS_LINES_PER_REQUEST){
+    let pending = wanted.slice(i, i + TTS_LINES_PER_REQUEST);
+    let lastCode = null;
+    for (let attempt = 0; attempt < TTS_ATTEMPTS && pending.length && !failure; attempt++){
+      if (attempt) await ttsSleep(ttsBackoffMs(attempt));
+      let out;
+      try {
+        // Only the first request of a repair repairs; a retry of it must not forget again.
+        out = await ttsRequest(pending, voiceKey, speed, { repair: o.repair && attempt === 0 });
+      } catch (e){
+        lastCode = (e && e.message) || 'generation_failed';
+        if (!ttsCodeRetryable(lastCode)) failure = lastCode;
+        continue;
+      }
+      const still = [];
       (out.clips || []).forEach(c => {
-        if (c.url) ttsCache.set(ttsLineKey(voiceKey, speed, c.text), Promise.resolve(c.url));
-        else if (c.error && c.error !== 'empty') failure = failure || c.error;
+        if (c.url){ ttsCache.set(ttsLineKey(voiceKey, speed, c.text), Promise.resolve(c.url)); return; }
+        if (!c.error || c.error === 'empty') return;
+        lastCode = c.error;
+        if (ttsCodeRetryable(c.error) && c.retryable !== false) still.push(c.text);
+        else failure = failure || c.error;
       });
-      if (out.warning) failure = failure || out.warning;
-    } catch (e){
-      failure = (e && e.message) || 'generation_failed';
-      break;   // quota, or no signal: the rest of the batches would fail the same way
+      if (out.warning && !ttsCodeRetryable(out.warning)) failure = failure || out.warning;
+      pending = still;
     }
+    if (!failure && pending.length) failure = lastCode || 'generation_failed';
+    if (!failure && o.onProgress) o.onProgress(Math.min(wanted.length, i + TTS_LINES_PER_REQUEST), wanted.length);
   }
   return { ok: !failure, code: failure };
 }
@@ -2249,134 +2297,316 @@ async function fetchSequenceAudio(lines, voiceKey){
    second tap on Generate lands on: the promise already running, not a second run
    of it. */
 const sequencePrepares = new Map();
-function prepareSequenceAudio(lines, voiceKey){
+function prepareSequenceAudio(lines, voiceKey, opts){
   const key = voiceKey + '|' + paceNow().speed + '|' + (lines || []).map(ttsLineText).join('\u0001');
   if (sequencePrepares.has(key)) return sequencePrepares.get(key);
-  const promise = fetchSequenceAudio(lines, voiceKey);
+  const promise = fetchSequenceAudio(lines, voiceKey, opts);
   sequencePrepares.set(key, promise);
   // Only a run that worked is worth remembering; a failed one should be retryable.
   promise.then(r => { if (!r.ok) sequencePrepares.delete(key); }).catch(() => sequencePrepares.delete(key));
   return promise;
 }
 
+/* ---------------- is the audio really there? ----------------
+   A 200 from the route means the server stored something. It does not mean this
+   device can fetch it, that it is not empty or cut short, that it decodes, or
+   that it is not silence. Each of those has happened to somebody's session
+   somewhere, and each used to surface as a subliminal that "plays" with no voice.
+
+   So before a voice session is marked ready every line is downloaded and checked
+   here: reachable, big enough, an audio file, decodable, audible. The downloaded
+   bytes are kept on the line's handle, which is what playback then uses. */
+const STUDIO_MIN_CLIP_BYTES = 1500;
+const STUDIO_MIN_CLIP_SECONDS = 0.15;
+const STUDIO_MIN_PEAK = 0.002;
+
+function elementCanPlay(blob){
+  return new Promise(resolve => {
+    let el = null, url = null, done = false;
+    const finish = (ok) => {
+      if (done) return; done = true;
+      try { el.removeAttribute('src'); el.load(); } catch(e){}
+      if (url) { try { URL.revokeObjectURL(url); } catch(e){} }
+      resolve(ok);
+    };
+    try {
+      el = new Audio(); url = URL.createObjectURL(blob);
+      el.preload = 'auto'; el.src = url;
+      el.oncanplaythrough = () => finish(true);
+      el.onerror = () => finish(false);
+      setTimeout(() => finish(false), 8000);
+      el.load();
+    } catch(e){ finish(false); }
+  });
+}
+/* Decoded length and loudest sample, or null where this browser cannot decode
+   offline (the size and header checks still apply). Safari sometimes refuses an
+   mp3 here that an <audio> element plays, and loadClip has that fallback, so the
+   element gets the same chance before the clip is called undecodable. */
+async function probeStudioAudio(blob){
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!Offline) return null;
+  let buffer;
+  try {
+    const off = new Offline(1, 1, 44100);
+    const data = await blob.arrayBuffer();
+    buffer = await new Promise((resolve, reject) => {
+      const p = off.decodeAudioData(data, resolve, reject);
+      if (p && p.catch) p.catch(reject);
+    });
+  } catch (e){
+    if (await elementCanPlay(blob)) return null;
+    throw new Error('audio_undecodable');
+  }
+  let peak = 0;
+  const ch = buffer.getChannelData(0);
+  for (let i = 0; i < ch.length; i += 16){ const v = Math.abs(ch[i]); if (v > peak) peak = v; }
+  return { seconds: buffer.duration, peak };
+}
+async function verifyStudioClip(url){
+  const handle = studioClipHandle(url);
+  if (handle.verified) return handle;
+  let blob = null;
+  for (let attempt = 0; attempt < TTS_ATTEMPTS && !blob; attempt++){
+    if (attempt) await ttsSleep(ttsBackoffMs(attempt));
+    try {
+      const res = await fetch(url);
+      if (res.ok) blob = await res.blob();
+      else if (res.status >= 400 && res.status < 500) break;   // expired or gone: the same link will not come back
+    } catch(e){ /* offline for a moment: try again */ }
+  }
+  if (!blob) throw new Error('audio_unreachable');
+  if (blob.size < STUDIO_MIN_CLIP_BYTES) throw new Error('audio_empty');
+  const head = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+  const frameSync = head[0] === 0xFF && (head[1] & 0xE0) === 0xE0;
+  if (!sniffAudioMime(head) && !frameSync) throw new Error('audio_undecodable');
+  const probe = await probeStudioAudio(blob);
+  if (probe){
+    if (!(probe.seconds >= STUDIO_MIN_CLIP_SECONDS)) throw new Error('audio_empty');
+    if (!(probe.peak >= STUDIO_MIN_PEAK)) throw new Error('audio_silent');
+  }
+  handle.blob = blob;
+  handle.verified = true;
+  return handle;
+}
+const STUDIO_CONTENT_FAULTS = new Set(['audio_empty', 'audio_undecodable', 'audio_silent']);
+
+/* Check every line of the plan, a few at a time. A line whose LINK is bad (expired,
+   gone) is asked for again, which gets a fresh link or a regenerated clip; a line
+   whose CONTENT is bad is asked for again with `repair`, which makes the stored
+   copy again. Either gets exactly one second chance, then the session fails
+   loudly instead of playing with a hole in it. */
+async function verifyStudioPlan(jobs){
+  const speed = paceNow().speed;
+  const entries = [];
+  jobs.forEach(([lines, voiceKey]) => lines.forEach(line => {
+    if (!entries.some(e => e.voiceKey === voiceKey && e.line === line)) entries.push({ voiceKey, line });
+  }));
+  async function checkAll(list){
+    const bad = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < list.length){
+        const e = list[next++];
+        try {
+          const pending = ttsCache.get(ttsLineKey(e.voiceKey, speed, e.line));
+          if (!pending) throw new Error('generation_failed');
+          await verifyStudioClip(await pending);
+        } catch (err){ e.code = (err && err.message) || 'audio_unreachable'; bad.push(e); }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    return bad;
+  }
+  let bad = await checkAll(entries);
+  if (!bad.length) return;
+  bad.forEach(e => reportStudioFailure(e.code, 'verify'));
+  sequencePrepares.clear();
+  for (const voiceKey of Array.from(new Set(bad.map(e => e.voiceKey)))){
+    for (const repair of [false, true]){
+      const group = bad.filter(e => e.voiceKey === voiceKey && STUDIO_CONTENT_FAULTS.has(e.code) === repair);
+      if (!group.length) continue;
+      group.forEach(e => ttsCache.delete(ttsLineKey(e.voiceKey, speed, e.line)));
+      const r = await fetchSequenceAudio(group.map(e => e.line), voiceKey, { repair });
+      if (!r.ok) throw new Error(r.code || 'generation_failed');
+    }
+  }
+  bad = await checkAll(bad);
+  if (bad.length) throw new Error(bad[0].code);
+}
+
+/* Tell the server what only the browser can see. Codes only, never words or
+   audio; best effort, and it can never get in the way of the session. */
+function reportStudioFailure(code, stage){
+  try {
+    if (!sb || !code) return;
+    Promise.resolve(sb.auth.getSession()).then(r => {
+      const token = r && r.data && r.data.session && r.data.session.access_token;
+      if (!token) return;
+      return fetch(`${API_BASE}/api/tts-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code, stage, voiceKey: state.aiVoiceId || null }),
+      });
+    }).catch(() => {});
+  } catch(e){}
+}
+
+/* ---------------- the voice session: one plan, one ready flag ----------------
+   Serenity and Clone Your Voice are the same thing to the player: audio that is
+   generated once, checked, held, and only then played. There is no device-voice
+   stand-in for either -- the device's speech is silent on an iPhone the moment
+   Web Audio is running, which is exactly when a session plays, so "falling back"
+   to it was how a failure turned into a session of silence. If the audio is not
+   there, the session says so and Retry Audio (or Play) makes it again.
+
+   The plan is the main voice's lines plus the second voice's, each with its voice
+   key. `studioReadyKey` is the plan that has been generated AND checked; Play
+   compares against it and nothing else. */
+function studioMainKey(){
+  return state.voiceMode === 'ai' && state.aiVoiceId && state.aiVoiceId !== DEVICE_VOICE ? state.aiVoiceId : null;
+}
+/* The second voice follows the clone when the main voice is the clone; otherwise
+   it is whatever it was set to. Null means it is read by this device or recorded. */
+function studioLayerKey(){
+  if (!layerVoiceEnabled || state.layerVoiceMode !== 'ai') return null;
+  if (studioMainKey() === MY_CLONED_VOICE) return MY_CLONED_VOICE;
+  const k = state.layerAiVoiceId;
+  return k && k !== DEVICE_VOICE ? k : null;
+}
+function studioMainLines(){ return studioMainKey() ? (state.affirmations || []).map(ttsLineText).filter(Boolean) : []; }
+function studioLayerLines(){ return studioLayerKey() ? (state.layerAffirmations || []).map(ttsLineText).filter(Boolean) : []; }
+function isStudioVoiceSession(){ return !!studioMainKey() || studioLayerLines().length > 0; }
+function isClonedVoiceSession(){ return state.voiceMode === 'ai' && state.aiVoiceId === MY_CLONED_VOICE; }
+function studioSequenceKey(){
+  return [paceNow().speed, studioMainKey(), studioMainLines().join('\u0001'), studioLayerKey(), studioLayerLines().join('\u0001')].join('|');
+}
+function studioClipUrl(voiceKey, line){
+  return ttsCache.get(ttsLineKey(voiceKey, paceNow().speed, line)) || null;
+}
+let studioReadyKey = null;
+let studioPreparing = null;
+let studioStatus = { state: 'idle', code: null };
+
+/* ---- what the person is told ---- */
+const STUDIO_RETRY = ' Nothing was played in another voice — tap Play to try again.';
+const SERENITY_TTS_MESSAGES = {
+  not_signed_in:    'Sign in to hear Serenity read this.',
+  upgrade_required: 'Serenity comes with Ritual. Upgrade to hear it, or switch this subliminal to Record Your Own Voice.',
+  nothing_to_say:   'There are no affirmations to read yet — go back and add at least one.',
+  too_long:         'One of your affirmations is too long to read as one clip — shorten it and try again.',
+  too_many_lines:   'That\'s more lines than one session can hold — trim a few.',
+  too_many_lines_for_ai_voice: 'Serenity reads up to 10 affirmations. Use Record Your Own Voice for a longer list.',
+  invalid_voice:    'Serenity isn\'t available right now.' + STUDIO_RETRY,
+  not_configured:   'Serenity isn\'t switched on yet.' + STUDIO_RETRY,
+  quota_exceeded:   'Serenity is unavailable for a little while.' + STUDIO_RETRY,
+  rate_limited:     'The voice service is busy — give it a minute.' + STUDIO_RETRY,
+  too_fast:         'That\'s a lot of generating at once — give it a minute.' + STUDIO_RETRY,
+  hourly_limit:     'You\'ve built a lot this hour — give it a little while.' + STUDIO_RETRY,
+  daily_limit:      'You\'ve built a lot today — it will be back tomorrow.' + STUDIO_RETRY,
+  timeout:          'The voice service took too long.' + STUDIO_RETRY,
+  network:          'Couldn\'t reach the voice service.' + STUDIO_RETRY,
+  audio_unreachable:'Your voice audio couldn\'t be downloaded.' + STUDIO_RETRY,
+  audio_empty:      'The voice audio came back incomplete and couldn\'t be repaired just now.' + STUDIO_RETRY,
+  audio_undecodable:'The voice audio couldn\'t be read by this device.' + STUDIO_RETRY,
+  audio_silent:     'The voice audio came back silent and couldn\'t be repaired just now.' + STUDIO_RETRY,
+  playback_failed:  'The voice audio stopped playing.' + STUDIO_RETRY,
+};
+function studioVoiceErrorText(code){
+  if (isClonedVoiceSession() && CLONE_TTS_MESSAGES[code]) return CLONE_TTS_MESSAGES[code];
+  if (SERENITY_TTS_MESSAGES[code]) return SERENITY_TTS_MESSAGES[code];
+  return (isClonedVoiceSession() ? 'Your cloned voice' : 'Serenity') + ' couldn\'t be generated just now.' + STUDIO_RETRY;
+}
+/* Retry Audio is for failures a second try can fix. Not for "sign in", "upgrade",
+   "no affirmations", a list that is too long, or a voice that does not exist. */
+const STUDIO_NOT_RECOVERABLE = new Set(['not_signed_in', 'upgrade_required', 'no_cloned_voice', 'nothing_to_say', 'too_long', 'too_many_lines', 'too_many_lines_for_ai_voice', 'invalid_voice', 'not_configured']);
+const STUDIO_STATUS_TEXT = { generating: 'Generating Voice…', saving: 'Saving Audio…', ready: 'Ready to Play', failed: 'Failed' };
+
+/* The four states, and the only thing that draws them. 'saving' is the stage after
+   the server has made the audio: it is being downloaded back and checked, and
+   nothing is called ready until that has passed. */
+function setStudioStatus(name, code, progress){
+  studioStatus = { state: name, code: code || null };
+  const lineEl = document.getElementById('finalLine');
+  const box = document.getElementById('voiceStatus');
+  const text = document.getElementById('voiceStatusText');
+  const retry = document.getElementById('retryAudioBtn');
+  if (box){
+    box.hidden = !STUDIO_STATUS_TEXT[name];
+    box.setAttribute('data-state', name);
+    if (text) text.textContent = (STUDIO_STATUS_TEXT[name] || '') + (progress && name === 'generating' ? ` (${progress})` : '');
+  }
+  if (retry) retry.hidden = !(name === 'failed' && !STUDIO_NOT_RECOVERABLE.has(code));
+  if (name === 'failed' && lineEl) lineEl.textContent = studioVoiceErrorText(code);
+}
+
+/* Anything played in a voice session that failed to load: drop what is held so the
+   retry asks the server again (which answers from its stored clips, not from the
+   provider, when they already exist). */
+function forgetStudioVoiceAudio(){
+  studioReadyKey = null;
+  const speed = paceNow().speed;
+  studioMainLines().forEach(l => ttsCache.delete(ttsLineKey(studioMainKey(), speed, l)));
+  studioLayerLines().forEach(l => ttsCache.delete(ttsLineKey(studioLayerKey(), speed, l)));
+  sequencePrepares.clear();
+  studioClipHandles.clear();
+}
+function retryStudioAudio(){
+  if (studioPreparing) return;
+  studioReadyKey = null;
+  sequencePrepares.clear();
+  if (isStudioVoiceSession()) prepareStudioVoice();
+}
+function prepareStudioVoice(){
+  if (studioPreparing) return studioPreparing;
+  studioPreparing = runStudioPrepare().finally(() => { studioPreparing = null; });
+  return studioPreparing;
+}
+
 /* Called as the final screen opens, for a freshly built subliminal and for one
    loaded out of the library. The session's voice is generated here, once, before
    anybody presses play — so the first loop doesn't stutter while it waits, and the
-   loops after it are free. */
+   loops after it are free. Resolves to whether the audio is ready. */
 let preparingSessionVoice = false;
 async function prepareSessionVoice(){
-  if (preparingSessionVoice) return;
-  if (state.voiceMode !== 'ai') return;
-  if (isClonedVoiceSession()) return prepareClonedVoice();
-  const voiceKey = await resolveVoiceKey(state.aiVoiceId);
-  if (!voiceKey) return;                       // device voice: nothing to generate
-  const lineEl = document.getElementById('finalLine');
+  if (!isStudioVoiceSession()) return true;
+  return prepareStudioVoice();
+}
+async function runStudioPrepare(){
   const playBtn = document.getElementById('finalPlayBtn');
-  const wasSaying = lineEl ? lineEl.textContent : '';
+  const mainKey = studioMainKey(), layerKey = studioLayerKey();
+  const mainLines = studioMainLines(), layerLines = studioLayerLines();
+  const key = studioSequenceKey();
+  if (studioReadyKey === key){ setStudioStatus('ready'); return true; }
+  if (mainKey && !mainLines.length){ setStudioStatus('failed', 'nothing_to_say'); return false; }
   preparingSessionVoice = true;
   if (playBtn) playBtn.disabled = true;
-  if (lineEl) lineEl.textContent = 'Recording your affirmations in that voice — this happens once, then it loops for as long as you set.';
-  try {
-    const main = await prepareSequenceAudio(state.affirmations, voiceKey);
-    let layer = { ok: true };
-    if (layerVoiceEnabled && state.layerVoiceMode === 'ai' && state.layerAffirmations && state.layerAffirmations.length){
-      const layerKey = await resolveVoiceKey(state.layerAiVoiceId);
-      if (layerKey) layer = await prepareSequenceAudio(state.layerAffirmations, layerKey);
-    }
-    if (lineEl){
-      const failure = !main.ok ? main.code : (!layer.ok ? layer.code : null);
-      lineEl.textContent = failure ? ttsErrorText(new Error(failure)) : wasSaying;
-    }
-  } catch (e){
-    if (lineEl) lineEl.textContent = ttsErrorText(e);
-  } finally {
-    preparingSessionVoice = false;
-    if (playBtn) playBtn.disabled = false;
-  }
-}
-
-/* ---------------- Clone Your Voice: generated once, then only replayed ----------------
-   The person's own ElevenLabs voice is never named by the page: it asks for
-   'mine' and /api/tts looks the voice id up against the signed-in account, so
-   nobody can read in somebody else's voice by sending an id of their own.
-
-   ElevenLabs is asked for speech here and nowhere else in a cloned session --
-   when the subliminal is generated, or when that generation failed and Play is
-   pressed to try again. Every line it returns is kept (Supabase Storage on the
-   server, ttsCache here), so Play, Pause, Resume and Start Over only replay
-   audio already in hand, and reopening a saved subliminal is answered from the
-   stored clips rather than generated again. Only a change to the words (or the
-   pace they are read at) makes new speech, and only for the lines that changed. */
-function isClonedVoiceSession(){
-  return state.voiceMode === 'ai' && state.aiVoiceId === MY_CLONED_VOICE;
-}
-/* The builder's affirmations, trimmed, with the blank ones left out: an empty
-   field is never sent to ElevenLabs. */
-function clonedVoiceLines(){
-  return (state.affirmations || []).map(ttsLineText).filter(Boolean);
-}
-/* The layered second voice reads in the cloned voice too when the main voice is
-   the clone, rather than in the device's voice underneath it. */
-function clonedLayerLines(){
-  if (!isClonedVoiceSession() || !layerVoiceEnabled || state.layerVoiceMode !== 'ai') return [];
-  return (state.layerAffirmations || []).map(ttsLineText).filter(Boolean);
-}
-function clonedSequenceKey(){
-  return paceNow().speed + '|' + clonedVoiceLines().join('\u0001') + '|' + clonedLayerLines().join('\u0001');
-}
-function clonedClipUrl(line){
-  return ttsCache.get(ttsLineKey(MY_CLONED_VOICE, paceNow().speed, line)) || null;
-}
-/* Which generation the lines in hand belong to. Play checks this and nothing
-   else, so it can tell "already generated" from "needs generating" without
-   asking the server. */
-let clonedVoiceReadyKey = null;
-let clonedVoicePreparing = null;
-/* Anything played in the cloned voice that failed to load: drop what is held
-   for those lines so the retry asks the server again (which answers from its
-   stored clips, not from ElevenLabs, when they already exist). */
-function forgetClonedVoiceAudio(){
-  clonedVoiceReadyKey = null;
-  const speed = paceNow().speed;
-  clonedVoiceLines().concat(clonedLayerLines()).forEach(l => ttsCache.delete(ttsLineKey(MY_CLONED_VOICE, speed, l)));
-  Array.from(sequencePrepares.keys()).forEach(k => { if (k.startsWith(MY_CLONED_VOICE + '|')) sequencePrepares.delete(k); });
-}
-function prepareClonedVoice(){
-  if (clonedVoicePreparing) return clonedVoicePreparing;
-  clonedVoicePreparing = runClonedVoicePrepare().finally(() => { clonedVoicePreparing = null; });
-  return clonedVoicePreparing;
-}
-async function runClonedVoicePrepare(){
-  const lineEl = document.getElementById('finalLine');
-  const playBtn = document.getElementById('finalPlayBtn');
-  const say = (t) => { if (lineEl) lineEl.textContent = t; };
-  const lines = clonedVoiceLines();
-  if (!lines.length){ say(clonedVoiceErrorText('nothing_to_say')); return false; }
-  const key = clonedSequenceKey();
-  if (clonedVoiceReadyKey === key) return true;
-  const wasSaying = lineEl ? lineEl.textContent : '';
-  preparingSessionVoice = true;
-  if (playBtn) playBtn.disabled = true;
-  say('Creating your affirmations in your voice — this happens once, then it replays for as long as you set.');
+  setStudioStatus('generating');
   try {
     if (!currentUser) throw new Error('not_signed_in');
-    if (!tierHasFeature(await getMyTier(), 'studio_voice')) throw new Error('upgrade_required');
-    if (!(await myVoiceProfile())) throw new Error('no_cloned_voice');
-    const layerLines = clonedLayerLines();
-    const main = await prepareSequenceAudio(lines, MY_CLONED_VOICE);
-    if (!main.ok) throw new Error(main.code || 'generation_failed');
-    if (layerLines.length){
-      const layer = await prepareSequenceAudio(layerLines, MY_CLONED_VOICE);
-      if (!layer.ok) throw new Error(layer.code || 'generation_failed');
+    let tierNow;
+    try { tierNow = await getMyTierChecked(); }
+    catch (e){ throw new Error('network'); }   // could not ask is not "not subscribed"
+    if (!tierHasFeature(tierNow, 'studio_voice')) throw new Error('upgrade_required');
+    if ((mainKey === MY_CLONED_VOICE || layerKey === MY_CLONED_VOICE) && !(await myVoiceProfile())) throw new Error('no_cloned_voice');
+    const jobs = [];
+    if (mainKey) jobs.push([mainLines, mainKey]);
+    if (layerKey) jobs.push([layerLines, layerKey]);
+    for (const [lines, voiceKey] of jobs){
+      const r = await prepareSequenceAudio(lines, voiceKey, { onProgress: (done, total) => setStudioStatus('generating', null, `${done} of ${total}`) });
+      if (!r.ok) throw new Error(r.code || 'generation_failed');
     }
+    setStudioStatus('saving');
+    await verifyStudioPlan(jobs);
     // Every line has to be in hand, or the session would have gaps to fill.
-    if (!lines.concat(layerLines).every(clonedClipUrl)) throw new Error('generation_failed');
-    clonedVoiceReadyKey = key;
-    say(wasSaying);
+    if (!jobs.every(([lines, voiceKey]) => lines.every(l => studioClipUrl(voiceKey, l)))) throw new Error('generation_failed');
+    studioReadyKey = key;
+    setStudioStatus('ready');
     return true;
   } catch (e){
     const code = (e && e.message) || 'generation_failed';
-    say(clonedVoiceErrorText(code));
+    setStudioStatus('failed', code);
+    if (code === 'network' || code === 'timeout') reportStudioFailure(code, 'prepare');
     /* No voice to read in: back to the Phase 1 setup, not to another voice. */
     if (code === 'no_cloned_voice' && document.getElementById('voiceClone')){
       state.selectedVoice = VOICE_CLONE;
@@ -4789,13 +5019,14 @@ function primeAudio(){
 
 function playFinal(){
   if (finalPlaying) return;
-  /* A cloned voice plays only audio that has already been generated. When it
-     has not (the generation failed, or the words changed), this press is the
-     retry: generate, then play. The context is opened now, inside the tap, so
+  /* A generated voice (Serenity or a clone) plays only audio that has already
+     been generated AND checked. When it has not (still being made, the
+     generation failed, or the words changed), this press waits for it -- or is
+     the retry -- and then plays. The context is opened now, inside the tap, so
      the browser still lets it make a sound once the audio arrives. */
-  if (isClonedVoiceSession() && clonedVoiceReadyKey !== clonedSequenceKey()){
+  if (isStudioVoiceSession() && studioReadyKey !== studioSequenceKey()){
     primeAudio();
-    prepareClonedVoice().then(ready => {
+    prepareStudioVoice().then(ready => {
       if (ready && !finalPlaying) playFinal();
       else if (!ready) stopSilentKeeper();
     });
@@ -4888,7 +5119,7 @@ function playFinal(){
   function runLayerSequence(){
     let idx = 0;
     const useOwn = state.layerVoiceMode === 'own' && layerRecordings.some(r=>r);
-    const clonedLayer = !useOwn && clonedLayerLines().length > 0;
+    const layerKey = !useOwn ? studioLayerKey() : null;
     function playNextLayerLine(){
       if (!alive()) return;
       if (waitWhileFinalPaused(playNextLayerLine)) return;
@@ -4917,25 +5148,16 @@ function playFinal(){
           utter.onend = () => { if (finalPaused) waitWhileFinalPaused(deviceSpeak); else next(); };
           window.speechSynthesis.speak(utter);
         };
-        if (clonedLayer){
-          // Only what was generated; a line that is not in hand is skipped, never spoken by the device.
-          const url = clonedClipUrl(line);
+        if (layerKey){
+          // Only what was generated and checked; a line that is not in hand is skipped, never spoken by the device.
+          const url = ttsLineText(line) ? studioClipUrl(layerKey, ttsLineText(line)) : null;
           if (!url){ next(); return; }
           url.then(u => loadClip(finalCtx, studioClipHandle(u)))
             .then(finalCallback(clip => { playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next); }))
             .catch(() => { if (alive()) next(); });
           return;
         }
-        resolveVoiceKey(state.layerAiVoiceId).catch(()=>null).then(voiceKey => {
-          if (!alive()) return;
-          if (!voiceKey){ deviceSpeak(); return; }
-          return synthesizeLine(line, voiceKey)
-            .then(url => loadClip(finalCtx, studioClipHandle(url)))
-            .then(finalCallback(clip => {
-              playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next);
-            }))
-            .catch(deviceSpeak);
-        }).catch(deviceSpeak);
+        deviceSpeak();
       }
     }
     // Starts a beat after the main voice so the two voices don't land on top of each other.
@@ -4990,18 +5212,19 @@ function playFinal(){
     } else {
       const lines = state.affirmations;
       let idx = 0;
-      // Resolved once per session: a studio voice key, or null to use the voice
-      // built into this device. Anything that goes wrong with a studio voice
-      // falls back to the device rather than leaving the session silent.
-      const voicePromise = resolveVoiceKey(state.aiVoiceId).catch(() => null);
-      /* ...except a cloned voice, which never falls back. A line that cannot be
-         played stops the session and says so; Play tries again. */
-      const cloned = isClonedVoiceSession();
-      function clonedVoiceFailed(){
+      /* A generated voice (Serenity, a clone) plays only the checked audio that
+         prepareStudioVoice() left in hand, and never falls back to the device:
+         the device's speech is silent on an iPhone once Web Audio is running,
+         which turned every failure into a session of silence. A line that cannot
+         be played stops the session and says so; Play and Retry Audio try again.
+         The device voice reads only a subliminal built with the device voice. */
+      const studioKey = studioMainKey();
+      function studioVoiceFailed(code){
         if (!alive()) return;
-        forgetClonedVoiceAudio();
+        forgetStudioVoiceAudio();
         stopFinal();
-        document.getElementById('finalLine').textContent = clonedVoiceErrorText('network');
+        setStudioStatus('failed', code || 'playback_failed');
+        reportStudioFailure(code || 'playback_failed', 'playback');
       }
       function speakNext(){
         if (!alive()) return;
@@ -5097,27 +5320,18 @@ function playFinal(){
           if (!alive()) return;
           if (waitWhileFinalPaused(speakOnce)) return;
           const line = lines[idx];
-          if (cloned){
+          if (studioKey){
             if (!ttsLineText(line)){ advance(); return; }   // a blank field is never read
-            const url = clonedClipUrl(line);
-            if (!url){ clonedVoiceFailed(); return; }
+            const url = studioClipUrl(studioKey, ttsLineText(line));
+            if (!url){ studioVoiceFailed('generation_failed'); return; }
             url.then(u => loadClip(finalCtx, studioClipHandle(u)))
               .then(finalCallback(clip => {
                 playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance, { index: idx });
               }))
-              .catch(clonedVoiceFailed);
+              .catch(() => studioVoiceFailed('playback_failed'));
             return;
           }
-          voicePromise.then(voiceKey => {
-            if (!alive()) return;
-            if (!voiceKey){ deviceSpeak(); return; }
-            return synthesizeLine(line, voiceKey)
-              .then(url => loadClip(finalCtx, studioClipHandle(url)))
-              .then(finalCallback(clip => {
-                playClip(finalCtx, clip, document.getElementById('mixVoice').value/100, destForRecording, advance, { index: idx });
-              }))
-              .catch(() => deviceSpeak());
-          }).catch(deviceSpeak);
+          deviceSpeak();
         }
         speakOnce();
       }

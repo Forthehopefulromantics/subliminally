@@ -22,6 +22,7 @@
     "test:unit": "npm run test:rituals && npm run test:faith && npm run test:checkout && npm run test:mix && npm run test:frequency-layers && npm run test:affirmations && npm run test:lifecycle && npm run test:take-sync && npm run test:marketing-sync",
     "test:take-sync": "node scripts/take-sync-test.cjs",
     "test:own-voice-100": "node scripts/own-voice-100-e2e.cjs",
+    "test:serenity-e2e": "node scripts/serenity-e2e.cjs",
     "test:marketing-sync": "node scripts/marketing-sync-test.mjs"
   },
   "dependencies": {

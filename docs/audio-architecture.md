@@ -141,3 +141,30 @@ pool of 3 over 100 takes, retries, lost-response safety, only uncommitted upload
 removed). `npm run test:layers-lyrics` and `npm run test:own-voice-100` are
 browser tests (serve the repo on :8123 first): the latter records, refreshes,
 edits, saves, reopens, re-records and plays a complete 100-affirmation subliminal.
+
+## Serenity (generated voice): generate, verify, then play
+
+Serenity and Clone Your Voice share one path in `js/builder.js` (`runStudioPrepare`):
+
+1. **Generating Voice** - `/api/tts`, batched 6 lines per request, up to 3 attempts per batch with
+   exponential backoff for timeouts / 5xx / bad audio. Quota, auth and rate limits are not retried.
+2. **Saving Audio** - every returned link is downloaded and checked in the browser (reachable, >= 1.5 KB,
+   an audio header, decodes, not silent). The bytes are kept on the line's handle, so playback needs
+   neither the link nor the network. A bad link is re-requested; bad content is re-requested with
+   `repair: true`, which makes the stored copy again. One second chance, then **Failed**.
+3. **Ready to Play** - only now is `studioReadyKey` set. Play compares against it and, if not ready,
+   waits for / triggers preparation. **There is no device-voice fallback** for a generated voice
+   (device speech is silent on iPhone once Web Audio runs). **Retry Audio** re-runs it.
+
+Server (`api/tts.js`): audio is validated before it is stored (`verifySpeechAudio`), the upload and the
+`tts_clips` row are both required, a cached row whose audio is gone is forgotten and regenerated
+(self-heal), and the function stops starting work 10 s before its 60 s limit. Failures are written to
+`tts_failures` (codes only, never text) by the route and by `/api/tts-report` (browser-side faults), and
+the fifth failure in 30 minutes emails the admin once an hour (`lib/tts-diagnostics.js`).
+Apply `supabase/migrations/20261018_tts_failures.sql`; nothing breaks if it is not applied yet.
+
+Plan lookups: `getMyTierChecked()` throws when the lookup fails, so a transient error is a retryable
+network failure rather than "free plan" (which used to be cached for 5 minutes).
+
+Tests: `npm run test:voice` (server), `npm run test:voice-routing` (client logic),
+`npm run test:serenity-e2e` (Chromium, iPhone UA, real mp3s, measured speaker output).

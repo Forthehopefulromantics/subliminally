@@ -187,3 +187,20 @@ body[data-sky="day"] #bgGrid .bg-card{background:#fffafc!important;color:#2e1b48
 body[data-sky="day"] #bgGrid .bg-card.sel{border-color:#a67bc7!important;}
 body[data-sky="day"] #serenityPreviewBtn,body[data-sky="day"] #bgGrid .bg-preview-btn{background:#efe5f4!important;color:#503268!important;border-color:#dfcbea!important;}
 @media(max-width:600px){#bgGrid .bg-row{grid-template-columns:1fr;}#bgGrid .bg-card-face{flex:1 1 150px;}#bgGrid .bg-preview-btn{margin:0 32px 0 0!important;}#bgGrid .bg-card::after{bottom:50%;transform:translateY(50%);}#voiceSerenity .voice-card-face{grid-template-columns:48px 1fr;gap:8px;}#voiceSerenity .sound-art{width:48px;height:54px;}#voiceSerenity h4{font-size:19px;}#voiceSerenity p{font-size:14px;}#serenityPreviewBtn{min-width:70px;margin-right:0!important;padding:0 9px!important;}}
+
+/* ---- Serenity / cloned voice: Generating Voice -> Saving Audio -> Ready to Play | Failed ---- */
+.voice-status {
+  display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+  margin: 10px auto 4px; padding: 8px 14px; max-width: 420px;
+  border-radius: 999px; font-size: 14px; letter-spacing: .02em;
+  background: rgba(255, 255, 255, .08); color: inherit;
+}
+.voice-status[hidden], .voice-status-retry[hidden] { display: none; }
+.voice-status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .6; }
+.voice-status[data-state="generating"] .voice-status-dot,
+.voice-status[data-state="saving"] .voice-status-dot { animation: voice-status-pulse 1.2s ease-in-out infinite; }
+.voice-status[data-state="ready"] .voice-status-dot { background: #7be0a8; opacity: 1; }
+.voice-status[data-state="failed"] { background: rgba(255, 120, 120, .16); }
+.voice-status[data-state="failed"] .voice-status-dot { background: #ff8a8a; opacity: 1; }
+@keyframes voice-status-pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .voice-status-dot { animation: none !important; } }

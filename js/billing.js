@@ -530,13 +530,11 @@ function requiredTierForMinutes(minutes){
 
 async function getMyTier(){
   const subRow = await getMySubscriberRow();
-  const validStatuses = ['active', 'trialing'];
-  const tier = (subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none';
   /* Whisper and Reverie were retired; anyone still paying for either keeps
-     everything they paid for, at Ritual level. The stored row is left alone —
-     it still says what they actually subscribe to — and only what it *means*
+     everything they paid for, at Ritual level. The stored row is left alone --
+     it still says what they actually subscribe to -- and only what it *means*
      is translated, here and in tierForUser() server-side. */
-  return normalizeTier(tier);
+  return normalizedTierFromRow(subRow);
 }
 
 /* Show pricing as an upsell only to people who have something to upgrade to.
@@ -588,16 +586,36 @@ function estimateSessionSeconds(){
   return (state.affirmations.length || 1) * 4;
 }
 
-async function getMySubscriberRow(){
+/* The subscriber row, or null when there isn't one. THROWS when the lookup itself
+   failed: "we could not ask" is not "they are on the free plan", and answering
+   the second to the first used to cache a paying member as free for five minutes
+   -- long enough for Serenity to be swapped for the device voice, which is silent
+   on an iPhone. Callers that are about to withhold something paid use this one. */
+async function getMySubscriberRowChecked(){
   if (!sb || !currentUser) return null;
   /* Which plan you are on is asked for constantly -- by the builder on every
      step, by each page as it opens, by the pricing block. It changes when you
      buy something and at almost no other time, so it is worth remembering for
-     longer than anything else here. `forgetFetch('tier')` after a purchase. */
+     longer than anything else here. `forgetFetch('tier')` after a purchase.
+     A thrown failure is not remembered (see fetchOnce). */
   return fetchOnce('tier', async () => {
-    const { data } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
+    const { data, error } = await sb.from('subscribers').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if (error) throw error;
     return data; // null if they've never subscribed
   }, 300000);
+}
+/* Everything that only draws a badge or a price keeps the forgiving form. */
+async function getMySubscriberRow(){
+  try { return await getMySubscriberRowChecked(); }
+  catch (e){ console.warn('could not read the subscriber row:', e && e.message); return null; }
+}
+function normalizedTierFromRow(subRow){
+  const validStatuses = ['active', 'trialing'];
+  return normalizeTier((subRow && validStatuses.includes(subRow.status) && subRow.tier) ? subRow.tier : 'none');
+}
+/* The plan, or a thrown error when it could not be read. */
+async function getMyTierChecked(){
+  return normalizedTierFromRow(await getMySubscriberRowChecked());
 }
 
 const TIER_SUBLIMINAL_CAPS = { none: 2, ritual: Infinity };
@@ -793,6 +811,12 @@ async function saveSubliminalNow(opts){
     : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
     : 'Saved to your library.';
   msg.className = 'save-msg ok';
+  /* What was saved is the words and the settings. If the voice audio is not ready
+     (still being made, or failed), say so rather than leave "Saved" to read as
+     "finished". */
+  if (typeof isStudioVoiceSession === 'function' && isStudioVoiceSession() && studioReadyKey !== studioSequenceKey()){
+    msg.textContent += ' The voice audio is not ready yet — use Retry Audio on the player if it does not finish.';
+  }
   // These files belong to a saved subliminal now and are never cleaned up as leftovers.
   markTakesCommitted(recordings); markTakesCommitted(layerRecordings);
   /* From now on this screen is editing the row just written, so the next save

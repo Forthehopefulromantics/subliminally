@@ -18,6 +18,8 @@
 process.env.ELEVENLABS_API_KEY = 'el_test_stub';
 process.env.SUPABASE_URL = 'https://stub.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service_stub';
+process.env.RESEND_API_KEY = 're_test_stub';
+process.env.TTS_RETRY_BASE_MS = '1';   // backoff is real in production; the test does not wait for it
 
 const SERENITY = 'PrH4gjaYIM8R16R889Vf'; // the one AI voice on offer — lib/voices.js
 const SARAH = 'EXAVITQu4vr4xnSDxMaL';   // retired, still resolvable — LEGACY_PRESET_VOICES
@@ -44,6 +46,9 @@ const db = {
 };
 let elevenCalls = [];
 let nextElevenResponse = null;   // { status, body } to fail with
+let elevenQueue = [];            // answers handed out first, one per call: { status, body } or { html: true }
+let failures = [];               // tts_failures rows
+let emails = [];                 // what Resend was asked to send
 let failProfileSave = false;     // Supabase refuses the voice profile write
 
 function reset(){
@@ -51,7 +56,7 @@ function reset(){
   db.voiceProfile = null;
   db.clonedVoiceId = null;
   db.clips = []; db.generations = []; db.objects = new Map();
-  elevenCalls = []; nextElevenResponse = null; failProfileSave = false;
+  elevenCalls = []; nextElevenResponse = null; failProfileSave = false; elevenQueue = []; failures = []; emails = [];
   providerVoices = [];
 }
 
@@ -129,11 +134,26 @@ globalThis.fetch = async (url, opts) => {
     }
     if (method === 'PATCH') return reply('');
     if (method === 'DELETE'){
+      const key = eqValue(p, 'clip_key');
+      if (key){ db.clips = db.clips.filter(c => c.clip_key !== key); return reply(''); }
       const voice = eqValue(p, 'voice_id');
       db.clips = db.clips.filter(c => c.voice_id !== voice);
       return reply('');
     }
   }
+  /* diagnostics, and the email that goes with a run of them */
+  if (u.includes('/rest/v1/tts_failures')){
+    if (method === 'POST'){ failures.push({ id: `f${failures.length + 1}`, created_at: new Date().toISOString(), alerted: false, ...body }); return reply(''); }
+    if (method === 'PATCH'){ const id = eqValue(paramsOf(u), 'id'); failures.forEach(f => { if (f.id === id) Object.assign(f, body); }); return reply(''); }
+    if (method === 'GET'){
+      const p = paramsOf(u);
+      let rows = failures.slice().reverse();
+      if ((p.get('alerted') || '') === 'is.true') rows = rows.filter(f => f.alerted);
+      if ((p.get('source') || '').startsWith('eq.')) rows = rows.filter(f => f.source === eqValue(p, 'source'));
+      return reply(rows, { headers: { 'content-range': `0-0/${rows.length}` } });
+    }
+  }
+  if (u === 'https://api.resend.com/emails'){ emails.push(body); return reply({ id: 'email-1' }); }
   /* the ledger, and the count the rate limit reads off it */
   if (u.includes('/rest/v1/tts_generations')){
     if (method === 'GET'){
@@ -173,8 +193,15 @@ globalThis.fetch = async (url, opts) => {
   if (u.startsWith('https://api.elevenlabs.io/')){
     elevenCalls.push({ url: u, method, key: o.headers && o.headers['xi-api-key'], body,
                        form: (typeof FormData !== 'undefined' && o.body instanceof FormData) ? o.body : null });
-    if (nextElevenResponse) return reply(nextElevenResponse.body || 'error', { status: nextElevenResponse.status });
-    if (u.includes('/text-to-speech/')) return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
+    if (nextElevenResponse && !elevenQueue.length) return reply(nextElevenResponse.body || 'error', { status: nextElevenResponse.status });
+    if (u.includes('/text-to-speech/')){
+      const next = elevenQueue.shift();
+      if (next && next.html) return reply('<html>gateway</html>', { bytes: new TextEncoder().encode('<html>' + 'x'.repeat(3000) + '</html>') });
+      if (next && next.tiny) return reply('', { bytes: new Uint8Array([0xff, 0xfb, 0x00, 0x00]) });
+      if (next) return reply(next.body || 'error', { status: next.status });
+      const mp3 = new Uint8Array(4000); mp3[0] = 0xff; mp3[1] = 0xfb;          // an MPEG frame header and a body
+      return reply('', { bytes: mp3 });
+    }
     if (u.includes('/voices/add')){
       // A new clone is a new voice at the provider, never the same id back.
       MY_CLONE = `voice_clone_of_kyla_${++clonesMade}`;
@@ -351,6 +378,119 @@ check('  ...and the rest of the sequence still plays', !!r.body.clips[1].url, tr
 reset();
 r = await callTts({ voiceKey: 'serenity', lines: new Array(30).fill(LINES[0]) });
 check('more lines than a session can hold is refused', [r.code, r.body.error], [400, 'too_many_lines']);
+
+/* ---------------- Serenity must produce audible, stored, findable audio ----------------
+   A 200 from the provider is not proof of speech, and a stored file is not proof
+   that anyone can find it. Each of these used to end in a line with no voice. */
+const ttsOnly = () => elevenCalls.filter(c => c.url.includes('/text-to-speech/'));
+
+reset();
+elevenQueue = [{ html: true }];
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('a 200 that is really an HTML page is retried, not stored', [r.code, ttsOnly().length], [200, 2]);
+check('  ...and what was stored is the good audio', [db.objects.size, r.body.clips[0].error], [1, null]);
+
+reset();
+elevenQueue = [{ tiny: true }, { tiny: true }, { tiny: true }];
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('audio that is only a header is never stored or indexed', [db.objects.size, db.clips.length], [0, 0]);
+check('  ...it fails as bad_audio after three attempts', [r.code, r.body.error, ttsOnly().length], [502, 'bad_audio', 3]);
+check('  ...and the clip is not marked retry-free (the browser may ask again)', r.body.retryable, true);
+
+reset();
+elevenQueue = [{ status: 503, body: 'upstream' }, { status: 500, body: 'oops' }];
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('two provider 5xx in a row then success: every line still arrives', [r.code, r.body.clips.every(c => !!c.url)], [200, true]);
+check('  ...the retries were bounded (one extra call per failure)', ttsOnly().length, 5);
+check('  ...and the failed attempts did not cost the person a ledger row', db.generations.length, 3);
+
+reset();
+elevenQueue = [{ status: 503 }, { status: 503 }, { status: 503 }];
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('a provider that stays down fails after three attempts, not forever', [r.code, ttsOnly().length], [502, 3]);
+check('  ...nothing is charged to the ledger for audio that was not made', db.generations.length, 0);
+
+reset();
+elevenQueue = [{ status: 429, body: 'too many requests' }];
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('a rate limit is not retried (retrying makes it worse)', [r.body.error, ttsOnly().length], ['rate_limited', 1]);
+
+/* the stored object exists but the index row was lost: the audio is not paid for twice */
+reset();
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+check('a generated clip is stored AND indexed together', [db.objects.size, db.clips.length], [1, 1]);
+
+/* SELF-HEAL: a row that says the clip exists, with no audio behind it */
+reset();
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+const callsAfterFirst = ttsOnly().length;
+const orphan = db.clips[1].storage_path;
+db.objects.delete(orphan);                         // the object vanished; the row remains
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('a row with no audio behind it is regenerated instead of handed back dead', [r.code, r.body.clips.every(c => !!c.url && !c.error)], [200, true]);
+check('  ...only that one line was made again', ttsOnly().length - callsAfterFirst, 1);
+check('  ...and its audio is back in the bucket, with one row, not two', [db.objects.has(orphan), db.clips.length], [true, 3]);
+check('  ...it is on the ledger as a generation, honestly', db.generations.filter(g => !g.cache_hit).length, 4);
+check('  ...and the repair was recorded as a stale_clip diagnostic', failures.some(f => f.code === 'stale_clip'), true);
+
+/* REPAIR: the browser got the file and it would not play */
+reset();
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]] });
+const gen1 = ttsOnly().length;
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]], repair: true });
+check('repair makes the named line again even though it is cached', [r.code, ttsOnly().length - gen1], [200, 1]);
+check('  ...and a normal request afterwards is served from the new copy', (await callTts({ voiceKey: 'serenity', lines: [LINES[0]] })).body.clips[0].cached, true);
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[1]], repair: true });
+check('repair on a line that was never made just makes it', [r.code, !!r.body.clips[0].url], [200, true]);
+reset();
+db.tier = null;
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[0]], repair: true });
+check('repair is not a way round the paywall', [r.code, elevenCalls.length], [403, 0]);
+
+/* RECOVERY costs the member nothing: there is no credit to take */
+reset();
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+const ledgerBefore = db.generations.length;
+db.objects.clear();                                 // every clip lost
+r = await callTts({ voiceKey: 'serenity', lines: LINES });
+check('a subliminal whose audio was all lost is made again from its saved words', r.body.clips.every(c => !!c.url), true);
+check('  ...the person\'s plan and affirmations are untouched (nothing on the request deducts anything)', db.tier.status, 'active');
+
+/* DIAGNOSTICS: codes, never words */
+reset();
+elevenQueue = [{ status: 503, body: 'I am safe. secret affirmation text' }, { status: 503 }, { status: 503 }];
+r = await callTts({ voiceKey: 'serenity', lines: [LINES[1]] });
+check('a failed generation is recorded', failures.length >= 1, true);
+const dump = JSON.stringify(failures);
+check('  ...with a code, a stage and the attempts', [failures[0].code, failures[0].stage, failures[0].attempts], ['provider_failed', 'generate', 3]);
+check('  ...and never the affirmation, the provider body, or a key', [dump.includes('promised'), dump.includes('secret'), dump.includes('el_test_stub'), dump.includes('service_stub')], [false, false, false, false]);
+
+/* ALERTS: one email, at the fifth failure, then quiet for an hour */
+reset();
+for (let i = 0; i < 4; i++){ elevenQueue = [{ status: 401, body: 'bad key' }]; await callTts({ voiceKey: 'serenity', lines: [LINES[0] + i] }); }
+check('four failures send no email', emails.length, 0);
+elevenQueue = [{ status: 401, body: 'bad key' }];
+await callTts({ voiceKey: 'serenity', lines: [LINES[0] + 'x'] });
+check('the fifth sends one', emails.length, 1);
+check('  ...to the admin, naming the failing code and what to do about it', [emails[0].to[0], emails[0].html.includes('provider_auth'), emails[0].html.includes('ELEVENLABS_API_KEY')], ['hello@subliminallybyfthr.com', true, true]);
+check('  ...with no affirmation text in it', emails[0].html.includes('promised'), false);
+elevenQueue = [{ status: 401, body: 'bad key' }];
+await callTts({ voiceKey: 'serenity', lines: [LINES[0] + 'y'] });
+check('a sixth failure inside the hour does not send another', emails.length, 1);
+
+/* the report from the browser */
+const { default: ttsReport } = await import(new URL('../api/tts-report.js', import.meta.url).href);
+reset();
+let rr = mockRes();
+await ttsReport({ method: 'POST', headers: { authorization: 'Bearer good-token' }, body: { code: 'audio_empty', stage: 'verify', voiceKey: 'serenity', text: 'I am safe.' } }, rr);
+check('a browser report is recorded', [rr.code, failures.length, failures[0].source], [200, 1, 'client']);
+check('  ...as a code and a stage only, whatever else was sent', [JSON.stringify(failures[0]).includes('safe'), failures[0].code, failures[0].stage], [false, 'audio_empty', 'verify']);
+rr = mockRes();
+await ttsReport({ method: 'POST', headers: { authorization: 'Bearer good-token' }, body: { code: '<script>', stage: 'x' } }, rr);
+check('  ...an unknown code is stored as a generic one, not as text', [failures[1].code, failures[1].stage], ['generation_failed', 'prepare']);
+rr = mockRes();
+await ttsReport({ method: 'POST', headers: {}, body: { code: 'audio_empty' } }, rr);
+check('  ...and a signed-out caller is refused', rr.code, 401);
 
 /* ---------------- a voice of their own ---------------- */
 reset();

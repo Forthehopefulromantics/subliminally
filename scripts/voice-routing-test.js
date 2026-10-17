@@ -159,7 +159,7 @@ const IDS = ['flowProgress','intensityCards','freqChips','intentionChips','toneC
   'finalPointTag','sessionTarget','reviewSub','lockSoothing','lockCustomTrack','lockLayerVoice',
   'finalFreqPicker','flowSteps','recordFlowTitle','recordFlowSub','recordBreathNote',
   'finalAmbiencePicker','finalAmbienceSelect','ambienceConfirmBtn','ambienceRemoveBtn','ambienceConfirmNote',
-  'ambienceMsg','mixBg','mixBgVal'];
+  'ambienceMsg','mixBg','mixBgVal','voiceStatus','voiceStatusText','retryAudioBtn'];
 IDS.forEach(id => mk(id));
 
 /* The eight flow-step panels, so showStep() has something to switch between. */
@@ -243,6 +243,8 @@ vm.runInContext(`
   var __myVoice = null;
   var __upgrades = [];
   async function getMyTier(){ return __tier; }
+  var __tierError = false;
+  async function getMyTierChecked(){ if (__tierError) throw new Error('lookup failed'); return __tier; }
   function tierHasFeature(t, key){
     if (t === 'ritual') return true;
     if (t === 'none' || t === 'free') return false;
@@ -277,6 +279,7 @@ vm.runInContext(`
      rather than before: nothing here plays audio or speaks. */
   previewVoice = async function(){};
   speakWithDeviceVoice = function(){};
+  ttsSleep = function(){ return Promise.resolve(); };   // retries back off in real time; the test does not wait
 `, ctx);
 
 const run = (src) => vm.runInContext(src, ctx);
@@ -295,9 +298,9 @@ const pickAmbience = (key) => vm.runInContext(
 const get = (expr) => vm.runInContext(`(${expr})`, ctx);
 async function settle(){
   // let the awaits inside the handlers resolve, then fire the 260ms advance
-  for (let i = 0; i < 12; i++) await Promise.resolve();
+  for (let i = 0; i < 80; i++) await Promise.resolve();
   while (timers.length){ const fn = timers.shift(); fn(); }
-  for (let i = 0; i < 12; i++) await Promise.resolve();
+  for (let i = 0; i < 80; i++) await Promise.resolve();
 }
 function setWorld(o){
   if ('tier' in o) run(`__tier = ${JSON.stringify(o.tier)};`);
@@ -454,18 +457,43 @@ doc.getElementById('loopToggle').checked = true;   // keep looping, as a set ses
 /* The server: every /api/tts request is recorded, and it answers like the real
    route — a line it has read before comes back from storage, only a new one
    costs an ElevenLabs generation. */
+// Whatever the sections above left generating against the default (offline) fetch finishes first.
+for (let i = 0; i < 6; i++) await settle();
 const ttsCalls = [];
 const serverClips = new Set();
 let elevenGenerations = 0;
 let ttsFailWith = null;
+let ttsTransient = 0;               // fail this many requests with a timeout, then recover
+let repairHeals = true;             // does asking for a repair really produce good audio?
+const audioFault = new Map();       // line -> '403' | 'empty' | 'html' : what the download of it does
+const reports = [];                 // /api/tts-report bodies
+function audioBlob(size, header){
+  const bytes = new Uint8Array(size);
+  header.forEach((b, i) => { bytes[i] = b; });
+  return { size, type: 'audio/mpeg',
+    slice: () => ({ arrayBuffer: async () => bytes.slice(0, 16).buffer }),
+    arrayBuffer: async () => bytes.buffer };
+}
 ctx.fetch = async (url, o) => {
-  if (!String(url).endsWith('/api/tts')) return { ok: false, status: 404, json: async () => ({}) };
+  const u = String(url);
+  if (u.startsWith('https://storage.test/')){
+    const text = decodeURIComponent(u.slice('https://storage.test/'.length)).replace(/\.mp3$/, '');
+    const fault = audioFault.get(text);
+    if (fault === '403'){ audioFault.delete(text); return { ok: false, status: 403 }; }   // a fresh link works
+    if (fault === 'empty') return { ok: true, status: 200, blob: async () => audioBlob(12, [0x49, 0x44, 0x33]) };
+    if (fault === 'html')  return { ok: true, status: 200, blob: async () => audioBlob(4000, [0x3c, 0x68, 0x74, 0x6d, 0x6c]) };
+    return { ok: true, status: 200, blob: async () => audioBlob(4000, [0x49, 0x44, 0x33]) };   // ID3 + body
+  }
+  if (u.endsWith('/api/tts-report')){ reports.push(JSON.parse(o.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+  if (!u.endsWith('/api/tts')) return { ok: false, status: 404, json: async () => ({}) };
   const body = JSON.parse(o.body);
   ttsCalls.push({ body, auth: o.headers.Authorization });
   if (ttsFailWith) return { ok: false, status: 502, json: async () => ({ error: ttsFailWith }) };
+  if (ttsTransient > 0){ ttsTransient--; return { ok: false, status: 504, json: async () => ({ error: 'timeout' }) }; }
   const clips = body.lines.map((text, index) => {
-    const cached = serverClips.has(text);
+    const cached = serverClips.has(text) && !body.repair;
     if (!cached){ serverClips.add(text); elevenGenerations++; }
+    if (body.repair && repairHeals) audioFault.delete(text);
     return { index, text, url: `https://storage.test/${encodeURIComponent(text)}.mp3`, cached, error: null };
   });
   return { ok: true, status: 200, json: async () => ({ clips }) };
@@ -501,7 +529,8 @@ run(`
   sessionBed.to = sessionLayerBed.to = function(){};
   sessionBed.detach = sessionLayerBed.detach = function(){};
   loadClip = async function(c, handle){ __loads++; return { url: handle.url }; };
-  playClip = function(c, clip, gain, dest, onended){ __played.push(clip.url); __ends.push(onended); };
+  __gains = [];
+  playClip = function(c, clip, gain, dest, onended){ __played.push(clip.url); __gains.push(gain); __ends.push(onended); };
 `);
 const played = () => get('__played.slice()');
 const device = () => get('__device');
@@ -509,18 +538,18 @@ const finalLine = () => get(`document.getElementById('finalLine').textContent`);
 async function drain(rounds = 6){
   // let a few lines play through: end each clip, then run the gap timers
   for (let i = 0; i < rounds; i++){
-    for (let j = 0; j < 12; j++) await Promise.resolve();
+    for (let j = 0; j < 80; j++) await Promise.resolve();
     run(`__ends.splice(0).forEach(f => f && f());`);
     while (timers.length){ const fn = timers.shift(); fn(); }
   }
-  for (let j = 0; j < 12; j++) await Promise.resolve();
+  for (let j = 0; j < 80; j++) await Promise.resolve();
 }
 
 setWorld({ tier: 'ritual', myVoice: { name: 'My voice' } });
 freshBuild();
 // Whatever the sections above left in flight lands before the count starts.
 await settle();
-run(`ttsCache.clear(); sequencePrepares.clear(); clonedVoiceReadyKey = null;`);
+run(`ttsCache.clear(); sequencePrepares.clear(); studioReadyKey = null;`);
 ttsCalls.length = 0; serverClips.clear(); elevenGenerations = 0;
 run(`chooseClonedVoice()`); await settle();
 check('the saved voice is recognized and committed', [get('state.voiceMode'), get('state.aiVoiceId')], ['ai', 'mine']);
@@ -533,7 +562,7 @@ check('  ...for the saved voice by key, never an id', ttsCalls[0].body.voiceKey,
 check('  ...as the signed-in user', ttsCalls[0].auth, 'Bearer tok-owner');
 check('  ...with trimmed lines and no blanks', ttsCalls[0].body.lines, ['I am calm.', 'I am safe.', 'I rest easily.']);
 check('  ...and ElevenLabs read each line once', elevenGenerations, 3);
-check('the subliminal is marked generated', get('clonedVoiceReadyKey === clonedSequenceKey()'), true);
+check('the subliminal is marked generated', get('studioReadyKey === studioSequenceKey()'), true);
 run(`prepareSessionVoice()`); await settle();
 check('generating the same words again asks for nothing', ttsCalls.length, 1);
 
@@ -551,7 +580,7 @@ run(`__played = []; stopFinal(); playFinal();`); await drain(1);
 check('Start over plays again from the top', played()[0], 'https://storage.test/I%20am%20calm..mp3');
 check('pause, resume and start over made no requests', ttsCalls.length, 1);
 run(`document.getElementById('mixBg').value = '20'; document.getElementById('mixVoice').value = '40'; state.bg = 'rain'; state.bgLayer = 'none';`);
-check('volume and nature changes leave it generated', get('clonedVoiceReadyKey === clonedSequenceKey()'), true);
+check('volume and nature changes leave it generated', get('studioReadyKey === studioSequenceKey()'), true);
 run(`stopFinal(); playFinal();`); await drain(2);
 check('  ...so playing again asks for nothing', ttsCalls.length, 1);
 check('the device voice never spoke', device(), 0);
@@ -559,23 +588,25 @@ run(`stopFinal();`);
 
 /* Reopening: a fresh page has nothing in hand, so the saved clips are asked for
    again — and the server answers them from storage, not from ElevenLabs. */
-run(`ttsCache.clear(); sequencePrepares.clear(); clonedVoiceReadyKey = null;`);
+run(`ttsCache.clear(); sequencePrepares.clear(); studioReadyKey = null;`);
 run(`prepareSessionVoice()`); await settle();
 check('reopening fetches the stored audio', ttsCalls.length, 2);
 check('  ...without generating it again', elevenGenerations, 3);
 
 /* Editing the words and generating again makes new speech for that line only. */
 run(`state.affirmations[4] = 'I rest deeply.';`);
-check('changed words mean it needs generating', get('clonedVoiceReadyKey === clonedSequenceKey()'), false);
+check('changed words mean it needs generating', get('studioReadyKey === studioSequenceKey()'), false);
 run(`prepareSessionVoice()`); await settle();
 check('  ...and only the changed line is generated', [ttsCalls[2].body.lines, elevenGenerations], [['I rest deeply.'], 4]);
 
 /* A failure is shown, nothing else is played, and Play is the retry. */
 run(`state.affirmations[0] = 'I am brave.'; __played = [];`);
 ttsFailWith = 'network';
+const callsBeforeFail = ttsCalls.length;
 run(`playFinal()`); await drain(2);
 check('a failed generation is not played', [get('finalPlaying'), played().length], [false, 0]);
 check('  ...it says so', finalLine().includes('tap Play to try again'), true);
+check('  ...after exactly three bounded attempts', ttsCalls.length - callsBeforeFail, 3);
 check('  ...and never falls back to the device voice', device(), 0);
 check('  ...or to any other voice', ttsCalls.every(c => c.body.voiceKey === 'mine'), true);
 ttsFailWith = null;
@@ -593,10 +624,217 @@ run(`loadClip = async function(c, handle){ __loads++; return { url: handle.url }
 /* No saved voice: back to the Phase 1 setup, nothing generated. */
 setWorld({ tier: 'ritual', myVoice: null });
 const before = ttsCalls.length;
-run(`clonedVoiceReadyKey = null; showStep(7); prepareSessionVoice();`); await settle();
+run(`studioReadyKey = null; showStep(7); prepareSessionVoice();`); await settle();
 check('without a saved voice, nothing is generated', ttsCalls.length, before);
 check('  ...and the voice setup opens instead', [step(), get(`document.getElementById('myVoicePanel').dataset.open`)], [4, '1']);
 check('  ...still without the device voice', device(), 0);
+
+/* ================= SERENITY: generated, checked, then played =================
+   The same rules as the clone, because they are the same code: nothing is called
+   ready until every line has been downloaded and checked; Play waits for ready; a
+   failure is said out loud and Retry Audio makes it again; and the device voice is
+   never what reads a Serenity session (on an iPhone it is silent). */
+section('Serenity — generate, verify, play');
+['voiceStatus', 'voiceStatusText', 'retryAudioBtn'].forEach(id => { if (!doc.getElementById(id)) mk(id); });
+const statusEl = () => get(`document.getElementById('voiceStatus').getAttribute('data-state')`);
+const statusText = () => get(`document.getElementById('voiceStatusText').textContent`);
+const retryHidden = () => get(`document.getElementById('retryAudioBtn').hidden`);
+run(`__statuses = []; { const orig = setStudioStatus; setStudioStatus = function(n, c, p){ __statuses.push(n); return orig(n, c, p); }; }`);
+const statuses = () => get('__statuses.slice()');
+function serenitySession(lines){
+  run(`state.affirmations = ${JSON.stringify(lines)}; state.voiceMode = 'ai'; state.aiVoiceId = 'serenity'; state.selectedVoice = 'serenity';
+       layerVoiceEnabled = false; state.layerAffirmations = []; state.layerVoiceMode = null; state.eftMode = false; state.visualizationMode = false;
+       ttsCache.clear(); sequencePrepares.clear(); studioClipHandles.clear(); studioReadyKey = null; studioPreparing = null;
+       __played = []; __device = 0; __statuses = []; document.getElementById('finalLine').textContent = '';`);
+  ttsCalls.length = 0; reports.length = 0; serverClips.clear(); elevenGenerations = 0;
+  ttsFailWith = null; ttsTransient = 0; repairHeals = true; audioFault.clear();
+  run(`__tierError = false;`);
+}
+const FIVE = ['I am calm.', 'I am safe.', 'I rest easily.', 'I am enough.', 'I am loved.'];
+setWorld({ tier: 'ritual', myVoice: null });
+
+/* -- the happy path, with the states in order -- */
+serenitySession(FIVE);
+run(`prepareSessionVoice()`); await settle();
+check('Serenity is requested by key, as the signed-in user', [ttsCalls[0].body.voiceKey, ttsCalls[0].auth], ['serenity', 'Bearer tok-owner']);
+check('all five lines go out in one batch', ttsCalls.length === 1 && ttsCalls[0].body.lines.length, 5);
+check('the states run Generating → Saving → Ready', [statuses()[0], statuses().includes('saving'), statuses().slice(-1)[0]], ['generating', true, 'ready']);
+check('Saving comes after Generating, never before', statuses().indexOf('saving') > statuses().indexOf('generating'), true);
+check('the badge reads Ready to Play', [statusEl(), statusText()], ['ready', 'Ready to Play']);
+check('Retry Audio is hidden when nothing failed', retryHidden(), true);
+check('the plan is marked ready only after the check', get('studioReadyKey === studioSequenceKey()'), true);
+check('every line was downloaded and its bytes kept for playback',
+  FIVE.every(l => get(`studioClipHandle('https://storage.test/${encodeURIComponent(l)}.mp3').verified === true && !!studioClipHandle('https://storage.test/${encodeURIComponent(l)}.mp3').blob`)), true);
+run(`prepareSessionVoice()`); await settle();
+check('preparing again asks for nothing', ttsCalls.length, 1);
+
+/* -- play, pause, resume, replay: only what is in hand -- */
+run(`playFinal()`); await drain();
+check('Play plays the generated Serenity audio', played().slice(0, 2), ['https://storage.test/I%20am%20calm..mp3', 'https://storage.test/I%20am%20safe..mp3']);
+check('  ...from the first line, in order', played().length >= 2, true);
+check('  ...with no request made by Play', ttsCalls.length, 1);
+run(`pauseFinal()`); await drain(2);
+const sPausedAt = played().length;
+await drain(2);
+check('pause holds the voice', played().length, sPausedAt);
+run(`resumeFinal()`); await drain(2);
+check('resume carries on', played().length > sPausedAt, true);
+run(`__played = []; stopFinal(); playFinal();`); await drain(1);
+check('replay starts again from the top', played()[0], 'https://storage.test/I%20am%20calm..mp3');
+run(`stopFinal(); __played = []; playFinal();`); await drain(8);
+check('looping comes round to the first line again', played().filter(u => u === 'https://storage.test/I%20am%20calm..mp3').length >= 1, true);
+run(`stopFinal(); __gains = []; __played = []; document.getElementById('mixVoice').value = '25'; playFinal();`); await drain(1);
+check('the voice plays at the voice fader, independent of the other layers', get('__gains[0]'), 0.25);
+run(`document.getElementById('mixVoice').value = '40'; document.getElementById('mixBg').value = '20';`);
+check('moving a fader never makes the voice stale or regenerates it', [get('studioReadyKey === studioSequenceKey()'), ttsCalls.length], [true, 1]);
+check('the device voice never spoke', device(), 0);
+check('nothing played twice at once (one session)', get('finalSession > 0 && finalPlaying'), true);
+run(`stopFinal();`);
+
+/* -- opening a saved one: Play waits for the audio instead of racing it -- */
+serenitySession(FIVE);
+run(`playFinal()`);
+check('pressing Play before the audio exists does not start a silent session', get('finalPlaying'), false);
+check('  ...it is generating instead', statusEl() === 'generating' || statusEl() === 'saving', true);
+await drain(3);
+check('  ...and the session starts by itself once the audio is ready', [get('finalPlaying'), played()[0]], [true, 'https://storage.test/I%20am%20calm..mp3']);
+check('  ...in one batched request, not one per line', ttsCalls.length, 1);
+check('  ...and the device voice never spoke', device(), 0);
+run(`stopFinal();`);
+
+/* -- transient failures: bounded retries with backoff -- */
+serenitySession(FIVE);
+ttsTransient = 2;
+run(`prepareSessionVoice()`); await settle();
+check('two timeouts then success: it recovers by itself', [statusEl(), ttsCalls.length], ['ready', 3]);
+serenitySession(FIVE);
+ttsTransient = 99;
+run(`prepareSessionVoice()`); await settle();
+check('a timeout that never clears stops after exactly three attempts', ttsCalls.length, 3);
+check('  ...shows Failed, with Retry Audio', [statusEl(), statusText(), retryHidden()], ['failed', 'Failed', false]);
+check('  ...says what happened and that nothing else was played', statusEl() === 'failed' && finalLine().includes('took too long') && finalLine().includes('tap Play to try again'), true);
+check('  ...is not marked ready', get('studioReadyKey === studioSequenceKey()'), false);
+run(`playFinal()`); await drain(3);
+check('  ...Play does not play a failed voice', [get('finalPlaying'), device()], [false, 0]);
+ttsTransient = 0;
+const callsAtRetry = ttsCalls.length;
+run(`retryStudioAudio()`); await settle();
+check('Retry Audio generates it, then it is Ready', [statusEl(), retryHidden()], ['ready', true]);
+check('  ...and asked for it once', ttsCalls.length - callsAtRetry, 1);
+run(`stopFinal();`);
+
+/* -- failures that retrying cannot fix are not retried -- */
+serenitySession(FIVE);
+ttsFailWith = 'quota_exceeded';
+run(`prepareSessionVoice()`); await settle();
+check('out of provider credit: one request, no retries', ttsCalls.length, 1);
+check('  ...Failed, and the person is not told about our account', [statusEl(), /quota|credit|ElevenLabs/i.test(finalLine())], ['failed', false]);
+serenitySession(FIVE);
+ttsFailWith = 'upgrade_required';
+run(`prepareSessionVoice()`); await settle();
+check('a refused plan: one request, Failed, and no Retry Audio to press', [ttsCalls.length, statusEl(), retryHidden()], [1, 'failed', true]);
+
+/* -- paid-user protection: free accounts, and a plan lookup that failed -- */
+setWorld({ tier: 'none', myVoice: null });
+serenitySession(FIVE);
+run(`prepareSessionVoice()`); await settle();
+check('a free account never sends a request for Serenity', ttsCalls.length, 0);
+check('  ...is told it comes with Ritual, and gets no Retry Audio', [statusEl(), finalLine().includes('Ritual'), retryHidden()], ['failed', true, true]);
+run(`playFinal()`); await drain(2);
+check('  ...and Play does not hand it to the device voice', [get('finalPlaying'), device()], [false, 0]);
+setWorld({ tier: 'ritual', myVoice: null });
+serenitySession(FIVE);
+run(`__tierError = true;`);
+run(`prepareSessionVoice()`); await settle();
+check('a plan lookup that FAILED is not treated as "not subscribed"', [ttsCalls.length, finalLine().includes('Ritual')], [0, false]);
+check('  ...it is a retryable network failure', [statusEl(), retryHidden(), finalLine().includes('Couldn\'t reach')], ['failed', false, true]);
+run(`__tierError = false;`);
+run(`retryStudioAudio()`); await settle();
+check('  ...and a paying member recovers with Retry Audio', statusEl(), 'ready');
+
+/* -- the audio itself is checked -- */
+serenitySession(FIVE);
+audioFault.set('I am safe.', 'empty');
+run(`prepareSessionVoice()`); await settle();
+check('a clip that downloads empty is repaired, not played', [statusEl(), ttsCalls.length], ['ready', 2]);
+check('  ...only that line is asked for again, flagged as a repair', [ttsCalls[1].body.lines, ttsCalls[1].body.repair], [['I am safe.'], true]);
+check('  ...and the browser reported it (a code, never the words)', reports.map(r => r.code + '/' + r.stage), ['audio_empty/verify']);
+check('  ...with no affirmation text in the report', JSON.stringify(reports).includes('safe'), false);
+serenitySession(FIVE);
+audioFault.set('I rest easily.', 'html');
+run(`prepareSessionVoice()`); await settle();
+check('a "clip" that is really an error page is repaired too', [statusEl(), ttsCalls[1] && ttsCalls[1].body.repair], ['ready', true]);
+serenitySession(FIVE);
+audioFault.set('I am calm.', 'empty');
+repairHeals = false;
+run(`prepareSessionVoice()`); await settle();
+check('audio that stays bad is never marked ready', [statusEl(), get('studioReadyKey === studioSequenceKey()')], ['failed', false]);
+check('  ...and a bad clip is never played', (run(`playFinal()`), await drain(3), [get('finalPlaying'), played().length, device()]), [false, 0, 0]);
+serenitySession(FIVE);
+audioFault.set('I am loved.', '403');
+run(`prepareSessionVoice()`); await settle();
+check('an expired link is refreshed (asked for again, no repair)', [statusEl(), ttsCalls.length, ttsCalls[1].body.repair], ['ready', 2, false]);
+
+/* -- a clip that cannot play stops the session and says so -- */
+serenitySession(FIVE);
+run(`prepareSessionVoice()`); await settle();
+run(`loadClip = async function(){ throw new Error('decode'); };`);
+run(`playFinal()`); await drain(3);
+check('an unplayable clip stops the session: Failed, Retry Audio, no device voice', [get('finalPlaying'), statusEl(), retryHidden(), device()], [false, 'failed', false, 0]);
+check('  ...and it is reported as a playback failure', reports.some(r => r.code === 'playback_failed' && r.stage === 'playback'), true);
+run(`loadClip = async function(c, handle){ __loads++; return { url: handle.url }; };`);
+run(`retryStudioAudio()`); await settle();
+run(`playFinal()`); await drain(2);
+check('  ...and after Retry Audio it plays', [get('finalPlaying'), played().length > 0], [true, true]);
+run(`stopFinal();`);
+
+/* -- editing the words regenerates only what changed -- */
+serenitySession(FIVE);
+run(`prepareSessionVoice()`); await settle();
+run(`state.affirmations[4] = 'I am whole.';`);
+check('edited words need generating again', get('studioReadyKey === studioSequenceKey()'), false);
+run(`prepareSessionVoice()`); await settle();
+check('  ...only the edited line is asked for', ttsCalls[1].body.lines, ['I am whole.']);
+check('  ...and the provider read exactly one new line', elevenGenerations, 6);
+
+/* -- list sizes: 5 and 10 are Serenity's, 20 and 100 are Record Your Own Voice's -- */
+for (const n of [5, 10]){
+  serenitySession(Array.from({ length: n }, (_, i) => `Serenity line ${i + 1}.`));
+  run(`prepareSessionVoice()`); await settle();
+  check(`${n} affirmations: all generated, verified, ready`, [statusEl(), ttsCalls.reduce((a, c) => a + c.body.lines.length, 0)], ['ready', n]);
+}
+for (const n of [20, 100]){
+  serenitySession(Array.from({ length: n }, (_, i) => `Too long a list ${i + 1}.`));
+  run(`prepareSessionVoice()`); await settle();
+  check(`${n} affirmations: Serenity declines without spending anything`, [ttsCalls.length, statusEl(), retryHidden()], [0, 'failed', true]);
+  check(`  ...and points to Record Your Own Voice`, finalLine().includes('Record Your Own Voice'), true);
+}
+
+/* -- a saved subliminal built under an older, larger limit still plays its stored audio -- */
+serenitySession(Array.from({ length: 13 }, (_, i) => `Saved long line ${i + 1}.`));
+run(`editingExistingId = 'saved-13';`);
+run(`prepareSessionVoice()`); await settle();
+check('a saved 13-line Serenity subliminal is read back, not refused', [statusEl(), ttsCalls.reduce((a, c) => a + c.body.lines.length, 0)], ['ready', 13]);
+run(`editingExistingId = null;`);
+
+/* -- the second voice, layered, in Serenity too -- */
+serenitySession(FIVE);
+run(`layerVoiceEnabled = true; state.layerVoiceMode = 'ai'; state.layerAiVoiceId = 'serenity'; state.layerAffirmations = ['Layer one.', 'Layer two.'];`);
+run(`prepareSessionVoice()`); await settle();
+check('main and second voice are both generated and checked', [statusEl(), serverClips.has('Layer one.'), serverClips.has('I am calm.')], ['ready', true, true]);
+run(`playFinal()`); await drain(8);
+check('the second voice plays its generated audio alongside', played().some(u => u.includes('Layer')), true);
+check('  ...and the device voice is not used for either', device(), 0);
+run(`stopFinal(); layerVoiceEnabled = false; state.layerAffirmations = []; state.layerVoiceMode = null;`);
+
+/* -- Record Your Own Voice is untouched -- */
+serenitySession(FIVE);
+run(`state.voiceMode = 'own'; state.aiVoiceId = null; state.selectedVoice = 'record_own'; recordings = [{ url: 'blob:take-1' }, { url: 'blob:take-2' }]; __played = [];`);
+run(`prepareSessionVoice()`); await settle();
+run(`playFinal()`); await drain(3);
+check('your own recordings play with no voice request at all', [ttsCalls.length, played()[0], get('finalPlaying')], [0, 'blob:take-1', true]);
+check('  ...and no Serenity status is shown', statusEl() === 'ready' || statusEl() === null, true);
+run(`stopFinal(); recordings = [];`);
 
 /* ================= the paywall must not strand the screen ================= */
 section('A refused tap leaves the screen telling the truth');
