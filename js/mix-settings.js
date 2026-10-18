@@ -58,6 +58,8 @@ function readMixSettings(){
   if (typeof state !== 'undefined' && state && Array.isArray(state.freqLayers) && state.freqLayers.length && typeof FrequencyLayers !== 'undefined') mix.freqLayers = FrequencyLayers.serializeFrequencyLayers(state.freqLayers);
   // Each affirmation's order, length, planned timing and the words its take was recorded for.
   if (typeof buildAffirmationMeta === 'function'){ const meta = buildAffirmationMeta(); if (meta) mix.affirmationMeta = meta; }
+  // Each voice layer's echo (on/off, intensity, delay), independent per layer.
+  if (typeof VoiceEcho !== 'undefined') mix.voiceEcho = VoiceEcho.serialize();
   // So does the soothing pad, which had nowhere to be saved before.
   if (typeof state !== 'undefined' && state && SOOTHING_VARIANTS.includes(state.soothingLayer)) mix.soothingLayer = state.soothingLayer;
   return mix;
@@ -71,6 +73,9 @@ function restoreMixSettings(id, settings){
   if(!id){ activeCoverPath=null; refreshListeningCover(); }
   mixRevision++;
   restoringMix = true;
+  // Echo first: it is per layer and independent of every level below. A subliminal
+  // saved before echo existed has none, and opens with every echo off.
+  if (typeof VoiceEcho !== 'undefined') VoiceEcho.open(id, settings && settings.voiceEcho);
   Object.entries(MIX_DEFAULTS).forEach(([key,fallback]) => {
     const raw = settings && settings[key];
     const value = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0,Math.min(100,raw)) : fallback;
@@ -81,6 +86,7 @@ function restoreMixSettings(id, settings){
   });
   restoringMix = false;
   syncListeningMix();
+  if(typeof VoiceEcho!=='undefined')VoiceEcho.paintControls();
   mixMessage(id ? 'Your saved sound levels' : 'Sound levels will be included when you save this subliminal.');
 }
 function queueMixSave(){
@@ -127,7 +133,10 @@ function flushMixSave(){
 function listeningMixMarkup(opts){
   const names = {mixTone:'Frequency',mixBg:'Nature sounds',mixVoice:'Affirmations',mixSoothing:'Soothing layer',mixCustom:'Your track',mixLayerVoice:'Second voice'};
   const freqs = opts && opts.frequencies ? `<div class="listening-freqs"><h5>Frequencies <small>up to 4</small></h5><div class="fl-chips" data-fl-chips="fl-chip" role="group" aria-label="Add or remove frequencies"></div><div class="fl-tray" data-fl-panel></div></div>` : '';
-  return freqs + Object.keys(MIX_DEFAULTS).map(id => `<label class="listening-mix-row"><span>${names[id]}</span><input type="range" min="0" max="100" data-listening-mix="${id}" aria-label="${names[id]} volume" oninput="setListeningMix('${id}',this.value)"><output data-listening-value="${id}"></output></label>`).join('');
+  // Echo sits directly under the voice it belongs to, one control set per voice layer.
+  const echoFor = {mixVoice:'voice', mixLayerVoice:'layerVoice'};
+  return freqs + Object.keys(MIX_DEFAULTS).map(id => `<label class="listening-mix-row" data-mix-row="${id}"><span>${names[id]}</span><input type="range" min="0" max="100" data-listening-mix="${id}" aria-label="${names[id]} volume" oninput="setListeningMix('${id}',this.value)"><output data-listening-value="${id}"></output></label>`
+    + (echoFor[id] && typeof VoiceEcho !== 'undefined' ? `<div class="echo-wrap" data-echo-wrap="${echoFor[id]}">${VoiceEcho.controlsMarkup(echoFor[id])}</div>` : '')).join('');
 }
 function setListeningMix(id,value){
   if(!Object.hasOwn(MIX_DEFAULTS,id)) return;
@@ -144,8 +153,12 @@ function syncListeningMix(){
     const row=el.closest('label');
     const original=src.closest('.mix-row');
     if(row && original)row.hidden=original.style.display==='none';
+    // The echo controls follow their voice's row: no second voice, no second-voice echo.
+    const wrap=row && row.nextElementSibling;
+    if(wrap && wrap.classList.contains('echo-wrap'))wrap.hidden=row.hidden;
     document.querySelectorAll('[data-listening-value="'+id+'"]').forEach(out=>{out.textContent=src.value+'%';});
   });
+  if(typeof VoiceEcho!=='undefined')VoiceEcho.paintControls();
 }
 function restartListening(){ stopFinal(); playFinal(); renderNowBar(); }
 function chooseListeningCover(){
