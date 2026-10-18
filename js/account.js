@@ -1180,6 +1180,7 @@ async function logOut(){
   forgetVoiceCatalogue();
   voiceCatalogue = { presets: FALLBACK_PRESET_VOICES, myVoice: null, consentStatement: VOICE_CONSENT_FALLBACK, provider: null, loaded: false };
   ttsCache.clear(); studioClipHandles.clear(); sequencePrepares.clear(); studioReadyKey = null;
+  savedVoiceAudio = null; studioRebuildAllowed = false; studioGeneratedThisRun = false;
   await sb.auth.signOut();
 }
 /* Apple requires in-app account deletion for any app with sign-up. The heavy

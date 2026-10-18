@@ -168,3 +168,41 @@ network failure rather than "free plan" (which used to be cached for 5 minutes).
 
 Tests: `npm run test:voice` (server), `npm run test:voice-routing` (client logic),
 `npm run test:serenity-e2e` (Chromium, iPhone UA, real mp3s, measured speaker output).
+
+## Saved voice audio (Serenity / Clone Your Voice): stored with the subliminal
+
+**Root cause of the recurring "That voice is unavailable right now".** A saved
+generated-voice subliminal was only words + a voice key. Every open re-requested its
+audio from `/api/tts`, which finds it in a cache keyed by (voice, model, **pace**, words)
+and regenerates on a miss. The pace was never saved, so a subliminal built at Drifting
+(0.82) reopened at the default Steady (0.92), missed every key, and fell through the plan
+check, the hourly/daily limits, the provider quota and ElevenLabs availability - any of
+which failing produced the error (and, in the preview, a silent switch to the device
+voice). Production showed the same account's lines at both 0.82 and 0.92, no audio tied
+to any of the 5 saved AI subliminals, and `tts_failures` had never been created, so the
+earlier monitoring was inert.
+
+**Now:** once generated and checked, every line is uploaded to the private `recordings`
+bucket at `<user>/voice/<sha256 of the bytes>.mp3` (immutable name: nothing is ever
+overwritten, "already exists" is success), downloaded back and compared, and only then
+does the row get `subliminals.voice_audio` (`supabase/migrations/20261019_...`).
+
+- Opening a subliminal loads those files (`hydrateSavedStudioAudio`). No plan check, no
+  limit, no provider call; a lapsed plan or dead provider does not matter.
+- Save is refused unless every line is generated, uploaded and read back
+  (`persistStudioAudio` in `saveSubliminal`); nothing partial is written.
+- A saved file that cannot be loaded is **Failed + Retry Audio**. It is never replaced by
+  the device voice and never regenerated silently. Only after a "missing/damaged" message
+  does Retry rebuild it (the person's explicit tap).
+- Subliminals saved before this get their audio stored the next time they are opened and
+  ready (`adoptStudioAudio` writes only `voice_audio`).
+- Pace is saved in `mix_settings.pace` and restored; stored audio is matched by voice +
+  words, so a pace change never invalidates it.
+- Recorded voices: takes are retried with fresh links, load failures are reported, and
+  Retry Audio re-fetches just the missing takes.
+- Monitoring: `tts_failures` (codes/stages only) gains `saved_audio_unreachable|missing|
+  corrupt`, `persist_failed`, `verify_failed` with stages `load|persist`; the existing
+  5-in-30-minutes admin email covers them. Affirmation text is never logged.
+- The app never deletes files under `<user>/voice/`.
+
+Tests: `npm run test:saved-audio` (Chromium; serve the repo on :8123 first).

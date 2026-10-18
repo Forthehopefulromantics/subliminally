@@ -222,23 +222,32 @@ async function fetchSavedTakes(paths, describe){
   } catch(e){ /* signed one at a time below */ }
   async function one(entry){
     const { p: path, i } = entry;
-    try {
-      let url = signed.get(path);
-      if (!url){
-        const { data, error } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
-        if (error || !data) throw new Error((error && error.message) || 'could not get a link to the audio');
-        url = data.signedUrl;
+    /* A dropped connection, an expired link or a 5xx is tried again (with a fresh
+       link) a few times; a file that is genuinely gone (404) is not. */
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt++){
+      if (attempt) await new Promise(r => setTimeout(r, 600 * attempt));
+      try {
+        let url = attempt ? null : signed.get(path);
+        if (!url){
+          const { data, error } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+          if (error || !data) throw new Error((error && error.message) || 'could not get a link to the audio');
+          url = data.signedUrl;
+        }
+        const res = await fetch(url);
+        if (!res.ok){ const err = new Error('the audio file came back ' + res.status); err.final = res.status === 404 || res.status === 400; throw err; }
+        const blob = await res.blob();
+        if (!blob.size) throw new Error('the audio file is empty');
+        const info = describe(i) || {};
+        // `path` marks the take as already saved: saving again reuses it, and it is never cleaned up.
+        takes[i] = { id: TakeSyncKit.makeId(), url: URL.createObjectURL(blob), blob, path, committed: true, text: info.text, durationMs: info.durationMs };
+        return;
+      } catch(e){
+        lastError = e;
+        if (e && e.final) break;
       }
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('the audio file came back ' + res.status);
-      const blob = await res.blob();
-      if (!blob.size) throw new Error('the audio file is empty');
-      const info = describe(i) || {};
-      // `path` marks the take as already saved: saving again reuses it, and it is never cleaned up.
-      takes[i] = { id: TakeSyncKit.makeId(), url: URL.createObjectURL(blob), blob, path, committed: true, text: info.text, durationMs: info.durationMs };
-    } catch(e){
-      errors.push((e && e.message) || 'the audio could not be downloaded');
     }
+    errors.push((lastError && lastError.message) || 'the audio could not be downloaded');
   }
   const queue = wanted.slice();
   const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
@@ -284,6 +293,18 @@ async function loadSavedIntoBuilder(id, opts){
   state.visualizationMode = !!s.visualization_mode;
   state.binauralBand = s.binaural_band || null;
 
+  /* Generated audio stored with this subliminal (see persistStudioAudio), and the
+     pace it was generated at -- from the saved mix, else from the stored audio, so
+     a subliminal saved before pace was kept does not reopen at a different one. */
+  savedVoiceAudio = s.voice_audio && Array.isArray(s.voice_audio.clips) ? s.voice_audio : null;
+  studioRebuildAllowed = false; studioGeneratedThisRun = false; savedRecordingSource = null;
+  {
+    const storedSpeed = savedVoiceAudio && savedVoiceAudio.clips[0] ? Number(savedVoiceAudio.clips[0].speed) : NaN;
+    const paceKey = (s.mix_settings && s.mix_settings.pace)
+      || (AFFIRMATION_PACES.find(p => p.speed === storedSpeed) || {}).key;
+    if (paceKey) setPaceByKey(paceKey);
+  }
+
   const hasRealRecordings = Array.isArray(s.recording_urls) && s.recording_urls.some(p => p);
   if (hasRealRecordings){
     /* Every way this can fail used to end in `null`, which is the same value as
@@ -307,17 +328,22 @@ async function loadSavedIntoBuilder(id, opts){
     });
     recordings = loaded.takes;
     recordingLoadErrors = loaded.errors;
+    savedRecordingSource = { paths: s.recording_urls.slice(), meta: savedMeta };
     state.voiceMode = 'own';
     state.selectedVoice = VOICE_RECORD_OWN;
     if (recordingLoadErrors.length){
       console.warn('subliminal audio did not load:', recordingLoadErrors);
+      reportStudioFailure('saved_audio_unreachable', 'load');
     }
   } else {
     recordingLoadErrors = [];
     // No recorded audio was saved for this one (or it was a studio voice
     // originally) — reloading plays it back in the voice it was built with.
     state.voiceMode = 'ai';
-    state.aiVoiceId = s.ai_voice_id || DEVICE_VOICE;
+    /* The voice it was built with. A row that names none but holds stored generated
+       audio is read in that audio's voice -- never quietly handed to the device. */
+    const storedClips = savedVoiceAudio && savedVoiceAudio.clips;
+    state.aiVoiceId = s.ai_voice_id || (storedClips && storedClips[0] && storedClips[0].voice) || DEVICE_VOICE;
     /* Reopening a saved subliminal has to put the voice picker back the way it
        was built, or Continue would fork on a blank answer -- and a blank answer
        used to mean the manual recorder. selectedVoiceFromState() reads it back
@@ -366,6 +392,31 @@ async function loadSavedIntoBuilder(id, opts){
   }
 }
 
+/* Retry for a recorded voice whose saved takes did not download: asks storage again
+   for just the lines that are missing, and never touches the ones already loaded. */
+let savedRecordingSource = null;
+async function retrySavedRecordings(){
+  if (!savedRecordingSource || !sb || !currentUser) return;
+  const { paths, meta } = savedRecordingSource;
+  const lineEl = document.getElementById('finalLine');
+  const retry = document.getElementById('retryAudioBtn');
+  if (lineEl) lineEl.textContent = 'Loading your saved recordings…';
+  const todo = paths.map((p, i) => (p && !recordings[i]) ? p : null);
+  const loaded = await fetchSavedTakes(todo, (lineNo) => {
+    const m = meta[lineNo] || {};
+    return { text: typeof m.recordedText === 'string' ? m.recordedText : state.affirmations[lineNo], durationMs: Number(m.durationMs) || undefined };
+  });
+  loaded.takes.forEach((t, i) => { if (t) recordings[i] = t; });
+  recordingLoadErrors = loaded.errors;
+  if (recordingLoadErrors.length){
+    reportStudioFailure('saved_audio_unreachable', 'load');
+    if (lineEl) lineEl.textContent = 'Your recordings are saved, but this device still could not download them — ' + recordingLoadErrors[0] + '. Tap Retry Audio.';
+    if (retry) retry.hidden = false;
+  } else {
+    if (lineEl) lineEl.textContent = '"' + (state.affirmations[0] || '') + '"';
+    if (retry) retry.hidden = true;
+  }
+}
 async function deleteMySubliminal(id){
   if (!sb || !currentUser) return;
   await sb.from('subliminals').delete().eq('id', id).eq('user_id', currentUser.id);

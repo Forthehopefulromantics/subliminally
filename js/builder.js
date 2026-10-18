@@ -434,6 +434,7 @@ function resetFlow(){
   const lengthQ = document.getElementById('sessionLengthRow');
   if (lengthQ) lengthQ.style.display = '';
   editingExistingId = null;
+  savedVoiceAudio = null; studioRebuildAllowed = false; studioGeneratedThisRun = false;
   restoreMixSettings(null, null);
   contentAlreadySaved = false;
   document.getElementById('finalTitleInput').value = '';
@@ -1957,11 +1958,10 @@ function toggleSerenityPreview(ev){
   const started = el.play();
   if (started && started.catch){
     started.catch(() => {
-      /* No signal, or the demo has never been generated. It is a courtesy, not a
-         feature to apologise for, so this device reads the same line instead. */
+      /* No signal, or the demo has never been generated. Say so; the sample is
+         never read in a different voice. */
       setSerenityPreviewLabel(false);
-      sayInVoicePicker('Hearing a sample on this device — Serenity itself is a moment away.');
-      speakWithDeviceVoice(SERENITY_PREVIEW_LINE);
+      sayInVoicePicker('The Serenity sample couldn\'t be loaded — check your connection and tap it again.', 'err');
     });
   }
 }
@@ -2054,10 +2054,13 @@ async function previewVoice(picked){
     return;
   }
   if (!voiceKey){
-    if (msg && picked !== DEVICE_VOICE && !currentUser){
-      msg.textContent = 'Sign in to hear Serenity — this device reads it for now.';
+    /* The device voice speaks only when it was chosen. Any other voice that cannot
+       be generated says why and reads nothing. */
+    if (picked === DEVICE_VOICE){ speakWithDeviceVoice(line); return; }
+    if (msg){
+      msg.textContent = !currentUser ? ttsErrorText({ message: 'not_signed_in' }) : ttsErrorText({ message: 'upgrade_required' });
+      msg.className = 'save-msg err';
     }
-    speakWithDeviceVoice(line);
     return;
   }
   if (msg) msg.textContent = 'Loading the voice…';
@@ -2078,8 +2081,7 @@ async function previewVoice(picked){
       if (msg){ msg.textContent = clonedVoiceErrorText(e && e.message); msg.className = 'save-msg err'; }
       return;
     }
-    if (msg){ msg.textContent = ttsErrorText(e); msg.className = 'save-msg'; }
-    speakWithDeviceVoice(line);
+    if (msg){ msg.textContent = ttsErrorText(e); msg.className = 'save-msg err'; }
   }
 }
 function speakWithDeviceVoice(line){
@@ -2093,27 +2095,28 @@ function speakWithDeviceVoice(line){
    The routes answer with a code, never a provider message: "voice_not_found" or a
    quota object with our account in it is no use to somebody trying to fall asleep.
    This is the one place those codes become something a person can read, and every
-   one of them ends the same way — the session still plays, in this device's voice. */
+   one of them says so plainly: a generated voice is never swapped for this device's
+   voice unless the person chooses the device voice themselves. */
 const TTS_MESSAGES = {
-  not_signed_in:    'Sign in to use Serenity — this device reads it for now.',
-  upgrade_required: 'Serenity comes with Ritual — using this device\'s voice for now.',
-  not_configured:   'Serenity isn\'t switched on yet — using this device\'s voice.',
+  not_signed_in:    'Sign in to hear Serenity.',
+  upgrade_required: 'Serenity comes with Ritual.',
+  not_configured:   'Serenity isn\'t switched on yet.',
   no_cloned_voice:  'Your voice hasn\'t been created yet — pick "Clone your voice" and give it a minute of your voice.',
-  invalid_voice:    'That voice isn\'t available any more — choose another one, or this device reads it.',
+  invalid_voice:    'That voice isn\'t available any more — choose another one.',
   consent_required: 'Tick the confirmation first, then your voice can be created.',
-  quota_exceeded:   'Serenity has run out of time this month — this device reads it for now, and it\'ll be back.',
-  rate_limited:     'The voice service is busy — give it a minute and try again. This device reads it for now.',
-  too_fast:         'That\'s a lot of generating at once — give it a minute. This device reads it for now.',
-  hourly_limit:     'You\'ve built a lot this hour. Serenity comes back shortly; this device reads it until then.',
-  daily_limit:      'You\'ve built a lot today. Serenity comes back tomorrow; this device reads it until then.',
-  timeout:          'The voice service took too long — this device reads it for now.',
-  network:          'Couldn\'t reach the voice service — this device reads it for now.',
-  too_long:         'That line is too long to read as one clip — shorten it, or this device reads it.',
+  quota_exceeded:   'Serenity is unavailable for a little while — nothing was played in another voice.',
+  rate_limited:     'The voice service is busy — give it a minute and try again.',
+  too_fast:         'That\'s a lot of generating at once — give it a minute.',
+  hourly_limit:     'You\'ve built a lot this hour. Serenity comes back shortly.',
+  daily_limit:      'You\'ve built a lot today. Serenity comes back tomorrow.',
+  timeout:          'The voice service took too long — try again.',
+  network:          'Couldn\'t reach the voice service — try again.',
+  too_long:         'That line is too long to read as one clip — shorten it.',
   too_many_lines:   'That\'s more lines than one session can hold — trim a few.',
 };
 function ttsErrorText(e){
   const code = (e && e.message) || '';
-  return TTS_MESSAGES[code] || 'That voice is unavailable right now — using this device\'s voice.';
+  return TTS_MESSAGES[code] || 'That voice is unavailable right now — nothing was played in another voice. Try again in a moment.';
 }
 
 /* Clone Your Voice gets its own words, because the ones above all end "this
@@ -2363,6 +2366,17 @@ async function probeStudioAudio(blob){
   for (let i = 0; i < ch.length; i += 16){ const v = Math.abs(ch[i]); if (v > peak) peak = v; }
   return { seconds: buffer.duration, peak };
 }
+async function verifyStudioBlob(blob){
+  if (blob.size < STUDIO_MIN_CLIP_BYTES) throw new Error('audio_empty');
+  const head = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+  const frameSync = head[0] === 0xFF && (head[1] & 0xE0) === 0xE0;
+  if (!sniffAudioMime(head) && !frameSync) throw new Error('audio_undecodable');
+  const probe = await probeStudioAudio(blob);
+  if (probe){
+    if (!(probe.seconds >= STUDIO_MIN_CLIP_SECONDS)) throw new Error('audio_empty');
+    if (!(probe.peak >= STUDIO_MIN_PEAK)) throw new Error('audio_silent');
+  }
+}
 async function verifyStudioClip(url){
   const handle = studioClipHandle(url);
   if (handle.verified) return handle;
@@ -2376,15 +2390,7 @@ async function verifyStudioClip(url){
     } catch(e){ /* offline for a moment: try again */ }
   }
   if (!blob) throw new Error('audio_unreachable');
-  if (blob.size < STUDIO_MIN_CLIP_BYTES) throw new Error('audio_empty');
-  const head = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
-  const frameSync = head[0] === 0xFF && (head[1] & 0xE0) === 0xE0;
-  if (!sniffAudioMime(head) && !frameSync) throw new Error('audio_undecodable');
-  const probe = await probeStudioAudio(blob);
-  if (probe){
-    if (!(probe.seconds >= STUDIO_MIN_CLIP_SECONDS)) throw new Error('audio_empty');
-    if (!(probe.peak >= STUDIO_MIN_PEAK)) throw new Error('audio_silent');
-  }
+  await verifyStudioBlob(blob);
   handle.blob = blob;
   handle.verified = true;
   return handle;
@@ -2452,6 +2458,185 @@ function reportStudioFailure(code, stage){
   } catch(e){}
 }
 
+/* ---------------- saved voice audio: generated once, kept for good ----------------
+   WHY THIS EXISTS. A saved Serenity / Clone Your Voice subliminal used to be only
+   its words and a voice key. Every time it was opened the audio was looked up in
+   a cache keyed by (voice, model, PACE, words) and regenerated on any miss -- and
+   the pace was never saved, so a subliminal built at "Drifting" reopened at the
+   default pace, missed every key, and went back to the provider through the plan
+   check, the rate limits and the quota. Whenever any of that said no, the person
+   got "That voice is unavailable right now".
+
+   NOW the audio is part of the subliminal. Once it has been generated and checked,
+   each line is uploaded to the person's private `recordings` bucket at
+   <user id>/voice/<sha-256 of the bytes>.mp3 -- a name that can only ever mean
+   those exact bytes, so nothing is overwritten and "already exists" is success --
+   downloaded back and compared, and only then does the subliminal's row get a
+   manifest (`voice_audio`) pointing at them. Opening it later reads those files.
+   Nothing is generated, no plan or limit is consulted, and no voice is substituted.
+   Files are never deleted by the app. */
+let savedVoiceAudio = null;            // the open subliminal's manifest: { v, clips: [{ voice, speed, text, path, bytes }] }
+let studioRebuildAllowed = false;      // set only by an explicit tap on Retry after saved audio was found missing
+let studioGeneratedThisRun = false;    // some line was generated just now, so the stored set needs topping up
+const STUDIO_STORE_FOLDER = 'voice';
+const STUDIO_MISSING_CODES = new Set(['saved_audio_missing', 'saved_audio_corrupt']);
+
+function studioStoreBucket(){ return sb.storage.from('recordings'); }
+function savedClipFor(voiceKey, line, speed){
+  const clips = savedVoiceAudio && Array.isArray(savedVoiceAudio.clips) ? savedVoiceAudio.clips : [];
+  const same = clips.filter(c => c && c.voice === voiceKey && c.text === line && c.path);
+  return same.find(c => Number(c.speed) === Number(speed)) || same[0] || null;
+}
+async function studioSha256(blob){
+  try {
+    if (!(window.crypto && crypto.subtle)) return null;
+    const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch(e){ return null; }
+}
+function storageGone(err){
+  const text = String((err && (err.message || err.error)) || '') + ' ' + String((err && (err.statusCode || err.status)) || '');
+  return /not found|no such|does not exist|object not found|\b404\b|\b400\b/i.test(text);
+}
+
+/* One saved file -> verified bytes on a handle. Throws a code from the closed set:
+   saved_audio_missing (the object is gone), saved_audio_corrupt (it is there but
+   is not playable audio), saved_audio_unreachable (could not be fetched just now). */
+async function loadSavedStudioClip(entry, fresh){
+  const handleKey = 'saved:' + entry.path;
+  const handle = studioClipHandle(handleKey);
+  // `fresh` ignores what is already held and reads storage again (used when saving).
+  if (handle.verified && !fresh) return handleKey;
+  let blob = null, gone = false;
+  for (let attempt = 0; attempt < TTS_ATTEMPTS && !blob && !gone; attempt++){
+    if (attempt) await ttsSleep(ttsBackoffMs(attempt));
+    try {
+      const { data, error } = await studioStoreBucket().createSignedUrl(entry.path, 600);
+      if (error || !data || !data.signedUrl){ if (storageGone(error)) gone = true; continue; }
+      const res = await fetch(data.signedUrl);
+      if (res.ok) blob = await res.blob();
+      else if (res.status === 404 || res.status === 400) gone = true;
+    } catch(e){ /* offline for a moment: try again */ }
+  }
+  if (gone) throw new Error('saved_audio_missing');
+  if (!blob) throw new Error('saved_audio_unreachable');
+  if (Number(entry.bytes) > 0 && blob.size !== Number(entry.bytes)) throw new Error('saved_audio_corrupt');
+  try { await verifyStudioBlob(blob); } catch(e){ throw new Error('saved_audio_corrupt'); }
+  handle.blob = blob; handle.verified = true; handle.savedPath = entry.path;
+  return handleKey;
+}
+
+/* Put every line that has saved audio into the player's hands. Lines without any
+   stay for the generator. A saved line that cannot be loaded is NOT regenerated
+   here (that would hide the fault and spend credits): it is returned as `error`,
+   unless the person has explicitly asked for a rebuild. */
+async function hydrateSavedStudioAudio(jobs){
+  const speed = paceNow().speed;
+  const wanted = [];
+  jobs.forEach(([lines, voiceKey]) => lines.forEach(line => {
+    if (ttsCache.has(ttsLineKey(voiceKey, speed, line))) return;
+    const entry = savedClipFor(voiceKey, line, speed);
+    if (entry && !wanted.some(w => w.voiceKey === voiceKey && w.line === line)) wanted.push({ voiceKey, line, entry });
+  }));
+  let error = null, next = 0;
+  const worker = async () => {
+    while (next < wanted.length){
+      const w = wanted[next++];
+      try {
+        const handleKey = await loadSavedStudioClip(w.entry);
+        ttsCache.set(ttsLineKey(w.voiceKey, speed, w.line), Promise.resolve(handleKey));
+      } catch (e){
+        const code = (e && e.message) || 'saved_audio_unreachable';
+        if (studioRebuildAllowed && STUDIO_MISSING_CODES.has(code)) continue;   // explicit rebuild: generate it again
+        // The worst code wins, so "missing" is not hidden behind a passing network blip.
+        if (!error || STUDIO_MISSING_CODES.has(code)) error = code;
+        reportStudioFailure(code, 'load');
+      }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  return { error };
+}
+
+/* Upload the plan's verified audio, read each file back and compare it, and return
+   the manifest. Throws (nothing partial is ever reported as saved) unless EVERY
+   line is stored and retrievable. Lines already stored are reused, not re-sent. */
+async function persistStudioAudio(){
+  if (!sb || !currentUser) throw new Error('not_signed_in');
+  const speed = paceNow().speed;
+  const jobs = [];
+  if (studioMainKey()) jobs.push([studioMainLines(), studioMainKey()]);
+  if (studioLayerKey()) jobs.push([studioLayerLines(), studioLayerKey()]);
+  const todo = [];
+  jobs.forEach(([lines, voiceKey]) => lines.forEach(line => {
+    if (!todo.some(t => t.voiceKey === voiceKey && t.line === line)) todo.push({ voiceKey, line });
+  }));
+  const stored = new Map();   // voiceKey|line -> manifest entry
+  let next = 0, failure = null;
+  const worker = async () => {
+    while (next < todo.length && !failure){
+      const t = todo[next++];
+      try {
+        const url = await studioClipUrl(t.voiceKey, t.line);
+        if (!url) throw new Error('persist_failed');
+        const handle = studioClipHandle(url);
+        if (!handle.blob || !handle.verified) throw new Error('persist_failed');
+        const blob = handle.blob;
+        /* Whatever the path, the proof is a read from storage NOW, compared with the
+           bytes in hand -- a file that was fine when the subliminal opened may not be
+           now. A stored file that fails the read is written again from those bytes. */
+        let path = handle.savedPath || null;
+        const readBack = (p) => loadSavedStudioClip({ path: p, bytes: blob.size }, true).catch((e) => {
+          throw new Error(STUDIO_MISSING_CODES.has(e && e.message) ? 'verify_failed' : 'persist_failed');
+        });
+        if (path){ try { await readBack(path); } catch(e){ path = null; } }
+        if (!path){
+          const hash = await studioSha256(blob);
+          path = `${currentUser.id}/${STUDIO_STORE_FOLDER}/${hash || TakeSyncKit.makeId()}.mp3`;
+          let lastError = null, done = false;
+          for (let attempt = 0; attempt < 4 && !done; attempt++){
+            if (attempt) await ttsSleep(ttsBackoffMs(attempt));
+            try {
+              const res = await studioStoreBucket().upload(path, blob, { contentType: 'audio/mpeg', upsert: false });
+              lastError = res && res.error ? res.error : null;
+            } catch(e){ lastError = e || new Error('upload failed'); }
+            done = !lastError || TakeSyncKit.isAlreadyThere(lastError);
+          }
+          if (!done) throw new Error('persist_failed');
+          await readBack(path);
+        }
+        handle.savedPath = path;
+        stored.set(t.voiceKey + '\u0000' + t.line, { voice: t.voiceKey, speed, text: t.line, path, bytes: blob.size });
+      } catch (e){ failure = failure || ((e && e.message) || 'persist_failed'); }
+    }
+  };
+  await Promise.all([worker(), worker(), worker()]);
+  if (failure){ reportStudioFailure(failure, 'persist'); throw new Error(failure); }
+  // Union with what the subliminal already holds: entries are only ever added, never dropped.
+  const merged = new Map();
+  ((savedVoiceAudio && savedVoiceAudio.clips) || []).forEach(c => { if (c && c.path) merged.set(c.voice + '\u0000' + c.text, c); });
+  stored.forEach((c, k) => merged.set(k, c));
+  return { v: 1, clips: Array.from(merged.values()) };
+}
+
+/* A subliminal that was saved before audio was kept (or whose audio had to be
+   rebuilt) gets its audio stored the next time it is opened and ready. Writes the
+   `voice_audio` column only -- nothing else on the row is touched. */
+let adoptingStudioAudio = false;
+async function adoptStudioAudio(){
+  if (adoptingStudioAudio || !editingExistingId || !sb || !currentUser) return;
+  adoptingStudioAudio = true;
+  try {
+    const manifest = await persistStudioAudio();
+    const { error } = await sb.from('subliminals').update({ voice_audio: manifest }).eq('id', editingExistingId).eq('user_id', currentUser.id);
+    if (error) throw new Error('persist_failed');
+    savedVoiceAudio = manifest;
+    studioGeneratedThisRun = false;
+  } catch (e){
+    console.warn('could not store this subliminal\'s voice audio yet:', e && e.message);
+  } finally { adoptingStudioAudio = false; }
+}
+
 /* ---------------- the voice session: one plan, one ready flag ----------------
    Serenity and Clone Your Voice are the same thing to the player: audio that is
    generated once, checked, held, and only then played. There is no device-voice
@@ -2511,6 +2696,11 @@ const SERENITY_TTS_MESSAGES = {
   audio_undecodable:'The voice audio couldn\'t be read by this device.' + STUDIO_RETRY,
   audio_silent:     'The voice audio came back silent and couldn\'t be repaired just now.' + STUDIO_RETRY,
   playback_failed:  'The voice audio stopped playing.' + STUDIO_RETRY,
+  saved_audio_unreachable: 'Your saved voice audio couldn\'t be loaded just now — check your connection.' + STUDIO_RETRY,
+  saved_audio_missing: 'A saved voice file could not be found. Nothing was played in another voice — tap Retry Audio to rebuild it.',
+  saved_audio_corrupt: 'A saved voice file is damaged. Nothing was played in another voice — tap Retry Audio to rebuild it.',
+  persist_failed:   'The voice audio couldn\'t be stored in your account just now.' + STUDIO_RETRY,
+  verify_failed:    'The voice audio was stored but could not be read back.' + STUDIO_RETRY,
 };
 function studioVoiceErrorText(code){
   if (isClonedVoiceSession() && CLONE_TTS_MESSAGES[code]) return CLONE_TTS_MESSAGES[code];
@@ -2553,6 +2743,10 @@ function forgetStudioVoiceAudio(){
 }
 function retryStudioAudio(){
   if (studioPreparing) return;
+  if (state.voiceMode === 'own'){ retrySavedRecordings(); return; }
+  /* The person tapped Retry after being told a saved file is gone: that is the
+     permission to make it again. Any other failure only tries to load again. */
+  studioRebuildAllowed = STUDIO_MISSING_CODES.has(studioStatus.code);
   studioReadyKey = null;
   sequencePrepares.clear();
   if (isStudioVoiceSession()) prepareStudioVoice();
@@ -2584,24 +2778,37 @@ async function runStudioPrepare(){
   setStudioStatus('generating');
   try {
     if (!currentUser) throw new Error('not_signed_in');
-    let tierNow;
-    try { tierNow = await getMyTierChecked(); }
-    catch (e){ throw new Error('network'); }   // could not ask is not "not subscribed"
-    if (!tierHasFeature(tierNow, 'studio_voice')) throw new Error('upgrade_required');
-    if ((mainKey === MY_CLONED_VOICE || layerKey === MY_CLONED_VOICE) && !(await myVoiceProfile())) throw new Error('no_cloned_voice');
     const jobs = [];
     if (mainKey) jobs.push([mainLines, mainKey]);
     if (layerKey) jobs.push([layerLines, layerKey]);
-    for (const [lines, voiceKey] of jobs){
-      const r = await prepareSequenceAudio(lines, voiceKey, { onProgress: (done, total) => setStudioStatus('generating', null, `${done} of ${total}`) });
-      if (!r.ok) throw new Error(r.code || 'generation_failed');
+    /* 1. Saved audio first. Whatever this subliminal already stores is loaded from
+       storage and checked; no plan lookup, no limit, no provider. */
+    const saved = await hydrateSavedStudioAudio(jobs);
+    if (saved.error) throw new Error(saved.error);
+    /* 2. Only lines with no stored audio are generated (a new subliminal, an edited
+       line, or a subliminal saved before audio was kept). */
+    const missing = jobs.map(([lines, voiceKey]) => [lines.filter(l => !studioClipUrl(voiceKey, l)), voiceKey]).filter(j => j[0].length);
+    if (missing.length){
+      studioGeneratedThisRun = true;
+      let tierNow;
+      try { tierNow = await getMyTierChecked(); }
+      catch (e){ throw new Error('network'); }   // could not ask is not "not subscribed"
+      if (!tierHasFeature(tierNow, 'studio_voice')) throw new Error('upgrade_required');
+      if (missing.some(j => j[1] === MY_CLONED_VOICE) && !(await myVoiceProfile())) throw new Error('no_cloned_voice');
+      for (const [lines, voiceKey] of missing){
+        const r = await prepareSequenceAudio(lines, voiceKey, { onProgress: (done, total) => setStudioStatus('generating', null, `${done} of ${total}`) });
+        if (!r.ok) throw new Error(r.code || 'generation_failed');
+      }
     }
     setStudioStatus('saving');
     await verifyStudioPlan(jobs);
     // Every line has to be in hand, or the session would have gaps to fill.
     if (!jobs.every(([lines, voiceKey]) => lines.every(l => studioClipUrl(voiceKey, l)))) throw new Error('generation_failed');
     studioReadyKey = key;
+    studioRebuildAllowed = false;
     setStudioStatus('ready');
+    /* 3. A saved subliminal whose audio was just (re)generated keeps it from now on. */
+    if (editingExistingId && studioGeneratedThisRun) adoptStudioAudio();
     return true;
   } catch (e){
     const code = (e && e.message) || 'generation_failed';
@@ -4617,6 +4824,13 @@ const DEFAULT_PACE = 'steady';
 const DEFAULT_GAP_SECONDS = AFFIRMATION_PACES.find(p => p.key === DEFAULT_PACE).gap;
 let affirmationPace = DEFAULT_PACE;
 let affirmationGapMs = Math.round(DEFAULT_GAP_SECONDS * 1000);
+function setPaceByKey(key){
+  const p = AFFIRMATION_PACES.find(x => x.key === key);
+  if (!p) return false;
+  affirmationPace = p.key; state.pace = p.key;
+  if (typeof syncSelectionByData === 'function') syncSelectionByData('#paceChips .length-chip', 'pace', p.key);
+  return true;
+}
 function paceNow(){ return AFFIRMATION_PACES.find(p => p.key === affirmationPace) || AFFIRMATION_PACES[1]; }
 /* What the player actually waits. Same gap, slightly different every time. */
 function gapForNextLine(){
@@ -5040,9 +5254,10 @@ function playFinal(){
     /* Tell the truth about which of the two this is. Telling someone to record
        lines they already recorded sends them to do the one thing that cannot
        help. */
+    if (recordingLoadErrors.length){ const rb = document.getElementById('retryAudioBtn'); if (rb) rb.hidden = false; }
     document.getElementById('finalLine').textContent = recordingLoadErrors.length
       ? 'Your recordings are saved, but this device could not download them — ' +
-        recordingLoadErrors[0] + '. Check your connection and open it again.'
+        recordingLoadErrors[0] + '. Check your connection and tap Retry Audio.'
       : 'No lines were recorded — go back and hold the record button on at least one.';
     return;
   }
@@ -5204,7 +5419,9 @@ function playFinal(){
           if (!alive()) return;
           // Never fail silently — a session that plays no voice should say why.
           console.error('could not play recorded line', i, e);
-          document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Re-record it here and save it again.";
+          document.getElementById('finalLine').textContent = "This device can't play the voice recording saved with this subliminal. Tap Retry Audio to load it again.";
+          reportStudioFailure('saved_audio_corrupt', 'playback');
+          if (savedRecordingSource){ const rb = document.getElementById('retryAudioBtn'); if (rb) rb.hidden = false; }
           finalCallback(() => { idx++; finalLater(playNext, gapForNextLine()); })();
         });
       }

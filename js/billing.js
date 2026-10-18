@@ -731,6 +731,32 @@ async function saveSubliminalNow(opts){
   }
   msg.textContent = 'Saving…'; msg.className = 'save-msg';
 
+  /* A generated voice (Serenity, Clone Your Voice) is not "created" until every
+     line of audio has been generated, checked, uploaded to this account and read
+     back. If any step fails nothing is written, so a saved subliminal can never
+     exist without its audio. */
+  let voiceAudio = null;
+  if (isStudioVoiceSession()){
+    if (studioReadyKey !== studioSequenceKey()){
+      msg.textContent = 'Making your voice audio…'; msg.className = 'save-msg';
+      await prepareStudioVoice();
+    }
+    if (studioReadyKey !== studioSequenceKey()){
+      msg.textContent = 'The voice audio isn\'t ready, so nothing was saved. Use Retry Audio on the player, then save again.';
+      msg.className = 'save-msg err';
+      return;
+    }
+    msg.textContent = 'Storing your voice audio…'; msg.className = 'save-msg';
+    try { voiceAudio = await persistStudioAudio(); }
+    catch (e){
+      console.error('voice audio was not stored:', e && e.message);
+      msg.textContent = 'Your voice audio couldn\'t be stored in your account just now, so nothing was saved. Check your connection and press Save again.';
+      msg.className = 'save-msg err';
+      return;
+    }
+    msg.textContent = 'Saving…'; msg.className = 'save-msg';
+  }
+
   let recordingUrls = null;
   if (state.voiceMode === 'own' && recordings.some(r => r)){
     msg.textContent = 'Uploading your voice…'; msg.className = 'save-msg';
@@ -796,6 +822,8 @@ async function saveSubliminalNow(opts){
     ai_voice_id: state.voiceMode === 'ai' ? (state.aiVoiceId || null) : null,
     layer_ai_voice_id: layerVoiceEnabled && state.layerVoiceMode === 'ai' ? (state.layerAiVoiceId || null) : null
   };
+  // Only a generated-voice save carries the manifest; any other save leaves the column as it is.
+  if (voiceAudio) row.voice_audio = voiceAudio;
   forgetFetch('todaySubs'); forgetFetch('todaySubCovers'); forgetFetch('myLibrary');
   await flushMixSave();
   const { data: savedSubliminal, error } = updatingId
@@ -811,12 +839,7 @@ async function saveSubliminalNow(opts){
     : asNew ? `Saved as a new subliminal, “${title}”. The original is unchanged.`
     : 'Saved to your library.';
   msg.className = 'save-msg ok';
-  /* What was saved is the words and the settings. If the voice audio is not ready
-     (still being made, or failed), say so rather than leave "Saved" to read as
-     "finished". */
-  if (typeof isStudioVoiceSession === 'function' && isStudioVoiceSession() && studioReadyKey !== studioSequenceKey()){
-    msg.textContent += ' The voice audio is not ready yet — use Retry Audio on the player if it does not finish.';
-  }
+  if (voiceAudio) savedVoiceAudio = voiceAudio;
   // These files belong to a saved subliminal now and are never cleaned up as leftovers.
   markTakesCommitted(recordings); markTakesCommitted(layerRecordings);
   /* From now on this screen is editing the row just written, so the next save

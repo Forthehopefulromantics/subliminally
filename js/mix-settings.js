@@ -58,6 +58,9 @@ function readMixSettings(){
   if (typeof state !== 'undefined' && state && Array.isArray(state.freqLayers) && state.freqLayers.length && typeof FrequencyLayers !== 'undefined') mix.freqLayers = FrequencyLayers.serializeFrequencyLayers(state.freqLayers);
   // Each affirmation's order, length, planned timing and the words its take was recorded for.
   if (typeof buildAffirmationMeta === 'function'){ const meta = buildAffirmationMeta(); if (meta) mix.affirmationMeta = meta; }
+  /* The pace is part of how generated speech is read (it is in the audio's identity),
+     so it travels with the subliminal: reopening one must not silently change it. */
+  if (typeof affirmationPace === 'string') mix.pace = affirmationPace;
   // So does the soothing pad, which had nowhere to be saved before.
   if (typeof state !== 'undefined' && state && SOOTHING_VARIANTS.includes(state.soothingLayer)) mix.soothingLayer = state.soothingLayer;
   return mix;
