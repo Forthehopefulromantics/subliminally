@@ -409,6 +409,7 @@ function resetFlow(){
   document.getElementById('layerVoiceMsg').textContent = '';
   paintLayerVoiceOptions();
   document.getElementById('layerVoiceMixRow').style.display = 'none';
+  document.getElementById('layerVoiceEchoHost').style.display = 'none';
   affirmationPace = DEFAULT_PACE;
   setAffirmationGap(DEFAULT_GAP_SECONDS);
   renderPaceChips();
@@ -3521,6 +3522,7 @@ async function flushRecordingDraft(){
     bg: state.bg, bgLayer: state.bgLayer, soothingLayer: state.soothingLayer,
     targetLengthMinutes: state.targetLengthMinutes,
     eftMode: !!state.eftMode, visualizationMode: !!state.visualizationMode,
+    voiceEcho: VoiceEcho.serialize(),
   });
   const keep = new Set(ids.filter(Boolean));
   for (const id of draftStoredIds) if (!keep.has(id)) await DraftStore.deleteTake(owner, id);
@@ -3586,6 +3588,7 @@ function resumeRecordingDraft(){
   if (d.targetLengthMinutes) state.targetLengthMinutes = d.targetLengthMinutes;
   setFrequencyLayers(FrequencyLayers.normalizeFrequencyLayers(d.freqLayers, FREQ_HZ_LIST), { silent:true });
   if (!state.freqLayers.length) setFrequencyLayers([{ hz: 528, vol: 100 }], { silent:true });
+  VoiceEcho.open('draft', d.voiceEcho);
   setSelectedVoice(VOICE_RECORD_OWN);
   beginRecordingPass('primary');
   const firstOpen = recordings.findIndex(r => !r);
@@ -3768,10 +3771,14 @@ function keepClipsNear(ctx, recorded, idx){
    voice passes no meta, so it can never light a line. */
 function playClip(ctx, clip, gainValue, extraDest, onended, meta){
   const lineIndex = meta && Number.isInteger(meta.index) ? meta.index : null;
+  /* Where this clip's voice goes: its layer's echo bus when there is one (the
+     bus is dry and untouched while that layer's echo is off), else straight to
+     the output, as before. Always one bus per layer, so a clip is never routed
+     twice. */
+  const voiceIn = voiceLayerInput(ctx, meta && meta.layer, extraDest);
   if (clip.kind === 'buffer'){
     const g = ctx.createGain(); g.gain.value = gainValue;
-    g.connect(audioOut(ctx));
-    if (extraDest && extraDest !== audioOut(ctx)) g.connect(extraDest);
+    voiceIn(g);
     const src = ctx.createBufferSource(); src.buffer = clip.buffer;
     src.connect(g);
     liveVoiceGains.add(g);
@@ -3785,8 +3792,7 @@ function playClip(ctx, clip, gainValue, extraDest, onended, meta){
   if (!clip.gain){
     clip.gain = ctx.createGain();
     ctx.createMediaElementSource(clip.el).connect(clip.gain);
-    clip.gain.connect(audioOut(ctx));
-    if (extraDest && extraDest !== audioOut(ctx)) clip.gain.connect(extraDest);
+    voiceIn(clip.gain);
   }
   clip.gain.gain.value = gainValue;
   liveVoiceGains.add(clip.gain);
@@ -3804,6 +3810,20 @@ function playClip(ctx, clip, gainValue, extraDest, onended, meta){
     if (finalPaused && liveVoiceElements.has(clip.el)) return;
     done();
   });
+}
+
+/* Connects a clip's gain node to its layer's echo bus (layer: 'voice' for the
+   main voice, 'layerVoice' for the second one). The bus feeds the output bus and,
+   when the session is being recorded, the recording destination. */
+function voiceLayerInput(ctx, layer, extraDest){
+  const out = audioOut(ctx);
+  const dests = [out];
+  if (extraDest && extraDest !== out) dests.push(extraDest);
+  if (typeof VoiceEcho === 'undefined'){
+    return node => dests.forEach(d => node.connect(d));
+  }
+  const bus = VoiceEcho.busFor(ctx, layer || 'voice', dests);
+  return node => node.connect(bus.input);
 }
 
 let mediaRecorder, audioChunks=[], holdStart=0, micStream, recCtx, analyser, dataArray, animId;
@@ -4160,6 +4180,7 @@ function prepareFinal(){
   document.getElementById('finalLine').classList.toggle('final-line-script', !!state.visualizationMode);
   document.getElementById('customMixRow').style.display = customTrackBlob ? 'flex' : 'none';
   document.getElementById('layerVoiceMixRow').style.display = layerVoiceEnabled ? 'flex' : 'none';
+  document.getElementById('layerVoiceEchoHost').style.display = layerVoiceEnabled ? 'block' : 'none';
   document.getElementById('finalNote').textContent = "Subliminally plays here on the website, and soon in the app — sessions aren't downloadable files, so your ritual stays part of your membership rather than sitting forgotten in a downloads folder.";
   document.getElementById('rerecordBtn').style.display = (state.voiceMode === 'own') ? 'inline-flex' : 'none';
   renderFinalFreqPicker();
@@ -5131,7 +5152,7 @@ function playFinal(){
         if (idx >= recorded.length) idx = 0; // loops independently, doesn't need to match the main track's length
         const { r } = recorded[idx];
         loadClip(finalCtx, r).then(finalCallback(clip=>{
-          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next);
+          playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next, { layer: 'layerVoice' });
         })).catch(e=>{
           console.error('could not play layered line', e);
           next();
@@ -5153,7 +5174,7 @@ function playFinal(){
           const url = ttsLineText(line) ? studioClipUrl(layerKey, ttsLineText(line)) : null;
           if (!url){ next(); return; }
           url.then(u => loadClip(finalCtx, studioClipHandle(u)))
-            .then(finalCallback(clip => { playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next); }))
+            .then(finalCallback(clip => { playClip(finalCtx, clip, liveLayerVoiceGain.gain.value, null, next, { layer: 'layerVoice' }); }))
             .catch(() => { if (alive()) next(); });
           return;
         }
@@ -5456,7 +5477,7 @@ function fadeOutAndFinishFinal(){
   if (!finalPlaying || finalFadeEnding) return;
   finalFadeEnding = true;
   const now = finalCtx ? finalCtx.currentTime : 0;
-  [liveToneGain,sessionBed.out,sessionLayerBed.out,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains].forEach(node => {
+  [liveToneGain,sessionBed.out,sessionLayerBed.out,liveSoothingGain,liveCustomGain,liveLayerVoiceGain,...liveVoiceGains,...(typeof VoiceEcho!=='undefined'?VoiceEcho.outputNodes():[])].forEach(node => {
     if (!node || !node.gain || !finalCtx) return;
     try {
       node.gain.cancelScheduledValues(now);
@@ -5513,6 +5534,7 @@ function finishFinal(){
     try { closing.close(); } catch(e){}
   }
   liveToneGain = null; liveSoothingGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  if (typeof VoiceEcho !== 'undefined') VoiceEcho.release();
   finalStream = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();
@@ -5551,6 +5573,7 @@ function stopFinal(){
   }
   if (finalCtx){ try{ finalCtx.close(); }catch(e){} finalCtx=null; }
   liveToneGain = null; liveSoothingGain = null; liveCustomGain = null; liveLayerVoiceGain = null;
+  if (typeof VoiceEcho !== 'undefined') VoiceEcho.release();
   finalStream = null;
   liveVoiceElements.forEach(el => { try { el.pause(); } catch(e){} });
   liveVoiceGains.clear();

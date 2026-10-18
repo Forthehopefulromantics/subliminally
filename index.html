@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0D0B18" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="stylesheet" href="/css/player.css?v=20261015a" />
-<link rel="stylesheet" href="/css/listening-fixes.css?v=20261018a" />
+<link rel="stylesheet" href="/css/listening-fixes.css?v=20261018b" />
 <link rel="stylesheet" href="/css/builder-celestial.css?v=20260923e" />
 
 <!-- Open Graph (Facebook, iMessage, LinkedIn, etc.) -->
@@ -3412,9 +3412,11 @@
               <div class="mix-row"><label>Healing frequency</label><input type="range" id="mixTone" min="0" max="100" value="30"><input type="number" class="mix-val-input" id="mixToneVal" min="0" max="100" value="30"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row"><label>Nature sounds</label><input type="range" id="mixBg" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixBgVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row"><label>Affirmations</label><input type="range" id="mixVoice" min="0" max="100" value="65"><input type="number" class="mix-val-input" id="mixVoiceVal" min="0" max="100" value="65"><span class="mix-pct-sign">%</span></div>
+              <div class="echo-wrap" data-echo-host="voice"></div>
               <div class="mix-row" id="soothingMixRow" style="display:none;"><label>Soothing layer</label><input type="range" id="mixSoothing" min="0" max="100" value="45"><input type="number" class="mix-val-input" id="mixSoothingVal" min="0" max="100" value="45"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="customMixRow" style="display:none;"><label>Your track</label><input type="range" id="mixCustom" min="0" max="100" value="50"><input type="number" class="mix-val-input" id="mixCustomVal" min="0" max="100" value="50"><span class="mix-pct-sign">%</span></div>
               <div class="mix-row" id="layerVoiceMixRow" style="display:none;"><label>Second voice</label><input type="range" id="mixLayerVoice" min="0" max="100" value="35"><input type="number" class="mix-val-input" id="mixLayerVoiceVal" min="0" max="100" value="35"><span class="mix-pct-sign">%</span></div>
+              <div class="echo-wrap" id="layerVoiceEchoHost" data-echo-host="layerVoice" style="display:none;"></div>
               <div class="mix-pace">
                 <label>Pace</label>
                 <div class="length-chip-grid" id="paceChips" style="grid-template-columns:repeat(3,1fr);"></div>
@@ -3916,8 +3918,9 @@
 <script src="js/sky.js"></script>
 <!-- Before builder.js: builder.js opens an ambience bed at load, and reads the
      library's names and categories to draw the picker. -->
+<script src="js/voice-echo.js?v=20261018a"></script>
 <script src="js/ambience.js"></script>
-<script src="js/builder.js?v=20261018a"></script>
+<script src="js/builder.js?v=20261018b"></script>
 <script src="js/billing.js?v=20261018a"></script>
 <script src="js/entitlements.js"></script>
 <script src="js/account.js?v=20261018a"></script>
@@ -3929,7 +3932,7 @@
 <script src="js/faith.js"></script>
 <script src="js/journey.js?v=20261005a"></script>
 <script src="js/profile.js?v=20261018a"></script>
-<script src="js/mix-settings.js?v=20261015a"></script>
+<script src="js/mix-settings.js?v=20261018b"></script>
 <script src="js/lyrics-list.js?v=20261015a"></script>
 <script src="js/player.js?v=20261015a"></script>
 <script src="js/audio-editor.js?v=20261015a"></script>

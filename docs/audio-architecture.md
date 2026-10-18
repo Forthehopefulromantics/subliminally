@@ -168,3 +168,36 @@ network failure rather than "free plan" (which used to be cached for 5 minutes).
 
 Tests: `npm run test:voice` (server), `npm run test:voice-routing` (client logic),
 `npm run test:serenity-e2e` (Chromium, iPhone UA, real mp3s, measured speaker output).
+
+## Voice echo (`js/voice-echo.js`)
+
+Each affirmation voice layer -- `voice` (the main voice) and `layerVoice` (the
+second, layered voice) -- has its own echo: `{ on, mix (0-100), delayMs (100-1000) }`,
+off by default. The settings object is per layer; `VoiceEcho.set(layer, patch)` is the
+only mutation and touches that layer alone.
+
+- **Signal path**, one `EchoBus` per layer per `AudioContext`: clip gain -> `input` ->
+  `dry` -> `out`, and `input` -> `send` -> `delay` -> low-pass -> `wet` -> `out`, with
+  `delay` -> low-pass -> `feedback` -> `delay`. `out` feeds `audioOut(ctx)` (and the
+  recording destination when the main voice is being recorded). `playClip` routes
+  through it via `voiceLayerInput`, for buffer clips (Record Your Own Voice) and
+  element clips (Serenity, cloned voices) alike.
+- **Non-destructive**: it only shapes playback. Nothing is regenerated or re-uploaded
+  when an echo changes, and the cached/decoded clips are never touched.
+- **Off = dry**: dry 1, send/wet/feedback 0. The delay line receives nothing while off.
+- **Headroom**: dry = 1 - 0.3 x mix, wet = 0.5 x mix, feedback = 0.45 x mix (hard cap
+  0.45, low-passed in the loop), so the worst-case coherent sum stays under 1.7 before
+  the output soft limiter. All parameter moves glide (`setTargetAtTime`, 40 ms).
+- **Live**: the controls call `applyLive` on the existing bus, so moving a slider while
+  a line plays is heard immediately; no restart.
+- **Persistence**: `mix_settings.voiceEcho` (no schema change) via `readMixSettings` /
+  `restoreMixSettings`, plus a device copy (`localStorage fthr_voice_echo:<id>`) so a
+  refresh or closed tab before the account write lands loses nothing; the newer copy
+  wins on open. An unsaved recording draft carries it in the draft record.
+- **Controls** are `[data-echo-layer]` blocks (toggle + Intensity + Delay) in the
+  builder mixer and in the player / Adjust Sounds sheets, wired by delegation.
+- **Safari**: only `DelayNode`, `GainNode`, `BiquadFilterNode`; no AudioWorklet. The
+  output still leaves through the single iOS media-element route in `audioOut`.
+- Tests: `npm run test:echo` (model, persistence, independence) and
+  `npm run test:echo-e2e` (offline render in Chromium: delay timing, silence between,
+  no clipping at max, off == dry bit-for-bit, other layer's output unchanged).
