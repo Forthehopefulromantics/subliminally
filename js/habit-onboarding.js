@@ -120,7 +120,6 @@ async function openHabitOnboarding(){
   hoIndex = 0; hoGoingBack = false; hoSaving = false;
   hoPicks = []; hoInsertedIds = []; hoOwnCounter = 0;
   overlay.classList.add('open');
-  document.body.style.overflow = 'hidden';
   hoPaintSky();
   hoShowSlide();
   /* Her face and her name both come off the profile row, and the row may not
@@ -140,7 +139,6 @@ async function openHabitOnboarding(){
 function closeHabitOnboarding(){
   const overlay = hoEl('habitOnboardOverlay');
   if (overlay) overlay.classList.remove('open');
-  document.body.style.overflow = '';
 }
 
 /* Leaves it unfinished on purpose, the same way the account questionnaire's

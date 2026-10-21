@@ -1,0 +1,15 @@
+/* Derive scroll locking from the overlay itself, never a separate body flag.
+   Closing either of two stacked dialogs must not unlock the other one. */
+body:has(.ob-shell.open, .immersive-player.open, .modal-overlay.open, .day-modal-overlay.open, .player-sheet.open){
+  overflow-y:hidden;
+}
+/* Each fixed overlay needs its own scrollable content on short phones,
+   landscape screens and when text is enlarged. */
+.ob-stage{ min-height:0; overscroll-behavior-y:contain; }
+.modal-card{ max-height:calc(100vh - 40px); max-height:calc(100dvh - 40px); overflow-y:auto; }
+.upgrade-modal{ overflow-y:auto; }
+.immersive-player{ overflow-y:auto; overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; }
+.ip-shell{ height:auto; min-height:100vh; min-height:100dvh; grid-template-rows:auto minmax(190px,1fr) auto; }
+@media (max-width:560px){
+  .upgrade-modal{ max-height:100vh; max-height:100dvh; }
+}
