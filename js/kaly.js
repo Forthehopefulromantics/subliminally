@@ -86,9 +86,27 @@ function avatarEntry(id){ return AVATAR_PACK.find(a => a.id === avatarId(id)) ||
    crop, because a round chip 26 pixels across cannot show a full-length figure:
    squeezed she is a smudge, and cropped down the middle she is a torso. */
 const AVATAR_CUTS = { full:'', thumb:'-t', face:'-face' };
+/* Root-absolute, and deliberately not relative. `img/avatar/...` is resolved
+   against whatever directory the document is sitting in, so it is only right
+   while the app is served from the site root: one nested route, one trailing
+   slash, one OAuth or checkout return landing under a sub-path, and every
+   picture on the screen 404s at the same moment -- which is exactly what a
+   page full of broken-image icons looks like. `/img/avatar/` is the same file
+   whoever asks and wherever they ask from. It is equally correct inside the
+   Capacitor apps, where www/ is itself the origin root.
+
+   One constant, because there is one place the artwork lives. Nothing else in
+   the app should be writing this prefix out by hand. */
+const AVATAR_BASE = '/img/avatar/';
 function avatarSrc(id, state, cut){
   const st = AVATAR_STATES.includes(state) ? state : 'keeper';
-  return `img/avatar/${avatarId(id)}-${st}${AVATAR_CUTS[cut] || ''}.webp`;
+  return `${AVATAR_BASE}${avatarId(id)}-${st}${AVATAR_CUTS[cut] || ''}.webp`;
+}
+/* The emotion portraits live one directory down, and are built here rather
+   than in the two places that used to spell the path out, so the roster and
+   the preloader can never drift apart. */
+function avatarEmotionSrc(who, emotion){
+  return `${AVATAR_BASE}emotion/${who}-${emotion}.webp`;
 }
 /* Alt text says which of the two this is, because on a page that shows both
    "a woman with box braids" twice tells you nothing about which is which. */
@@ -96,6 +114,45 @@ function avatarAlt(id, state){
   const a = avatarEntry(id);
   return state === 'hero' ? `You, with ${a.look}` : `Your higher self, with ${a.look}`;
 }
+/* ---------- when a drawing does not arrive ----------
+   Never the browser's broken-image icon. A torn-paper glyph in the middle of
+   the roster reads as the app being broken; a quiet silhouette reads as one
+   picture being late, which is the truth. The <img> keeps the box it already
+   reserved -- width and height are still on the element -- so nothing on the
+   screen moves when this happens.
+
+   The console line is the useful half. It names the identity, the exact URL
+   that failed and the screen that asked for it, so a missing or misspelled
+   file is one line away from being identified instead of guessed at. This is a
+   net, not a fix: a gap here means a real file is missing from /img/avatar/
+   and the path or the artwork still has to be put right.
+
+   Said once per URL. Rosters redraw on every tap and would otherwise fill the
+   console with the same line. */
+const avatarArtGapsReported = new Set();
+/* A muted lilac head-and-shoulders, the app's own accent, drawn at whatever
+   box the element already has. Inline so it cannot itself 404. */
+const AVATAR_FALLBACK_SRC =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E"
+  + "%3Crect width='24' height='24' rx='3' fill='%23B9A7E8' opacity='.10'/%3E"
+  + "%3Cg fill='%23B9A7E8' opacity='.42'%3E%3Ccircle cx='12' cy='9' r='3.6'/%3E"
+  + "%3Cpath d='M12 14.2c-3.6 0-6.5 2.3-6.5 5.1V21h13v-1.7c0-2.8-2.9-5.1-6.5-5.1z'/%3E"
+  + "%3C/g%3E%3C/svg%3E";
+function avatarArtMissing(img){
+  if (!img || img.dataset.avatarFallback === '1') return;
+  const id = img.dataset.avatarId || '(unknown)';
+  const where = img.dataset.avatarWhere || '(unspecified)';
+  const wanted = img.currentSrc || img.src || '(no src)';
+  const key = `${id}|${wanted}`;
+  if (!avatarArtGapsReported.has(key)){
+    avatarArtGapsReported.add(key);
+    console.error('Higher Self avatar failed to load.',
+      { avatarId:id, requestedPath:wanted, component:where });
+  }
+  img.dataset.avatarFallback = '1';
+  img.src = AVATAR_FALLBACK_SRC;
+}
+
 /* Drawn full-length, so the box is portrait and the figure is fitted inside it
    rather than cropped to it -- no heads, hair, headphones, hands or feet cut
    off at any size. */
@@ -107,7 +164,9 @@ function avatarMarkup(look, opts){
   const state = o.state || 'keeper';
   const [w, h] = AVATAR_CUT_SIZE[cut];
   return `<img class="av av-${cut}" src="${avatarSrc(id, state, cut)}" alt="${o.alt === false ? '' : avatarAlt(id, state)}"
-    width="${w}" height="${h}" loading="lazy" decoding="async">`;
+    width="${w}" height="${h}" loading="lazy" decoding="async"
+    data-avatar-id="${avatarId(id)}" data-avatar-where="${o.where || `avatarMarkup:${state}/${cut}`}"
+    onerror="avatarArtMissing(this)">`;
 }
 
 /* The columns arrive with 20260919 and 20260920. Until those are run this
@@ -381,7 +440,7 @@ function higherSelfEmotionAvailable(id, emotion){
 function higherSelfEmotionArt(who, emotion){
   const size = higherSelfEmotionSize(who, emotion);
   if (!size) return null;
-  return { src:`img/avatar/emotion/${who}-${emotion}.webp`, emotion, kind:'emotion', w:size[0], h:size[1] };
+  return { src:avatarEmotionSrc(who, emotion), emotion, kind:'emotion', w:size[0], h:size[1] };
 }
 function higherSelfArt(id, emotion){
   const who = avatarId(id);
@@ -418,7 +477,7 @@ const higherSelfPreloaded = new Set();
 function preloadHigherSelfEmotion(id, emotion){
   const who = avatarId(id);
   if (!higherSelfEmotionAvailable(who, emotion)) return;
-  const src = `img/avatar/emotion/${who}-${emotion}.webp`;
+  const src = avatarEmotionSrc(who, emotion);
   if (higherSelfPreloaded.has(src)) return;
   higherSelfPreloaded.add(src);
   const img = new Image();
@@ -474,7 +533,10 @@ function higherSelfDialogue(opts){
          beside her. Alt text repeating "your higher self, with box braids" in
          front of every line she speaks is noise, not description. */
       art = `<img class="hsd-portrait" src="${found.src}" alt="" data-art="${found.kind}"
-        width="${found.w}" height="${found.h}" decoding="async" fetchpriority="high">`;
+        width="${found.w}" height="${found.h}" decoding="async" fetchpriority="high"
+        data-avatar-id="${avatarId(o.avatar)}"
+        data-avatar-where="higherSelfDialogue:${found.kind}${found.emotion ? '/' + found.emotion : ''}"
+        onerror="avatarArtMissing(this)">`;
     }
   }
 
